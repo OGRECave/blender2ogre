@@ -212,7 +212,7 @@ bl_addon_info = {
 
 
 
-import os, sys, time, hashlib
+import os, sys, time, hashlib, getpass
 
 IMAGE_MAGICK = '/usr/bin/'
 if sys.platform.startswith('win'):		# win32 and win64
@@ -547,7 +547,7 @@ class Ogre_setup_version_control_op(bpy.types.Operator):
 			if '_category_' not in keys: ob['_category_'] = 'my category'
 			if '_title_' not in keys: ob['_title_'] = 'my title'
 			if '_notes_' not in keys: ob['_notes_'] = 'my notes'
-			if '_owner_' not in keys: ob['_owner_'] = os.getlogin()
+			if '_owner_' not in keys: ob['_owner_'] = getpass.getuser()
 
 			if ob.type == 'MESH':
 				mesh = ob.data
@@ -4310,7 +4310,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 		if '_previous_export_time_' in bscn.keys(): scn.setAttribute('previous_export_time', str(bscn['_previous_export_time_']))
 		else: scn.setAttribute('previous_export_time', '0')
 		bscn[ '_previous_export_time_' ] = now
-		scn.setAttribute('exported_by', os.getlogin())
+		scn.setAttribute('exported_by', getpass.getuser())
 
 		nodes = doc.createElement('nodes')
 		extern = doc.createElement('externals')
