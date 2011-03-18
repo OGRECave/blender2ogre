@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
-VERSION = 'Ogre Exporter v30'
+VERSION = 'Ogre Exporter v31'
 __devnotes__ = '''
 --final bug fix milestone--
 
@@ -91,6 +91,10 @@ Jan 6th 2011:
 	. updated for blender256
 	. fixed Nvidia DDS output
 	. add swap axis options
+
+March 18th (SRombauts):
+	. issue1: os.getlogin() unreliable; using getpass.getuser() instead
+	. issue5: speed optimization O(n^2) into O(n log n)
 
 '''
 
