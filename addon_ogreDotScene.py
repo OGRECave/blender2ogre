@@ -205,7 +205,7 @@ Installing:
 bl_addon_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
     "author": "HartsAntler",
-    "version": (0,3,0),
+    "version": (0,3,1),
     "blender": (2, 5, 6),
     "location": "INFO Menu",
     "description": "Export to Ogre xml and binary formats",
