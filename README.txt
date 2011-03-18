@@ -50,3 +50,11 @@ Dependencies:
 			If your using 64bit Windows, you will need to download a 64bit OgreMeshy
 			(Linux copy to your home folder)
 
+Changelog:
+	0.3.1 small bug fix and optimization (Sébastien Rombauts)
+		. issue1: os.getlogin() unreliable; using getpass.getuser() instead
+		. issue5: speed optimization O(n^2) into O(n log n)
+
+		
+	0.3.0 milestone (Brett Hartshorn)
+	
