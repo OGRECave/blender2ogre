@@ -4960,6 +4960,19 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 	## write all verts, even if not in material index, inflates xml, should not bloat .mesh (TODO is this true?)
 	print('	writing vertex data' )
 	badverts = 0
+	
+	## texture maps - vertex dictionary : for speed optimization of O(n^2) into O(n log n)
+	uvOfVertex = {}
+	if mesh.uv_textures.active:
+		for layer in mesh.uv_textures:
+			uvOfVertex[layer] = {}
+			for fidx, uvface in enumerate(layer.data):
+				face = mesh.faces[ fidx ]
+				for vertex in face.vertices:
+					if vertex not in uvOfVertex[layer]:
+						uv = uvface.uv[ list(face.vertices).index(vertex) ]
+						uvOfVertex[layer][vertex] = uv
+
 	for vidx, v in enumerate(mesh.vertices):
 		if arm:
 			check = 0
@@ -5044,16 +5057,14 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 			vb.setAttribute('texture_coords', '%s' %len(mesh.uv_textures) )
 
 			for layer in mesh.uv_textures:
-				for fidx, uvface in enumerate(layer.data):
-					face = mesh.faces[ fidx ]
-					if vidx in face.vertices:
-						uv = uvface.uv[ list(face.vertices).index(vidx) ]
-						tcoord = doc.createElement('texcoord')
-						tcoord.setAttribute('u', '%6f' %uv[0] )
-						tcoord.setAttribute('v', '%6f' %(1.0-uv[1]) )
-						#tcoord.setAttribute('v', '%6f' %uv[1] )
-						vertex.appendChild( tcoord )
-						break
+				if vidx in uvOfVertex[layer]:
+					uv = uvOfVertex[layer][vidx]
+					tcoord = doc.createElement('texcoord')
+					tcoord.setAttribute('u', '%6f' %uv[0] )
+					tcoord.setAttribute('v', '%6f' %(1.0-uv[1]) )
+					#tcoord.setAttribute('v', '%6f' %uv[1] )
+					vertex.appendChild( tcoord )
+
 	## end vert loop
 	if hasnormals: vb.setAttribute('normals','true')
 	#else: vb.setAttribute('normals','false')
