@@ -202,12 +202,12 @@ Installing:
 ## useful for online content - texture load is speed hit
 
 
-bl_addon_info = {
+bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
     "author": "HartsAntler",
     "version": (0,3,1),
     "blender": (2, 5, 6),
-    "location": "INFO Menu",
+    "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "warning": "",
     #"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
