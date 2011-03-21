@@ -116,6 +116,7 @@ March 20th (SRombauts):
 March 21th (SRombauts):
 	. Blender SVN compatibility : using bl_info for printing version when registering
 	. Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
+	. Blender SVN compatibility : registering the module is requiered in Blender SVN >2.56 to use operators
 	
 '''
 
@@ -5706,21 +5707,50 @@ def import_menu_func(self, context):
 _header_ = None
 MyShaders = None
 def register():
-	print( VERSION )
+	print(VERSION)
 	global MyShaders, _header_
-	_header_ = bpy.types.INFO_HT_header
-	bpy.types.unregister( bpy.types.INFO_HT_header )
+
+	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
+	try:
+		# registering the module is requiered in Blender SVN >2.56
+		bpy.utils.register_module(__name__)
+	except:
+		print('Blender SVN compatibility issue')
+
+	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
+	try:
+		# unregistering this type does not seems possible anymore in Blender SVN >2.56
+		_header_ = bpy.types.INFO_HT_header
+		bpy.types.unregister(_header_)
+	except:
+		print('Blender SVN compatibility issue')
+		
 	MyShaders = MyShadersSingleton()
+	
 	bpy.types.INFO_MT_file_export.append(export_menu_func)
 	bpy.types.INFO_MT_file_import.append(import_menu_func)
 
 def unregister():
 	print('unreg-> ogre exporter')
-	bpy.types.register( _header_ )
+
+	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except (see above the register() function)
+	try:
+		bpy.utils.unregister_module(__name__)
+	except:
+		print('Blender SVN compatibility issue')
+
+	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except (see above the register() function)
+	try:
+		bpy.types.register(_header_)
+	except:
+		print('Blender SVN compatibility issue')
+		
 	bpy.types.INFO_MT_file_export.remove(export_menu_func)
 	bpy.types.INFO_MT_file_import.remove(import_menu_func)
 
-if __name__ == "__main__": register()
+
+if __name__ == "__main__":
+	register()
 
 NVDXT_DOC = '''
 Version 8.30
