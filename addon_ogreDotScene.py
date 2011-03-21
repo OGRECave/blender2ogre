@@ -5697,9 +5697,9 @@ class INFO_HT_myheader(bpy.types.Header):
 			layout.menu( "INFO_MT_ogre_docs" )
 
 def export_menu_func(self, context):
-	default_path = os.path.splitext(bpy.data.filepath)[0] + ".scene"
+	path,name = os.path.split( context.blend_data.filepath )
 	op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene)")
-	op.filepath = default_path
+	op.filepath = os.path.join( path, name.split('.')[0]+'.scene' )
 		
 def import_menu_func(self, context):
 	self.layout.operator(Ogre_import_op.bl_idname, text="Ogre3D (.scene) | read version control attributes (UUIDs)")
