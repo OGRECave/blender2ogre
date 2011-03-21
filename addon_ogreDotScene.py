@@ -16,7 +16,21 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
-VERSION = 'Ogre Exporter v31'
+bl_info = {
+    "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
+    "author": "HartsAntler",
+    "version": (0,3,1),
+    "blender": (2,5,6),
+    "location": "File > Export..., INFO Menu",
+    "description": "Export to Ogre xml and binary formats",
+    "warning": "",
+    #"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
+    #"tracker_url": "https://projects.blender.org/tracker/index.php?"\
+    "category": "Import-Export"}
+
+
+VERSION = bl_info["name"] + " Addon v" + bl_info["version"][0].__str__() + "." + bl_info["version"][1].__str__() + "." + bl_info["version"][2].__str__() 
+
 __devnotes__ = '''
 --final bug fix milestone--
 
@@ -96,6 +110,12 @@ March 18th (SRombauts):
 	. issue1: os.getlogin() unreliable; using getpass.getuser() instead
 	. issue5: speed optimization O(n^2) into O(n log n)
 
+March 20th (SRombauts):
+	. correction to bl_info
+	
+March 21th (SRombauts):
+	. using bl_info for printing version when registering
+	
 '''
 
 ##2.49 code reference: "<quaternion x=\"%.6f\" y=\"%.6f\" z=\"%.6f\" w=\"%.6f\"/>\n" % (rot.x, rot.z, -rot.y, rot.w))
@@ -200,20 +220,6 @@ Installing:
 ## TODO count verts, and count collision verts
 ## TODO - image compression browser (previews total size)
 ## useful for online content - texture load is speed hit
-
-
-bl_info = {
-    "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
-    "author": "HartsAntler",
-    "version": (0,3,1),
-    "blender": (2, 5, 6),
-    "location": "File > Export...",
-    "description": "Export to Ogre xml and binary formats",
-    "warning": "",
-    #"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
-    #"tracker_url": "https://projects.blender.org/tracker/index.php?"\
-    "category": "Import-Export"}
-
 
 
 import os, sys, time, hashlib, getpass
