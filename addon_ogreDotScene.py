@@ -117,6 +117,7 @@ March 21th (SRombauts):
 	. Blender SVN compatibility : using bl_info for printing version when registering
 	. Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
 	. Blender SVN compatibility : registering the module is requiered in Blender SVN >2.56 to use operators
+	. Blender SVN compatibility : mathutils.Matrix format changed in Blender SVN >2.56
 	
 '''
 
@@ -4619,10 +4620,17 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 		## end _node_export
 
 def get_parent_matrix( ob, objects ):
-	if not ob.parent: return mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+	if not ob.parent:
+		#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
+		try:
+			return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
+		except:
+			return mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
 	else:
-		if ob.parent in objects: return ob.parent.matrix_world.copy()
-		else: return get_parent_matrix( ob.parent, objects )
+		if ob.parent in objects:
+			return ob.parent.matrix_world.copy()
+		else:
+			return get_parent_matrix(ob.parent, objects)
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
 	mat = get_parent_matrix(ob, objects).invert() * ob.matrix_world
@@ -5177,7 +5185,11 @@ class Bone(object):
 		if self.parent:
 			pose = self.parent._inverse_total_trans_pose * pose
 		elif self.fixUpAxis:
-			pose = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1]) * pose
+			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
+			try:
+				pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
+			except:
+				pose = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1]) * pose
 
 		# get transformation values
 		# translation relative to parent coordinate system orientation
@@ -5203,7 +5215,6 @@ class Bone(object):
 		self.skeleton = skeleton
 		self.name = pbone.name
 		self.matrix = matrix
-		#self.matrix *= mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1])
 		self.bone = pbone		# safe to hold pointer to pose bone, not edit bone!
 		if not pbone.bone.use_deform: print('warning: bone <%s> is non-deformabled, this is inefficient!' %self.name)
 		#TODO test#if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
@@ -5220,9 +5231,17 @@ class Bone(object):
 		if self.parent:
 			inverseParentMatrix = self.parent.inverse_total_trans
 		elif (self.fixUpAxis):
-			inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1])
+			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
+			try:
+				inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
+			except:
+				inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1])
 		else:
-			inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
+			try:
+				inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
+			except:
+				inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
 
 		# bone matrix relative to armature object
 		self.ogre_rest_matrix = self.matrix.copy()
