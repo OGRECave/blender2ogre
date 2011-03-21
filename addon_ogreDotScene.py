@@ -114,7 +114,8 @@ March 20th (SRombauts):
 	. correction to bl_info
 	
 March 21th (SRombauts):
-	. using bl_info for printing version when registering
+	. Blender SVN compatibility : using bl_info for printing version when registering
+	. Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
 	
 '''
 
@@ -810,7 +811,7 @@ class Harts_Tools(bpy.types.Panel):
 		else: return False
 	def draw(self, context):
 		layout = self.layout
-		layout.operator('ogre.relocate_textures')
+		layout.operator(Ogre_relocate_textures_op.bl_idname)
 
 		ob = context.active_object
 		if ob.type != 'MESH': return
@@ -2266,7 +2267,7 @@ class _ogre_shader_prog_param_menu_(bpy.types.Menu):
 			vcode = p['value-code']
 			txt = name + '|' + vcode
 			if 'args' in p: txt += '  ' + p['args']
-			op = layout.operator("ogre.add_shader_program_subparam", text=txt, icon='ZOOMIN')
+			op = layout.operator(_ogre_op_shader_program_subparam.bl_idname, text=txt, icon='ZOOMIN')
 			op.program_name = prog.name
 			op.param_name = name
 
@@ -2301,11 +2302,11 @@ class _ogre_shader_progs_mixin_(object): # TODO chat with jesterking, layout.men
 		layout = self.layout
 		if self.mytype == 'vertex':
 			for prog in MyShaders.vertex_progs:
-				op = layout.operator("ogre.add_shader_program", text=prog.name, icon='ZOOMIN')
+				op = layout.operator(_ogre_op_shader_programs.bl_idname, text=prog.name, icon='ZOOMIN')
 				op.program_name = prog.name
 		else:
 			for prog in MyShaders.fragment_progs:
-				op = layout.operator("ogre.add_shader_program", text=prog.name, icon='ZOOMIN')
+				op = layout.operator(_ogre_op_shader_programs.bl_idname, text=prog.name, icon='ZOOMIN')
 				op.program_name = prog.name
 class OgreShader_vertexprogs(bpy.types.Menu, _ogre_shader_progs_mixin_):
 	bl_label = "Vertex Programs"
@@ -2409,12 +2410,12 @@ class INFO_MT_ogre_helper(bpy.types.Menu):
 			for param in self.ogre_shader_params:
 				if hasattr(self, 'ogre_shader_tex_op'):
 					txt = '%s    %s' %(self.ogre_shader_tex_op, param)
-					op = layout.operator("ogre.set_shader_tex_param", text=txt, icon='ZOOMIN')
+					op = layout.operator(INFO_OT_ogre_set_shader_tex_param.bl_idname, text=txt, icon='ZOOMIN')
 					op.shader_tex = self.ogre_shader_tex_op		# bpy op API note: uses slots to prevent an op from having dynamic attributes
 					op.shader_tex_param = param
 				else:
 					txt = '%s    %s' %(self.ogre_shader_op, param)
-					op = layout.operator("ogre.set_shader_param", text=txt, icon='ZOOMIN')
+					op = layout.operator(INFO_OT_ogre_set_shader_param.bl_idname, text=txt, icon='ZOOMIN')
 					op.shader_pass = self.ogre_shader_op		# bpy op API note: uses slots to prevent an op from having dynamic attributes
 					op.shader_pass_param = param
 
@@ -5492,13 +5493,13 @@ class INFO_MT_instances(bpy.types.Menu):
 		inst = gather_instances()
 		for data in inst:
 			ob = inst[data][0]
-			op = layout.operator("select_instances", text=ob.name)	# operator has no variable for button name?
+			op = layout.operator(INFO_MT_instance.bl_idname, text=ob.name)	# operator has no variable for button name?
 			op.mystring = ob.name
 		layout.separator()
 
 class INFO_MT_instance(bpy.types.Operator):                
 	'''select instance group'''                                                     
-	bl_idname = "select_instances"                                             
+	bl_idname = "ogre.select_instances"                                             
 	bl_label = "Select Instance Group"                                             
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
@@ -5516,16 +5517,16 @@ class INFO_MT_groups(bpy.types.Menu):
 	def draw(self, context):
 		layout = self.layout
 		for group in bpy.data.groups:
-			op = layout.operator("select_group", text=group.name)	# operator no variable for button name?
-			op.mystring = group.name
-			#op = layout.operator("mark_group_export_combine")
+			#op = layout.operator(INFO_MT_group_mark.bl_idname)
 			#op.groupname = group.name
+			op = layout.operator(INFO_MT_group.bl_idname, text=group.name)	# operator no variable for button name?
+			op.mystring = group.name
 		layout.separator()
 
 #TODO
 class INFO_MT_group_mark(bpy.types.Operator):                  
 	'''mark group auto combine on export'''                                                
-	bl_idname = "mark_group_export_combine"                                        
+	bl_idname = "ogre.mark_group_export_combine"                                        
 	bl_label = "Group Auto Combine"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mybool= BoolProperty(name="groupautocombine", description="set group auto-combine", default=False)
@@ -5538,7 +5539,7 @@ class INFO_MT_group_mark(bpy.types.Operator):
 
 class INFO_MT_group(bpy.types.Operator):                  
 	'''select group'''                                                
-	bl_idname = "select_group"                                        
+	bl_idname = "ogre.select_group"                                        
 	bl_label = "Select Group"                                                # The panel label, http://www.blender.org/documentation/250PythonDoc/bpy.types.Panel.html
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
@@ -5559,13 +5560,13 @@ class INFO_MT_actors(bpy.types.Menu):
 		layout = self.layout
 		for ob in bpy.data.objects:
 			if ob.game.use_actor:
-				op = layout.operator("select_actor", text=ob.name)
+				op = layout.operator(INFO_MT_actor.bl_idname, text=ob.name)
 				op.mystring = ob.name
 		layout.separator()
 
 class INFO_MT_actor(bpy.types.Operator):                
 	'''select actor'''                                                     
-	bl_idname = "select_actor"                                             
+	bl_idname = "ogre.select_actor"                                             
 	bl_label = "Select Actor"                                             
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
@@ -5581,13 +5582,13 @@ class INFO_MT_dynamics(bpy.types.Menu):
 		layout = self.layout
 		for ob in bpy.data.objects:
 			if ob.game.physics_type in 'DYNAMIC SOFT_BODY RIGID_BODY'.split():
-				op = layout.operator("select_dynamic", text=ob.name)
+				op = layout.operator(INFO_MT_dynamic.bl_idname, text=ob.name)
 				op.mystring = ob.name
 		layout.separator()
 
 class INFO_MT_dynamic(bpy.types.Operator):                
 	'''select dynamic'''                                                     
-	bl_idname = "select_dynamic"                                             
+	bl_idname = "ogre.select_dynamic"                                             
 	bl_label = "Select Dynamic"                                             
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
@@ -5610,8 +5611,8 @@ class INFO_HT_myheader(bpy.types.Header):
 		ob = context.active_object
 		screen = context.screen
 
-		op = layout.operator( 'ogre.preview_ogremeshy', text='', icon='FILE_REFRESH' ); op.mesh = True
-		op = layout.operator( 'ogre.preview_ogremeshy', text='', icon='MATERIAL' ); op.mesh = False
+		op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='FILE_REFRESH' ); op.mesh = True
+		op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='MATERIAL' ); op.mesh = False
 		row = layout.row(align=True)
 		sub = row.row(align=True)
 		sub.menu("INFO_MT_file")
@@ -5695,15 +5696,12 @@ class INFO_HT_myheader(bpy.types.Header):
 			layout.menu( "INFO_MT_ogre_docs" )
 
 def export_menu_func(self, context):
-	#ext = os.path.splitext(bpy.app.binary_path)[-1]
-	#default_blend_path = bpy.data.filepath.replace(".blend", ext)
-	path,name = os.path.split( context.blend_data.filepath )
-	op = self.layout.operator("ogre.export", text="Ogre3D (.scene)")
-	op.filepath=os.path.join( path, name.split('.')[0]+'.scene' )
-
+	default_path = os.path.splitext(bpy.data.filepath)[0] + ".scene"
+	op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene)")
+	op.filepath = default_path
+		
 def import_menu_func(self, context):
-	self.layout.operator("ogre.import", text="Ogre3D (.scene) | read version control attributes (UUIDs)")
-
+	self.layout.operator(Ogre_import_op.bl_idname, text="Ogre3D (.scene) | read version control attributes (UUIDs)")
 
 _header_ = None
 MyShaders = None
