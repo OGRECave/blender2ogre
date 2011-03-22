@@ -4517,7 +4517,6 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 							self.dot_mesh( ob, os.path.split(url)[0] )
 
 			## deal with Array mod ##
-			vecs = [ ob.matrix_world.translation_part() ]
 			vecs = [ ob.matrix_world.to_translation() ]
 			for mod in ob.modifiers:
 				if mod.type == 'ARRAY':
