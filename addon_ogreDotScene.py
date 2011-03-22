@@ -224,6 +224,12 @@ Installing:
 ## TODO - image compression browser (previews total size)
 ## useful for online content - texture load is speed hit
 
+## TODO Remove try/expect arround register_module() in Blender 2.57 release and in the same way,
+## TODO Replace all 5 Matrix.copy().invert() call by Matrix.inverted() in Blender 2.57 release and in the same way,
+## TODO translation_part()=>to_translation()
+## TODO scale_part()=>to_scale()
+## TODO rotation_part().to_euler() => to_euler()
+## TODO rotation_part().to_quat() => to_quaternion()
 
 import os, sys, time, hashlib, getpass
 
@@ -296,10 +302,10 @@ def get_materials_using_image( img ):
 				if mat not in mats: mats.append( mat )
 	return mats
 
-class Ogre_relocate_textures_op(bpy.types.Operator):                
+class Ogre_relocate_textures_op(bpy.types.Operator):
 	'''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
 	bl_idname = "ogre.relocate_textures"  
-	bl_label = "relocate textures"                    
+	bl_label = "relocate textures"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 
 	@classmethod
@@ -542,10 +548,10 @@ def UUID( ob ):
 		ob[ '_UUID_' ] = uid
 		return uid
 
-class Ogre_setup_version_control_op(bpy.types.Operator):                
+class Ogre_setup_version_control_op(bpy.types.Operator):
 	'''operator: setup version control helper'''  
 	bl_idname = "ogre.setup_version_control"  
-	bl_label = "setup version control"        
+	bl_label = "setup version control"
 	bl_options = {'REGISTER'}
 	@classmethod
 	def poll(cls, context): return True
@@ -627,10 +633,10 @@ class Ogre_VC_Panel(bpy.types.Panel):
 
 
 
-class Ogre_toggle_prop_op(bpy.types.Operator):                
+class Ogre_toggle_prop_op(bpy.types.Operator):
 	'''operator: prop toggle helper'''  
 	bl_idname = "ogre.toggle_prop"  
-	bl_label = "toggle"                    
+	bl_label = "toggle"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	propname = StringProperty(name="property name", description="...", maxlen=32, default="")
 	@classmethod
@@ -643,7 +649,7 @@ class Ogre_toggle_prop_op(bpy.types.Operator):
 		a[ self.propname ] = not a[ self.propname ]
 		return {'FINISHED'}
 
-class Ogre_select_by_prop_value(bpy.types.Operator):                
+class Ogre_select_by_prop_value(bpy.types.Operator):
 	'''select other objects with the same property value'''  
 	bl_idname = "ogre.select_by_prop_value"  
 	bl_label = "select by prop"
@@ -660,7 +666,7 @@ class Ogre_select_by_prop_value(bpy.types.Operator):
 				if str(ob[self.propname]) == self.propvalue: ob.select = True
 		return {'FINISHED'}
 
-class Ogre_update_mod_time(bpy.types.Operator):                
+class Ogre_update_mod_time(bpy.types.Operator):
 	'''set modified time and bump the version number up'''  
 	bl_idname = "ogre.update_modify_time"  
 	bl_label = "update mod time"
@@ -765,10 +771,10 @@ class Ogre_Physics_LOD(bpy.types.Panel):
 							box.prop( decmod, 'ratio', 'vertex reduction ratio' )
 							box.label(text='faces: %s' %decmod.face_count )
 
-class Ogre_create_collision_op(bpy.types.Operator):                
+class Ogre_create_collision_op(bpy.types.Operator):
 	'''operator: creates new collision'''  
 	bl_idname = "ogre.create_collision"  
-	bl_label = "create collision mesh"                    
+	bl_label = "create collision mesh"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 
 	@classmethod
@@ -837,10 +843,10 @@ class Harts_Tools(bpy.types.Panel):
 
 
 
-class Harts_bake_texture_vc_op(bpy.types.Operator):                
-	'''operator: bakes texture to vertex colors'''                    
+class Harts_bake_texture_vc_op(bpy.types.Operator):
+	'''operator: bakes texture to vertex colors'''
 	bl_idname = "harts.bake_texture_to_vertexcolors"  
-	bl_label = "harts extra tools"                             
+	bl_label = "harts extra tools"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 
 	@classmethod
@@ -1038,10 +1044,10 @@ class Ogre_Physics(bpy.types.Panel):
 		#elif game.physics_type in ('SENSOR', 'INVISIBLE', 'NO_COLLISION', 'OCCLUDE'):
 
 
-class Ogre_game_logic_op(bpy.types.Operator):                
-	'''helper to hijack BGE logic'''                                                     
-	bl_idname = "ogre.gamelogic"                                             
-	bl_label = "ogre game logic helper"                                      
+class Ogre_game_logic_op(bpy.types.Operator):
+	'''helper to hijack BGE logic'''
+	bl_idname = "ogre.gamelogic"
+	bl_label = "ogre game logic helper"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	logictype = StringProperty(name="logic-type", description="...", maxlen=32, default="")
 	subtype = StringProperty(name="logic-subtype", description="...", maxlen=32, default="")
@@ -1298,7 +1304,7 @@ _shader_linking_steps_doc_ = '''
 Shader Linking Steps:
 	1. Communication: if the shader-programmer and artists do not stay in good communication, things are likely to break.  To help make this task simpler.  The shader-programmer can put comments in the .program file that will appear as 'notes' within the artists shader interface.  Comments declared in the 'shader-program-body' are considered comments the artist will see.  Comments in nested structures like 'default_params' are hidden from the artist.
 
-	2a. Material Library: the shader-programer first places their .program file in 'myshaders', then when enabling the addon in Blender any .program files found in myshaders will be parsed and each vertex/fragment shader is added to a menu within Blender's shader nodes interface.  Next, from the shader nodes interface the vertex/fragment shaders can be assigned to 'Sub-Materials' they create and name accordingly, note that references to a given vertex/fragment program are stored as custom-attributes' on the material.    
+	2a. Material Library: the shader-programer first places their .program file in 'myshaders', then when enabling the addon in Blender any .program files found in myshaders will be parsed and each vertex/fragment shader is added to a menu within Blender's shader nodes interface.  Next, from the shader nodes interface the vertex/fragment shaders can be assigned to 'Sub-Materials' they create and name accordingly, note that references to a given vertex/fragment program are stored as custom-attributes' on the material.
 
 	2b. A Sub-Material is one that does not contain any sub nodes ('use_nodes' is disabled), it however can be used as a sub-material within a shader node tree (to serve as examples and for testing), but its a good idea that these are named '_do_not_link_me_' so that artists do not get confused when linking which materials are 'node-tree-containers' and which are sub-materials that they should link to.  Default textures can also be defined, the artist will have the option later to over-ride these in their scene.  Finally the shader-programmer will save the file as their material library master .blend, and inform the artists it is ready to link in.
 
@@ -2091,10 +2097,10 @@ class _node_panel_mixin_(object):		# bug in bpy_rna.c line: 5005 (/* rare case. 
 				else:
 					layout.label(text='no material')
 
-class Ogre_ogremeshy_op(bpy.types.Operator):              
-	'''helper to open ogremeshy'''     
+class Ogre_ogremeshy_op(bpy.types.Operator):
+	'''helper to open ogremeshy'''
 	bl_idname = 'ogre.preview_ogremeshy'
-	bl_label = "opens ogremeshy in a subprocess"           
+	bl_label = "opens ogremeshy in a subprocess"
 	bl_options = {'REGISTER'}
 	preview = BoolProperty(name="preview", description="fast preview", default=True)
 	groups = BoolProperty(name="preview merge groups", description="use merge groups", default=False)
@@ -2162,10 +2168,10 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
 		return {'FINISHED'}
 
 
-class _ogre_new_tex_block(bpy.types.Operator):              
-	'''helper to create new texture block'''                   
-	bl_idname = "ogre.new_texture_block"    
-	bl_label = "helper creates a new texture block"           
+class _ogre_new_tex_block(bpy.types.Operator):
+	'''helper to create new texture block'''
+	bl_idname = "ogre.new_texture_block"
+	bl_label = "helper creates a new texture block"
 	bl_options = {'REGISTER', 'UNDO'}
 	@classmethod
 	def poll(cls, context): return True
@@ -2240,10 +2246,10 @@ class NODE_PT_user_notes_props(bpy.types.Panel, _node_panel_mixin_):
 	bl_label = "Ogre Shader: User Notes"; mytype = 'notes'
 
 
-class _ogre_op_shader_program_param(bpy.types.Operator):              
-	'''helper to create new texture block'''                   
-	bl_idname = "ogre.add_shader_program_param"    
-	bl_label = "assign program shader to material"           
+class _ogre_op_shader_program_param(bpy.types.Operator):
+	'''helper to create new texture block'''
+	bl_idname = "ogre.add_shader_program_param"
+	bl_label = "assign program shader to material"
 	bl_options = {'REGISTER', 'UNDO'}
 	program_name = StringProperty('prog-name')
 	@classmethod
@@ -2273,10 +2279,10 @@ class _ogre_shader_prog_param_menu_(bpy.types.Menu):
 			op.program_name = prog.name
 			op.param_name = name
 
-class _ogre_op_shader_program_subparam(bpy.types.Operator):              
-	'''helper to...'''                   
-	bl_idname = "ogre.add_shader_program_subparam"    
-	bl_label = "assign program shader subparam to material"           
+class _ogre_op_shader_program_subparam(bpy.types.Operator):
+	'''helper to...'''
+	bl_idname = "ogre.add_shader_program_subparam"
+	bl_label = "assign program shader subparam to material"
 	bl_options = {'REGISTER', 'UNDO'}
 	program_name = StringProperty('prog-name')
 	param_name = StringProperty('param-name')
@@ -2317,10 +2323,10 @@ class OgreShader_fragmentprogs(bpy.types.Menu, _ogre_shader_progs_mixin_):
 	bl_label = "Fragment Programs"
 	mytype = 'fragment'
 
-class _ogre_op_shader_programs(bpy.types.Operator):              
-	'''helper to create new texture block'''                   
-	bl_idname = "ogre.add_shader_program"    
-	bl_label = "assign program shader to material"           
+class _ogre_op_shader_programs(bpy.types.Operator):
+	'''helper to create new texture block'''
+	bl_idname = "ogre.add_shader_program"
+	bl_label = "assign program shader to material"
 	bl_options = {'REGISTER', 'UNDO'}
 	program_name = StringProperty('prog-name')
 	@classmethod
@@ -2423,10 +2429,10 @@ class INFO_MT_ogre_helper(bpy.types.Menu):
 
 
 
-class INFO_OT_ogre_set_shader_param(bpy.types.Operator):              
-	'''assign ogre shader param'''                   
-	bl_idname = "ogre.set_shader_param"    
-	bl_label = "Ogre Shader Param"               
+class INFO_OT_ogre_set_shader_param(bpy.types.Operator):
+	'''assign ogre shader param'''
+	bl_idname = "ogre.set_shader_param"
+	bl_label = "Ogre Shader Param"
 	bl_options = {'REGISTER', 'UNDO'}
 	shader_pass = StringProperty(name="shader operation", description="", maxlen=64, default="")
 	shader_pass_param = StringProperty(name="shader param", description="", maxlen=64, default="")
@@ -2437,10 +2443,10 @@ class INFO_OT_ogre_set_shader_param(bpy.types.Operator):
 		context.area.tag_redraw()
 		return {'FINISHED'}
 
-class INFO_OT_ogre_set_shader_tex_param(bpy.types.Operator):              
-	'''assign ogre shader texture param'''                   
-	bl_idname = "ogre.set_shader_tex_param"    
-	bl_label = "Ogre Shader Texture Param"               
+class INFO_OT_ogre_set_shader_tex_param(bpy.types.Operator):
+	'''assign ogre shader texture param'''
+	bl_idname = "ogre.set_shader_tex_param"
+	bl_label = "Ogre Shader Texture Param"
 	bl_options = {'REGISTER', 'UNDO'}
 	shader_tex = StringProperty(name="shader operation", description="", maxlen=64, default="")
 	shader_tex_param = StringProperty(name="shader param", description="", maxlen=64, default="")
@@ -3946,11 +3952,11 @@ def _mesh_entity_helper( doc, ob, o ):
 			user.setAttribute( 'type', type(propvalue).__name__ )
 
 
-class Ogre_import_op(bpy.types.Operator):              
-	'''Import Ogre Scene'''                   
-	bl_idname = "ogre.import"    
-	bl_label = "Import Ogre"               
-	bl_options = {'REGISTER', 'UNDO'}      
+class Ogre_import_op(bpy.types.Operator):
+	'''Import Ogre Scene'''
+	bl_idname = "ogre.import"
+	bl_label = "Import Ogre"
+	bl_options = {'REGISTER', 'UNDO'}
 	filepath= StringProperty(name="File Path", description="Filepath used for importing Ogre .scene file", maxlen=1024, default="")
 	COPY_ATTRIBUTES = BoolProperty(name="Copy Attributes", description="copy version control attributes: category, title, owner, etc.", default=True)
 
@@ -4029,11 +4035,11 @@ OptionsEx = {
 
 
 
-class INFO_OT_createOgreExport(bpy.types.Operator):              
-	'''Export Ogre Scene'''                   
-	bl_idname = "ogre.export"    
-	bl_label = "Export Ogre"               
-	bl_options = {'REGISTER', 'UNDO'}      
+class INFO_OT_createOgreExport(bpy.types.Operator):
+	'''Export Ogre Scene'''
+	bl_idname = "ogre.export"
+	bl_label = "Export Ogre"
+	bl_options = {'REGISTER', 'UNDO'}
 	filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
 	#_force_image_format = None
 	#filename_ext= StringProperty(name="File Name", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="xxx")
@@ -4250,9 +4256,9 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 
 		a = doc.createElement('attribute'); c.appendChild(a)
 		a.setAttribute('name', "Transform" )
-		loc = '%6f,%6f,%6f' %tuple(ob.matrix_world.translation_part())
-		rot = '%6f,%6f,%6f' %tuple(ob.matrix_world.rotation_part().to_euler())
-		scl = '%6f,%6f,%6f' %tuple(ob.matrix_world.scale_part())
+		loc = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_translation())
+		rot = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_euler())
+		scl = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_scale())
 		a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
 
 		a = doc.createElement('attribute'); c.appendChild(a)
@@ -4518,6 +4524,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 
 			## deal with Array mod ##
 			vecs = [ ob.matrix_world.translation_part() ]
+			vecs = [ ob.matrix_world.to_translation() ]
 			for mod in ob.modifiers:
 				if mod.type == 'ARRAY':
 					if mod.fit_type != 'FIXED_COUNT':
@@ -4528,7 +4535,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 						continue
 
 					else:
-						#v = ob.matrix_world.translation_part()
+						#v = ob.matrix_world.to_translation()
 
 						newvecs = []
 						for prev in vecs:
@@ -4621,11 +4628,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 
 def get_parent_matrix( ob, objects ):
 	if not ob.parent:
-		#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-		try:
-			return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
-		except:
-			return mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+		return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
 	else:
 		if ob.parent in objects:
 			return ob.parent.matrix_world.copy()
@@ -4633,7 +4636,7 @@ def get_parent_matrix( ob, objects ):
 			return get_parent_matrix(ob.parent, objects)
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
-	mat = get_parent_matrix(ob, objects).invert() * ob.matrix_world
+	mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
 
 	o = doc.createElement('node')
 	o.setAttribute('name',prefix+ob.name)
@@ -4643,13 +4646,13 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
 	for n in (p,q,s): o.appendChild(n)
 
 	if pos: v = swap(pos)
-	else: v = swap( mat.translation_part() )
+	else: v = swap( mat.to_translation() )
 	p.setAttribute('x', '%6f'%v.x)
 	p.setAttribute('y', '%6f'%v.y)
 	p.setAttribute('z', '%6f'%v.z)
 
 	if rot: v = swap(rot)
-	else: v = swap( mat.rotation_part().to_quat() )
+	else: v = swap( mat.to_quaternion() )
 	q.setAttribute('x', '%6f'%v.x)
 	q.setAttribute('y', '%6f'%v.y)
 	q.setAttribute('z', '%6f'%v.z)
@@ -4662,9 +4665,9 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
 		s.setAttribute('y', '%6f'%y)
 		s.setAttribute('z', '%6f'%z)
 	else:		# scale is different in Ogre from blender - rotation is removed
-		ri = mat.rotation_part().to_quat().inverse().to_matrix()
+		ri = mat.to_quaternion().inverted().to_matrix()
 		scale = ri.to_4x4() * mat
-		v = swap( scale.scale_part() )
+		v = swap( scale.to_scale() )
 		x=abs(v.x); y=abs(v.y); z=abs(v.z)
 		s.setAttribute('x', '%6f'%x)
 		s.setAttribute('y', '%6f'%y)
@@ -4878,7 +4881,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 	for mod in rem: copy.modifiers.remove( mod )
 
 	## bake mesh ##
-	_mesh_normals = copy.create_mesh(bpy.context.scene, True, "PREVIEW")	# collaspe
+	_mesh_normals = copy.to_mesh(bpy.context.scene, True, "PREVIEW")	# collaspe
 	_lookup_normals = False
 	if normals: _lookup_normals = mesh_is_smooth( _mesh_normals )
 	if _lookup_normals: print('using super slow normal lookup...')
@@ -4889,7 +4892,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 	e.use_edge_sharp = True
 	for edge in copy.data.edges: edge.use_edge_sharp = True
 	## bake mesh ##
-	mesh = copy.create_mesh(bpy.context.scene, True, "PREVIEW")	# collaspe
+	mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")	# collaspe
 
 	prefix = ''
 	#if opts['mesh-sub-dir']:	#self.EX_MESH_SUBDIR:
@@ -5179,30 +5182,26 @@ class Bone(object):
 	def update(self):		# called on frame update
 		pose = self.bone.matrix * self.skeleton.object_space_transformation
 		pose =  self.skeleton.object_space_transformation * self.bone.matrix
-		self._inverse_total_trans_pose = pose.copy().invert()
+		self._inverse_total_trans_pose = pose.inverted()
 
 		# calculate difference to parent bone
 		if self.parent:
 			pose = self.parent._inverse_total_trans_pose * pose
 		elif self.fixUpAxis:
-			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-			try:
-				pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
-			except:
-				pose = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1]) * pose
+			pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
 
 		# get transformation values
 		# translation relative to parent coordinate system orientation
 		# and as difference to rest pose translation
 		#blender2.49#translation -= self.ogreRestPose.translationPart()
-		self.pose_location =  pose.translation_part()  -  self.ogre_rest_matrix.translation_part()
+		self.pose_location =  pose.to_translation()  -  self.ogre_rest_matrix.to_translation()
 		# rotation (and scale) relative to local coordiante system
 		# calculate difference to rest pose
 		#blender2.49#poseTransformation *= self.inverseOgreRestPose
 		#pose = pose * self.inverse_ogre_rest_matrix		# this was wrong, fixed Dec3rd
 		pose = self.inverse_ogre_rest_matrix * pose
-		self.pose_rotation = pose.rotation_part().to_quat()
-		self.pose_scale = pose.scale_part().copy()
+		self.pose_rotation = pose.to_quaternion()
+		self.pose_scale = pose.to_scale()
 
 		#self.pose_location = self.bone.location.copy()
 		#self.pose_rotation = self.bone.rotation_quaternion.copy()
@@ -5231,17 +5230,9 @@ class Bone(object):
 		if self.parent:
 			inverseParentMatrix = self.parent.inverse_total_trans
 		elif (self.fixUpAxis):
-			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-			try:
-				inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
-			except:
-				inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1])
+			inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
 		else:
-			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-			try:
-				inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
-			except:
-				inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+			inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
 
 		# bone matrix relative to armature object
 		self.ogre_rest_matrix = self.matrix.copy()
@@ -5250,11 +5241,11 @@ class Bone(object):
 		self.ogre_rest_matrix = self.skeleton.object_space_transformation * self.ogre_rest_matrix
 
 		# store total inverse transformation
-		self.inverse_total_trans = self.ogre_rest_matrix.copy().invert()
+		self.inverse_total_trans = self.ogre_rest_matrix.inverted()
 		# relative to OGRE parent bone origin
 		#self.ogre_rest_matrix *= inverseParentMatrix		# 2.49 style
 		self.ogre_rest_matrix = inverseParentMatrix * self.ogre_rest_matrix
-		self.inverse_ogre_rest_matrix = self.ogre_rest_matrix.copy().invert()
+		self.inverse_ogre_rest_matrix = self.ogre_rest_matrix.inverted()
 
 		## recursion ##
 		for child in self.children:
@@ -5292,8 +5283,8 @@ class Skeleton(object):
 		# additional transformation for root bones:
 		# from armature object space into mesh object space, i.e.,
 		# (x,y,z,w)*AO*MO^(-1)
-		self.object_space_transformation = arm.matrix_local * ob.matrix_local.copy().invert()
-		#self.object_space_transformation = ob.matrix_local.copy().invert() * arm.matrix_local 
+		self.object_space_transformation = arm.matrix_local * ob.matrix_local.inverted()
+		#self.object_space_transformation = ob.matrix_local.inverted() * arm.matrix_local 
 
 		## setup bones for Ogre format ##
 		for b in self.bones: b.rebuild_tree()
@@ -5322,14 +5313,14 @@ class Skeleton(object):
 				bh.appendChild( bp )
 
 			pos = doc.createElement( 'position' ); b.appendChild( pos )
-			x,y,z = mat.translation_part()
+			x,y,z = mat.to_translation()
 			pos.setAttribute('x', '%6f' %x )
 			pos.setAttribute('y', '%6f' %y )
 			pos.setAttribute('z', '%6f' %z )
 			rot =  doc.createElement( 'rotation' )		# note "rotation", not "rotate"
 			b.appendChild( rot )
 
-			q = mat.rotation_part().to_quat()
+			q = mat.to_quaternion()
 			rot.setAttribute('angle', '%6f' %q.angle )
 			axis = doc.createElement('axis'); rot.appendChild( axis )
 			x,y,z = q.axis
@@ -5339,7 +5330,7 @@ class Skeleton(object):
 			## Ogre bones do not have initial scaling? ##
 			if 0:
 				scale = doc.createElement('scale'); b.appendChild( scale )
-				x,y,z = swap( mat.scale_part() )
+				x,y,z = swap( mat.to_scale() )
 				scale.setAttribute('x', str(x))
 				scale.setAttribute('y', str(y))
 				scale.setAttribute('z', str(z))
@@ -5409,7 +5400,7 @@ class Skeleton(object):
 
 						rot =  doc.createElement( 'rotate' )		# note "rotate" - bug fixed Dec2nd
 						keyframe.appendChild( rot )
-						q = _rot #swap( mat.rotation_part().to_quat() )
+						q = _rot #swap( mat.to_quaternion() )
 						rot.setAttribute('angle', '%6f' %q.angle )
 						axis = doc.createElement('axis'); rot.appendChild( axis )
 						x,y,z = q.axis
@@ -5419,7 +5410,7 @@ class Skeleton(object):
 
 						scale = doc.createElement('scale')
 						keyframe.appendChild( scale )
-						x,y,z = _scl #swap( mat.scale_part() )
+						x,y,z = _scl #swap( mat.to_scale() )
 						scale.setAttribute('x', '%6f' %x)
 						scale.setAttribute('y', '%6f' %y)
 						scale.setAttribute('z', '%6f' %z)
@@ -5517,10 +5508,10 @@ class INFO_MT_instances(bpy.types.Menu):
 			op.mystring = ob.name
 		layout.separator()
 
-class INFO_MT_instance(bpy.types.Operator):                
-	'''select instance group'''                                                     
-	bl_idname = "ogre.select_instances"                                             
-	bl_label = "Select Instance Group"                                             
+class INFO_MT_instance(bpy.types.Operator):
+	'''select instance group'''
+	bl_idname = "ogre.select_instances"
+	bl_label = "Select Instance Group"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
 	@classmethod
@@ -5544,26 +5535,26 @@ class INFO_MT_groups(bpy.types.Menu):
 		layout.separator()
 
 #TODO
-class INFO_MT_group_mark(bpy.types.Operator):                  
-	'''mark group auto combine on export'''                                                
-	bl_idname = "ogre.mark_group_export_combine"                                        
+class INFO_MT_group_mark(bpy.types.Operator):
+	'''mark group auto combine on export'''
+	bl_idname = "ogre.mark_group_export_combine"
 	bl_label = "Group Auto Combine"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mybool= BoolProperty(name="groupautocombine", description="set group auto-combine", default=False)
 	mygroups = {}
-	@classmethod                                                      
+	@classmethod
 	def poll(cls, context): return True
 	def invoke(self, context, event):
 		self.mygroups[ op.groupname ] = self.mybool
 		return {'FINISHED'}
 
-class INFO_MT_group(bpy.types.Operator):                  
-	'''select group'''                                                
-	bl_idname = "ogre.select_group"                                        
+class INFO_MT_group(bpy.types.Operator):
+	'''select group'''
+	bl_idname = "ogre.select_group"
 	bl_label = "Select Group"                                                # The panel label, http://www.blender.org/documentation/250PythonDoc/bpy.types.Panel.html
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
-	@classmethod                                                      
+	@classmethod
 	def poll(cls, context):
 		print('----poll group, below context -----')
 		print( dir(context) )
@@ -5584,10 +5575,10 @@ class INFO_MT_actors(bpy.types.Menu):
 				op.mystring = ob.name
 		layout.separator()
 
-class INFO_MT_actor(bpy.types.Operator):                
-	'''select actor'''                                                     
-	bl_idname = "ogre.select_actor"                                             
-	bl_label = "Select Actor"                                             
+class INFO_MT_actor(bpy.types.Operator):
+	'''select actor'''
+	bl_idname = "ogre.select_actor"
+	bl_label = "Select Actor"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
 	@classmethod
@@ -5606,10 +5597,10 @@ class INFO_MT_dynamics(bpy.types.Menu):
 				op.mystring = ob.name
 		layout.separator()
 
-class INFO_MT_dynamic(bpy.types.Operator):                
-	'''select dynamic'''                                                     
-	bl_idname = "ogre.select_dynamic"                                             
-	bl_label = "Select Dynamic"                                             
+class INFO_MT_dynamic(bpy.types.Operator):
+	'''select dynamic'''
+	bl_idname = "ogre.select_dynamic"
+	bl_label = "Select Dynamic"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
 	@classmethod
@@ -5723,26 +5714,17 @@ def export_menu_func(self, context):
 def import_menu_func(self, context):
 	self.layout.operator(Ogre_import_op.bl_idname, text="Ogre3D (.scene) | read version control attributes (UUIDs)")
 
-_header_ = None
+#_header_ = None
 MyShaders = None
 def register():
 	print(VERSION)
 	global MyShaders, _header_
 
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-	try:
-		# registering the module is requiered in Blender SVN >2.56
-		bpy.utils.register_module(__name__)
-	except:
-		print('Blender SVN compatibility issue')
+	bpy.utils.register_module(__name__)
 
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-	try:
-		# unregistering this type does not seems possible anymore in Blender SVN >2.56
-		_header_ = bpy.types.INFO_HT_header
-		bpy.types.unregister(_header_)
-	except:
-		print('Blender SVN compatibility issue')
+	#TODO unregistering this type does not seems possible anymore in Blender SVN >2.56
+	#_header_ = bpy.types.INFO_HT_header
+	#bpy.types.unregister(_header_)
 		
 	MyShaders = MyShadersSingleton()
 	
@@ -5752,17 +5734,10 @@ def register():
 def unregister():
 	print('unreg-> ogre exporter')
 
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except (see above the register() function)
-	try:
-		bpy.utils.unregister_module(__name__)
-	except:
-		print('Blender SVN compatibility issue')
+	bpy.utils.unregister_module(__name__)
 
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except (see above the register() function)
-	try:
-		bpy.types.register(_header_)
-	except:
-		print('Blender SVN compatibility issue')
+	#TODO unregistering this type does not seems possible anymore in Blender SVN >2.56
+	#bpy.types.register(_header_)
 		
 	bpy.types.INFO_MT_file_export.remove(export_menu_func)
 	bpy.types.INFO_MT_file_import.remove(import_menu_func)
