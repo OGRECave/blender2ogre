@@ -21,7 +21,7 @@ bl_info = {
     "author": "HartsAntler",
     "version": (0,3,1),
     "blender": (2,5,6),
-    "location": "File > Export..., INFO Menu",
+    "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "warning": "",
     #"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
@@ -116,8 +116,6 @@ March 20th (SRombauts):
 March 21th (SRombauts):
 	. Blender SVN compatibility : using bl_info for printing version when registering
 	. Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
-	. Blender SVN compatibility : registering the module is requiered in Blender SVN >2.56 to use operators
-	. Blender SVN compatibility : mathutils.Matrix format changed in Blender SVN >2.56
 	
 '''
 
@@ -4621,11 +4619,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 
 def get_parent_matrix( ob, objects ):
 	if not ob.parent:
-		#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-		try:
-			return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
-		except:
-			return mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+		return mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
 	else:
 		if ob.parent in objects:
 			return ob.parent.matrix_world.copy()
@@ -5185,11 +5179,7 @@ class Bone(object):
 		if self.parent:
 			pose = self.parent._inverse_total_trans_pose * pose
 		elif self.fixUpAxis:
-			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-			try:
-				pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
-			except:
-				pose = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1]) * pose
+			pose = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1]) * pose
 
 		# get transformation values
 		# translation relative to parent coordinate system orientation
@@ -5231,17 +5221,9 @@ class Bone(object):
 		if self.parent:
 			inverseParentMatrix = self.parent.inverse_total_trans
 		elif (self.fixUpAxis):
-			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-			try:
-				inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
-			except:
-				inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1])
+			inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1])
 		else:
-			#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-			try:
-				inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
-			except:
-				inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+			inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
 
 		# bone matrix relative to armature object
 		self.ogre_rest_matrix = self.matrix.copy()
@@ -5729,20 +5711,8 @@ def register():
 	print(VERSION)
 	global MyShaders, _header_
 
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-	try:
-		# registering the module is requiered in Blender SVN >2.56
-		bpy.utils.register_module(__name__)
-	except:
-		print('Blender SVN compatibility issue')
-
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except
-	try:
-		# unregistering this type does not seems possible anymore in Blender SVN >2.56
-		_header_ = bpy.types.INFO_HT_header
-		bpy.types.unregister(_header_)
-	except:
-		print('Blender SVN compatibility issue')
+	_header_ = bpy.types.INFO_HT_header
+	bpy.types.unregister(_header_)
 		
 	MyShaders = MyShadersSingleton()
 	
@@ -5752,17 +5722,7 @@ def register():
 def unregister():
 	print('unreg-> ogre exporter')
 
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except (see above the register() function)
-	try:
-		bpy.utils.unregister_module(__name__)
-	except:
-		print('Blender SVN compatibility issue')
-
-	#TODO SRombauts : Blender SVN compatibility issue - temporary try/except (see above the register() function)
-	try:
-		bpy.types.register(_header_)
-	except:
-		print('Blender SVN compatibility issue')
+	bpy.types.register(_header_)
 		
 	bpy.types.INFO_MT_file_export.remove(export_menu_func)
 	bpy.types.INFO_MT_file_import.remove(import_menu_func)
