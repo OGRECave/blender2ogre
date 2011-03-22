@@ -21,7 +21,7 @@ bl_info = {
     "author": "HartsAntler",
     "version": (0,3,1),
     "blender": (2,5,6),
-    "location": "File > Export..., INFO Menu",
+    "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "warning": "",
     #"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
@@ -224,12 +224,6 @@ Installing:
 ## TODO - image compression browser (previews total size)
 ## useful for online content - texture load is speed hit
 
-## TODO Remove try/expect arround register_module() in Blender 2.57 release and in the same way,
-## TODO Replace all 5 Matrix.copy().invert() call by Matrix.inverted() in Blender 2.57 release and in the same way,
-## TODO translation_part()=>to_translation()
-## TODO scale_part()=>to_scale()
-## TODO rotation_part().to_euler() => to_euler()
-## TODO rotation_part().to_quat() => to_quaternion()
 
 import os, sys, time, hashlib, getpass
 
