@@ -222,6 +222,13 @@ Installing:
 ## TODO - image compression browser (previews total size)
 ## useful for online content - texture load is speed hit
 
+## How to switch to Blender 2.57 when released :
+## TODO Remove try/expect arround register_module() in Blender 2.57 release and in the same way,
+## TODO Replace all 5 Matrix.copy().invert() call by Matrix.inverted() in Blender 2.57 release and in the same way,
+## TODO translation_part()=>to_translation()
+## TODO scale_part()=>to_scale()
+## TODO rotation_part().to_euler() => to_euler()
+## TODO rotation_part().to_quat() => to_quaternion()
 
 import os, sys, time, hashlib, getpass
 
