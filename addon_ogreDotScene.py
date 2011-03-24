@@ -182,8 +182,9 @@ _doc_installing_ = '''
 Installing:
 	Installing the Addon:
 		You can simply copy addon_ogreDotScene.py to your blender installation under blender/2.56/scripts/addons/
+		and enable it in the user-prefs interface (CTRL+ALT+U)
 		Or you can use blenders interface, under user-prefs, click addons, and click 'install-addon'
-		( its a good idea to delete the old version first )
+		(its a good idea to delete the old version first)
 
 	Required:
 		1. blender2.56		(svn 33087+)
