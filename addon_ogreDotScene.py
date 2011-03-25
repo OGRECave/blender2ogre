@@ -118,7 +118,7 @@ March 21th (SRombauts):
 	. Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
 
 March 25th (SRombauts):
-	. issue7: Need for an add-on config file with user preferences: work initiated by a forum patch of f00bar
+	. issue7: Need for an add-on config file with user preferences
 	
 '''
 
@@ -237,16 +237,27 @@ Installing:
 import os, sys, time, hashlib, getpass, tempfile , configparser
 
 
+CONFIG_FILENAME = 'blender2ogre.cfg'
+
+
+# Methode to read a config value from a config file, or update it to the default value
+def readOrCreateConfigValue(config, section, option, default):
+	try:
+		return config.get(section, option)
+	except configparser.NoOptionError:
+		config.set(section, option, default)
+		return default
+
 # Read the addon config values from the config blender2ogre.cfg file, or create/update it whith platform specific default values
 def readConfig():
 	# TODO SRombauts: make a class AddonConfig to store these values
-	global 	CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR
+	global 	CONFIG_TEMP_DIR, CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR
 	
 	# Create default options values (platform specific paths)
 	DEFAULT_TEMP_DIR = tempfile.gettempdir()
 	if sys.platform.startswith('win'):		# win32 and win64
 		DEFAULT_OGRETOOLS_XML_CONVERTER = 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe'
-		DEFAULT_OGRETOOLS_MESH_MAGICK = 'C:\\OgreCommandLineTools\\MeshMagick.exe''
+		DEFAULT_OGRETOOLS_MESH_MAGICK = 'C:\\OgreCommandLineTools\\MeshMagick.exe'
 		DEFAULT_OGRE_MESHY = 'C:\\OgreMeshy\\Ogre Meshy.exe'
 		for name in os.listdir(  'C:\\Program Files' ):
 			if name.startswith( 'ImageMagick' ):
@@ -260,27 +271,20 @@ def readConfig():
 		# DEFAULT_TEMP_PATH = '/tmp' 
 		DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'
 		DEFAULT_OGRETOOLS_MESH_MAGICK = '%s/.wine/drive_c/OgreCommandLineTools/MeshMagick.exe' %os.environ['HOME']
-		DEFAULT_OGRE_MESHY = '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME'])
+		DEFAULT_OGRE_MESHY = '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME']
 		DEFAULT_IMAGE_MAGICK_CONVERT = '/usr/bin/convert/convert'
 		DEFAULT_NVIDIATOOLS_EXE = '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME']
 		DEFAULT_MYSHADERS_DIR = '%s/myshaders' %os.environ['HOME']
 		
 
-	# Read (or create) a blender2ogre.cfg config file for addon options
+	# Read the blender2ogre.cfg config file for addon options (or create a 'paths' section if not present)
+	print('Opening config file %s...' % CONFIG_FILENAME)
 	config = configparser.ConfigParser()
-	config.read('blender2ogre.cfg')
+	config.read(CONFIG_FILENAME)
 	if not config.has_section('paths'):
 		config.add_section('paths')
 
-	# Read a config value from a config file, or update it to the default value
-	def readOrCreateConfigValue(config, section, option, default):
-		try:
-			return config.get(section, option)
-		except configparser.NoOptionError:
-			config.set(section, option, default)
-			return default
-
-	# Read and print config values
+	# Read (or create default) config values
 	CONFIG_TEMP_DIR                = readOrCreateConfigValue(config, 'paths', 'TEMP_DIR',                DEFAULT_TEMP_DIR)
 	CONFIG_OGRETOOLS_XML_CONVERTER = readOrCreateConfigValue(config, 'paths', 'OGRETOOLS_XML_CONVERTER', DEFAULT_OGRETOOLS_XML_CONVERTER)
 	CONFIG_OGRETOOLS_MESH_MAGICK   = readOrCreateConfigValue(config, 'paths', 'OGRETOOLS_MESH_MAGICK',   DEFAULT_OGRETOOLS_MESH_MAGICK)
@@ -289,13 +293,19 @@ def readConfig():
 	CONFIG_NVIDIATOOLS_EXE         = readOrCreateConfigValue(config, 'paths', 'NVIDIATOOLS_EXE',         DEFAULT_NVIDIATOOLS_EXE)
 	CONFIG_MYSHADERS_DIR           = readOrCreateConfigValue(config, 'paths', 'MYSHADERS_DIR',           DEFAULT_MYSHADERS_DIR)
 
-	print('paths: CONFIG_TEMP_DIR=%s'                % CONFIG_TEMP_DIR)
-	print('paths: CONFIG_OGRETOOLS_XML_CONVERTER=%s' % CONFIG_OGRETOOLS_XML_CONVERTER)
-	print('paths: CONFIG_OGRETOOLS_MESH_MAGICK=%s'   % CONFIG_OGRETOOLS_MESH_MAGICK)
-	print('paths: CONFIG_OGRE_MESHY=%s'              % CONFIG_OGRE_MESHY)
-	print('paths: CONFIG_IMAGE_MAGICK_CONVERT=%s'    % CONFIG_IMAGE_MAGICK_CONVERT)
-	print('paths: CONFIG_NVIDIATOOLS_EXE=%s'         % CONFIG_NVIDIATOOLS_EXE)
-	print('paths: CONFIG_MYSHADERS_DIR=%s'           % CONFIG_MYSHADERS_DIR)
+	# Write the blender2ogre.cfg config file 
+	with open(CONFIG_FILENAME, 'w') as configfile:
+		config.write(configfile)
+		print('config file %s written.' % CONFIG_FILENAME)
+
+	# Print config values
+	print('CONFIG_TEMP_DIR=%s'                % CONFIG_TEMP_DIR)
+	print('CONFIG_OGRETOOLS_XML_CONVERTER=%s' % CONFIG_OGRETOOLS_XML_CONVERTER)
+	print('CONFIG_OGRETOOLS_MESH_MAGICK=%s'   % CONFIG_OGRETOOLS_MESH_MAGICK)
+	print('CONFIG_OGRE_MESHY=%s'              % CONFIG_OGRE_MESHY)
+	print('CONFIG_IMAGE_MAGICK_CONVERT=%s'    % CONFIG_IMAGE_MAGICK_CONVERT)
+	print('CONFIG_NVIDIATOOLS_EXE=%s'         % CONFIG_NVIDIATOOLS_EXE)
+	print('CONFIG_MYSHADERS_DIR=%s'           % CONFIG_MYSHADERS_DIR)
 
 
 # 
@@ -2206,15 +2216,12 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
 
 		if merged: context.scene.objects.unlink( merged )
 
- 		if sys.platform == 'linux2':
- 			subprocess.call( 
- 				['/usr/bin/wine', 
-				CONFIG_OGRE_MESHY, 
- 				'C:\\tmp\\preview.mesh'])
- 		else:
-			subprocess.call( [ CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh' ] )
- 
- 		return {'FINISHED'}
+		if sys.platform == 'linux2':
+			subprocess.call([CONFIG_OGRE_MESHY, '/tmp'])
+		else:
+			subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
+
+		return {'FINISHED'}
 
 
 class _ogre_new_tex_block(bpy.types.Operator):              
@@ -5771,14 +5778,6 @@ def register():
 	bpy.types.unregister(_header_)
 
 	readConfig()
-	# TODO SRombauts : for testing purpose (in progress)
-	print('paths: CONFIG_TEMP_DIR=%s'                % CONFIG_TEMP_DIR)
-	print('paths: CONFIG_OGRETOOLS_XML_CONVERTER=%s' % CONFIG_OGRETOOLS_XML_CONVERTER)
-	print('paths: CONFIG_OGRETOOLS_MESH_MAGICK=%s'   % CONFIG_OGRETOOLS_MESH_MAGICK)
-	print('paths: CONFIG_OGRE_MESHY=%s'              % CONFIG_OGRE_MESHY)
-	print('paths: CONFIG_IMAGE_MAGICK_CONVERT=%s'    % CONFIG_IMAGE_MAGICK_CONVERT)
-	print('paths: CONFIG_NVIDIATOOLS_EXE=%s'         % CONFIG_NVIDIATOOLS_EXE)
-	print('paths: CONFIG_MYSHADERS_DIR=%s'           % CONFIG_MYSHADERS_DIR)
 		
 	MyShaders = MyShadersSingleton()
 	
