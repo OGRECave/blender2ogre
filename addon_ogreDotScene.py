@@ -118,7 +118,7 @@ March 21th (SRombauts):
 	. Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
 
 March 25th (SRombauts):
-	. issue7: Need for an add-on config file with user preferences
+	. issue7: Need for an add-on config file with user preferences: work initiated by a forum patch of f00bar
 	
 '''
 
@@ -234,79 +234,80 @@ Installing:
 ## TODO rotation_part().to_euler() => to_euler()
 ## TODO rotation_part().to_quat() => to_quaternion()
 
-import os, sys, time, hashlib, getpass, configparser
+import os, sys, time, hashlib, getpass, tempfile , configparser
 
 
-# Read (or create) a config file for addon options
-config = configparser.ConfigParser()
-config.read('blender2ogre.cfg')
-if not config.has_section('paths'):
-	config.add_section('paths')
-	config.set('paths', 'IMAGE_MAGICK', '/usr/bin/')
+# Read the addon config values from the config blender2ogre.cfg file, or create/update it whith platform specific default values
+def readConfig():
+	# TODO SRombauts: make a class AddonConfig to store these values
+	global 	CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR
+	
+	# Create default options values (platform specific paths)
+	DEFAULT_TEMP_DIR = tempfile.gettempdir()
 	if sys.platform.startswith('win'):		# win32 and win64
-		config.set('paths', 'MYSHADERS', 'C:\\myshaders')
-		config.set('paths', 'OGRETOOLS', 'C:\\OgreCommandLineTools')
-		config.set('paths', 'NVIDIATOOLS', 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities')
+		DEFAULT_OGRETOOLS_XML_CONVERTER = 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe'
+		DEFAULT_OGRETOOLS_MESH_MAGICK = 'C:\\OgreCommandLineTools\\MeshMagick.exe''
+		DEFAULT_OGRE_MESHY = 'C:\\OgreMeshy\\Ogre Meshy.exe'
 		for name in os.listdir(  'C:\\Program Files' ):
 			if name.startswith( 'ImageMagick' ):
-				config.set('paths', 'IMAGE_MAGICK', os.path.join(  'C:\\Program Files', name ))
+				image_magick_path = os.path.join('C:\\Program Files', name)
+				DEFAULT_IMAGE_MAGICK_CONVERT = os.path.join(image_magick_path, 'convert.exe');
 				break
-		del name
+		DEFAULT_NVIDIATOOLS_EXE = 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe'
+		DEFAULT_MYSHADERS_DIR = 'C:\\myshaders'
+		
 	elif sys.platform.startswith('linux'):		# bug fix reported by Borris
-		config.set('paths', 'OGRETOOLS', '%s/.wine/drive_c/OgreCommandLineTools' %os.environ['HOME'])
-		config.set('paths', 'NVIDIATOOLS', '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME'])
+		# DEFAULT_TEMP_PATH = '/tmp' 
+		DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'
+		DEFAULT_OGRETOOLS_MESH_MAGICK = '%s/.wine/drive_c/OgreCommandLineTools/MeshMagick.exe' %os.environ['HOME']
+		DEFAULT_OGRE_MESHY = '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME'])
+		DEFAULT_IMAGE_MAGICK_CONVERT = '/usr/bin/convert/convert'
+		DEFAULT_NVIDIATOOLS_EXE = '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME']
+		DEFAULT_MYSHADERS_DIR = '%s/myshaders' %os.environ['HOME']
+		
 
-	if sys.platform.startswith('linux') or sys.platform == 'darwin':
-		config.set('paths', 'MYSHADERS', '%s/myshaders' %os.environ['HOME'])
-	
-	# for Ogre_ogremeshy_op
-	if sys.platform == 'linux2':
-		config.set('paths', 'OGRE_MESHY', '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME'])
-	else:
-		config.set('paths', 'OGRE_MESHY', 'C:\\OgreMeshy\\Ogre Meshy.exe')
-	
-	with open('blender2ogre.cfg', 'w') as configfile:
-		config.write(configfile)
-		print("config file 'blender2ogre.cfg' written.")
+	# Read (or create) a blender2ogre.cfg config file for addon options
+	config = configparser.ConfigParser()
+	config.read('blender2ogre.cfg')
+	if not config.has_section('paths'):
+		config.add_section('paths')
+
+	# Read a config value from a config file, or update it to the default value
+	def readOrCreateConfigValue(config, section, option, default):
+		try:
+			return config.get(section, option)
+		except configparser.NoOptionError:
+			config.set(section, option, default)
+			return default
+
+	# Read and print config values
+	CONFIG_TEMP_DIR                = readOrCreateConfigValue(config, 'paths', 'TEMP_DIR',                DEFAULT_TEMP_DIR)
+	CONFIG_OGRETOOLS_XML_CONVERTER = readOrCreateConfigValue(config, 'paths', 'OGRETOOLS_XML_CONVERTER', DEFAULT_OGRETOOLS_XML_CONVERTER)
+	CONFIG_OGRETOOLS_MESH_MAGICK   = readOrCreateConfigValue(config, 'paths', 'OGRETOOLS_MESH_MAGICK',   DEFAULT_OGRETOOLS_MESH_MAGICK)
+	CONFIG_OGRE_MESHY              = readOrCreateConfigValue(config, 'paths', 'OGRE_MESHY',              DEFAULT_OGRE_MESHY)
+	CONFIG_IMAGE_MAGICK_CONVERT    = readOrCreateConfigValue(config, 'paths', 'IMAGE_MAGICK_CONVERT',    DEFAULT_IMAGE_MAGICK_CONVERT)
+	CONFIG_NVIDIATOOLS_EXE         = readOrCreateConfigValue(config, 'paths', 'NVIDIATOOLS_EXE',         DEFAULT_NVIDIATOOLS_EXE)
+	CONFIG_MYSHADERS_DIR           = readOrCreateConfigValue(config, 'paths', 'MYSHADERS_DIR',           DEFAULT_MYSHADERS_DIR)
+
+	print('paths: CONFIG_TEMP_DIR=%s'                % CONFIG_TEMP_DIR)
+	print('paths: CONFIG_OGRETOOLS_XML_CONVERTER=%s' % CONFIG_OGRETOOLS_XML_CONVERTER)
+	print('paths: CONFIG_OGRETOOLS_MESH_MAGICK=%s'   % CONFIG_OGRETOOLS_MESH_MAGICK)
+	print('paths: CONFIG_OGRE_MESHY=%s'              % CONFIG_OGRE_MESHY)
+	print('paths: CONFIG_IMAGE_MAGICK_CONVERT=%s'    % CONFIG_IMAGE_MAGICK_CONVERT)
+	print('paths: CONFIG_NVIDIATOOLS_EXE=%s'         % CONFIG_NVIDIATOOLS_EXE)
+	print('paths: CONFIG_MYSHADERS_DIR=%s'           % CONFIG_MYSHADERS_DIR)
 
 
-# Read a config value from the config blender2ogre.cfg config file
-def readConfigValue(config, section, option, default):
-	try:
-		return config.get(section, option)
-	except configparser.NoOptionError:
-		return default
+# 
 
-# Read and print 
-IMAGE_MAGICK = readConfigValue(config, 'paths', 'IMAGE_MAGICK', None)
-MYSHADERS = readConfigValue(config, 'paths', 'MYSHADERS', None)
-OGRETOOLS = readConfigValue(config, 'paths', 'OGRETOOLS', None)
-NVIDIATOOLS = readConfigValue(config, 'paths', 'NVIDIATOOLS', None)
-OGRE_MESHY = readConfigValue(config, 'paths', 'OGRE_MESHY', None)
-
-print('paths: IMAGE_MAGICK=%s' % IMAGE_MAGICK)
-print('paths: MYSHADERS=%s' % MYSHADERS)
-print('paths: OGRETOOLS=%s' % OGRETOOLS)
-print('paths: NVIDIATOOLS=%s' % NVIDIATOOLS)
-print('paths: OGRE_MESHY=%s' % OGRE_MESHY)
-
- 
- # customize missing material - red flags for users so they can quickly see what they forgot to assign a material to.
- # (do not crash if no material on object - thats annoying for the user)
-@@ -2145,10 +2177,10 @@
- 		if sys.platform == 'linux2':
- 			subprocess.call( 
- 				['/usr/bin/wine', 
--				'%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME'], 
-+				OGRE_MESHY, 
- 				'C:\\tmp\\preview.mesh'])
- 		else:
--			subprocess.call( [ 'C:\\OgreMeshy\\Ogre Meshy.exe', 'C:\\tmp\\preview.mesh' ] )
-+			subprocess.call( [ OGRE_MESHY, 'C:\\tmp\\preview.mesh' ] )
- 
- 		return {'FINISHED'}
- 
-
+# options yet to be added to the config file
+OPTIONS = {
+	'FORCE_IMAGE_FORMAT' : None,
+	'TEXTURES_SUBDIR' : False,
+	'PATH' : '/tmp',	# TODO SRombauts: use the CONFIG_TEMP_DIR variable
+	'TOUCH_TEXTURES' : False,
+	'SWAP_AXIS' : '-x z y',
+}
 
 
 # customize missing material - red flags for users so they can quickly see what they forgot to assign a material to.
@@ -486,7 +487,7 @@ class MyShadersSingleton(object):
 		elif name in self.fragment_progs_by_name: return self.fragment_progs_by_name[ name ]
 			
 	def __init__(self):
-		self.path = MYSHADERS
+		self.path = CONFIG_MYSHADERS_DIR
 		self.files = []
 		self.vertex_progs = []
 		self.vertex_progs_by_name = {}
@@ -1371,14 +1372,6 @@ Shader Linking Steps:
 
 '''
 
-OPTIONS = {
-	'FORCE_IMAGE_FORMAT' : None,
-	'TEXTURES_SUBDIR' : False,
-	'PATH' : '/tmp',
-	'TOUCH_TEXTURES' : False,
-	'SWAP_AXIS' : '-x z y',
-}
-
 _ogre_doc_classic_textures_ = '''
 Ogre texture blending is far more limited than Blender's texture slots.  While many of the blending options are the same or similar, only the blend mode "Mix" is allowed to have a variable setting.  All other texture blend modes are either on or off, for example you can not use the "Add" blend mode and set the amount to anything other than fully on (1.0).  The user also has to take into consideration the hardware multi-texturing limitations of their target platform - for example the GeForce3 can only do four texture blend operations in a single pass.  Note that Ogre will fallback to multipass rendering when the hardware won't accelerate it.
 
@@ -1973,8 +1966,7 @@ class ShaderTree(object):
 	def _reformat( self, image ): return image[ : image.rindex('.') ] + OPTIONS['FORCE_IMAGE_FORMAT']
 	def image_magick( self, infile ):
 		print('[Image Magick Wrapper]', infile )
-		if sys.platform.startswith('win'): exe = os.path.join(IMAGE_MAGICK,'convert.exe')
-		else: exe = os.path.join(IMAGE_MAGICK, 'convert')
+		exe = CONFIG_IMAGE_MAGICK_CONVERT
 		if not os.path.isfile( exe ):
 			Report.warnings.append( 'ImageMagick not installed!' )
 			print( 'ERROR: can not find Image Magick - convert', exe ); return
@@ -1987,7 +1979,7 @@ class ShaderTree(object):
 	EX_DDS_MIPS = 3	# default
 	def DDS_converter(self, infile ):
 		print('[NVIDIA DDS Wrapper]', infile )
-		exe = os.path.join(NVIDIATOOLS,'nvdxt.exe')
+		exe = CONFIG_NVIDIATOOLS_EXE
 		if not os.path.isfile( exe ):
 			Report.warnings.append( 'Nvidia DDS tools not installed!' )
 			print( 'ERROR: can not find nvdxt.exe', exe ); return
@@ -2214,15 +2206,15 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
 
 		if merged: context.scene.objects.unlink( merged )
 
-		if sys.platform == 'linux2':
-			subprocess.call( 
-				['/usr/bin/wine', 
-				'%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME'], 
-				'C:\\tmp\\preview.mesh'])
-		else:
-			subprocess.call( [ 'C:\\OgreMeshy\\Ogre Meshy.exe', 'C:\\tmp\\preview.mesh' ] )
-
-		return {'FINISHED'}
+ 		if sys.platform == 'linux2':
+ 			subprocess.call( 
+ 				['/usr/bin/wine', 
+				CONFIG_OGRE_MESHY, 
+ 				'C:\\tmp\\preview.mesh'])
+ 		else:
+			subprocess.call( [ CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh' ] )
+ 
+ 		return {'FINISHED'}
 
 
 class _ogre_new_tex_block(bpy.types.Operator):              
@@ -4800,7 +4792,7 @@ class MeshMagick(object):
 	def merge( group, path='/tmp', force_name=None ):
 		print('-'*80)
 		print(' mesh magick - merge ')
-		exe = os.path.join(OGRETOOLS, 'MeshMagick.exe')
+		exe = CONFIG_OGRETOOLS_MESH_MAGICK
 		if not os.path.isfile( exe ):
 			print( 'ERROR: can not find MeshMagick.exe' )
 			print( exe )
@@ -4864,9 +4856,9 @@ Available options:
 def OgreXMLConverter( infile, opts ):
 	print('[Ogre Tools Wrapper]', infile )
 
-	exe = os.path.join(OGRETOOLS,'OgreXmlConverter.exe')
+	exe = CONFIG_OGRETOOLS_XML_CONVERTER
 	if not os.path.isfile( exe ):
-		print( 'ERROR: can not find OgreXmlConverter.exe' )
+		print( 'ERROR: can not find OgreXMLConverter' )
 		print( exe )
 		return
 
@@ -4899,8 +4891,7 @@ def OgreXMLConverter( infile, opts ):
 	opts = '-log _ogre_debug.txt %s' %basicArguments
 	path,name = os.path.split( infile )
 
-	if sys.platform == 'linux2': cmd = '/usr/bin/wine %s %s' %(exe, opts)
-	else: cmd = '%s %s' %(exe, opts)
+	cmd = '%s %s' %(exe, opts)
 	print(cmd)
 	cmd = cmd.split() + [infile]		#, outfile] #[ infile.replace(' ','\\ '), outfile.replace(' ','\\ ') ]
 
@@ -5775,9 +5766,19 @@ MyShaders = None
 def register():
 	print(VERSION)
 	global MyShaders, _header_
-
+	
 	_header_ = bpy.types.INFO_HT_header
 	bpy.types.unregister(_header_)
+
+	readConfig()
+	# TODO SRombauts : for testing purpose (in progress)
+	print('paths: CONFIG_TEMP_DIR=%s'                % CONFIG_TEMP_DIR)
+	print('paths: CONFIG_OGRETOOLS_XML_CONVERTER=%s' % CONFIG_OGRETOOLS_XML_CONVERTER)
+	print('paths: CONFIG_OGRETOOLS_MESH_MAGICK=%s'   % CONFIG_OGRETOOLS_MESH_MAGICK)
+	print('paths: CONFIG_OGRE_MESHY=%s'              % CONFIG_OGRE_MESHY)
+	print('paths: CONFIG_IMAGE_MAGICK_CONVERT=%s'    % CONFIG_IMAGE_MAGICK_CONVERT)
+	print('paths: CONFIG_NVIDIATOOLS_EXE=%s'         % CONFIG_NVIDIATOOLS_EXE)
+	print('paths: CONFIG_MYSHADERS_DIR=%s'           % CONFIG_MYSHADERS_DIR)
 		
 	MyShaders = MyShadersSingleton()
 	
