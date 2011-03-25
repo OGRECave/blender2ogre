@@ -116,6 +116,9 @@ March 20th (SRombauts):
 March 21th (SRombauts):
 	. Blender SVN compatibility : using bl_info for printing version when registering
 	. Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
+
+March 25th (SRombauts):
+	. issue7: Need for an add-on config file with user preferences
 	
 '''
 
@@ -231,24 +234,78 @@ Installing:
 ## TODO rotation_part().to_euler() => to_euler()
 ## TODO rotation_part().to_quat() => to_quaternion()
 
-import os, sys, time, hashlib, getpass
+import os, sys, time, hashlib, getpass, configparser
 
-IMAGE_MAGICK = '/usr/bin/'
-if sys.platform.startswith('win'):		# win32 and win64
-	MYSHADERS = 'C:\\myshaders'
-	OGRETOOLS = 'C:\\OgreCommandLineTools'
-	NVIDIATOOLS = 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities'
-	for name in os.listdir(  'C:\\Program Files' ):
-		if name.startswith( 'ImageMagick' ):
-			IMAGE_MAGICK = os.path.join(  'C:\\Program Files', name )
-			break
-	del name
-elif sys.platform.startswith('linux'):		# bug fix reported by Borris
-	OGRETOOLS = '%s/.wine/drive_c/OgreCommandLineTools' %os.environ['HOME']
-	NVIDIATOOLS = '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME']
 
-if sys.platform.startswith('linux') or sys.platform == 'darwin':
-	MYSHADERS = '%s/myshaders' %os.environ['HOME']
+# Read (or create) a config file for addon options
+config = configparser.ConfigParser()
+config.read('blender2ogre.cfg')
+if not config.has_section('paths'):
+	config.add_section('paths')
+	config.set('paths', 'IMAGE_MAGICK', '/usr/bin/')
+	if sys.platform.startswith('win'):		# win32 and win64
+		config.set('paths', 'MYSHADERS', 'C:\\myshaders')
+		config.set('paths', 'OGRETOOLS', 'C:\\OgreCommandLineTools')
+		config.set('paths', 'NVIDIATOOLS', 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities')
+		for name in os.listdir(  'C:\\Program Files' ):
+			if name.startswith( 'ImageMagick' ):
+				config.set('paths', 'IMAGE_MAGICK', os.path.join(  'C:\\Program Files', name ))
+				break
+		del name
+	elif sys.platform.startswith('linux'):		# bug fix reported by Borris
+		config.set('paths', 'OGRETOOLS', '%s/.wine/drive_c/OgreCommandLineTools' %os.environ['HOME'])
+		config.set('paths', 'NVIDIATOOLS', '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME'])
+
+	if sys.platform.startswith('linux') or sys.platform == 'darwin':
+		config.set('paths', 'MYSHADERS', '%s/myshaders' %os.environ['HOME'])
+	
+	# for Ogre_ogremeshy_op
+	if sys.platform == 'linux2':
+		config.set('paths', 'OGRE_MESHY', '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME'])
+	else:
+		config.set('paths', 'OGRE_MESHY', 'C:\\OgreMeshy\\Ogre Meshy.exe')
+	
+	with open('blender2ogre.cfg', 'w') as configfile:
+		config.write(configfile)
+		print("config file 'blender2ogre.cfg' written.")
+
+
+# Read a config value from the config blender2ogre.cfg config file
+def readConfigValue(config, section, option, default):
+	try:
+		return config.get(section, option)
+	except configparser.NoOptionError:
+		return default
+
+# Read and print 
+IMAGE_MAGICK = readConfigValue(config, 'paths', 'IMAGE_MAGICK', None)
+MYSHADERS = readConfigValue(config, 'paths', 'MYSHADERS', None)
+OGRETOOLS = readConfigValue(config, 'paths', 'OGRETOOLS', None)
+NVIDIATOOLS = readConfigValue(config, 'paths', 'NVIDIATOOLS', None)
+OGRE_MESHY = readConfigValue(config, 'paths', 'OGRE_MESHY', None)
+
+print('paths: IMAGE_MAGICK=%s' % IMAGE_MAGICK)
+print('paths: MYSHADERS=%s' % MYSHADERS)
+print('paths: OGRETOOLS=%s' % OGRETOOLS)
+print('paths: NVIDIATOOLS=%s' % NVIDIATOOLS)
+print('paths: OGRE_MESHY=%s' % OGRE_MESHY)
+
+ 
+ # customize missing material - red flags for users so they can quickly see what they forgot to assign a material to.
+ # (do not crash if no material on object - thats annoying for the user)
+@@ -2145,10 +2177,10 @@
+ 		if sys.platform == 'linux2':
+ 			subprocess.call( 
+ 				['/usr/bin/wine', 
+-				'%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME'], 
++				OGRE_MESHY, 
+ 				'C:\\tmp\\preview.mesh'])
+ 		else:
+-			subprocess.call( [ 'C:\\OgreMeshy\\Ogre Meshy.exe', 'C:\\tmp\\preview.mesh' ] )
++			subprocess.call( [ OGRE_MESHY, 'C:\\tmp\\preview.mesh' ] )
+ 
+ 		return {'FINISHED'}
+ 
 
 
 
