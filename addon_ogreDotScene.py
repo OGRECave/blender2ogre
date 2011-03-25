@@ -370,10 +370,10 @@ def get_materials_using_image( img ):
 				if mat not in mats: mats.append( mat )
 	return mats
 
-class Ogre_relocate_textures_op(bpy.types.Operator):                
+class Ogre_relocate_textures_op(bpy.types.Operator):
 	'''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
 	bl_idname = "ogre.relocate_textures"  
-	bl_label = "relocate textures"                    
+	bl_label = "relocate textures"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 
 	@classmethod
@@ -616,10 +616,10 @@ def UUID( ob ):
 		ob[ '_UUID_' ] = uid
 		return uid
 
-class Ogre_setup_version_control_op(bpy.types.Operator):                
+class Ogre_setup_version_control_op(bpy.types.Operator):
 	'''operator: setup version control helper'''  
 	bl_idname = "ogre.setup_version_control"  
-	bl_label = "setup version control"        
+	bl_label = "setup version control"
 	bl_options = {'REGISTER'}
 	@classmethod
 	def poll(cls, context): return True
@@ -701,10 +701,10 @@ class Ogre_VC_Panel(bpy.types.Panel):
 
 
 
-class Ogre_toggle_prop_op(bpy.types.Operator):                
+class Ogre_toggle_prop_op(bpy.types.Operator):
 	'''operator: prop toggle helper'''  
 	bl_idname = "ogre.toggle_prop"  
-	bl_label = "toggle"                    
+	bl_label = "toggle"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	propname = StringProperty(name="property name", description="...", maxlen=32, default="")
 	@classmethod
@@ -717,7 +717,7 @@ class Ogre_toggle_prop_op(bpy.types.Operator):
 		a[ self.propname ] = not a[ self.propname ]
 		return {'FINISHED'}
 
-class Ogre_select_by_prop_value(bpy.types.Operator):                
+class Ogre_select_by_prop_value(bpy.types.Operator):
 	'''select other objects with the same property value'''  
 	bl_idname = "ogre.select_by_prop_value"  
 	bl_label = "select by prop"
@@ -734,7 +734,7 @@ class Ogre_select_by_prop_value(bpy.types.Operator):
 				if str(ob[self.propname]) == self.propvalue: ob.select = True
 		return {'FINISHED'}
 
-class Ogre_update_mod_time(bpy.types.Operator):                
+class Ogre_update_mod_time(bpy.types.Operator):
 	'''set modified time and bump the version number up'''  
 	bl_idname = "ogre.update_modify_time"  
 	bl_label = "update mod time"
@@ -839,10 +839,10 @@ class Ogre_Physics_LOD(bpy.types.Panel):
 							box.prop( decmod, 'ratio', 'vertex reduction ratio' )
 							box.label(text='faces: %s' %decmod.face_count )
 
-class Ogre_create_collision_op(bpy.types.Operator):                
+class Ogre_create_collision_op(bpy.types.Operator):
 	'''operator: creates new collision'''  
 	bl_idname = "ogre.create_collision"  
-	bl_label = "create collision mesh"                    
+	bl_label = "create collision mesh"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 
 	@classmethod
@@ -911,10 +911,10 @@ class Harts_Tools(bpy.types.Panel):
 
 
 
-class Harts_bake_texture_vc_op(bpy.types.Operator):                
-	'''operator: bakes texture to vertex colors'''                    
+class Harts_bake_texture_vc_op(bpy.types.Operator):
+	'''operator: bakes texture to vertex colors'''
 	bl_idname = "harts.bake_texture_to_vertexcolors"  
-	bl_label = "harts extra tools"                             
+	bl_label = "harts extra tools"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 
 	@classmethod
@@ -1112,10 +1112,10 @@ class Ogre_Physics(bpy.types.Panel):
 		#elif game.physics_type in ('SENSOR', 'INVISIBLE', 'NO_COLLISION', 'OCCLUDE'):
 
 
-class Ogre_game_logic_op(bpy.types.Operator):                
-	'''helper to hijack BGE logic'''                                                     
-	bl_idname = "ogre.gamelogic"                                             
-	bl_label = "ogre game logic helper"                                      
+class Ogre_game_logic_op(bpy.types.Operator):
+	'''helper to hijack BGE logic'''
+	bl_idname = "ogre.gamelogic"
+	bl_label = "ogre game logic helper"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	logictype = StringProperty(name="logic-type", description="...", maxlen=32, default="")
 	subtype = StringProperty(name="logic-subtype", description="...", maxlen=32, default="")
@@ -1372,7 +1372,7 @@ _shader_linking_steps_doc_ = '''
 Shader Linking Steps:
 	1. Communication: if the shader-programmer and artists do not stay in good communication, things are likely to break.  To help make this task simpler.  The shader-programmer can put comments in the .program file that will appear as 'notes' within the artists shader interface.  Comments declared in the 'shader-program-body' are considered comments the artist will see.  Comments in nested structures like 'default_params' are hidden from the artist.
 
-	2a. Material Library: the shader-programer first places their .program file in 'myshaders', then when enabling the addon in Blender any .program files found in myshaders will be parsed and each vertex/fragment shader is added to a menu within Blender's shader nodes interface.  Next, from the shader nodes interface the vertex/fragment shaders can be assigned to 'Sub-Materials' they create and name accordingly, note that references to a given vertex/fragment program are stored as custom-attributes' on the material.    
+	2a. Material Library: the shader-programer first places their .program file in 'myshaders', then when enabling the addon in Blender any .program files found in myshaders will be parsed and each vertex/fragment shader is added to a menu within Blender's shader nodes interface.  Next, from the shader nodes interface the vertex/fragment shaders can be assigned to 'Sub-Materials' they create and name accordingly, note that references to a given vertex/fragment program are stored as custom-attributes' on the material.
 
 	2b. A Sub-Material is one that does not contain any sub nodes ('use_nodes' is disabled), it however can be used as a sub-material within a shader node tree (to serve as examples and for testing), but its a good idea that these are named '_do_not_link_me_' so that artists do not get confused when linking which materials are 'node-tree-containers' and which are sub-materials that they should link to.  Default textures can also be defined, the artist will have the option later to over-ride these in their scene.  Finally the shader-programmer will save the file as their material library master .blend, and inform the artists it is ready to link in.
 
@@ -2156,10 +2156,10 @@ class _node_panel_mixin_(object):		# bug in bpy_rna.c line: 5005 (/* rare case. 
 				else:
 					layout.label(text='no material')
 
-class Ogre_ogremeshy_op(bpy.types.Operator):              
-	'''helper to open ogremeshy'''     
+class Ogre_ogremeshy_op(bpy.types.Operator):
+	'''helper to open ogremeshy'''
 	bl_idname = 'ogre.preview_ogremeshy'
-	bl_label = "opens ogremeshy in a subprocess"           
+	bl_label = "opens ogremeshy in a subprocess"
 	bl_options = {'REGISTER'}
 	preview = BoolProperty(name="preview", description="fast preview", default=True)
 	groups = BoolProperty(name="preview merge groups", description="use merge groups", default=False)
@@ -2224,10 +2224,10 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
 		return {'FINISHED'}
 
 
-class _ogre_new_tex_block(bpy.types.Operator):              
-	'''helper to create new texture block'''                   
-	bl_idname = "ogre.new_texture_block"    
-	bl_label = "helper creates a new texture block"           
+class _ogre_new_tex_block(bpy.types.Operator):
+	'''helper to create new texture block'''
+	bl_idname = "ogre.new_texture_block"
+	bl_label = "helper creates a new texture block"
 	bl_options = {'REGISTER', 'UNDO'}
 	@classmethod
 	def poll(cls, context): return True
@@ -2302,10 +2302,10 @@ class NODE_PT_user_notes_props(bpy.types.Panel, _node_panel_mixin_):
 	bl_label = "Ogre Shader: User Notes"; mytype = 'notes'
 
 
-class _ogre_op_shader_program_param(bpy.types.Operator):              
-	'''helper to create new texture block'''                   
-	bl_idname = "ogre.add_shader_program_param"    
-	bl_label = "assign program shader to material"           
+class _ogre_op_shader_program_param(bpy.types.Operator):
+	'''helper to create new texture block'''
+	bl_idname = "ogre.add_shader_program_param"
+	bl_label = "assign program shader to material"
 	bl_options = {'REGISTER', 'UNDO'}
 	program_name = StringProperty('prog-name')
 	@classmethod
@@ -2335,10 +2335,10 @@ class _ogre_shader_prog_param_menu_(bpy.types.Menu):
 			op.program_name = prog.name
 			op.param_name = name
 
-class _ogre_op_shader_program_subparam(bpy.types.Operator):              
-	'''helper to...'''                   
-	bl_idname = "ogre.add_shader_program_subparam"    
-	bl_label = "assign program shader subparam to material"           
+class _ogre_op_shader_program_subparam(bpy.types.Operator):
+	'''helper to...'''
+	bl_idname = "ogre.add_shader_program_subparam"
+	bl_label = "assign program shader subparam to material"
 	bl_options = {'REGISTER', 'UNDO'}
 	program_name = StringProperty('prog-name')
 	param_name = StringProperty('param-name')
@@ -2379,10 +2379,10 @@ class OgreShader_fragmentprogs(bpy.types.Menu, _ogre_shader_progs_mixin_):
 	bl_label = "Fragment Programs"
 	mytype = 'fragment'
 
-class _ogre_op_shader_programs(bpy.types.Operator):              
-	'''helper to create new texture block'''                   
-	bl_idname = "ogre.add_shader_program"    
-	bl_label = "assign program shader to material"           
+class _ogre_op_shader_programs(bpy.types.Operator):
+	'''helper to create new texture block'''
+	bl_idname = "ogre.add_shader_program"
+	bl_label = "assign program shader to material"
 	bl_options = {'REGISTER', 'UNDO'}
 	program_name = StringProperty('prog-name')
 	@classmethod
@@ -2485,10 +2485,10 @@ class INFO_MT_ogre_helper(bpy.types.Menu):
 
 
 
-class INFO_OT_ogre_set_shader_param(bpy.types.Operator):              
-	'''assign ogre shader param'''                   
-	bl_idname = "ogre.set_shader_param"    
-	bl_label = "Ogre Shader Param"               
+class INFO_OT_ogre_set_shader_param(bpy.types.Operator):
+	'''assign ogre shader param'''
+	bl_idname = "ogre.set_shader_param"
+	bl_label = "Ogre Shader Param"
 	bl_options = {'REGISTER', 'UNDO'}
 	shader_pass = StringProperty(name="shader operation", description="", maxlen=64, default="")
 	shader_pass_param = StringProperty(name="shader param", description="", maxlen=64, default="")
@@ -2499,10 +2499,10 @@ class INFO_OT_ogre_set_shader_param(bpy.types.Operator):
 		context.area.tag_redraw()
 		return {'FINISHED'}
 
-class INFO_OT_ogre_set_shader_tex_param(bpy.types.Operator):              
-	'''assign ogre shader texture param'''                   
-	bl_idname = "ogre.set_shader_tex_param"    
-	bl_label = "Ogre Shader Texture Param"               
+class INFO_OT_ogre_set_shader_tex_param(bpy.types.Operator):
+	'''assign ogre shader texture param'''
+	bl_idname = "ogre.set_shader_tex_param"
+	bl_label = "Ogre Shader Texture Param"
 	bl_options = {'REGISTER', 'UNDO'}
 	shader_tex = StringProperty(name="shader operation", description="", maxlen=64, default="")
 	shader_tex_param = StringProperty(name="shader param", description="", maxlen=64, default="")
@@ -4008,11 +4008,11 @@ def _mesh_entity_helper( doc, ob, o ):
 			user.setAttribute( 'type', type(propvalue).__name__ )
 
 
-class Ogre_import_op(bpy.types.Operator):              
-	'''Import Ogre Scene'''                   
-	bl_idname = "ogre.import"    
-	bl_label = "Import Ogre"               
-	bl_options = {'REGISTER', 'UNDO'}      
+class Ogre_import_op(bpy.types.Operator):
+	'''Import Ogre Scene'''
+	bl_idname = "ogre.import"
+	bl_label = "Import Ogre"
+	bl_options = {'REGISTER', 'UNDO'}
 	filepath= StringProperty(name="File Path", description="Filepath used for importing Ogre .scene file", maxlen=1024, default="")
 	COPY_ATTRIBUTES = BoolProperty(name="Copy Attributes", description="copy version control attributes: category, title, owner, etc.", default=True)
 
@@ -4091,11 +4091,11 @@ OptionsEx = {
 
 
 
-class INFO_OT_createOgreExport(bpy.types.Operator):              
-	'''Export Ogre Scene'''                   
-	bl_idname = "ogre.export"    
-	bl_label = "Export Ogre"               
-	bl_options = {'REGISTER', 'UNDO'}      
+class INFO_OT_createOgreExport(bpy.types.Operator):
+	'''Export Ogre Scene'''
+	bl_idname = "ogre.export"
+	bl_label = "Export Ogre"
+	bl_options = {'REGISTER', 'UNDO'}
 	filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
 	#_force_image_format = None
 	#filename_ext= StringProperty(name="File Name", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="xxx")
@@ -5563,9 +5563,9 @@ class INFO_MT_instances(bpy.types.Menu):
 		layout.separator()
 
 class INFO_MT_instance(bpy.types.Operator):                
-	'''select instance group'''                                                     
-	bl_idname = "ogre.select_instances"                                             
-	bl_label = "Select Instance Group"                                             
+	'''select instance group'''
+	bl_idname = "ogre.select_instances"
+	bl_label = "Select Instance Group"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
 	@classmethod
@@ -5589,26 +5589,26 @@ class INFO_MT_groups(bpy.types.Menu):
 		layout.separator()
 
 #TODO
-class INFO_MT_group_mark(bpy.types.Operator):                  
-	'''mark group auto combine on export'''                                                
-	bl_idname = "ogre.mark_group_export_combine"                                        
+class INFO_MT_group_mark(bpy.types.Operator):
+	'''mark group auto combine on export'''
+	bl_idname = "ogre.mark_group_export_combine"
 	bl_label = "Group Auto Combine"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mybool= BoolProperty(name="groupautocombine", description="set group auto-combine", default=False)
 	mygroups = {}
-	@classmethod                                                      
+	@classmethod
 	def poll(cls, context): return True
 	def invoke(self, context, event):
 		self.mygroups[ op.groupname ] = self.mybool
 		return {'FINISHED'}
 
-class INFO_MT_group(bpy.types.Operator):                  
-	'''select group'''                                                
-	bl_idname = "ogre.select_group"                                        
+class INFO_MT_group(bpy.types.Operator):
+	'''select group'''
+	bl_idname = "ogre.select_group"
 	bl_label = "Select Group"                                                # The panel label, http://www.blender.org/documentation/250PythonDoc/bpy.types.Panel.html
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
-	@classmethod                                                      
+	@classmethod
 	def poll(cls, context):
 		print('----poll group, below context -----')
 		print( dir(context) )
@@ -5629,10 +5629,10 @@ class INFO_MT_actors(bpy.types.Menu):
 				op.mystring = ob.name
 		layout.separator()
 
-class INFO_MT_actor(bpy.types.Operator):                
-	'''select actor'''                                                     
-	bl_idname = "ogre.select_actor"                                             
-	bl_label = "Select Actor"                                             
+class INFO_MT_actor(bpy.types.Operator):
+	'''select actor'''
+	bl_idname = "ogre.select_actor"
+	bl_label = "Select Actor"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
 	@classmethod
@@ -5651,10 +5651,10 @@ class INFO_MT_dynamics(bpy.types.Menu):
 				op.mystring = ob.name
 		layout.separator()
 
-class INFO_MT_dynamic(bpy.types.Operator):                
-	'''select dynamic'''                                                     
-	bl_idname = "ogre.select_dynamic"                                             
-	bl_label = "Select Dynamic"                                             
+class INFO_MT_dynamic(bpy.types.Operator):
+	'''select dynamic'''
+	bl_idname = "ogre.select_dynamic"
+	bl_label = "Select Dynamic"
 	bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 	mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
 	@classmethod
