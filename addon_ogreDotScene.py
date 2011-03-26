@@ -16,7 +16,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
-bl_info = {
+bl_addon_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
     "author": "HartsAntler",
     "version": (0,3,1),
@@ -29,7 +29,7 @@ bl_info = {
     "category": "Import-Export"}
 
 
-VERSION = bl_info["name"] + " Addon v" + bl_info["version"][0].__str__() + "." + bl_info["version"][1].__str__() + "." + bl_info["version"][2].__str__() 
+VERSION = bl_addon_info["name"] + " Addon v" + bl_addon_info["version"][0].__str__() + "." + bl_addon_info["version"][1].__str__() + "." + bl_addon_info["version"][2].__str__() 
 
 __devnotes__ = '''
 --final bug fix milestone--
@@ -111,14 +111,15 @@ March 18th (SRombauts):
     . issue5: speed optimization O(n^2) into O(n log n)
 
 March 20th (SRombauts):
-    . correction to bl_info
+    . correction to bl_addon_info
     
 March 21th (SRombauts):
-    . Blender SVN compatibility : using bl_info for printing version when registering
+    . using bl_addon_info for printing version when registering
     . Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
 
 March 25th (SRombauts):
     . issue7: Need for an add-on config file with user preferences
+    . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
     
 '''
 
