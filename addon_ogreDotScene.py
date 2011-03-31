@@ -121,7 +121,12 @@ March 21th (SRombauts):
 
 March 25th (SRombauts):
     . issue7: Need for an add-on config file with user preferences
+    . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
     
+March 31th (SRombauts):
+    . Issue 14:	DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
+    . 0.3.2 release
+
 '''
 
 ##2.49 code reference: "<quaternion x=\"%.6f\" y=\"%.6f\" z=\"%.6f\" w=\"%.6f\"/>\n" % (rot.x, rot.z, -rot.y, rot.w))
