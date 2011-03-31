@@ -19,8 +19,8 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
     "author": "HartsAntler",
-    "version": (0,3,1),
-    "blender": (2,5,6),
+    "version": (0,3,2),
+    "blender": (2,5,7),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "warning": "",
@@ -254,6 +254,7 @@ def readConfig():
         DEFAULT_OGRETOOLS_XML_CONVERTER = 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe'
         DEFAULT_OGRETOOLS_MESH_MAGICK = 'C:\\OgreCommandLineTools\\MeshMagick.exe'
         DEFAULT_OGRE_MESHY = 'C:\\OgreMeshy\\Ogre Meshy.exe'
+        DEFAULT_IMAGE_MAGICK_CONVERT = ''
         for name in os.listdir(  'C:\\Program Files' ):
             if name.startswith( 'ImageMagick' ):
                 image_magick_path = os.path.join('C:\\Program Files', name)
