@@ -19,7 +19,7 @@
 bl_addon_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
     "author": "HartsAntler",
-    "version": (0,3,1),
+    "version": (0,3,2),
     "blender": (2,5,6),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -109,6 +109,7 @@ Jan 6th 2011:
 March 18th (SRombauts):
     . issue1: os.getlogin() unreliable; using getpass.getuser() instead
     . issue5: speed optimization O(n^2) into O(n log n)
+    . 0.3.1 Blender 2.56 release
 
 March 20th (SRombauts):
     . correction to bl_addon_info
@@ -121,6 +122,10 @@ March 25th (SRombauts):
     . issue7: Need for an add-on config file with user preferences
     . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
     
+March 31th (SRombauts):
+    . Issue 14:	DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
+    . 0.3.2 last Blender 2.56 release
+
 '''
 
 ##2.49 code reference: "<quaternion x=\"%.6f\" y=\"%.6f\" z=\"%.6f\" w=\"%.6f\"/>\n" % (rot.x, rot.z, -rot.y, rot.w))
@@ -260,6 +265,7 @@ def readConfig():
         DEFAULT_OGRETOOLS_XML_CONVERTER = 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe'
         DEFAULT_OGRETOOLS_MESH_MAGICK = 'C:\\OgreCommandLineTools\\MeshMagick.exe'
         DEFAULT_OGRE_MESHY = 'C:\\OgreMeshy\\Ogre Meshy.exe'
+        DEFAULT_IMAGE_MAGICK_CONVERT = ''
         for name in os.listdir(  'C:\\Program Files' ):
             if name.startswith( 'ImageMagick' ):
                 image_magick_path = os.path.join('C:\\Program Files', name)
