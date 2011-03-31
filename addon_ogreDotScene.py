@@ -16,11 +16,11 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
-bl_addon_info = {
+bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
     "author": "HartsAntler",
     "version": (0,3,2),
-    "blender": (2,5,6),
+    "blender": (2,5,7),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "warning": "",
@@ -29,7 +29,7 @@ bl_addon_info = {
     "category": "Import-Export"}
 
 
-VERSION = bl_addon_info["name"] + " Addon v" + bl_addon_info["version"][0].__str__() + "." + bl_addon_info["version"][1].__str__() + "." + bl_addon_info["version"][2].__str__() 
+VERSION = bl_info["name"] + " Addon v" + bl_info["version"][0].__str__() + "." + bl_info["version"][1].__str__() + "." + bl_info["version"][2].__str__() 
 
 __devnotes__ = '''
 --final bug fix milestone--
@@ -109,11 +109,15 @@ Jan 6th 2011:
 March 18th (SRombauts):
     . issue1: os.getlogin() unreliable; using getpass.getuser() instead
     . issue5: speed optimization O(n^2) into O(n log n)
-    . 0.3.1 Blender 2.56 release
 
+March 20th (SRombauts):
+    . correction to bl_info
+    
 March 21th (SRombauts):
-    . using bl_addon_info for printing version when registering
+    . Blender SVN compatibility : using bl_info for printing version when registering
     . Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
+    . Blender SVN compatibility : registering the module is requiered in Blender SVN >2.56 to use operators
+    . Blender SVN compatibility : mathutils.Matrix format changed in Blender SVN >2.56
 
 March 25th (SRombauts):
     . issue7: Need for an add-on config file with user preferences
@@ -121,7 +125,7 @@ March 25th (SRombauts):
     
 March 31th (SRombauts):
     . Issue 14:	DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
-    . 0.3.2 last Blender 2.56 release
+    . 0.3.2 release
 
 '''
 
@@ -229,13 +233,6 @@ Installing:
 ## TODO - image compression browser (previews total size)
 ## useful for online content - texture load is speed hit
 
-## How to switch to Blender 2.57 when released :
-## TODO Remove try/expect arround register_module() in Blender 2.57 release and in the same way,
-## TODO Replace all 5 Matrix.copy().invert() call by Matrix.inverted() in Blender 2.57 release and in the same way,
-## TODO translation_part()=>to_translation()
-## TODO scale_part()=>to_scale()
-## TODO rotation_part().to_euler() => to_euler()
-## TODO rotation_part().to_quat() => to_quaternion()
 
 import os, sys, time, hashlib, getpass, tempfile , configparser
 
@@ -4316,9 +4313,9 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Transform" )
-        loc = '%6f,%6f,%6f' %tuple(ob.matrix_world.translation_part())
-        rot = '%6f,%6f,%6f' %tuple(ob.matrix_world.rotation_part().to_euler())
-        scl = '%6f,%6f,%6f' %tuple(ob.matrix_world.scale_part())
+        loc = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_translation())
+        rot = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_euler())
+        scl = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_scale())
         a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
 
         a = doc.createElement('attribute'); c.appendChild(a)
@@ -4583,7 +4580,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
                             self.dot_mesh( ob, os.path.split(url)[0] )
 
             ## deal with Array mod ##
-            vecs = [ ob.matrix_world.translation_part() ]
+            vecs = [ ob.matrix_world.to_translation() ]
             for mod in ob.modifiers:
                 if mod.type == 'ARRAY':
                     if mod.fit_type != 'FIXED_COUNT':
@@ -4594,7 +4591,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
                         continue
 
                     else:
-                        #v = ob.matrix_world.translation_part()
+                        #v = ob.matrix_world.to_translation()
 
                         newvecs = []
                         for prev in vecs:
@@ -4687,7 +4684,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 
 def get_parent_matrix( ob, objects ):
     if not ob.parent:
-        return mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+        return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
     else:
         if ob.parent in objects:
             return ob.parent.matrix_world.copy()
@@ -4695,7 +4692,7 @@ def get_parent_matrix( ob, objects ):
             return get_parent_matrix(ob.parent, objects)
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
-    mat = get_parent_matrix(ob, objects).invert() * ob.matrix_world
+    mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
 
     o = doc.createElement('node')
     o.setAttribute('name',prefix+ob.name)
@@ -4705,13 +4702,13 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
     for n in (p,q,s): o.appendChild(n)
 
     if pos: v = swap(pos)
-    else: v = swap( mat.translation_part() )
+    else: v = swap( mat.to_translation() )
     p.setAttribute('x', '%6f'%v.x)
     p.setAttribute('y', '%6f'%v.y)
     p.setAttribute('z', '%6f'%v.z)
 
     if rot: v = swap(rot)
-    else: v = swap( mat.rotation_part().to_quat() )
+    else: v = swap( mat.to_quaternion() )
     q.setAttribute('x', '%6f'%v.x)
     q.setAttribute('y', '%6f'%v.y)
     q.setAttribute('z', '%6f'%v.z)
@@ -4724,9 +4721,9 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
         s.setAttribute('y', '%6f'%y)
         s.setAttribute('z', '%6f'%z)
     else:        # scale is different in Ogre from blender - rotation is removed
-        ri = mat.rotation_part().to_quat().inverse().to_matrix()
+        ri = mat.to_quaternion().inverted().to_matrix()
         scale = ri.to_4x4() * mat
-        v = swap( scale.scale_part() )
+        v = swap( scale.to_scale() )
         x=abs(v.x); y=abs(v.y); z=abs(v.z)
         s.setAttribute('x', '%6f'%x)
         s.setAttribute('y', '%6f'%y)
@@ -4939,7 +4936,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
     for mod in rem: copy.modifiers.remove( mod )
 
     ## bake mesh ##
-    _mesh_normals = copy.create_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
+    _mesh_normals = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
     _lookup_normals = False
     if normals: _lookup_normals = mesh_is_smooth( _mesh_normals )
     if _lookup_normals: print('using super slow normal lookup...')
@@ -4950,7 +4947,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
     e.use_edge_sharp = True
     for edge in copy.data.edges: edge.use_edge_sharp = True
     ## bake mesh ##
-    mesh = copy.create_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
+    mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
 
     prefix = ''
     #if opts['mesh-sub-dir']:    #self.EX_MESH_SUBDIR:
@@ -5240,26 +5237,26 @@ class Bone(object):
     def update(self):        # called on frame update
         pose = self.bone.matrix * self.skeleton.object_space_transformation
         pose =  self.skeleton.object_space_transformation * self.bone.matrix
-        self._inverse_total_trans_pose = pose.copy().invert()
+        self._inverse_total_trans_pose = pose.inverted()
 
         # calculate difference to parent bone
         if self.parent:
             pose = self.parent._inverse_total_trans_pose * pose
         elif self.fixUpAxis:
-            pose = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1]) * pose
+            pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
 
         # get transformation values
         # translation relative to parent coordinate system orientation
         # and as difference to rest pose translation
         #blender2.49#translation -= self.ogreRestPose.translationPart()
-        self.pose_location =  pose.translation_part()  -  self.ogre_rest_matrix.translation_part()
+        self.pose_location =  pose.to_translation()  -  self.ogre_rest_matrix.to_translation()
         # rotation (and scale) relative to local coordiante system
         # calculate difference to rest pose
         #blender2.49#poseTransformation *= self.inverseOgreRestPose
         #pose = pose * self.inverse_ogre_rest_matrix        # this was wrong, fixed Dec3rd
         pose = self.inverse_ogre_rest_matrix * pose
-        self.pose_rotation = pose.rotation_part().to_quat()
-        self.pose_scale = pose.scale_part().copy()
+        self.pose_rotation = pose.to_quaternion()
+        self.pose_scale = pose.to_scale()
 
         #self.pose_location = self.bone.location.copy()
         #self.pose_rotation = self.bone.rotation_quaternion.copy()
@@ -5288,9 +5285,9 @@ class Bone(object):
         if self.parent:
             inverseParentMatrix = self.parent.inverse_total_trans
         elif (self.fixUpAxis):
-            inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,0,-1,0],[0,1,0,0],[0,0,0,1])
+            inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
         else:
-            inverseParentMatrix = mathutils.Matrix([1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1])
+            inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
 
         # bone matrix relative to armature object
         self.ogre_rest_matrix = self.matrix.copy()
@@ -5299,11 +5296,11 @@ class Bone(object):
         self.ogre_rest_matrix = self.skeleton.object_space_transformation * self.ogre_rest_matrix
 
         # store total inverse transformation
-        self.inverse_total_trans = self.ogre_rest_matrix.copy().invert()
+        self.inverse_total_trans = self.ogre_rest_matrix.inverted()
         # relative to OGRE parent bone origin
         #self.ogre_rest_matrix *= inverseParentMatrix        # 2.49 style
         self.ogre_rest_matrix = inverseParentMatrix * self.ogre_rest_matrix
-        self.inverse_ogre_rest_matrix = self.ogre_rest_matrix.copy().invert()
+        self.inverse_ogre_rest_matrix = self.ogre_rest_matrix.inverted()
 
         ## recursion ##
         for child in self.children:
@@ -5341,8 +5338,8 @@ class Skeleton(object):
         # additional transformation for root bones:
         # from armature object space into mesh object space, i.e.,
         # (x,y,z,w)*AO*MO^(-1)
-        self.object_space_transformation = arm.matrix_local * ob.matrix_local.copy().invert()
-        #self.object_space_transformation = ob.matrix_local.copy().invert() * arm.matrix_local 
+        self.object_space_transformation = arm.matrix_local * ob.matrix_local.inverted()
+        #self.object_space_transformation = ob.matrix_local.inverted() * arm.matrix_local 
 
         ## setup bones for Ogre format ##
         for b in self.bones: b.rebuild_tree()
@@ -5371,14 +5368,14 @@ class Skeleton(object):
                 bh.appendChild( bp )
 
             pos = doc.createElement( 'position' ); b.appendChild( pos )
-            x,y,z = mat.translation_part()
+            x,y,z = mat.to_translation()
             pos.setAttribute('x', '%6f' %x )
             pos.setAttribute('y', '%6f' %y )
             pos.setAttribute('z', '%6f' %z )
             rot =  doc.createElement( 'rotation' )        # note "rotation", not "rotate"
             b.appendChild( rot )
 
-            q = mat.rotation_part().to_quat()
+            q = mat.to_quaternion()
             rot.setAttribute('angle', '%6f' %q.angle )
             axis = doc.createElement('axis'); rot.appendChild( axis )
             x,y,z = q.axis
@@ -5388,7 +5385,7 @@ class Skeleton(object):
             ## Ogre bones do not have initial scaling? ##
             if 0:
                 scale = doc.createElement('scale'); b.appendChild( scale )
-                x,y,z = swap( mat.scale_part() )
+                x,y,z = swap( mat.to_scale() )
                 scale.setAttribute('x', str(x))
                 scale.setAttribute('y', str(y))
                 scale.setAttribute('z', str(z))
@@ -5458,7 +5455,7 @@ class Skeleton(object):
 
                         rot =  doc.createElement( 'rotate' )        # note "rotate" - bug fixed Dec2nd
                         keyframe.appendChild( rot )
-                        q = _rot #swap( mat.rotation_part().to_quat() )
+                        q = _rot #swap( mat.to_quaternion() )
                         rot.setAttribute('angle', '%6f' %q.angle )
                         axis = doc.createElement('axis'); rot.appendChild( axis )
                         x,y,z = q.axis
@@ -5468,7 +5465,7 @@ class Skeleton(object):
 
                         scale = doc.createElement('scale')
                         keyframe.appendChild( scale )
-                        x,y,z = _scl #swap( mat.scale_part() )
+                        x,y,z = _scl #swap( mat.to_scale() )
                         scale.setAttribute('x', '%6f' %x)
                         scale.setAttribute('y', '%6f' %y)
                         scale.setAttribute('z', '%6f' %z)
@@ -5566,7 +5563,7 @@ class INFO_MT_instances(bpy.types.Menu):
             op.mystring = ob.name
         layout.separator()
 
-class INFO_MT_instance(bpy.types.Operator):                
+class INFO_MT_instance(bpy.types.Operator):
     '''select instance group'''
     bl_idname = "ogre.select_instances"
     bl_label = "Select Instance Group"
@@ -5772,14 +5769,17 @@ def export_menu_func(self, context):
 def import_menu_func(self, context):
     self.layout.operator(Ogre_import_op.bl_idname, text="Ogre3D (.scene) | read version control attributes (UUIDs)")
 
-_header_ = None
+#_header_ = None
 MyShaders = None
 def register():
     print(VERSION)
     global MyShaders, _header_
-    
-    _header_ = bpy.types.INFO_HT_header
-    bpy.types.unregister(_header_)
+
+    bpy.utils.register_module(__name__)
+
+    #TODO unregistering this type does not seems possible anymore in Blender SVN >2.56
+    #_header_ = bpy.types.INFO_HT_header
+    #bpy.types.unregister(_header_)
 
     readConfig()
         
@@ -5791,7 +5791,10 @@ def register():
 def unregister():
     print('unreg-> ogre exporter')
 
-    bpy.types.register(_header_)
+    bpy.utils.unregister_module(__name__)
+
+    #TODO unregistering this type does not seems possible anymore in Blender SVN >2.56
+    #bpy.types.register(_header_)
         
     bpy.types.INFO_MT_file_export.remove(export_menu_func)
     bpy.types.INFO_MT_file_import.remove(import_menu_func)
