@@ -52,7 +52,7 @@ Dependencies:
 
 Changelog:
 
-	0.3.2 added a config file - probably last release for Blender 2.56 (Sébastien Rombauts)
+	0.3.2 added a config file - first Blender 2.57 release
     . issue7: Need for an add-on config file with user preferences
     . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
     . Issue 14:	DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
