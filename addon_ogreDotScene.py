@@ -111,9 +111,6 @@ March 18th (SRombauts):
     . issue5: speed optimization O(n^2) into O(n log n)
     . 0.3.1 Blender 2.56 release
 
-March 20th (SRombauts):
-    . correction to bl_addon_info
-    
 March 21th (SRombauts):
     . using bl_addon_info for printing version when registering
     . Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)

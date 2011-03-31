@@ -51,10 +51,15 @@ Dependencies:
 			(Linux copy to your home folder)
 
 Changelog:
+
+	0.3.2 added a config file - probably last release for Blender 2.56 (Sébastien Rombauts)
+    . issue7: Need for an add-on config file with user preferences
+    . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
+    . Issue 14:	DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
+
 	0.3.1 small bug fix and optimization (Sébastien Rombauts)
 		. issue1: os.getlogin() unreliable; using getpass.getuser() instead
 		. issue5: speed optimization O(n^2) into O(n log n)
-
 		
 	0.3.0 milestone (Brett Hartshorn)
 	
