@@ -19,7 +19,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
     "author": "HartsAntler",
-    "version": (0,3,2),
+    "version": (0,3,3),
     "blender": (2,5,7),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -130,6 +130,7 @@ March 31th (SRombauts):
 April 3rd (SRombauts):
     . Issue 9:  Blender script/addon name must be changed
     . Issue 15: Use an appropriate path for the addon config file
+    . 0.3.3 release
     
 '''
 
