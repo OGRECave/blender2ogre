@@ -13,7 +13,7 @@ Help:
 
 Installing:
 	Installing the Addon:
-		1. You can simply copy addon_ogreDotScene.py to your blender installation under blender/2.56/scripts/addons/
+		1. You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.56/scripts/addons/
 			( manual copy is the safest way )
 		2. Or you can use blenders interface, under user-prefs, click addons, and click 'install-addon'
 			( this way fails to overwrite a previous version )
