@@ -124,9 +124,13 @@ March 25th (SRombauts):
     . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
     
 March 31th (SRombauts):
-    . Issue 14:	DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
+    . Issue 14: DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
     . 0.3.2 release
 
+April 3rd (SRombauts):
+    . Issue 9:  Blender script/addon name must be changed
+    . Issue 15: Use an appropriate path for the addon config file
+    
 '''
 
 ##2.49 code reference: "<quaternion x=\"%.6f\" y=\"%.6f\" z=\"%.6f\" w=\"%.6f\"/>\n" % (rot.x, rot.z, -rot.y, rot.w))
@@ -234,7 +238,18 @@ Installing:
 ## useful for online content - texture load is speed hit
 
 
+######
+# imports
+######
 import os, sys, time, hashlib, getpass, tempfile , configparser
+import xml.dom.minidom as dom
+import math, subprocess
+
+try:
+    import bpy, mathutils
+    from bpy.props import *
+except ImportError:
+    sys.exit("This script is an addon for blender, you must install it from blender.")
 
 
 CONFIG_FILENAME = 'blender2ogre.cfg'
@@ -249,7 +264,7 @@ def readOrCreateConfigValue(config, section, option, default):
         return default
 
 # Read the addon config values from the config blender2ogre.cfg file, or create/update it whith platform specific default values
-def readConfig():
+def readOrCreateConfig():
     # TODO SRombauts: make a class AddonConfig to store these values
     global     CONFIG_TEMP_DIR, CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR
     
@@ -277,11 +292,14 @@ def readConfig():
         DEFAULT_NVIDIATOOLS_EXE = '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME']
         DEFAULT_MYSHADERS_DIR = '%s/myshaders' %os.environ['HOME']
         
+    # Compose the path to the config file, in the config/scripts subfolder
+    config_path = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
+    config_filepath = os.path.join(config_path, CONFIG_FILENAME)
 
     # Read the blender2ogre.cfg config file for addon options (or create a 'paths' section if not present)
-    print('Opening config file %s...' % CONFIG_FILENAME)
+    print('Opening config file %s ...' % config_filepath)
     config = configparser.ConfigParser()
-    config.read(CONFIG_FILENAME)
+    config.read(config_filepath)
     if not config.has_section('paths'):
         config.add_section('paths')
 
@@ -295,9 +313,9 @@ def readConfig():
     CONFIG_MYSHADERS_DIR           = readOrCreateConfigValue(config, 'paths', 'MYSHADERS_DIR',           DEFAULT_MYSHADERS_DIR)
 
     # Write the blender2ogre.cfg config file 
-    with open(CONFIG_FILENAME, 'w') as configfile:
+    with open(config_filepath, 'w') as configfile:
         config.write(configfile)
-        print('config file %s written.' % CONFIG_FILENAME)
+        print('config file %s written.' % config_filepath)
 
     # Print config values
     print('CONFIG_TEMP_DIR=%s'                % CONFIG_TEMP_DIR)
@@ -341,17 +359,6 @@ material _missing_material_
 '''
 
 
-######
-# imports
-######
-import xml.dom.minidom as dom
-import math, subprocess
-
-try:
-    import bpy, mathutils
-    from bpy.props import *
-except ImportError:
-    sys.exit("This script is an addon for blender, you must install it from blender.")
 
 def get_objects_using_materials( mats ):
     obs = []
@@ -5781,7 +5788,7 @@ def register():
     #_header_ = bpy.types.INFO_HT_header
     #bpy.types.unregister(_header_)
 
-    readConfig()
+    readOrCreateConfig()
         
     MyShaders = MyShadersSingleton()
     
