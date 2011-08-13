@@ -5802,21 +5802,29 @@ def material_name( mat ):
     else: return mat.name + mat.library.filepath.replace('/','_')
 
 
-import array
+import array, time
 class FastMesh(object):
 
     def __init__(self, ob):
+        start = time.time()
         data = ob.data; N = len( data.vertices )
         self.vertex_positions = array.array( 'f', [.0]*3 ) * N
         data.vertices.foreach_get( 'co', self.vertex_positions )
+        print('vert pos ok')
+
         self.vertex_normals = array.array( 'f', [.0]*3 ) * N
         data.vertices.foreach_get( 'normal', self.vertex_normals )
+        print('vert normals ok')
+
+        self.faces = array.array( 'I', [0]*4 ) * len(data.faces)
+        data.faces.foreach_get( 'vertices_raw', self.faces )
+        print('faces ok')
 
         self.vertex_colors = []
-        if len( mesh.vertex_colors ):
+        if len( data.vertex_colors ):
             vc = data.vertex_colors[0]
             n = len(vc.data)
-
+            # no colors_raw !!?
             self.vcolors1 = array.array( 'f', [.0]*3 ) * n  # face1
             vc.data.foreach_get( 'color1', self.vcolors1 )
             self.vertex_colors.append( self.vcolors1 )
@@ -5833,10 +5841,24 @@ class FastMesh(object):
             vc.data.foreach_get( 'color4', self.vcolors4 )
             self.vertex_colors.append( self.vcolors4 )
 
+        self.uv_textures = []
+        if data.uv_textures.active:
+            for layer in data.uv_textures:
+                a = array.array( 'f', [.0]*8 ) * len(layer.data)
+                layer.data.foreach_get( 'uv_raw', a )   # 4 faces
+                self.uv_textures.append( a )
+
+        print('_'*80)
+        print( 'fast mesh created in:', time.time()-start)
+
 
 
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
     print('mesh to Ogre mesh XML format', ob.name)
+
+    fastmesh = FastMesh( ob )
+    assert 0
+
     if not os.path.isdir( path ):
         print('creating directory', path )
         os.makedirs( path )
