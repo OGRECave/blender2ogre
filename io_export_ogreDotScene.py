@@ -18,7 +18,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
-    "version": (0,5,0),
+    "version": (0,5,1),
     "blender": (2,5,8),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -5801,6 +5801,40 @@ def material_name( mat ):
     elif not mat.library: return mat.name
     else: return mat.name + mat.library.filepath.replace('/','_')
 
+
+import array
+class FastMesh(object):
+
+    def __init__(self, ob):
+        data = ob.data; N = len( data.vertices )
+        self.vertex_positions = array.array( 'f', [.0]*3 ) * N
+        data.vertices.foreach_get( 'co', self.vertex_positions )
+        self.vertex_normals = array.array( 'f', [.0]*3 ) * N
+        data.vertices.foreach_get( 'normal', self.vertex_normals )
+
+        self.vertex_colors = []
+        if len( mesh.vertex_colors ):
+            vc = data.vertex_colors[0]
+            n = len(vc.data)
+
+            self.vcolors1 = array.array( 'f', [.0]*3 ) * n  # face1
+            vc.data.foreach_get( 'color1', self.vcolors1 )
+            self.vertex_colors.append( self.vcolors1 )
+
+            self.vcolors2 = array.array( 'f', [.0]*3 ) * n  # face2
+            vc.data.foreach_get( 'color2', self.vcolors2 )
+            self.vertex_colors.append( self.vcolors2 )
+
+            self.vcolors3 = array.array( 'f', [.0]*3 ) * n  # face3
+            vc.data.foreach_get( 'color3', self.vcolors3 )
+            self.vertex_colors.append( self.vcolors3 )
+
+            self.vcolors4 = array.array( 'f', [.0]*3 ) * n  # face4
+            vc.data.foreach_get( 'color4', self.vcolors4 )
+            self.vertex_colors.append( self.vcolors4 )
+
+
+
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
     print('mesh to Ogre mesh XML format', ob.name)
     if not os.path.isdir( path ):
@@ -6388,5 +6422,11 @@ class SimpleSaxWriter():
     def close(self):
         self._xml_writer.endElement(self.top_level_tag)
         self._xml_writer.endDocument()
+
+
+
+
+
+
 
 
