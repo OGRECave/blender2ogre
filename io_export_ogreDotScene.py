@@ -1,5 +1,5 @@
 # Copyright (C) 2005  Michel Reimpell    [ blender24 version ]
-# Copyright (C) 2010 Brett Hartshorn        [ blender25 version ]
+# Copyright (C) 2010 Brett Hartshorn    [ blender25 version ]
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -15,93 +15,29 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-
 bl_info = {
-    "name": "OGRE Exporter (.scene, .mesh, .skeleton)",
-    "author": "HartsAntler",
-    "version": (0,3,3),
-    "blender": (2,5,7),
+    "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
+    "author": "HartsAntler, Sebastien Rombauts, and F00bar",
+    "version": (0,5,0),
+    "blender": (2,5,8),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
-    "warning": "",
-    #"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
-    #"tracker_url": "https://projects.blender.org/tracker/index.php?"\
+    "warning": "Quick Start: '.mesh' output requires OgreCommandLineTools (http://www.ogre3d.org/download/tools) - install to the default path.",
+    "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
+    "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
+VERSION = '0.5.0 Aug13th 2011'
 
-VERSION = bl_info["name"] + " Addon v" + bl_info["version"][0].__str__() + "." + bl_info["version"][1].__str__() + "." + bl_info["version"][2].__str__() 
 
 __devnotes__ = '''
---final bug fix milestone--
 
-Nov24:
-    . fixed triangles flipped wrong
-    . fixed .xml_mesh, .xml_skeleton (caused ogrecommandlinetools to fail)
-Nov30:
-    . fixed multi-mats preview
-    . fixed material with use_nodes off but with dangling empty sub-materials
-Dec1st:
-    . added bone class to wrap blenders bone types
-Dec2nd:
-    . fixed bug in armature anim, rest pose xml is "rotation" while keyframe is "rotate"
-Dec3rd:
-    . fixed bug, armature is hidden, can not get into edit_bones
-    . fixed bug in armature anim, wrong mult order of rotation pose
-    . fixed restore default INFO header
-    . fixed vertex colours
-    . fixed UV seams
-Dec4th:
-    . fixed bone index out of order, and allows extra vertex groups
-    . started FAQ
-    . added dot-rex output
-    . fixed vertex normals edge-split mod bug, reported by Sanni
-Dec5th:
-    . added object hierarchy (preserves parent/child relationships from blender)
-Dec8th:
-    . generateTangents can not be default True because it requires texture coords
-    . supports more than 65,535 vertices per mesh
-    . fixed if no normals, then normals set to false (was crashing OgreCommandLineTools)
-    . added user data (custom properties) to .scene
-    <node>
-        <user_data name="mycustprop" type="float" value="1.0"/>
-    . updated the FAQ
-    . added MeshMagick merge ( but seems useless? )
-    . added blender mesh merge
-Dec9th:
-    . fixing bugs in mesh merge
-    . added physics panel
-    . added panels for Sensor/Actuator hijacking, and xml output
-Dec10th:
-    . added support for unpacking texture images
-    . fixed Ogre Logic in all tabs - now only in physics
-    . added support for classic materials with basic options and Panel
-    . fixed meshed with zero faces, or submaterials with no faces
-Dec11th:
-    . changed tex-slot.offset to be offset and animation to custom prop
-    . added material panel
-Dec14th:
-    . dropped to 6 decimal precision
-    . added support for vertex alpha by using second vertex-color-channel named "alpha"
-    . added extra tool bake-tex-2-vertex-colors
-Dec16th:
-    . added collision LOD panel
-    . fixed inverse texture scaling (blender inverse of ogre).
-    . trying unflipped UV - reported by Reyn
-Dec 17th:
-    . fixed inverse texture scaling (1.0/x) not (-1.0/x)
-    . added respect blender's slot.use (texture slot on/off)
-Dec 22nd:
-    . added relocate missing textures helper
-    . zero faces fixes
-    . fixed transparent mats by forcing cull_hardware to none, also ignore material.alpha if use_alpha at texture level.
-Dec 23rd:
-    . faster material preview in OgreMeshy
-Dec 31st:
-    . read/write: UUIDs, categories, titles, and notes
+## b2rex touches these, so keep the names! ##
+ogre_mesh_entity_helper = addon_ogreDotScene.INFO_OT_createOgreExport._node_export
+ogre_material_export = addon_ogreDotScene.INFO_OT_createOgreExport.gen_dot_material
 
--- end of milestones --
--- post fixes --
-Jan 6th 2011:
+
+Jan 6th 2011 (Hart):
     . updated for blender256
     . fixed Nvidia DDS output
     . add swap axis options
@@ -131,11 +67,107 @@ April 3rd (SRombauts):
     . Issue 9:  Blender script/addon name must be changed
     . Issue 15: Use an appropriate path for the addon config file
     . 0.3.3 release
-    
+
+May 11th (Hart):
+    . small fixes
+
+May 12th (Hart):
+    . fixed ogre-export being forced to .txml
+    . fixed multi-track animation export, cleaned up doc, added examples.    
+
+May 16th (Hart):
+    . tested again in OgreMeshy under linux, fixed works again.
+    . really fixed multi-track animation
+    . confirmed that shape-animation is badly broken, needs redesign.
+
+June 2nd (Hart):
+    . mesh export speedup
+    . fixed shape animation export
+
+June 6th (Hart):
+    . fixed merge groups
+    . added OSX patch
+    . dot scene more conformant to spec
+    . closed several issues on the tracker
+    . fixed multiple materials on single mesh
+    . fixed uv textures
+
+June 7th (Hart):
+    . really fixed uvs
+    . fixed ubuntu (different naming for OgreXMLConverter when using apt-get ogre-tools)
+    . fixed Texture Panel and rotation animation option changed to use_from_dupli
+
+June 12th (Hart):
+    . fixed collision panel - if not ob.show_bounds: ob.show_bounds = True
+    . fixed sharp face normals
+    . fixed badverts
+    . supports library linking with name collisions
+
+June 18th (Hart):
+    . fixed usealpha line: 1959
+    . fixed floating bones
+    . changed default axis to x z -y
+    . fixed ogre_user_report not found if toolbar not enabled
+
+June 30th (Hart):
+    . Fixed Lamp export "color" to British "colour" - reported by Mohdakra
+    . New spotLightRange inner and outer options
+    . Fixed sharedGeometry vertexcount, compatible with jMonkeyEngine
+    . New Lamp option powerScale taken from Lamp energy
+    . OgreMeshy preview disabled when in mesh-edit mode.
+
+July 2nd (Hart):
+    . Fixed fog settings - reported by junode
+July 3rd (Hart):
+    . Fixed lamp direction - reported by Mohdakra
+July 22nd (Hart):
+    . Fixed (untested) 32bit indices - should be on submesh not sharedgeo
+July 25th (Hart):
+    . Improved memory and performance - replaced xml.dom.minidom with custom microdom
+
+July 26th (f00bar):
+    . mesh.xml is directly written to file [class SimpleSaxWriter() at end of script]
+    . material file name is derived from .scene file name (bpy.context.scene.name always returns "Scene" for me)
+    . [shape keys] bpy.context.scene.frame_current did not work (so all values were from current time), now using bpy.context.scene.frame_set(frame)
+    . [shape keys] poseindex: need to subtract 1, because shape 0 is base and not written to the file
+    . not writing an "index" on "pose" and "track", the index is for the case where "target" is "submesh"
+    . "use32bitindexes" : str(bool(numverts > 65535)) is used, that means it is set in cases not needed, but that way it needs no postprocessing of file
+    . ugly: function replaceInplace, using fileinput module to write number of vertices into file at end (could write into it without processing the whole file)
+
+July 27th (Hart):
+    . reviewed F00bar's changes
+    . replaced bpy.data.objects with bpy.context.scene.objects - and tested multiple scene export
+
+August 12th (f00bar):
+    . using (nx,ny,nz, r,g,b,ra, vert_uvs) to check if vertex must be duplicated.
+         - this is overkill, but it can be replaced when bmesh comes out
+    . hopefully fixed bug with deleted materials which blender returns as None
+    . small fixes (e.g. Report, being sure mesh.xml file is closed,...)
+
+August 13th (Hart):
+    . went back to axis swap "-x z y" - this is the Ogre default
+    . fixed swap axis for .txml output
+    . removed swap axis option - from now on its always Ogre default
+    . merged with f00bar's updates
+    . export armature and shape animation now respects FPS
+    . shape animation now respects bpy.context.scene.frame_step
+    . shadeless material sets emissive to 1.0
+
+
 '''
 
-##2.49 code reference: "<quaternion x=\"%.6f\" y=\"%.6f\" z=\"%.6f\" w=\"%.6f\"/>\n" % (rot.x, rot.z, -rot.y, rot.w))
-def swap(vec):
+# to compare floats (e.g. to decide if vertex in two faces has similar normal, uvs, ... or if vertex must be duplicated)
+# tested by looking at normals of subdivided cube, errors in that example were up to 0.000000581
+EPSILON=0.000001
+
+# Hardcoded to Ogre Default #
+def swap( vec ):
+    if len(vec) == 3: return mathutils.Vector( [-vec.x, vec.z, vec.y] )
+    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, -vec.x, vec.z, vec.y] )
+    else: assert 0
+
+## Deprecated
+def swap_old(vec):
     if OPTIONS['SWAP_AXIS'] == 'x y z': return vec
     elif OPTIONS['SWAP_AXIS'] == 'x z y':
         if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, vec.y] )
@@ -150,13 +182,6 @@ def swap(vec):
         print( 'unknown swap axis mode', OPTIONS['SWAP_AXIS'] )
 
 _faq_ = '''
-Q: my model is over 10,000 faces and it seems to take forever to export it!!!
-A: the current code uses an inefficient means for dealing with smooth normals,
-    you can make your export 100x faster by making dense models flat shaded.
-    (select all; then, View3D->Object Tools->Shading->Flat)
-    TIP:
-        Try making the model flat shaded and using a subsurf or multi-res modifer,
-        this will give you semi-smoothed normals without a speed hit.
 
 Q: i have hundres of objects, is there a way i can merge them on export only?
 A: yes, just add them to a group named starting with "merge"
@@ -186,27 +211,25 @@ Q: i want to use a low-resolution mesh as a collision proxy for my high-resoluti
 A: make the lowres mesh the child of the hires mesh, and name the low res mesh starting with "collision"
 
 Q: i do not want to use triangle mesh collision, can i use simple collision primitives?
-A: yes, go to Properties->Physics->Ogre Physics.  This gets save to the OgreDotScene file.
+A: yes, go to View3D->Tools->Ogre Physics.  This gets save to the OgreDotScene file.
 
-Q: what version of this script am i running?
-A: %s
-''' %VERSION
+'''
 
 
 _doc_installing_ = '''
 Installing:
     Installing the Addon:
-        You can simply copy addon_ogreDotScene.py to your blender installation under blender/2.56/scripts/addons/
+        You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.57/scripts/addons/
         and enable it in the user-prefs interface (CTRL+ALT+U)
         Or you can use blenders interface, under user-prefs, click addons, and click 'install-addon'
         (its a good idea to delete the old version first)
 
     Required:
-        1. blender2.56        (svn 33087+)
+        1. blender2.58
 
         2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
             http://www.ogre3d.org/download/tools
-            (Linux users will need to use Wine)
+            (Linux users may use above and Wine, or install from source, or install via apt-get install ogre-tools)
 
     Optional:
         3. Install NVIDIA DDS Legacy Utilities    ( install to default path )
@@ -224,27 +247,16 @@ Installing:
             (Linux copy to your home folder)
 
 '''
-## Nov23, tried PyOgre, it sucks - new plan: Tundra
-
-## KeyError: 'the length of IDProperty names is limited to 31 characters'        - chat with Jesterking request 64
-## ICONS are in blender/editors/include/UI_icons.h
-## TODO exploit pynodes, currently they are disabled pending python3 support: nodes/intern/SHD_dynamic.c
-## TODO future idea: render procedural texture to images, more optimal to save settings and reimplment in Ogre, blender could also benifit from GLSL procedural shaders ##
-## TODO request IDProperties support for material-nodes
-## TODO check out https://github.com/realXtend/naali/blob/develop/bin/pymodules/webserver/webcontroller.py
-## <antont> we looked at adding support for the b2rex xmlrpc methods there, to add b2rex support to tundra
-## TODO are 1e-10 exponent numbers ok in the xml files?
-## TODO count verts, and count collision verts
-## TODO - image compression browser (previews total size)
-## useful for online content - texture load is speed hit
 
 
 ######
 # imports
 ######
 import os, sys, time, hashlib, getpass, tempfile , configparser
-import xml.dom.minidom as dom
 import math, subprocess
+#sax xml:
+from xml.sax.saxutils import XMLGenerator
+
 
 try:
     import bpy, mathutils
@@ -284,12 +296,26 @@ def readOrCreateConfig():
         DEFAULT_NVIDIATOOLS_EXE = 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe'
         DEFAULT_MYSHADERS_DIR = 'C:\\myshaders'
         
-    elif sys.platform.startswith('linux'):        # bug fix reported by Borris
+    elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):        # OSX patch by FreqMod June6th 2011
         # DEFAULT_TEMP_PATH = '/tmp' 
-        DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'
-        DEFAULT_OGRETOOLS_MESH_MAGICK = '%s/.wine/drive_c/OgreCommandLineTools/MeshMagick.exe' %os.environ['HOME']
+        DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXmlConverter'
+        DEFAULT_OGRETOOLS_MESH_MAGICK = '/usr/bin/MeshMagick'
+
+        if not os.path.isfile( DEFAULT_OGRETOOLS_XML_CONVERTER ):
+            if os.path.isfile( '/usr/local/bin/OgreXMLConverter'):
+                DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/local/bin/OgreXMLConverter'
+            if os.path.isfile( '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME'] ):
+                DEFAULT_OGRETOOLS_XML_CONVERTER = '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME']
+                DEFAULT_OGRETOOLS_MESH_MAGICK = '%s/.wine/drive_c/OgreCommandLineTools/MeshMagick.exe' %os.environ['HOME']
+            elif os.path.isfile( '/usr/bin/OgreXMLConverter'):   # ubuntu ogre-tools package changes name of OgreXmlConverter to OgreXMLConverter
+                DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'
+
+
         DEFAULT_OGRE_MESHY = '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME']
+
         DEFAULT_IMAGE_MAGICK_CONVERT = '/usr/bin/convert/convert'
+        if not os.path.isfile( DEFAULT_IMAGE_MAGICK_CONVERT ): DEFAULT_IMAGE_MAGICK_CONVERT = '/usr/local/bin/convert/convert'
+
         DEFAULT_NVIDIATOOLS_EXE = '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME']
         DEFAULT_MYSHADERS_DIR = '%s/myshaders' %os.environ['HOME']
         
@@ -330,13 +356,19 @@ def readOrCreateConfig():
 
 # 
 
+
+
+
+
 # options yet to be added to the config file
 OPTIONS = {
     'FORCE_IMAGE_FORMAT' : None,
     'TEXTURES_SUBDIR' : False,
     'PATH' : '/tmp',    # TODO SRombauts: use the CONFIG_TEMP_DIR variable
     'TOUCH_TEXTURES' : False,
-    'SWAP_AXIS' : '-x z y',
+    #'SWAP_AXIS' : '-x z y',        # this was not correct when viewed in OgreMeshy
+    #'SWAP_AXIS' : 'x z -y',         # this is ogre standard?
+    'SWAP_AXIS' : '-x z y',         # ogre standard
 }
 
 
@@ -423,7 +455,7 @@ class Ogre_relocate_textures_op(bpy.types.Operator):
 
         for ob in get_objects_using_materials(badmats): ob.select=True
         for mat in badmats:
-            Report.warnings.append( 'BAD-MATERIAL:  %s' %mat.name )
+            Report.warnings.append( 'BAD-MATERIAL:  %s' %material_name(mat) )
 
         if not Report.messages and not badmats: Report.messages.append( 'Everything is OK' )
 
@@ -445,6 +477,7 @@ class ReportSingleton(object):
         self.shape_animations = []
         self.textures = []
         self.vertices = 0
+        self.orig_vertices = 0
         self.faces = 0
         self.triangles = 0
         self.warnings = []
@@ -474,9 +507,10 @@ class ReportSingleton(object):
 
 
         if self.vertices:
-            r.append( '  Total Vertices: %s' %self.vertices )
-            r.append( '  Total Faces: %s' %self.faces )
-            r.append( '  Total Triangles: %s' %self.triangles )
+            r.append( '  Original Vertices: %s' %self.orig_vertices)
+            r.append( '  Exported Vertices: %s' %self.vertices )
+            r.append( '  Original Faces: %s' %self.faces )
+            r.append( '  Exported Triangles: %s' %self.triangles )
             ## TODO report file sizes, meshes and textures
 
         for tag in 'meshes lights cameras armatures armature_animations shape_animations materials textures'.split():
@@ -654,9 +688,9 @@ class Ogre_setup_version_control_op(bpy.types.Operator):
         return {'FINISHED'}
 
 class Ogre_VC_Panel(bpy.types.Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "object"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    #bl_context = "object"
     bl_label = "Ogre Version Control"
     @classmethod
     def poll(cls, context):
@@ -738,7 +772,7 @@ class Ogre_select_by_prop_value(bpy.types.Operator):
     def poll(cls, context): return True
     def invoke(self, context, event):
         #ob = context.active_object
-        for ob in bpy.data.objects:
+        for ob in bpy.context.scene.objects:
             if self.propname in ob.keys():
                 if str(ob[self.propname]) == self.propvalue: ob.select = True
         return {'FINISHED'}
@@ -747,7 +781,7 @@ class Ogre_update_mod_time(bpy.types.Operator):
     '''set modified time and bump the version number up'''  
     bl_idname = "ogre.update_modify_time"  
     bl_label = "update mod time"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     @classmethod
     def poll(cls, context): return True
@@ -757,12 +791,96 @@ class Ogre_update_mod_time(bpy.types.Operator):
         ob['_version_'] += 1
         return {'FINISHED'}
 
+class Ogre_toggle_collision(bpy.types.Operator):
+    '''enables collision'''  
+    bl_idname = "ogre.toggle_collision"  
+    bl_label = "modify collision"
+    bl_options = {'REGISTER'}
+
+    MODE = StringProperty(name="toggle mode", description="...", maxlen=32, default="disable")
+
+    @classmethod
+    def poll(cls, context): return True
+    def invoke(self, context, event):
+        ob = context.active_object
+        game = ob.game
+
+        colchild = None
+        for child in ob.children:
+            if child.name.startswith('collision'): colchild = child; break
+
+        if self.MODE != 'disable' and not colchild:
+            parent = context.active_object
+            child = parent.copy()
+            bpy.context.scene.objects.link( child )
+            child.name = 'collision'
+            child.matrix_local = mathutils.Matrix()
+            child.parent = parent
+            child.hide_select = True
+            child.draw_type = 'WIRE'
+            #child.select = False
+            child.lock_location = [True]*3
+            child.lock_rotation = [True]*3
+            child.lock_scale = [True]*3
+            colchild = child
+
+        decmod = None
+        if colchild:
+            for mod in colchild.modifiers:
+                if mod.type == 'DECIMATE': decmod = mod; break
+            if not decmod:
+                decmod = colchild.modifiers.new('LOD', type='DECIMATE')
+                decmod.ratio = 0.5
+
+
+        if self.MODE == 'disable':
+            game.use_ghost = True
+            if ob.show_bounds: ob.show_bounds = False
+            if ob.show_wire: ob.show_wire = False
+            if colchild and not colchild.hide: colchild.hide = True
+
+        elif self.MODE.startswith('primitive'):
+            game.use_ghost = False
+            game.use_collision_bounds = True
+            colchild.hide = False
+            if colchild and not colchild.hide: colchild.hide = True
+            btype = self.MODE.split(':')[-1]
+            game.collision_bounds_type = btype
+            if btype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
+                if not ob.show_bounds: ob.show_bounds = True
+                if ob.draw_bounds_type != btype: ob.draw_bounds_type = btype
+                if ob.show_wire: ob.show_wire = False
+            elif btype == 'TRIANGLE_MESH':
+                if ob.show_bounds: ob.show_bounds = False
+                if not ob.show_wire: ob.show_wire = True
+                ob.draw_bounds_type = 'POLYHEDRON'    #whats this?
+            else: game.collision_bounds_type = 'BOX'
+
+        elif self.MODE == 'proxy':
+            decmod.show_viewport = True
+            game.use_ghost = False
+            game.use_collision_bounds = False
+
+            if ob.show_bounds: ob.show_bounds = False
+            if ob.show_wire: ob.show_wire = False
+
+            if colchild.hide: colchild.hide = False
+            if not colchild.select:
+                colchild.hide_select = False
+                colchild.select = True
+                colchild.hide_select = True
+
+
+
+        return {'FINISHED'}
+
+
 
 ############## mesh LOD physics #############
 class Ogre_Physics_LOD(bpy.types.Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "data"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    #bl_context = "data"
     bl_label = "Ogre Collision"
     @classmethod
     def poll(cls, context):
@@ -773,80 +891,60 @@ class Ogre_Physics_LOD(bpy.types.Panel):
         ob = context.active_object
         if ob.type != 'MESH': return
         game = ob.game
-        box = layout.box()
 
         if ob.name.startswith('collision'):
+            box = layout.box()
             if ob.parent:
                 box.label(text='object is a collision proxy for: %s' %ob.parent.name)
             else:
                 box.label(text='WARNING: collision proxy missing parent')
 
-        else:
-            colchild = None
-            for child in ob.children:
-                if child.name.startswith('collision'): colchild = child; break
+        else:   # valid parent
+            box = layout.box()
+            if not game.use_ghost:  # HAS collision
+                op = box.operator( 'ogre.toggle_collision', text='Disable' )
+                op.MODE = 'disable'
 
-
-            row = box.row()
-            row.prop( game, 'use_ghost', text='Disable Collision' )
-            if game.use_ghost:
-                if ob.show_bounds: ob.show_bounds = False
-                if ob.show_wire: ob.show_wire = False
-                if colchild and not colchild.hide: colchild.hide = True
-
-            else:
-                row.prop(game, "use_collision_bounds", text="Use Collision Primitive")
-                row = box.row()
-
-                if game.use_collision_bounds:
-                    if colchild and not colchild.hide: colchild.hide = True
-
-                    row.prop(game, "collision_bounds_type", text="Primitive Type")
-                    box.prop(game, "collision_margin", text="Collision Margin", slider=True)
-                    btype = game.collision_bounds_type
-                    if btype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
-                        if not ob.show_bounds: ob.show_bounds = True
-                        if ob.draw_bounds_type != btype: ob.draw_bounds_type = btype
-                        if ob.show_wire: ob.show_wire = False
-                    elif btype == 'TRIANGLE_MESH':
-                        if ob.show_bounds: ob.show_bounds = False
-                        if not ob.show_wire: ob.show_wire = True
-                        #ob.draw_bounds_type = 'POLYHEDRON'    #whats this?
-                        box.label(text='(directly using triangles of mesh as collision)')
-                    else: game.collision_bounds_type = 'BOX'
-
-                else:
-                    ## without these if tests, object is always redrawn and slows down view
-                    if ob.show_bounds: ob.show_bounds = False
-                    if ob.show_wire: ob.show_wire = False
-
-                    if not colchild:
-                        box.operator("ogre.create_collision", text="create new collision mesh")
-                    else:
-                        if colchild.hide: colchild.hide = False
-                        if not colchild.select:
-                            colchild.hide_select = False
-                            colchild.select = True
-                            colchild.hide_select = True
-
-                        row.label(text='collision proxy name: %s' %colchild.name)
-                        if colchild.hide_select:
-                            row.prop( colchild, 'hide_select', text='', icon='LOCKED' )
-                        else:
-                            row.prop( colchild, 'hide_select', text='', icon='UNLOCKED' )
-
+                if not game.use_collision_bounds:
+                    box = layout.box()
+                    colchild = None
+                    for child in ob.children:
+                        if child.name.startswith('collision'): colchild = child; break
+                    if colchild:
                         decmod = None
                         for mod in colchild.modifiers:
                             if mod.type == 'DECIMATE': decmod = mod; break
-                        if not decmod:
-                            decmod = colchild.modifiers.new('LOD', type='DECIMATE')
-                            decmod.ratio = 0.5
-
                         if decmod:
-                            #print(dir(decmod))
-                            #row = box.row()
                             box.prop( decmod, 'ratio', 'vertex reduction ratio' )
                             box.label(text='faces: %s' %decmod.face_count )
+                    else:
+                        op = box.operator( 'ogre.toggle_collision', text='Enable Proxy' )
+                        op.MODE = 'proxy'
+                        op = box.operator( 'ogre.toggle_collision', text='Enable Primitive' )
+                        op.MODE = 'primitive:%s' %game.collision_bounds_type
+
+                elif game.use_collision_bounds:
+                    box = layout.box()
+                    box.prop(game, "collision_margin", text="Collision Margin", slider=True)
+                    for btype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
+                        if game.collision_bounds_type == btype:
+                            box.label(text='<%s>' %btype )
+                        else:
+                            op = box.operator( 'ogre.toggle_collision', text=btype )
+                            op.MODE = 'primitive:%s' %btype
+
+
+            else:   # NO collision
+
+                op = box.operator( 'ogre.toggle_collision', text='Enable Proxy' )
+                op.MODE = 'proxy'
+                op = box.operator( 'ogre.toggle_collision', text='Enable Primitive' )
+                op.MODE = 'primitive:%s' %game.collision_bounds_type
+
+
+
+
+
 
 class Ogre_create_collision_op(bpy.types.Operator):
     '''operator: creates new collision'''  
@@ -889,7 +987,7 @@ class Harts_Tools(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "data"
-    bl_label = "Harts Extra Tools"
+    bl_label = "Ogre Extra Tools"
     @classmethod
     def poll(cls, context):
         if context.active_object: return True
@@ -952,7 +1050,7 @@ class Harts_bake_texture_vc_op(bpy.types.Operator):
             tex.factor_red = 1.0
             tex.factor_green = .0
             tex.factor_blue = .0
-            _data = o2.create_mesh(bpy.context.scene, True, "PREVIEW")
+            _data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")
             baked.append( [] )
             for v1 in ob.data.vertices:
                 v2 = _data.vertices[ v1.index ]
@@ -962,7 +1060,7 @@ class Harts_bake_texture_vc_op(bpy.types.Operator):
             tex.factor_red = .0
             tex.factor_green = 1.0
             tex.factor_blue = .0
-            _data = o2.create_mesh(bpy.context.scene, True, "PREVIEW")
+            _data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")
             baked.append( [] )
             for v1 in ob.data.vertices:
                 v2 = _data.vertices[ v1.index ]
@@ -972,7 +1070,7 @@ class Harts_bake_texture_vc_op(bpy.types.Operator):
             tex.factor_red = .0
             tex.factor_green = .0
             tex.factor_blue = 1.0
-            _data = o2.create_mesh(bpy.context.scene, True, "PREVIEW")
+            _data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")
             baked.append( [] )
             for v1 in ob.data.vertices:
                 v2 = _data.vertices[ v1.index ]
@@ -1041,9 +1139,9 @@ The most common thing a designer will want to do is have an event trigger an ani
 
 
 class Ogre_Physics(bpy.types.Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "physics"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    #bl_context = "physics"
     bl_label = "Ogre Physics"
 
     @classmethod
@@ -1057,68 +1155,42 @@ class Ogre_Physics(bpy.types.Panel):
         game = ob.game
         #nothing useful here?#soft = ob.game.soft_body
 
-        #if game.physics_type:    # in ('DYNAMIC', 'RIGID_BODY'):
-        split = layout.split()
+        box = layout.box()
+        box.prop(game, "physics_type", text='Type')
+        box.prop(game, "use_actor")
 
-        col = split.column()
-        col.prop(game, "physics_type", text='Type')
-        col.prop(game, "use_actor")
-        col.prop(game, "use_ghost")
+        box.separator()
 
-        col = split.column()
-        col.prop(game, "use_collision_bounds", text="Use Primitive Collision")
-        col.prop(game, "collision_bounds_type", text="Primitive Type")
-        col.prop(game, "collision_margin", text="Collision Margin", slider=True)
-        #col.prop(game, "use_collision_compound", text="Compound")        TODO
+        box.label(text="Attributes:")
+        box.prop(game, "mass")
+        box.prop(game, "radius")
+        box.prop(game, "form_factor")
 
-        layout.separator()
 
-        split = layout.split()
-
-        col = split.column()
-        col.label(text="Attributes:")
-        col.prop(game, "mass")
-        col.prop(game, "radius")
-        col.prop(game, "form_factor")
-
-        col = split.column()
-        sub = col.column()
-        #sub.active = (game.physics_type == 'RIGID_BODY')
-        sub.prop(game, "use_anisotropic_friction")
-        subsub = sub.column()
+        box.prop(game, "use_anisotropic_friction")
+        subsub = box.column()
         subsub.active = game.use_anisotropic_friction
         subsub.prop(game, "friction_coefficients", text="", slider=True)
 
-        split = layout.split()
 
-        col = split.column()
-        col.label(text="Velocity:")
-        sub = col.column(align=True)
-        sub.prop(game, "velocity_min", text="Minimum")
-        sub.prop(game, "velocity_max", text="Maximum")
+        box.label(text="Velocity:")
+        box.prop(game, "velocity_min", text="Minimum")
+        box.prop(game, "velocity_max", text="Maximum")
 
-        col = split.column()
-        col.label(text="Damping:")
-        sub = col.column(align=True)
-        sub.prop(game, "damping", text="Translation", slider=True)
-        sub.prop(game, "rotation_damping", text="Rotation", slider=True)
+        box.label(text="Damping:")
+        box.prop(game, "damping", text="Translation", slider=True)
+        box.prop(game, "rotation_damping", text="Rotation", slider=True)
 
-        layout.separator()
+        box.separator()
 
-        split = layout.split()
+        box.prop(game, "lock_location_x", text="Lock Translation: X")
+        box.prop(game, "lock_location_y", text="Lock Translation: Y")
+        box.prop(game, "lock_location_z", text="Lock Translation: Z")
 
-        col = split.column()
-        col.prop(game, "lock_location_x", text="Lock Translation: X")
-        col.prop(game, "lock_location_y", text="Lock Translation: Y")
-        col.prop(game, "lock_location_z", text="Lock Translation: Z")
+        box.prop(game, "lock_rotation_x", text="Lock Rotation: X")
+        box.prop(game, "lock_rotation_y", text="Lock Rotation: Y")
+        box.prop(game, "lock_rotation_z", text="Lock Rotation: Z")
 
-        col = split.column()
-        col.prop(game, "lock_rotation_x", text="Lock Rotation: X")
-        col.prop(game, "lock_rotation_y", text="Lock Rotation: Y")
-        col.prop(game, "lock_rotation_z", text="Lock Rotation: Z")
-
-        #elif game.physics_type == 'STATIC':
-        #elif game.physics_type in ('SENSOR', 'INVISIBLE', 'NO_COLLISION', 'OCCLUDE'):
 
 
 class Ogre_game_logic_op(bpy.types.Operator):
@@ -1197,10 +1269,11 @@ class WrapSensor( _WrapLogic ):
     }
 
 
-class Ogre_Logic_Sensors(bpy.types.Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "physics"        # selects tab within the properties
+#class Ogre_Logic_Sensors(bpy.types.Panel):
+class Deprecated1:
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    #bl_context = "physics"        # selects tab within the properties
     bl_label = "Ogre Game Logic | Sensors"
 
     @classmethod
@@ -1264,9 +1337,10 @@ class WrapActuator( _WrapLogic ):
     }
 
 
-class Ogre_Logic_Actuators(bpy.types.Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
+#class Ogre_Logic_Actuators(bpy.types.Panel):
+class Deprecated2:
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
     bl_context = "physics"
     bl_label = "Ogre Game Logic | Actuators"
 
@@ -1555,7 +1629,7 @@ class Ogre_Texture_Panel(bpy.types.Panel):
         box = layout.box()
         row = box.row()
         row.label(text='scrolling animation')
-        #cant use if its enabled by defaultrow.prop(slot, "use_map_density", text="")
+        #cant use if its enabled by default row.prop(slot, "use_map_density", text="")
         row.prop(slot, "use_map_scatter", text="")
         row = box.row()
         row.prop(slot, "density_factor", text="X")
@@ -1565,7 +1639,7 @@ class Ogre_Texture_Panel(bpy.types.Panel):
         row = box.row()
         row.label(text='rotation animation')
         row.prop(slot, "emission_color_factor", text="")
-        row.prop(slot, "use_map_emission", text="")
+        row.prop(slot, "use_from_dupli", text="")
 
 
         #box = layout.box()
@@ -1739,7 +1813,7 @@ class ShaderTree(object):
         ## packed images - dec10th 2010 ##
         if texture.image.packed_file:
             orig = texture.image.filepath
-            if sys.platform.startswith('linux'):
+            if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
                 iurl = '/tmp/%s' %texname
             else:
                 iurl = 'C:\\tmp\\%s' %texname
@@ -1791,7 +1865,8 @@ class ShaderTree(object):
             if oz:
                 M += indent(4, 'rotate %s' %oz )
 
-            if slot.use_map_emission:    # hijacked from volume shaders
+            #if slot.use_map_emission:    # problem, user will want to use emission sometimes
+            if slot.use_from_dupli:    # hijacked again - june7th
                 M += indent(4, 'rotate_anim %s' %slot.emission_color_factor )
             if slot.use_map_scatter:    # hijacked from volume shaders
                 M += indent(4, 'scroll_anim %s %s ' %(slot.density_factor, slot.emission_factor) )
@@ -1880,7 +1955,7 @@ class ShaderTree(object):
             usealpha = False
             for slot in slots:
                 if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
-        if usealpha: alpha = 1.0
+            if usealpha: alpha = 1.0    # reported by f00bar june 18th
 
         def _helper( child, opname, f ):        # python note, define inline function shares variables - copies?
             if child.type == 'RGB':
@@ -1896,7 +1971,7 @@ class ShaderTree(object):
 
         M = ''
         if self.node:        # ogre combines passes with the same name, be careful!
-            passname = '%s__%s' %(self.node.name,mat.name)
+            passname = '%s__%s' %(self.node.name,material_name(mat))
             passname = passname.replace(' ','_')
             M += indent(2, 'pass %s' %passname, '{' )        # be careful with pass names
         else:
@@ -1936,6 +2011,8 @@ class ShaderTree(object):
             M += _helper( child, 'emissive', f )
         elif mat.use_vertex_color_light:
             M += indent(3, 'emissive vertexcolour' )
+        elif mat.use_shadeless:     # requested by Borris
+            M += indent(3, 'emissive 1.0 1.0 1.0 1.0' )
         else:
             M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
@@ -2006,7 +2083,7 @@ class ShaderTree(object):
         path,name = os.path.split( infile )
         outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
         opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
-        if sys.platform == 'linux2': subprocess.call( ['/usr/bin/wine', exe]+opts )
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'): subprocess.call( ['/usr/bin/wine', exe]+opts )
         else: subprocess.call( [exe]+opts )         ## TODO support OSX
         data = open( '_tmp_.dds', 'rb' ).read()
         f = open( outfile, 'wb' )
@@ -2014,54 +2091,6 @@ class ShaderTree(object):
         f.close()
 
 
-## from scripts/ui/space_node.py
-if False:
-    class NODE_HT_header(bpy.types.Header):
-        bl_space_type = 'NODE_EDITOR'
-        def draw(self, context):
-            layout = self.layout
-            snode = context.space_data
-            row = layout.row(align=True)
-            row.template_header()
-            if context.area.show_menus:
-                sub = row.row(align=True)
-                sub.menu("NODE_MT_view")
-                sub.menu("NODE_MT_select")
-                sub.menu("NODE_MT_add")
-                sub.menu("NODE_MT_node")
-            row = layout.row()
-            row.prop(snode, "tree_type", text="", expand=True)
-
-            if snode.tree_type == 'MATERIAL':
-                ob = snode.id_from
-                snode_id = snode.id
-                if ob:
-                    layout.template_ID(ob, "active_material", new="material.new")
-                if snode_id:
-                    layout.prop(snode_id, "use_nodes")
-                layout.menu( 'INFO_MT_ogre_shader_ref' )
-                #layout.menu( 'ogre_dot_mat_preview' )
-            elif snode.tree_type == 'TEXTURE':
-                row.prop(snode, "texture_type", text="", expand=True)
-                snode_id = snode.id
-                id_from = snode.id_from
-                if id_from:
-                    if snode.texture_type == 'BRUSH':
-                        layout.template_ID(id_from, "texture", new="texture.new")
-                    else:
-                        layout.template_ID(id_from, "active_texture", new="texture.new")
-                if snode_id:
-                    layout.prop(snode_id, "use_nodes")
-
-            elif snode.tree_type == 'COMPOSITING':
-                scene = snode.id
-
-                layout.prop(scene, "use_nodes")
-                layout.prop(scene.render, "use_free_unused_nodes", text="Free Unused")
-                layout.prop(snode, "show_backdrop")
-
-            layout.separator()
-            layout.template_running_jobs()
 
 SELECTED_MATERIAL_NODE = None
 SELECTED_TEXTURE_NODE = None
@@ -2175,23 +2204,43 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
     mesh = BoolProperty(name="update mesh", description="update mesh (disable for fast material preview", default=True)
     @classmethod
     def poll(cls, context):
-        if context.active_object: return True
+        if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
+            if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
+            else: return True
+
     def execute(self, context):
         if sys.platform == 'linux2':
             path = '%s/.wine/drive_c/tmp' %os.environ['HOME']
         else:
             path = 'C:\\tmp'
 
-        mat = context.active_object.active_material
+        mat = None
         mgroup = merged = None
         umaterials = []
+        
+        if context.active_object.type == 'MESH': mat = context.active_object.active_material
+        elif context.active_object.type == 'EMPTY':     # assume group
+            obs = []
+            for e in context.selected_objects:
+                if e.type != 'EMPTY' and e.dupli_group: continue
+                grp = e.dupli_group
+                subs = []
+                for o in grp.objects:
+                    if o.type=='MESH': subs.append( o )
+                m = merge_objects( subs, transform=e.matrix_world )
+                obs.append( m )
+            merged = merge_objects( obs )
+            umaterials = dot_mesh( merged, path=path, force_name='preview' )
+            for o in obs: context.scene.objects.unlink(o)
+
+        
         if not self.mesh:
             for ob in context.selected_objects:
                 if ob.type == 'MESH':
                     for mat in ob.data.materials:
                         if mat and mat not in umaterials: umaterials.append( mat )
 
-        else:
+        if not merged:
             mgroup = MeshMagick.get_merge_group( context.active_object )
             if not mgroup and self.groups:
                 group = get_merge_group( context.active_object )
@@ -2210,9 +2259,9 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
                         if m not in umaterials: umaterials.append( m )
                 MeshMagick.merge( mgroup, path=path, force_name='preview' )
             elif merged:
-                umaterials = dot_mesh( merged, path=path, force_name='preview', normals=not self.preview )
+                umaterials = dot_mesh( merged, path=path, force_name='preview' )
             else:
-                umaterials = dot_mesh( context.active_object, path=path, force_name='preview', normals=not self.preview )
+                umaterials = dot_mesh( context.active_object, path=path, force_name='preview' )
 
         if mat or umaterials:
             OPTIONS['TOUCH_TEXTURES'] = True
@@ -2226,7 +2275,13 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
         if merged: context.scene.objects.unlink( merged )
 
         if sys.platform == 'linux2':
-            subprocess.call([CONFIG_OGRE_MESHY, '/tmp'])
+            if CONFIG_OGRE_MESHY.endswith('.exe'):
+                cmd = [CONFIG_OGRE_MESHY, 'c:\\tmp\\preview.mesh' ]
+            else:
+                cmd = [CONFIG_OGRE_MESHY, '/tmp/preview.mesh']
+            print( cmd )
+            subprocess.call(cmd)
+
         else:
             subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
 
@@ -2315,7 +2370,7 @@ class _ogre_op_shader_program_param(bpy.types.Operator):
     '''helper to create new texture block'''
     bl_idname = "ogre.add_shader_program_param"
     bl_label = "assign program shader to material"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     program_name = StringProperty('prog-name')
     @classmethod
     def poll(cls, context): return True
@@ -2348,7 +2403,7 @@ class _ogre_op_shader_program_subparam(bpy.types.Operator):
     '''helper to...'''
     bl_idname = "ogre.add_shader_program_subparam"
     bl_label = "assign program shader subparam to material"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     program_name = StringProperty('prog-name')
     param_name = StringProperty('param-name')
 
@@ -2599,13 +2654,13 @@ Ogre Exporter Features:
 class _ogredoc_Texture_Options( INFO_MT_ogre_helper ):
     mydoc = _ogre_doc_classic_textures_
 
-@ogredoc
-class _ogredoc_Game_Logic_Intro( INFO_MT_ogre_helper ):
-    mydoc = _game_logic_intro_doc_
+#@ogredoc
+#class _ogredoc_Game_Logic_Intro( INFO_MT_ogre_helper ):
+#    mydoc = _game_logic_intro_doc_
 
-@ogredoc
-class _ogredoc_Game_Logic_Types( INFO_MT_ogre_helper ):
-    mydoc = _ogre_logic_types_doc_
+#@ogredoc
+#class _ogredoc_Game_Logic_Types( INFO_MT_ogre_helper ):
+#    mydoc = _ogre_logic_types_doc_
 
 
 @ogredoc
@@ -2617,63 +2672,23 @@ Armature Animation System | OgreDotSkeleton
             . note, this step is just a hack for creating an action so you can then create an NLA track.
             . do not key in pose mode, unless you want to only export animation on the keyed bones.
         2. open the NLA, and convert the action into an NLA strip
-        3. name the NLA strip
-        4. set the in and out frames for the strip
-        ** note that you DO NOT need to bake your constaint animation, you can keep the constaints, simply export!
+        3. name the NLA strip(s)
+        4. set the in and out frames for each strip ( the strip name becomes the Ogre track name )
+
+    How it Works:
+        The NLA strips can be blank, they are only used to define Ogre track names, and in and out frame ranges.  You are free to animate the armature with constraints (no baking required), or you can used baked animation and motion capture.  Blending that is driven by the NLA is also supported, if you don't want blending, put space between each strip.
 
     The OgreDotSkeleton (.skeleton) format supports multiple named tracks that can contain some or all of the bones of an armature.  This feature can be exploited by a game engine for segmenting and animation blending.  For example: lets say we want to animate the upper torso independently of the lower body while still using a single armature.  This can be done by hijacking the NLA of the armature.
 
-    NLA Hijacking:
-        . define an action and keyframe the bones you want to 'group', ie. key all the upper torso bones
-
+    Advanced NLA Hijacking (selected-bones-animation):
+        . define an action and keyframe only the bones you want to 'group', ie. key all the upper torso bones
         . import the action into the NLA
-        . name the NLA track (this becomes the track name in Ogre)
-        . adjust the start and end frames of the strip (only the first strip is considered)
-
-    Benefits:
-        . cleaner and lighter source code
-        . blender user can stay within blender's interface, that they are already familiar with
-
-        . frame ranges and groupings are saved in the blend file and easy to adjust
-
-
-    Cons:
-        . the user has to remember which bones were keyed per action grouping
-            ...if the user names their actions clearly, then its not an issue
-        . what if the user wants to mix constraints and forward kinematics driven by the NLA?
-            ...can work if the track is not muted...
-            ...do constraints override the NLA?
+        . name the strip (this becomes the track name in Ogre)
+        . adjust the start and end frames of each strip
+        ( you may use multiple NLA tracks, multiple strips per-track is ok, and strips may overlap in time )
 
 '''
 
-@ogredoc
-class _ogredoc_Unresolved_Development_Issues( INFO_MT_ogre_helper ):
-    mydoc = '''
-Unresolved Development Issues:
-
- 1. Texture Face (texface) - NOT SUPPORTED
-     from object-data tab, when in game-mode, meshes with a UV texture are allowed to have per-face options that affect BGE, the old exporter had limited support for these per-face options.
-
-     pros:
-          . per face control of double sided
-          . per face control over transparency blending (but with limited options: opaque, add, alpha, clip alpha)
-          . per face visible
-          . per face object color (very old option, why would any one want object color when vertex colors can be used?)
-
-     cons:
-          . generates a new material shader for each combination of options (slower rendering, could end up with many submeshes)
-          . limited blender viewport visual feedback, the artist can easily lose track of which faces have which settings.  Blender has no select-all by texface option, and only double-sided and visible are shown in the viewport.
-          . many of the options make sense only for the BGE
-
-     user workarounds:
-          . per face control of double sided: user breaks into muliple objects when he needs control over single/double sided and uses object level double sided option (under Object tab -> Normals panel)
-          . per face transparency blending options: user creates mutiple shaders, this should help the user stay more organized, and help the user keep track of performance bottlenecks
-          . per face visible: user creates mutiple objects, and sets visiblity per object.
-
-     programmed workarounds (pending):
-          . per face collision is cool, and does not require generating multiple shaders per mesh.  Not that hard to script: delete those faces and auto-assign a collision mesh.  Although there is already support for user defined collision meshes, and they should be used most of the time because its optimal, so the user can delete those faces while making the collision mesh.
-
-'''
 
 @ogredoc
 class _ogredoc_Physics( INFO_MT_ogre_helper ):
@@ -2706,9 +2721,8 @@ Blender Collision Setup:
 @ogredoc
 class _ogredoc_Warnings( INFO_MT_ogre_helper ):
     mydoc = '''
-General Warnings:
+Warnings:
     . extra vertex groups, can mess up an armature weights (new vgroups must come after armature assignment, not before)
-    . no sharp vertex color edges (face level vertex colors)
     . quadratic lights falloff not supported (needs pre calc)
     . do not enable subsurf modifier on meshes that have shape or armature animation.  
         (Any modifier that changes the vertex count is bad with shape anim or armature anim)
@@ -2730,8 +2744,7 @@ Current Shader Issues:
 class _ogredoc_Bugs( INFO_MT_ogre_helper ):
     mydoc = '''
 Known Issues:
-    . all bones must be connected
-    . exporting with normals is very slow
+    . shape animation breaks when using modifiers that change the vertex count
 
 '''
 
@@ -4021,7 +4034,7 @@ class Ogre_import_op(bpy.types.Operator):
     '''Import Ogre Scene'''
     bl_idname = "ogre.import"
     bl_label = "Import Ogre"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     filepath= StringProperty(name="File Path", description="Filepath used for importing Ogre .scene file", maxlen=1024, default="")
     COPY_ATTRIBUTES = BoolProperty(name="Copy Attributes", description="copy version control attributes: category, title, owner, etc.", default=True)
 
@@ -4099,61 +4112,27 @@ OptionsEx = {
 }
 
 
-
-class INFO_OT_createOgreExport(bpy.types.Operator):
-    '''Export Ogre Scene'''
-    bl_idname = "ogre.export"
-    bl_label = "Export Ogre"
-    bl_options = {'REGISTER', 'UNDO'}
-    filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
-    #_force_image_format = None
-    #filename_ext= StringProperty(name="File Name", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="xxx")
-
-    #_axis_modes =  [
-    #    ('1', '-x z y', 'default'),
-    #    ('2', 'x z -y', 'old standard'),
-    #    ('3', 'x z y', 'swap z y'),
-    #    ('4', 'x y z', 'no swap'),
-    #]
-    _axis_modes =  [
-        ('-x z y', '-x z y', 'default'),
-        ('x z -y', 'x z -y', 'old default'),
-        ('x z y', 'x z y', 'swap y and z'),
-        ('x y z', 'x y z', 'no swapping'),
-    ]
-    EX_SWAP_MODE = EnumProperty( items=_axis_modes, name='swap axis',  description='axis swapping mode', default='-x z y' )
+class _OgreCommonExport_(object):
+    @classmethod
+    def poll(cls, context): return True
+    def invoke(self, context, event):
+        wm = context.window_manager
+        fs = wm.fileselect_add(self)        # writes to filepath
+        print( 'fs', fs )
+        return {'RUNNING_MODAL'}
+    def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
 
+    #EXPORT_TYPE = StringProperty(default="OGRE")
     ## Options ##
-    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
-    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=True)
+    _axis_modes =  [
+        ('x z -y', 'x z -y', 'ogre standard'),
+        ('x y z', 'x y z', 'no swapping'),
+        ('-x z y', '-x z y', 'old default'),
+        ('x z y', 'x z y', 'swap y and z'),
+    ]
 
-    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=True)
-    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=True)
 
-    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=True)
-    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=True)
-
-    #EX_LAYERS = BoolProperty(name="Active/All-Layers", description="toggle export active/all-layers", default=False)
-    EX_INSTANCES = BoolProperty(name="Optimize Instances", description="optimize instances in OgreDotScene xml", default=True)
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=True)
-
-    #EX_CONVERT_TEXTURES = BoolProperty( name="Enable Convert Textures", default=False )
-    #EX_IMAGE_FORMAT = CollectionProperty(IMAGE_FORMATS, type=_type, description="convert textures for platform\n\tinstall python -> c:\\python26\n\t\t.install PIL (http://www.pythonware.com/products/pil/)\n\tinstall Nvidia DDS tools http://developer.nvidia.com/object/dds_utilities_legacy.html")
-
-    ## TODO replace with per texture conversion and resizing options ?
-    #EX_CONVERT_DDS = BoolProperty( name="Convert DDS Files", default=True )
-    #EX_DDS_TO_FORMAT = CollectionProperty({'jpg','png'}, description="convert only DDS textures to selected format", default='png')
-    #EX_TEX_SIZE_MAX = CollectionProperty({128,256,512,1024}, description="limit texture size to", default=512)
-    #EX_LIMIT_TEX_SIZE = BoolProperty( name="Enable Limit Tex Size", default=False )
-
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=True)
-    #EX_MESH_SUBDIR = BoolProperty(name="Mesh Subdir", description="exports .mesh and .xml files to ./meshes subdirectory", default=False)
-    #EX_TEXTURES_SUBDIR = BoolProperty(name="Texture Subdir", description="exports textures to ./textures subdirectory", default=False)
-
-    #EX_FORCE_IMAGE = StringProperty(name="Convert Textures", description="convert texture maps using Image Magick (or Nvidia DDS)\nrequires image magick to be installed\ntype name of format or leave blank (do not convert)", maxlen=5, default="")
     _image_formats =  [
         ('','do not convert', 'default'),
         ('jpg', 'jpg', 'jpeg format'),
@@ -4161,38 +4140,9 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
         ('dds', 'dds', 'nvidia dds format'),
     ]
 
-    EX_FORCE_IMAGE = EnumProperty( items=_image_formats, name='Convert Images',  description='convert all textures to format', default='' )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
-
-    #EX_SWAP_AXIS = BoolProperty(name="Swap Axis", description="fix up axis (swap y and z, and negate y)", default=True)
-
-    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.1)
 
 
-    lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
-    lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
-    lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", default=40, min=0, max=99)
-
-    nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", default=0, min=0, max=65536)
-    generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=False)
-    generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=False)
-    tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default="uvw")
-    tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", default=4, min=0, max=16)
-    tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=False)
-    tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
-    reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
-    optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
-
-
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        wm = context.window_manager
-        wm.fileselect_add(self)        # writes to filepath
-        return {'RUNNING_MODAL'}
-    def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
-
-    def dot_material( self, meshes, path='/tmp' ):
+    def dot_material( self, meshes, path='/tmp', mat_file_name='SceneMaterial'):
         print('updating .material')
         mats = []
         for ob in meshes:
@@ -4202,17 +4152,29 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
         if not mats: print('WARNING: no materials, not writting .material script'); return
         M = MISSING_MATERIAL + '\n'
         for mat in mats:
-            Report.materials.append( mat.name )
-            M += self.gen_dot_material( mat, path, convert_textures=True )
-        url = os.path.join(path, '%s.material' %bpy.context.scene.name)
+            if mat is None:
+                continue
+            Report.materials.append( material_name(mat) )
+            data = self.gen_dot_material( mat, path, convert_textures=True )
+            M += data
+            if self.EXPORT_TYPE == 'REX': self.dot_material_write_separate( mat, data, path )
+
+        #always sets "Scene.material", not so good if exporting all stuff to same directory
+        #url = os.path.join(path, '%s.material' %bpy.context.scene.name)
+        url = os.path.join(path, '%s.material' % mat_file_name)
         f = open( url, 'wb' ); f.write( bytes(M,'utf-8') ); f.close()
+        print('saved', url)
+
+    def dot_material_write_separate( self, mat, data, path = '/tmp' ):      # thanks Pforce
+        url = os.path.join(path, '%s.material' % material_name(mat))
+        f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
         print('saved', url)
 
     ## python note: classmethods prefer attributes defined at the classlevel, kinda makes sense, (even if called by an instance)
     @classmethod
     def gen_dot_material( self, mat, path='/tmp', convert_textures=False ):        # TODO deprecated context_textures...
         M = ''
-        M += 'material %s \n{\n'        %mat.name
+        M += 'material %s \n{\n'        %material_name(mat)     # supports blender library linking
         if mat.use_shadows: M += indent(1, 'receive_shadows on')
         else: M += indent(1, 'receive_shadows off')
 
@@ -4226,22 +4188,23 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
 
     @classmethod
     def gen_dot_material_pass( self, mat, path, convert_textures ):
-        print('gen_dot_material_pass', mat)
+        print('GEN DOT MATERIAL...', mat)
         OPTIONS['PATH'] = path
         M = ''
         #if mat.node_tree and len(mat.node_tree.nodes):
         if ShaderTree.valid_node_material( mat ):
-            print('        material has nodes')
+            print('        NODES MATERIAL')
             tree = ShaderTree.parse( mat )
             passes = tree.get_passes()
             for P in passes:
-                print('        shader pass:', P)
+                print('        SHADER PASS:', P)
                 M += P.dotmat_pass()
         else:
-            print('        standard material')
+            print('        STANDARD MATERIAL')
             tree = ShaderTree( material=mat )
             M += tree.dotmat_pass()
         return M
+
 
 
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
@@ -4250,13 +4213,11 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
             'shape-anim' : self.EX_SHAPE_ANIM,
             'trim-bone-weights' : self.EX_TRIM_BONE_WEIGHTS,
             'armature-anim' : self.EX_ANIM,
-
             'lodLevels' : self.lodLevels,
             'lodDistance' : self.lodDistance,
             'lodPercent' : self.lodPercent,
             'nuextremityPoints' : self.nuextremityPoints,
             'generateEdgeLists' : self.generateEdgeLists,
-
             'generateTangents' : self.generateTangents,
             'tangentSemantic' : self.tangentSemantic, 
             'tangentUseParity' : self.tangentUseParity,
@@ -4264,109 +4225,15 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
             'tangentSplitRotated' : self.tangentSplitRotated,
             'reorganiseBuffers' : self.reorganiseBuffers,
             'optimiseAnimations' : self.optimiseAnimations,
-
         }
         dot_mesh( ob, path, force_name, ignore_shape_animation=False, opts=opts )
 
 
-    def rex_entity( self, doc, ob ):        # does rex flatten the hierarchy? or keep it like ogredotscene?
-        e = doc.createElement( 'entity' )
-        doc.documentElement.appendChild( e )
-        e.setAttribute('id', str(len(doc.documentElement.childNodes)) )
-
-        c = doc.createElement('component'); e.appendChild( c )
-        c.setAttribute('type', "EC_Mesh")
-        c.setAttribute('sync', '1')
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Mesh ref" )
-        a.setAttribute('value', "file://%s.mesh"%ob.data.name )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Mesh materials" )
-        a.setAttribute('value', "file://%s.material"%bpy.context.scene.name )
-
-        if ob.find_armature():
-            a = doc.createElement('attribute'); c.appendChild(a)
-            a.setAttribute('name', "Skeleton ref" )
-            a.setAttribute('value', "file://%s.skeleton"%ob.data.name )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Draw distance" )
-        a.setAttribute('value', "0" )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Cast shadows" )
-        a.setAttribute('value', "false" )
-
-        c = doc.createElement('component'); e.appendChild( c )
-        c.setAttribute('type', "EC_Name")
-        c.setAttribute('sync', '1')
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "name" )
-        a.setAttribute('value', ob.data.name )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "description" )
-        a.setAttribute('value', "" )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "user-defined" )
-        a.setAttribute('value', "false" )
-
-        c = doc.createElement('component'); e.appendChild( c )
-        c.setAttribute('type', "EC_Placeable")
-        c.setAttribute('sync', '1')
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Transform" )
-        loc = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_translation())
-        rot = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_euler())
-        scl = '%6f,%6f,%6f' %tuple(ob.matrix_world.to_scale())
-        a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Show bounding box" )
-        a.setAttribute('value', "false" )
-
-
-        ## realXtend internal Naali format ##
-        if ob.game.physics_type == 'RIGID_BODY':
-            com = doc.createElement('component'); e.appendChild( com )
-            com.setAttribute('type', 'EC_RigidBody')
-            com.setAttribute('sync', '1')
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Mass')
-            a.setAttribute('value', str(ob.game.mass))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Friction')
-            avg = sum( ob.game.friction_coefficients ) / 3.0
-            a.setAttribute('value', str(avg))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Linear damping')
-            a.setAttribute('value', str(ob.game.damping))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Angular damping')
-            a.setAttribute('value', str(ob.game.rotation_damping))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Phantom')        # is this no collide or hide from view?
-            a.setAttribute('value', str(ob.game.use_ghost).lower() )
-
-
-
-
     def ogre_export(self, url, context ):
         global OPTIONS
-        #OPTIONS['TEXTURES_SUBDIR'] = self.EX_TEXTURES_SUBDIR
         OPTIONS['FORCE_IMAGE_FORMAT'] = None
         OPTIONS['TOUCH_TEXTURES'] = True
-        OPTIONS['SWAP_AXIS'] = self.EX_SWAP_MODE
+        #OPTIONS['SWAP_AXIS'] = self.EX_SWAP_MODE
         Report.reset()
 
         ShaderTree.EX_DDS_MIPS = self.EX_DDS_MIPS
@@ -4383,13 +4250,17 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
         print('ogre export->', url)
         prefix = url.split('.')[0]
 
-        rex = dom.Document()        # realxtend .rex
+        #rex = dom.Document()        # realxtend .rex
+        rex = RDocument()
+
         rex.appendChild( rex.createElement('scene') )
 
         now = time.time()
-        doc = dom.Document()
+        #doc = dom.Document()
+        doc = RDocument()
         scn = doc.createElement('scene'); doc.appendChild( scn )
         scn.setAttribute('export_time', str(now))
+        scn.setAttribute('formatVersion', '1.0.1')
         bscn = bpy.context.scene
         if '_previous_export_time_' in bscn.keys(): scn.setAttribute('previous_export_time', str(bscn['_previous_export_time_']))
         else: scn.setAttribute('previous_export_time', '0')
@@ -4406,33 +4277,61 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
         item = doc.createElement('item'); extern.appendChild( item )
         item.setAttribute('type','material')
         a = doc.createElement('file'); item.appendChild( a )
-        a.setAttribute('name', '%s.material' %context.scene.name)    # .material file (scene mats)
+        #does return "Scene" always
+        #material_file_name_base=context.scene.name
+        material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
+        a.setAttribute('name', '%s.material' % material_file_name_base)    # .material file (scene mats)
 
 
         ## environ settings ##
         world = context.scene.world
-        _c = {'colorAmbient':world.ambient_color, 'colorBackground':world.horizon_color, 'colorDiffuse':world.horizon_color}
-        for ctag in _c:
-            a = doc.createElement(ctag); environ.appendChild( a )
-            color = _c[ctag]
-            a.setAttribute('r', '%s'%color.r)
-            a.setAttribute('g', '%s'%color.g)
-            a.setAttribute('b', '%s'%color.b)
-        if world.mist_settings.use_mist:
+        if world:   # multiple scenes - other scenes may not have a world
+            _c = {'colourAmbient':world.ambient_color, 'colourBackground':world.horizon_color, 'colourDiffuse':world.horizon_color}
+            for ctag in _c:
+                a = doc.createElement(ctag); environ.appendChild( a )
+                color = _c[ctag]
+                a.setAttribute('r', '%s'%color.r)
+                a.setAttribute('g', '%s'%color.g)
+                a.setAttribute('b', '%s'%color.b)
+
+        if world and world.mist_settings.use_mist:
             a = doc.createElement('fog'); environ.appendChild( a )
             a.setAttribute('linearStart', '%s'%world.mist_settings.start )
-            a.setAttribute('mode', world.mist_settings.falloff.lower() )    # only linear supported?
+            mist_falloff = world.mist_settings.falloff
+            if mist_falloff == 'QUADRATIC': a.setAttribute('mode', 'exp')	# on DTD spec (none | exp | exp2 | linear)
+            elif mist_falloff == 'LINEAR': a.setAttribute('mode', 'linear')
+            else: a.setAttribute('mode', 'exp2')
+            #a.setAttribute('mode', world.mist_settings.falloff.lower() )	# not on DTD spec
             a.setAttribute('linearEnd', '%s' %(world.mist_settings.start+world.mist_settings.depth))
+            a.setAttribute('expDensity', world.mist_settings.intensity)
+            a.setAttribute('colourR', world.horizon_color.r)
+            a.setAttribute('colourG', world.horizon_color.g)
+            a.setAttribute('colourB', world.horizon_color.b)
+
 
         ## nodes (objects) ##
         objects = []        # gather because macros will change selection state
-        for ob in bpy.data.objects:
+        linkedgroups = []
+        for ob in bpy.context.scene.objects:
             if ob.name.startswith('collision'): continue
             if self.EX_SELONLY and not ob.select:
                 if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA: pass
                 elif ob.type == 'LAMP' and self.EX_FORCE_LAMPS: pass
                 else: continue
-            objects.append( ob )
+            if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP': linkedgroups.append( ob )
+            else: objects.append( ob )
+
+        temps = []
+
+        for e in linkedgroups:
+            grp = e.dupli_group
+            subs = []
+            for o in grp.objects:
+                if o.type=='MESH': subs.append( o )
+            m = merge_objects( subs, name=e.name, transform=e.matrix_world )
+            objects.append( m )
+            temps.append( m )
+
 
         ## find merge groups
         mgroups = []
@@ -4446,7 +4345,6 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
         for rem in mobjects:
             if rem in objects: objects.remove( rem )
 
-        temps = []
         for group in mgroups:
             merged = merge_group( group )
             objects.append( merged )
@@ -4480,17 +4378,19 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
             )
 
         if self.EX_SCENE:
-            data = rex.toprettyxml()
-            f = open( url+'.rex', 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
-            print('realxtend scene dumped', url)
+            if self.EXPORT_TYPE == 'REX':
+                if not url.endswith('.txml'): url += '.txml'
+                data = rex.toprettyxml()
+                f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
+                print('realxtend scene dumped', url)
+            else:
+                if not url.endswith('.scene'): url += '.scene'
+                data = doc.toprettyxml()
+                f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
+                print('ogre scene dumped', url)
 
-            data = doc.toprettyxml()
-            if not url.endswith('.scene'): url += '.scene'
-            f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
-            print('ogre scene dumped', url)
 
-
-        if self.EX_MATERIALS: self.dot_material( meshes, os.path.split(url)[0] )
+        if self.EX_MATERIALS: self.dot_material( meshes, os.path.split(url)[0], material_file_name_base)
 
         for ob in temps:context.scene.objects.unlink( ob )
         bpy.ops.wm.call_menu( name='Ogre_User_Report' )
@@ -4643,11 +4543,27 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
             a.setAttribute('farPlaneDist', '%s' %ob.data.clip_end)
 
 
-        elif ob.type == 'LAMP':
+        elif ob.type == 'LAMP' and ob.data.type in 'POINT SPOT SUN'.split():
             Report.lights.append( ob.name )
             l = doc.createElement('light')
-            o.appendChild(l); l.setAttribute('name', ob.data.name)
-            l.setAttribute('type', ob.data.type.lower() )
+            o.appendChild(l)
+
+            mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
+
+            p = doc.createElement('position')   # just to make sure we conform with the DTD
+            l.appendChild(p)
+            v = swap( ob.matrix_world.to_translation() )
+            p.setAttribute('x', '%6f'%v.x)
+            p.setAttribute('y', '%6f'%v.y)
+            p.setAttribute('z', '%6f'%v.z)
+
+            if ob.data.type == 'POINT': l.setAttribute('type', 'point')
+            elif ob.data.type == 'SPOT': l.setAttribute('type', 'spot')
+            elif ob.data.type == 'SUN': l.setAttribute('type', 'directional')
+
+            l.setAttribute('name', ob.name )
+            l.setAttribute('powerScale', str(ob.data.energy))
+
             a = doc.createElement('lightAttenuation'); l.appendChild( a )
             a.setAttribute('range', '5000' )            # is this an Ogre constant?
             a.setAttribute('constant', '1.0')        # TODO support quadratic light
@@ -4655,23 +4571,36 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
             a.setAttribute('quadratic', '0.0')
 
 
-            ## actually need to precompute light brightness by adjusting colors below ##
+            if ob.data.type in ('SPOT', 'SUN'):
+                vector = swap(mathutils.Euler.to_matrix(ob.rotation_euler)[2])
+                a = doc.createElement('direction')
+                l.appendChild(a)
+                a.setAttribute('x',str(round(-vector[0],3)))
+                a.setAttribute('y',str(round(-vector[1],3)))
+                a.setAttribute('z',str(round(-vector[2],3)))
+
+            if ob.data.type == 'SPOT':
+                a = doc.createElement('spotLightRange')
+                l.appendChild(a)
+                a.setAttribute('inner',str( ob.data.spot_size*(1.0-ob.data.spot_blend) ))
+                a.setAttribute('outer',str(ob.data.spot_size))
+                a.setAttribute('falloff','1.0')
+
             if ob.data.use_diffuse:
-                a = doc.createElement('colorDiffuse'); l.appendChild( a )
+                a = doc.createElement('colourDiffuse'); l.appendChild( a )
                 a.setAttribute('r', '%s'%ob.data.color.r)
                 a.setAttribute('g', '%s'%ob.data.color.g)
                 a.setAttribute('b', '%s'%ob.data.color.b)
 
             if ob.data.use_specular:
-                a = doc.createElement('colorSpecular'); l.appendChild( a )
+                a = doc.createElement('colourSpecular'); l.appendChild( a )
                 a.setAttribute('r', '%s'%ob.data.color.r)
                 a.setAttribute('g', '%s'%ob.data.color.g)
                 a.setAttribute('b', '%s'%ob.data.color.b)
 
-            ## bug reported by C.L.B ##
-            if ob.data.type != 'HEMI':        # hemi lights should actually provide info for fragment/vertex-program ambient shaders
-                if ob.data.shadow_method != 'NOSHADOW':        # just a guess - is this Ogre API?
-                    a = doc.createElement('colorShadow'); l.appendChild( a )
+            if ob.data.type != 'HEMI':  # colourShadow is extra, not part of Ogre DTD
+                if ob.data.shadow_method != 'NOSHADOW': # Hemi light has no shadow_method
+                    a = doc.createElement('colourShadow');l.appendChild( a )
                     a.setAttribute('r', '%s'%ob.data.color.r)
                     a.setAttribute('g', '%s'%ob.data.color.g)
                     a.setAttribute('b', '%s'%ob.data.color.b)
@@ -4690,6 +4619,203 @@ class INFO_OT_createOgreExport(bpy.types.Operator):
             )
         ## end _node_export
 
+
+    ########################################
+    def rex_entity( self, doc, ob ):        # does rex flatten the hierarchy? or keep it like ogredotscene?
+        proto = 'local://'      # antont says file:// is also valid
+        e = doc.createElement( 'entity' )
+        doc.documentElement.appendChild( e )
+        e.setAttribute('id', str(len(doc.documentElement.childNodes)) )
+
+        c = doc.createElement('component'); e.appendChild( c )
+        c.setAttribute('type', "EC_Mesh")
+        c.setAttribute('sync', '1')
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Mesh ref" )
+        a.setAttribute('value', "%s%s.mesh"%(proto,ob.data.name) )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Mesh materials" )
+        #a.setAttribute('value', "%s%s.material"%(proto,bpy.context.scene.name) )       # pre-pforces-patch
+        # Query object its materials and make a proper material ref string of it.
+        # note: We assume blindly here that the 'submesh' indexes are correct in the material list.
+        #       the most common usecase is to have one material per object for rex artists.
+        #       They can now assign multiple and they will at least go to the .txml data but I cant
+        #       guarantee that they are in correct submesh index slots! At least they have the refs and 
+        #       can manually shift them around in the viewer.
+        mymaterials = ob.data.materials
+        if mymaterials is not None and len(mymaterials) > 0:
+            mymatstring = ''
+            # generate ; separated material list
+            for mymat in mymaterials: 
+                if mymat is None:
+                    continue
+                mymatstring += proto + material_name(mymat) + '.material;'
+            mymatstring = mymatstring[:-1]  # strip ending ;
+            a.setAttribute('value', mymatstring )
+        else:
+            # default to nothing to avoid error prints in .txml import
+            a.setAttribute('value', "" ) 
+
+        if ob.find_armature():
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Skeleton ref" )
+            a.setAttribute('value', "%s%s.skeleton"%(proto,ob.data.name) )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Draw distance" )
+        a.setAttribute('value', "0" )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Cast shadows" )	# cast shadows is per object? not per material?
+        a.setAttribute('value', "false" )
+
+        c = doc.createElement('component'); e.appendChild( c )
+        c.setAttribute('type', "EC_Name")
+        c.setAttribute('sync', '1')
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "name" )
+        a.setAttribute('value', ob.data.name )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "description" )
+        a.setAttribute('value', "" )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "user-defined" )
+        a.setAttribute('value', "false" )
+
+        c = doc.createElement('component'); e.appendChild( c )
+        c.setAttribute('type', "EC_Placeable")
+        c.setAttribute('sync', '1')
+
+        ############ TRANSFORM ####################
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Transform" )
+        x,y,z = swap(ob.matrix_world.to_translation())
+        loc = '%6f,%6f,%6f' %(x,y,z)
+        ex,ey,ez = swap( ob.matrix_world.to_euler() )
+        x = math.degrees( ex ); y = math.degrees( ey ); z = math.degrees( ez )
+        rot = '%6f,%6f,%6f' %(x,y,z)
+        x,y,z = swap(ob.matrix_world.to_scale())
+        scl = '%6f,%6f,%6f' %(x,y,z)
+        a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
+        #############################################
+
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Show bounding box" )
+        if ob.show_bounds: a.setAttribute('value', "true" )
+        else: a.setAttribute('value', "false" )
+
+        ## realXtend internal Naali format ##
+        if ob.game.physics_type == 'RIGID_BODY':
+            com = doc.createElement('component'); e.appendChild( com )
+            com.setAttribute('type', 'EC_RigidBody')
+            com.setAttribute('sync', '1')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Mass')
+            a.setAttribute('value', str(ob.game.mass))
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Friction')
+            avg = sum( ob.game.friction_coefficients ) / 3.0
+            a.setAttribute('value', str(avg))
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Linear damping')
+            a.setAttribute('value', str(ob.game.damping))
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Angular damping')
+            a.setAttribute('value', str(ob.game.rotation_damping))
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Phantom')        # this must mean no-collide
+            a.setAttribute('value', str(ob.game.use_ghost).lower() )
+
+
+class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
+    '''Export Ogre Scene'''
+    bl_idname = "ogre.export"
+    bl_label = "Export Ogre"
+    bl_options = {'REGISTER', 'UNDO'}
+    filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
+    EXPORT_TYPE = 'OGRE'
+
+    #EX_SWAP_MODE = EnumProperty( items=_OgreCommonExport_._axis_modes, name='swap axis',  description='axis swapping mode', default='x z -y' )
+    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
+    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
+    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
+    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=True)
+    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=True)
+    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=True)
+    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=True)
+    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=True)
+    EX_INSTANCES = BoolProperty(name="Optimize Instances", description="optimize instances in OgreDotScene xml", default=True)
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=True)
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=True)
+
+    EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default='' )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.1)
+    ## Mesh Options ##
+    lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
+    lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
+    lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", default=40, min=0, max=99)
+    nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", default=0, min=0, max=65536)
+    generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=False)
+    generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=False)
+    tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default="uvw")
+    tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", default=4, min=0, max=16)
+    tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=False)
+    tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
+    reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
+    optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
+
+
+class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_ ):
+    '''Export RealXtend Scene'''
+    bl_idname = "ogre.export_realxtend"
+    bl_label = "Export RealXtend"
+    bl_options = {'REGISTER', 'UNDO'}
+    filepath= StringProperty(name="File Path", description="Filepath used for exporting .txml file", maxlen=1024, default="", subtype='FILE_PATH')
+    EXPORT_TYPE = 'REX'
+
+    #EX_SWAP_MODE = EnumProperty( items=_OgreCommonExport_._axis_modes, name='swap axis',  description='axis swapping mode', default='x z -y' )
+    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
+    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
+    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
+    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=True)
+    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=True)
+    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=True)
+    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=True)
+    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=True)
+    EX_INSTANCES = BoolProperty(name="Optimize Instances", description="optimize instances in OgreDotScene xml", default=True)
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=True)
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=True)
+
+    EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default='' )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.1)
+    ## Mesh Options ##
+    lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
+    lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
+    lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", default=40, min=0, max=99)
+    nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", default=0, min=0, max=65536)
+    generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=False)
+    generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=False)
+    tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default="uvw")
+    tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", default=4, min=0, max=16)
+    tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=False)
+    tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
+    reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
+    optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
+
+
 def get_parent_matrix( ob, objects ):
     if not ob.parent:
         return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
@@ -4705,7 +4831,7 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
     o = doc.createElement('node')
     o.setAttribute('name',prefix+ob.name)
     p = doc.createElement('position')
-    q = doc.createElement('quaternion')
+    q = doc.createElement('rotation')       #('quaternion')
     s = doc.createElement('scale')
     for n in (p,q,s): o.appendChild(n)
 
@@ -4717,10 +4843,10 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
 
     if rot: v = swap(rot)
     else: v = swap( mat.to_quaternion() )
-    q.setAttribute('x', '%6f'%v.x)
-    q.setAttribute('y', '%6f'%v.y)
-    q.setAttribute('z', '%6f'%v.z)
-    q.setAttribute('w','%6f'%v.w)
+    q.setAttribute('qx', '%6f'%v.x)
+    q.setAttribute('qy', '%6f'%v.y)
+    q.setAttribute('qz', '%6f'%v.z)
+    q.setAttribute('qw','%6f'%v.w)
 
     if scl:        # this should not be used
         v = swap(scl)
@@ -4746,7 +4872,7 @@ def merge_group( group ):
         if ob.type == 'MESH':
             print( '\t group member', ob.name )
             o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.create_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
+            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
             while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
             bpy.context.scene.objects.link( o2 )#; o2.select = True
     merged = merge( copies )
@@ -4754,13 +4880,16 @@ def merge_group( group ):
     merged.data.name = group.name
     return merged
 
-def merge_objects( objects, name='_temp_' ):
+def merge_objects( objects, name='_temp_', transform=None ):
+    assert objects
     copies = []
     for ob in objects:
+        ob.select = False
         if ob.type == 'MESH':
             o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.create_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
+            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
             while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
+            if transform: o2.matrix_world =  transform * o2.matrix_local
             bpy.context.scene.objects.link( o2 )#; o2.select = True
     merged = merge( copies )
     merged.name = name
@@ -4769,8 +4898,12 @@ def merge_objects( objects, name='_temp_' ):
 
 
 def merge( objects ):
+    print('MERGE', objects)
     for ob in bpy.context.selected_objects: ob.select = False
-    for ob in objects: ob.select = True
+    for ob in objects:
+        print('\t'+ob.name)
+        ob.select = True
+        assert not ob.library
     bpy.context.scene.objects.active = ob
     bpy.ops.object.join()
     return bpy.context.active_object
@@ -4908,11 +5041,11 @@ def OgreXMLConverter( infile, opts ):
     path,name = os.path.split( infile )
 
     cmd = '%s %s' %(exe, opts)
+    print('-'*80)
     print(cmd)
-    cmd = cmd.split() + [infile]        #, outfile] #[ infile.replace(' ','\\ '), outfile.replace(' ','\\ ') ]
-
+    print('_'*80)
+    cmd = cmd.split() + [infile]
     subprocess.call( cmd )
-    #if not os.path.isfile( outfile ): print('warning: OgreXmlConverter failed')
 
 
 
@@ -4927,331 +5060,39 @@ def mesh_is_smooth( mesh ):
         if face.use_smooth: return True
 
 
-def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
-    print('mesh to Ogre mesh XML format', ob.name)
-    if not os.path.isdir( path ):
-        print('creating directory', path )
-        os.makedirs( path )
 
-    Report.meshes.append( ob.data.name )
-    Report.faces += len( ob.data.faces )
-    Report.vertices += len( ob.data.vertices )
-
-    copy = ob.copy()
-    rem = []
-    for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
-        if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
-    for mod in rem: copy.modifiers.remove( mod )
-
-    ## bake mesh ##
-    _mesh_normals = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
-    _lookup_normals = False
-    if normals: _lookup_normals = mesh_is_smooth( _mesh_normals )
-    if _lookup_normals: print('using super slow normal lookup...')
-
-    ## hijack blender's edge-split modifier to make this easy ##
-    e = copy.modifiers.new('_hack_', type='EDGE_SPLIT')
-    e.use_edge_angle = False
-    e.use_edge_sharp = True
-    for edge in copy.data.edges: edge.use_edge_sharp = True
-    ## bake mesh ##
-    mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
-
-    prefix = ''
-    #if opts['mesh-sub-dir']:    #self.EX_MESH_SUBDIR:
-    #    mdir = os.path.join(path,'meshes')
-    #    if not os.path.isdir( mdir ): os.mkdir( mdir )
-    #    prefix = 'meshes/'
-
-    doc = dom.Document()
-    root = doc.createElement('mesh'); doc.appendChild( root )
-
-    sharedgeo = doc.createElement('sharedgeometry')
-    root.appendChild( sharedgeo )
-    sharedgeo.setAttribute('vertexcount', '%s' %len(mesh.vertices))
-    if len(mesh.vertices) > 65535:
-        sharedgeo.setAttribute("use32bitindexes", 'true')
-
-    subs = doc.createElement('submeshes')
-    root.appendChild( subs )
-
-    arm = ob.find_armature()
-    if arm:
-        skel = doc.createElement('skeletonlink')
-        skel.setAttribute('name', '%s%s.skeleton' %(prefix, force_name or ob.data.name) )
-        root.appendChild( skel )
-
-    ## verts ##
-    print('    writing shared geometry')
-    #geo = doc.createElement('geometry')
-    #sm.appendChild( geo )
-    #geo.setAttribute('vertexcount', '%s' %len(mesh.vertices))
-    vb = doc.createElement('vertexbuffer')
-    vb.setAttribute('positions','true')
-    #buffix dec8th#vb.setAttribute('normals','true')
-    hasnormals = False
-    sharedgeo.appendChild( vb )
-
-    if arm:
-        bweights = doc.createElement('boneassignments')
-        root.appendChild( bweights )
-
-    if opts['shape-anim'] and ob.data.shape_keys and len(ob.data.shape_keys.keys):
-        print('    writing shape animation')
-
-        poses = doc.createElement('poses'); root.appendChild( poses )
-        for sidx, skey in enumerate(ob.data.shape_keys.keys):
-            if sidx == 0: continue
-            pose = doc.createElement('pose'); poses.appendChild( pose )
-            pose.setAttribute('name', skey.name)
-            pose.setAttribute('index', str(sidx-1))
-
-            pose.setAttribute('target', 'mesh')        # If target is 'mesh', targets the shared geometry, if target is submesh, targets the submesh identified by 'index'. 
-            for i,p in enumerate( skey.data ):
-                x,y,z = swap( ob.data.vertices[i].co - p.co )
-                if x==.0 and y==.0 and z==.0: continue        # the older exporter optimized this way, is it safe?
-                po = doc.createElement('poseoffset'); pose.appendChild( po )
-                po.setAttribute('x', '%6f' %x)
-                po.setAttribute('y', '%6f' %y)
-                po.setAttribute('z', '%6f' %z)
-                po.setAttribute('index', str(i))        # this was 3 values in old exporter, from triangulation?
-
-        if ob.data.shape_keys.animation_data and len(ob.data.shape_keys.animation_data.nla_tracks):
-            anims = doc.createElement('animations'); root.appendChild( anims )
-            for nla in ob.data.shape_keys.animation_data.nla_tracks:
-                strip = nla.strips[0]
-                anim = doc.createElement('animation'); anims.appendChild( anim )
-                anim.setAttribute('name', nla.name)        # do not use the action's name
-                anim.setAttribute('length', str((strip.frame_end-strip.frame_start)/30.0) )        # TODO proper fps
-                tracks = doc.createElement('tracks'); anim.appendChild( tracks )
-                track = doc.createElement('track'); tracks.appendChild( track )
-                track.setAttribute('type','pose')
-                track.setAttribute('target','mesh')
-                track.setAttribute('index','0')
-                keyframes = doc.createElement('keyframes')
-                track.appendChild( keyframes )
-
-
-                for frame in range( int(strip.frame_start), int(strip.frame_end), 2):        # every other frame
-                    bpy.context.scene.frame_current = frame
-                    keyframe = doc.createElement('keyframe')
-                    keyframes.appendChild( keyframe )
-                    keyframe.setAttribute('time', str(frame/30.0))
-                    for sidx, skey in enumerate( ob.data.shape_keys.keys ):
-                        if sidx == 0: continue
-                        poseref = doc.createElement('poseref'); keyframe.appendChild( poseref )
-                        poseref.setAttribute('poseindex', str(sidx))
-                        poseref.setAttribute('influence', str(skey.value) )
-
-    ## write all verts, even if not in material index, inflates xml, should not bloat .mesh (TODO is this true?)
-    print('    writing vertex data' )
-    badverts = 0
-    
-    ## texture maps - vertex dictionary : for speed optimization of O(n^2) into O(n log n)
-    uvOfVertex = {}
-    if mesh.uv_textures.active:
-        for layer in mesh.uv_textures:
-            uvOfVertex[layer] = {}
-            for fidx, uvface in enumerate(layer.data):
-                face = mesh.faces[ fidx ]
-                for vertex in face.vertices:
-                    if vertex not in uvOfVertex[layer]:
-                        uv = uvface.uv[ list(face.vertices).index(vertex) ]
-                        uvOfVertex[layer][vertex] = uv
-
-    for vidx, v in enumerate(mesh.vertices):
-        if arm:
-            check = 0
-            for vgroup in v.groups:
-                if vgroup.weight > opts['trim-bone-weights']:        #self.EX_TRIM_BONE_WEIGHTS:        # optimized
-                    bnidx = find_bone_index(copy,arm,vgroup.group)
-                    if bnidx is not None:        # allows other vertex groups, not just armature vertex groups
-                        vba = doc.createElement('vertexboneassignment')
-                        bweights.appendChild( vba )
-                        vba.setAttribute( 'vertexindex', str(vidx) )
-                        vba.setAttribute( 'boneindex', str(bnidx) )
-                        vba.setAttribute( 'weight', str(vgroup.weight) )
-                        check += 1
-            if check > 4:
-                badverts += 1
-                print('WARNING: vertex %s is in more than 4 vertex groups (bone weights)\n(this maybe Ogre incompatible)' %vidx)
-
-        vertex = doc.createElement('vertex')
-        p = doc.createElement('position')
-        n = doc.createElement('normal')
-        vb.appendChild( vertex )
-        vertex.appendChild( p )
-        vertex.appendChild( n )
-        x,y,z = swap( v.co )
-        p.setAttribute('x', '%6f' %x)
-        p.setAttribute('y', '%6f' %y)
-        p.setAttribute('z', '%6f' %z)
-
-        ## edge_split modifier causes normals to break
-
-        # this can not be done because the indices have changed
-        #ov = _mesh_normals.vertices[ vidx ]
-        #hasnormals = True
-        #x,y,z = swap( ov.normal )
-        #n.setAttribute('x', str(x))
-        #n.setAttribute('y', str(y))
-        #n.setAttribute('z', str(z))
-
-        if _lookup_normals:
-            # this is very expensive  (TODO manual face split - get rid of edgesplit-mod-hack)
-            for ov in _mesh_normals.vertices:        #fixed dec8th ob.data.vertices:
-                if ov.co == v.co:
-                    hasnormals = True
-                    x,y,z = swap( ov.normal )
-                    n.setAttribute('x', '%6f' %x)
-                    n.setAttribute('y', '%6f' %y)
-                    n.setAttribute('z', '%6f' %z)
-                    break
-        else:
-            hasnormals = True
-            x,y,z = swap( v.normal )
-            n.setAttribute('x', '%6f' %x)
-            n.setAttribute('y', '%6f' %y)
-            n.setAttribute('z', '%6f' %z)
-
-
-        ## vertex colors ##
-        if len( mesh.vertex_colors ):        # TODO need to do proper face lookup for color1,2,3,4
-            vb.setAttribute('colours_diffuse','true')        # fixed Dec3rd
-            cd = doc.createElement( 'colour_diffuse' )    #'color_diffuse')
-            vertex.appendChild( cd )
-            vchan = mesh.vertex_colors[0]
-
-            valpha = None    ## hack support for vertex color alpha
-            for bloc in mesh.vertex_colors:
-                if bloc.name.lower().startswith('alpha'):
-                    valpha = bloc; break
-
-            for f in mesh.faces:
-                if vidx in f.vertices:
-                    k = list(f.vertices).index(vidx)
-                    r,g,b = getattr( vchan.data[ f.index ], 'color%s'%(k+1) )
-                    if valpha:
-                        ra,ga,ba = getattr( valpha.data[ f.index ], 'color%s'%(k+1) )
-                        cd.setAttribute('value', '%6f %6f %6f %6f' %(r,g,b,ra) )    
-                    else:
-                        cd.setAttribute('value', '%6f %6f %6f 1.0' %(r,g,b) )
-                    break
-
-        ## texture maps ##
-        if mesh.uv_textures.active:
-            vb.setAttribute('texture_coords', '%s' %len(mesh.uv_textures) )
-
-            for layer in mesh.uv_textures:
-                if vidx in uvOfVertex[layer]:
-                    uv = uvOfVertex[layer][vidx]
-                    tcoord = doc.createElement('texcoord')
-                    tcoord.setAttribute('u', '%6f' %uv[0] )
-                    tcoord.setAttribute('v', '%6f' %(1.0-uv[1]) )
-                    #tcoord.setAttribute('v', '%6f' %uv[1] )
-                    vertex.appendChild( tcoord )
-
-    ## end vert loop
-    if hasnormals: vb.setAttribute('normals','true')
-    #else: vb.setAttribute('normals','false')
-
-    if badverts:
-        Report.warnings.append( '%s has %s vertices weighted to too many bones (Ogre limits a vertex to 4 bones)\n[try increaseing the Trim-Weights threshold option]' %(mesh.name, badverts) )
-
-
-
-    ######################################################
-    used_materials = []
-    matnames = []
-    for mat in ob.data.materials:
-        if mat: matnames.append( mat.name )
-        else:
-            print('warning: bad material data', ob)
-            matnames.append( '_missing_material_' )        # fixed dec22, keep proper index
-    if not matnames: matnames.append( '_missing_material_' )
-
-    print('    writing submeshes' )
-    for matidx, matname in enumerate( matnames ):
-        if not len(mesh.faces):        # bug fix dec10th, reported by Matti
-            print('WARNING: submesh without faces, skipping!', ob)
-            continue
-
-        sm = doc.createElement('submesh')        # material split?
-        sm.setAttribute('usesharedvertices', 'true')
-        sm.setAttribute('material', matname)
-
-
-        ## faces ##
-        faces = doc.createElement('faces')
-        for F in mesh.faces:    #ob.data.faces:
-            ## skip faces not in this material index ##
-            if F.material_index != matidx: continue
-            if matname not in used_materials: used_materials.append( matname )
-            ## Ogre only supports triangles
-            tris = []
-            tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
-            if len(F.vertices) >= 4:    #TODO split face on shortest edge? or will that mess up triangle-strips?
-                #correct-but-flipped#tris.append( (F.vertices[2], F.vertices[0], F.vertices[3]) )
-                tris.append( (F.vertices[0], F.vertices[2], F.vertices[3]) )
-            for tri in tris:
-                v1,v2,v3 = tri
-                face = doc.createElement('face')
-                face.setAttribute('v1', str(v1))
-                face.setAttribute('v2', str(v2))
-                face.setAttribute('v3', str(v3))
-                faces.appendChild(face)
-
-        if len(faces.childNodes):
-            subs.appendChild( sm )
-            faces.setAttribute('count', '%s' %len(faces.childNodes))
-            Report.triangles += len(faces.childNodes)
-            sm.appendChild( faces )
-
-
-    bpy.data.objects.remove(copy)
-    bpy.data.meshes.remove(mesh)
-
-    name = force_name or ob.data.name
-
-    data = doc.documentElement.toprettyxml()
-    xmlfile = os.path.join(path, '%s%s.mesh.xml' %(prefix,name) )
-    f = open( xmlfile, 'wb' )
-    f.write( bytes(data,'utf-8') )
-    f.close()
-    OgreXMLConverter( xmlfile, opts )
-
-    if arm and opts['armature-anim']:        #self.EX_ANIM:
-        skel = Skeleton( ob )
-        data = skel.to_xml()
-        name = force_name or ob.data.name
-        xmlfile = os.path.join(path, '%s%s.skeleton.xml' %(prefix,name) )
-        f = open( xmlfile, 'wb' )
-        f.write( bytes(data,'utf-8') )
-        f.close()
-        OgreXMLConverter( xmlfile, opts )
-
-    mats = []
-    for name in used_materials:
-        if name != '_missing_material_':
-            mats.append( bpy.data.materials[name] )
-    return mats
-## end dot_mesh ##
 
 class Bone(object):
     ''' EditBone
     ['__doc__', '__module__', '__slots__', 'align_orientation', 'align_roll', 'bbone_in', 'bbone_out', 'bbone_segments', 'bl_rna', 'envelope_distance', 'envelope_weight', 'head', 'head_radius', 'hide', 'hide_select', 'layers', 'lock', 'matrix', 'name', 'parent', 'rna_type', 'roll', 'select', 'select_head', 'select_tail', 'show_wire', 'tail', 'tail_radius', 'transform', 'use_connect', 'use_cyclic_offset', 'use_deform', 'use_envelope_multiply', 'use_inherit_rotation', 'use_inherit_scale', 'use_local_location']
 
     '''
+
+    def __init__(self, matrix, pbone, skeleton):
+        self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+        self.skeleton = skeleton
+        self.name = pbone.name
+        #self.matrix = self.flipMat * matrix
+        self.matrix = matrix
+        self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
+        if not pbone.bone.use_deform: print('warning: bone <%s> is non-deformabled, this is inefficient!' %self.name)
+        #TODO test#if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
+        self.parent = pbone.parent
+        self.children = []
+        self.fixUpAxis = True
+
     def update(self):        # called on frame update
-        pose = self.bone.matrix * self.skeleton.object_space_transformation
-        pose =  self.skeleton.object_space_transformation * self.bone.matrix
+        pose = self.bone.matrix.copy()
+        #pose = self.bone.matrix * self.skeleton.object_space_transformation
+        #pose =  self.skeleton.object_space_transformation * self.bone.matrix
         self._inverse_total_trans_pose = pose.inverted()
 
         # calculate difference to parent bone
         if self.parent:
             pose = self.parent._inverse_total_trans_pose * pose
         elif self.fixUpAxis:
-            pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
+            #pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
+            pose = self.flipMat * pose
 
         # get transformation values
         # translation relative to parent coordinate system orientation
@@ -5268,43 +5109,36 @@ class Bone(object):
 
         #self.pose_location = self.bone.location.copy()
         #self.pose_rotation = self.bone.rotation_quaternion.copy()
-
-
         for child in self.children: child.update()
 
 
-    def __init__(self, matrix, pbone, skeleton):
-        self.skeleton = skeleton
-        self.name = pbone.name
-        self.matrix = matrix
-        self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
-        if not pbone.bone.use_deform: print('warning: bone <%s> is non-deformabled, this is inefficient!' %self.name)
-        #TODO test#if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
-        self.parent = pbone.parent
-        self.children = []
-        self.fixUpAxis = True
+
 
     def rebuild_tree( self ):        # called first on all bones
         if self.parent:
             self.parent = self.skeleton.get_bone( self.parent.name )
             self.parent.children.append( self )
 
-    def compute_rest( self ):    # called second, only on root bones
+    def compute_rest( self ):    # called after rebuild_tree, recursive roots to leaves
         if self.parent:
             inverseParentMatrix = self.parent.inverse_total_trans
         elif (self.fixUpAxis):
-            inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
+            inverseParentMatrix = self.flipMat
         else:
-            inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
+            inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))
 
         # bone matrix relative to armature object
         self.ogre_rest_matrix = self.matrix.copy()
         # relative to mesh object origin
         #self.ogre_rest_matrix *= self.skeleton.object_space_transformation        # 2.49 style
-        self.ogre_rest_matrix = self.skeleton.object_space_transformation * self.ogre_rest_matrix
+
+        ##not correct - june18##self.ogre_rest_matrix = self.skeleton.object_space_transformation * self.ogre_rest_matrix
+        #self.ogre_rest_matrix -= self.skeleton.object_space_transformation
+
 
         # store total inverse transformation
         self.inverse_total_trans = self.ogre_rest_matrix.inverted()
+
         # relative to OGRE parent bone origin
         #self.ogre_rest_matrix *= inverseParentMatrix        # 2.49 style
         self.ogre_rest_matrix = inverseParentMatrix * self.ogre_rest_matrix
@@ -5324,10 +5158,9 @@ class Skeleton(object):
         self.bones = []
         mats = {}
         self.arm = arm = ob.find_armature()
-        ## ob.pose.bones[0].matrix is not the same as ob.data.edit_bones[0].matrix
-        #bug?#layers = list(arm.layers)
         arm.hide = False
-        arm.layers = [True]*20
+        self._restore_layers = list(arm.layers)
+        arm.layers = [True]*20      # can not have anything hidden - just to be sure
         prev = bpy.context.scene.objects.active
         bpy.context.scene.objects.active = arm        # arm needs to be in edit mode to get to .edit_bones
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
@@ -5347,7 +5180,6 @@ class Skeleton(object):
         # from armature object space into mesh object space, i.e.,
         # (x,y,z,w)*AO*MO^(-1)
         self.object_space_transformation = arm.matrix_local * ob.matrix_local.inverted()
-        #self.object_space_transformation = ob.matrix_local.inverted() * arm.matrix_local 
 
         ## setup bones for Ogre format ##
         for b in self.bones: b.rebuild_tree()
@@ -5359,7 +5191,9 @@ class Skeleton(object):
                 self.roots.append( b )
 
     def to_xml( self ):
-        doc = dom.Document()
+        _fps = float( bpy.context.scene.render.fps )
+
+        doc = RDocument()
         root = doc.createElement('skeleton'); doc.appendChild( root )
         bones = doc.createElement('bones'); root.appendChild( bones )
         bh = doc.createElement('bonehierarchy'); root.appendChild( bh )
@@ -5390,124 +5224,171 @@ class Skeleton(object):
             axis.setAttribute('x', '%6f' %x )
             axis.setAttribute('y', '%6f' %y )
             axis.setAttribute('z', '%6f' %z )
+
             ## Ogre bones do not have initial scaling? ##
+            ## NOTE: Ogre bones by default do not pass down their scaling in animation,
+            ## so in blender all bones are like 'do-not-inherit-scaling'
             if 0:
                 scale = doc.createElement('scale'); b.appendChild( scale )
                 x,y,z = swap( mat.to_scale() )
                 scale.setAttribute('x', str(x))
                 scale.setAttribute('y', str(y))
                 scale.setAttribute('z', str(z))
-            ## NOTE: Ogre bones by default do not pass down their scaling in animation, in blender all bones are like 'do-not-inherit-scaling'
 
         arm = self.arm
-        if arm.animation_data:
+        if not arm.animation_data or (arm.animation_data and not arm.animation_data.nla_tracks):  # assume animated via constraints and use blender timeline.
+            anims = doc.createElement('animations'); root.appendChild( anims )
+            anim = doc.createElement('animation'); anims.appendChild( anim )
+            tracks = doc.createElement('tracks'); anim.appendChild( tracks )
+            anim.setAttribute('name', 'my_animation')
+            start = bpy.context.scene.frame_start; end = bpy.context.scene.frame_end
+            anim.setAttribute('length', str( (end-start)/_fps ) )
+
+            _keyframes = {}
+            _bonenames_ = []
+            for bone in arm.pose.bones:
+                _bonenames_.append( bone.name )
+                track = doc.createElement('track')
+                track.setAttribute('bone', bone.name)
+                tracks.appendChild( track )
+                keyframes = doc.createElement('keyframes')
+                track.appendChild( keyframes )
+                _keyframes[ bone.name ] = keyframes
+
+            for frame in range( int(start), int(end), bpy.context.scene.frame_step):
+                bpy.context.scene.frame_set(frame)
+                for bone in self.roots: bone.update()
+                print('\t\t Frame:', frame)
+                for bonename in _bonenames_:
+                    bone = self.get_bone( bonename )
+                    _loc = bone.pose_location
+                    _rot = bone.pose_rotation
+                    _scl = bone.pose_scale
+
+                    keyframe = doc.createElement('keyframe')
+                    keyframe.setAttribute('time', str((frame-start)/_fps))
+                    _keyframes[ bonename ].appendChild( keyframe )
+                    trans = doc.createElement('translate')
+                    keyframe.appendChild( trans )
+                    x,y,z = _loc
+                    trans.setAttribute('x', '%6f' %x)
+                    trans.setAttribute('y', '%6f' %y)
+                    trans.setAttribute('z', '%6f' %z)
+
+                    rot =  doc.createElement( 'rotate' )
+                    keyframe.appendChild( rot )
+                    q = _rot
+                    rot.setAttribute('angle', '%6f' %q.angle )
+                    axis = doc.createElement('axis'); rot.appendChild( axis )
+                    x,y,z = q.axis
+                    axis.setAttribute('x', '%6f' %x )
+                    axis.setAttribute('y', '%6f' %y )
+                    axis.setAttribute('z', '%6f' %z )
+
+                    scale = doc.createElement('scale')
+                    keyframe.appendChild( scale )
+                    x,y,z = _scl
+                    scale.setAttribute('x', '%6f' %x)
+                    scale.setAttribute('y', '%6f' %y)
+                    scale.setAttribute('z', '%6f' %z)
+
+
+        elif arm.animation_data:
             anims = doc.createElement('animations'); root.appendChild( anims )
             if not len( arm.animation_data.nla_tracks ):
                 Report.warnings.append('you must assign an NLA strip to armature (%s) that defines the start and end frames' %arm.name)
 
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
-                if not len(nla.strips): continue
-                if len( nla.strips ) > 1:
-                    Report.warnings.append('NLA track with multiple strips on armature (%s), using only the first strip, use multiple NLA tracks not multiple NLA strips.' %arm.name)
-                nla.mute = False        # TODO is this required?
-                strip = nla.strips[0]
-                anim = doc.createElement('animation'); anims.appendChild( anim )
-                tracks = doc.createElement('tracks'); anim.appendChild( tracks )
-                Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]' %(arm.name, nla.name, strip.frame_start, strip.frame_end) )
+                if not len(nla.strips): print( 'skipping empty NLA track: %s' %nla.name ); continue
+                for strip in nla.strips:
+                    anim = doc.createElement('animation'); anims.appendChild( anim )
+                    tracks = doc.createElement('tracks'); anim.appendChild( tracks )
+                    Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]' %(arm.name, nla.name, strip.frame_start, strip.frame_end) )
 
-                anim.setAttribute('name', nla.name)        # do not use the action's name
-                anim.setAttribute('length', str( (strip.frame_end-strip.frame_start)/30.0 ) )        # TODO proper fps
-                ## using the fcurves directly is useless, because:
-                ## we need to support constraints and the interpolation between keys
-                ## is Ogre smart enough that if a track only has a set of bones, then blend animation with current animation?
-                ## the exporter will not be smart enough to know which bones are active for a given track...
-                ## can hijack blender NLA, user sets a single keyframe for only selected bones, and keys last frame
-                stripbones = []
-                for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
-                    if group.name in arm.pose.bones: stripbones.append( group.name )
-                if not stripbones:                                    # otherwise we use all bones
-                    for bone in arm.pose.bones: stripbones.append( bone.name )
-                print('NLA-strip:',  nla.name)
-                _keyframes = {}
-                for bonename in stripbones:
-                    track = doc.createElement('track')
-                    track.setAttribute('bone', bonename)
-                    tracks.appendChild( track )
-                    keyframes = doc.createElement('keyframes')
-                    track.appendChild( keyframes )
-                    _keyframes[ bonename ] = keyframes
-                    print('\t', bonename)
-
-                for frame in range( int(strip.frame_start), int(strip.frame_end), 2):        # every other frame
-                    #bpy.context.scene.frame_current = frame
-                    bpy.context.scene.frame_set(frame)
-                    #self.object.update( bpy.context.scene )
-                    #bpy.context.scene.update()
-                    for bone in self.roots: bone.update()
-                    print('\t\t', frame)
+                    #anim.setAttribute('animation_group', nla.name)        # this is extended xml format not useful?
+                    anim.setAttribute('name', strip.name)                       # USE the action's name
+                    anim.setAttribute('length', str( (strip.frame_end-strip.frame_start)/_fps ) )
+                    ## using the fcurves directly is useless, because:
+                    ## we need to support constraints and the interpolation between keys
+                    ## is Ogre smart enough that if a track only has a set of bones, then blend animation with current animation?
+                    ## the exporter will not be smart enough to know which bones are active for a given track...
+                    ## can hijack blender NLA, user sets a single keyframe for only selected bones, and keys last frame
+                    stripbones = []
+                    for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
+                        if group.name in arm.pose.bones: stripbones.append( group.name )
+                    if not stripbones:                                    # otherwise we use all bones
+                        for bone in arm.pose.bones: stripbones.append( bone.name )
+                    print('NLA-strip:',  nla.name)
+                    _keyframes = {}
                     for bonename in stripbones:
-                        bone = self.get_bone( bonename )
-                        _loc = bone.pose_location
-                        _rot = bone.pose_rotation
-                        _scl = bone.pose_scale
+                        track = doc.createElement('track')
+                        track.setAttribute('bone', bonename)
+                        tracks.appendChild( track )
+                        keyframes = doc.createElement('keyframes')
+                        track.appendChild( keyframes )
+                        _keyframes[ bonename ] = keyframes
+                        print('\t Bone:', bonename)
 
-                        keyframe = doc.createElement('keyframe')
-                        keyframe.setAttribute('time', str(frame/30.0))
-                        _keyframes[ bonename ].appendChild( keyframe )
-                        trans = doc.createElement('translate')
-                        keyframe.appendChild( trans )
-                        x,y,z = _loc
-                        trans.setAttribute('x', '%6f' %x)
-                        trans.setAttribute('y', '%6f' %y)
-                        trans.setAttribute('z', '%6f' %z)
+                    for frame in range( int(strip.frame_start), int(strip.frame_end), bpy.context.scene.frame_step):
+                        bpy.context.scene.frame_set(frame)
+                        for bone in self.roots: bone.update()
+                        print('\t\t Frame:', frame)
+                        for bonename in stripbones:
+                            bone = self.get_bone( bonename )
+                            _loc = bone.pose_location
+                            _rot = bone.pose_rotation
+                            _scl = bone.pose_scale
 
-                        rot =  doc.createElement( 'rotate' )        # note "rotate" - bug fixed Dec2nd
-                        keyframe.appendChild( rot )
-                        q = _rot #swap( mat.to_quaternion() )
-                        rot.setAttribute('angle', '%6f' %q.angle )
-                        axis = doc.createElement('axis'); rot.appendChild( axis )
-                        x,y,z = q.axis
-                        axis.setAttribute('x', '%6f' %x )
-                        axis.setAttribute('y', '%6f' %y )
-                        axis.setAttribute('z', '%6f' %z )
+                            keyframe = doc.createElement('keyframe')
+                            keyframe.setAttribute('time', str((frame-strip.frame_start)/_fps))
+                            _keyframes[ bonename ].appendChild( keyframe )
+                            trans = doc.createElement('translate')
+                            keyframe.appendChild( trans )
+                            x,y,z = _loc
+                            trans.setAttribute('x', '%6f' %x)
+                            trans.setAttribute('y', '%6f' %y)
+                            trans.setAttribute('z', '%6f' %z)
 
-                        scale = doc.createElement('scale')
-                        keyframe.appendChild( scale )
-                        x,y,z = _scl #swap( mat.to_scale() )
-                        scale.setAttribute('x', '%6f' %x)
-                        scale.setAttribute('y', '%6f' %y)
-                        scale.setAttribute('z', '%6f' %z)
+                            rot =  doc.createElement( 'rotate' )
+                            keyframe.appendChild( rot )
+                            q = _rot
+                            rot.setAttribute('angle', '%6f' %q.angle )
+                            axis = doc.createElement('axis'); rot.appendChild( axis )
+                            x,y,z = q.axis
+                            axis.setAttribute('x', '%6f' %x )
+                            axis.setAttribute('y', '%6f' %y )
+                            axis.setAttribute('z', '%6f' %z )
 
+                            scale = doc.createElement('scale')
+                            keyframe.appendChild( scale )
+                            x,y,z = _scl
+                            scale.setAttribute('x', '%6f' %x)
+                            scale.setAttribute('y', '%6f' %y)
+                            scale.setAttribute('z', '%6f' %z)
 
-        return doc.documentElement.toprettyxml()
-
-    ## below _convertRestpose is from blender2.49 script
-'''
-    #meshObjectSpaceTransformation = armatureExporter.getAdditionalRootBoneTransformation()
-    #track.addKeyframe(pose, frameTime, meshObjectSpaceTransformation)
-    def _convertRestpose(self):
-        """Convert rest pose of Blender skeleton.
-        
-           Note that not every Blender bone has a corresponding OGRE bone.
-           Root bones need an additional transformation caused by the
-           possibliy different object coordinate systems of Blender's
-           armature object and Blender's mesh object.
-        """
-        # Warning: Blender uses left-multiplication: vector*matrix
-        
-        # additional transformation caused by the objects
-        inverseMeshObjectMatrix = Blender.Mathutils.Matrix(*self.bMeshObject.getMatrix())
-        inverseMeshObjectMatrix.invert()
-        armatureObjectMatrix = Blender.Mathutils.Matrix(*self.bArmatureObject.getMatrix())
-        
-        # additional transformation for root bones:
-        # from armature object space into mesh object space, i.e.,
-        # (x,y,z,w)*AO*MO^(-1)
-        self.additionalRootBoneTransformation = armatureObjectMatrix*inverseMeshObjectMatrix
-'''
+        return doc.toprettyxml()
 
 
 
+class VertexNoPos:
+    def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
+        self.ogre_vidx = ogre_vidx
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+        self.r = r
+        self.g = g
+        self.b = b
+        self.ra = ra
+        self.vert_uvs = vert_uvs
+
+    '''does not compare ogre_vidx (and position at the moment)'''
+    def __eq__(self, o):
+        return abs(self.nx - o.nx) < EPSILON and abs(self.ny - o.ny) < EPSILON and abs(self.nz - o.nz) < EPSILON and abs(self.r - o.r) < EPSILON \
+                and abs(self.g - o.g) < EPSILON and abs(self.b - o.b) < EPSILON and abs(self.ra - o.ra) < EPSILON \
+                and ( self.vert_uvs == o.vert_uvs or ( \
+                abs(self.vert_uvs[0][0] - o.vert_uvs[0][0]) < EPSILON and abs(self.vert_uvs[0][1] - o.vert_uvs[0][1]) < EPSILON \
+                and abs(self.vert_uvs[1][0] - o.vert_uvs[1][0]) < EPSILON and abs(self.vert_uvs[1][1] - o.vert_uvs[1][1]) < EPSILON ) )
 
 
 
@@ -5534,15 +5415,15 @@ def indent( level, *args ):
 
 def gather_instances():
     instances = {}
-    for ob in bpy.data.objects:
+    for ob in bpy.context.scene.objects:
         if ob.data and ob.data.users > 1:
             if ob.data not in instances: instances[ ob.data ] = []
             instances[ ob.data ].append( ob )
     return instances
 
 def select_instances( context, name ):
-    for ob in bpy.data.objects: ob.select = False
-    ob = bpy.data.objects[ name ]
+    for ob in bpy.context.scene.objects: ob.select = False
+    ob = bpy.context.scene.objects[ name ]
     if ob.data:
         inst = gather_instances()
         for ob in inst[ ob.data ]: ob.select = True
@@ -5550,7 +5431,7 @@ def select_instances( context, name ):
 
 
 def select_group( context, name, options={} ):
-    for ob in bpy.data.objects: ob.select = False
+    for ob in bpy.context.scene.objects: ob.select = False
     for grp in bpy.data.groups:
         if grp.name == name:
             #context.scene.objects.active = grp.objects
@@ -5597,12 +5478,12 @@ class INFO_MT_groups(bpy.types.Menu):
             op.mystring = group.name
         layout.separator()
 
-#TODO
+#TODO - is this being used?
 class INFO_MT_group_mark(bpy.types.Operator):
     '''mark group auto combine on export'''
     bl_idname = "ogre.mark_group_export_combine"
     bl_label = "Group Auto Combine"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
+    bl_options = {'REGISTER'}                              # Options for this panel type
     mybool= BoolProperty(name="groupautocombine", description="set group auto-combine", default=False)
     mygroups = {}
     @classmethod
@@ -5614,14 +5495,11 @@ class INFO_MT_group_mark(bpy.types.Operator):
 class INFO_MT_group(bpy.types.Operator):
     '''select group'''
     bl_idname = "ogre.select_group"
-    bl_label = "Select Group"                                                # The panel label, http://www.blender.org/documentation/250PythonDoc/bpy.types.Panel.html
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
+    bl_label = "Select Group"
+    bl_options = {'REGISTER'}                              # Options for this panel type
     mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
     @classmethod
     def poll(cls, context):
-        print('----poll group, below context -----')
-        print( dir(context) )
-        #return context.active_object != None  # as long as something is selected, return the active Object?
         return True
     def invoke(self, context, event):
         select_group( context, self.mystring )
@@ -5632,7 +5510,7 @@ class INFO_MT_actors(bpy.types.Menu):
     bl_label = "Actors"
     def draw(self, context):
         layout = self.layout
-        for ob in bpy.data.objects:
+        for ob in bpy.context.scene.objects:
             if ob.game.use_actor:
                 op = layout.operator(INFO_MT_actor.bl_idname, text=ob.name)
                 op.mystring = ob.name
@@ -5642,7 +5520,7 @@ class INFO_MT_actor(bpy.types.Operator):
     '''select actor'''
     bl_idname = "ogre.select_actor"
     bl_label = "Select Actor"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
+    bl_options = {'REGISTER'}                              # Options for this panel type
     mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
     @classmethod
     def poll(cls, context): return True
@@ -5669,147 +5547,12 @@ class INFO_MT_dynamic(bpy.types.Operator):
     @classmethod
     def poll(cls, context): return True
     def invoke(self, context, event):
-        bpy.data.objects[self.mystring].select = True
+        bpy.context.scene.objects[self.mystring].select = True
         return {'FINISHED'}
 
 
 
-class INFO_HT_myheader(bpy.types.Header):
-    bl_space_type = 'INFO'
-    def draw(self, context):
-        layout = self.layout
-        wm = context.window_manager
-        window = context.window
-        scene = context.scene
-        rd = scene.render
-        ob = context.active_object
-        screen = context.screen
 
-        op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='FILE_REFRESH' ); op.mesh = True
-        op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='MATERIAL' ); op.mesh = False
-        row = layout.row(align=True)
-        sub = row.row(align=True)
-        sub.menu("INFO_MT_file")
-        sub.menu("INFO_MT_add")
-        if rd.use_game_engine: sub.menu("INFO_MT_game")
-        else: sub.menu("INFO_MT_render")
-        layout.separator()
-        sub.menu("INFO_MT_instances")
-        sub.menu("INFO_MT_groups")
-
-        #layout.separator()
-        layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
-
-
-        layout.template_header()
-        if not context.area.show_menus:
-            if window.screen.show_fullscreen: layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
-            else: layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
-            layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
-
-            layout.separator()
-            layout.template_running_jobs()
-            layout.template_reports_banner()
-            layout.separator()
-            if rd.has_multiple_engines: layout.prop(rd, "engine", text="")
-
-            layout.label(text=scene.statistics())
-            layout.menu( "INFO_MT_help" )
-
-        else:
-            row = layout.row(align=True)        # align makes buttons compact together
-            #row.operator("screen.frame_jump", text="", icon='REW').end = False
-            row.operator("screen.keyframe_jump", text="", icon='PREV_KEYFRAME').next = False
-            if not screen.is_animation_playing: row.operator("screen.animation_play", text="", icon='PLAY')
-            else: sub = row.row(); sub.scale_x = 1.0; sub.operator("screen.animation_play", text="", icon='PAUSE')
-            row.operator("screen.keyframe_jump", text="", icon='NEXT_KEYFRAME').next = True
-            #row.operator("screen.frame_jump", text="", icon='FF').end = True
-            row = layout.row(align=True)
-            layout.prop(scene, "frame_current", text="")
-
-            if ob:
-                row = layout.row(align=True)
-                row.prop( ob, 'name', text='' )
-                keys = ob.keys()
-
-                if '_modified_' in keys:
-                    op = row.operator( 'ogre.update_modify_time', text='', icon='TIME' )
-                    v = ob['_modified_']
-                    if v: v = time.asctime(time.localtime(v))
-                    else: v = ''
-                    row.label( text='version: %s  %s' %(ob['_version_'],v) )
-                else:
-                    op = row.operator('ogre.setup_version_control')
-
-                row = layout.row(align=True); row.scale_x=1.1
-                if '_category' in keys:
-                    tag = '_category_'
-                    a = tag.replace('_','')
-                    row.prop( ob, '["%s"]' %tag, text='' )
-                    op = row.operator( 'ogre.select_by_prop_value', text='', icon='GROUP' )
-                    op.propname = tag
-                    op.propvalue = str( ob[tag] )
-
-            row = layout.row(align=True); row.scale_x=1.6
-            row.menu("INFO_MT_actors", icon='GAME')
-            row.menu("INFO_MT_dynamics", icon='PHYSICS')
-
-            if ob and ob.type == 'MESH':
-                row = layout.row(align=True)
-                mesh = ob.data
-                mkeys = mesh.keys()
-                for tag in VersionControlMesh:
-                    if tag in mkeys: v = mesh[tag]
-                    else: v = True
-                    if v: icon = 'CHECKBOX_HLT'
-                    else: icon = 'CHECKBOX_DEHLT'
-                    txt = tag.replace('_',' ').split('update')[-1]
-                    op = row.operator( 'ogre.toggle_prop', text=txt, icon=icon )
-                    op.propname = tag
-
-            layout.menu( "INFO_MT_ogre_docs" )
-
-def export_menu_func(self, context):
-    path,name = os.path.split( context.blend_data.filepath )
-    op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene)")
-    op.filepath = os.path.join( path, name.split('.')[0]+'.scene' )
-        
-def import_menu_func(self, context):
-    self.layout.operator(Ogre_import_op.bl_idname, text="Ogre3D (.scene) | read version control attributes (UUIDs)")
-
-#_header_ = None
-MyShaders = None
-def register():
-    print(VERSION)
-    global MyShaders, _header_
-
-    bpy.utils.register_module(__name__)
-
-    #TODO unregistering this type does not seems possible anymore in Blender SVN >2.56
-    #_header_ = bpy.types.INFO_HT_header
-    #bpy.types.unregister(_header_)
-
-    readOrCreateConfig()
-        
-    MyShaders = MyShadersSingleton()
-    
-    bpy.types.INFO_MT_file_export.append(export_menu_func)
-    bpy.types.INFO_MT_file_import.append(import_menu_func)
-
-def unregister():
-    print('unreg-> ogre exporter')
-
-    bpy.utils.unregister_module(__name__)
-
-    #TODO unregistering this type does not seems possible anymore in Blender SVN >2.56
-    #bpy.types.register(_header_)
-        
-    bpy.types.INFO_MT_file_export.remove(export_menu_func)
-    bpy.types.INFO_MT_file_import.remove(import_menu_func)
-
-
-if __name__ == "__main__":
-    register()
 
 NVDXT_DOC = '''
 Version 8.30
@@ -6028,7 +5771,6 @@ and source of depth info:
   -max    : max of (r,g,b)
   -colorspace : mix of r,g,b
 
-
 Depth Sprite dxt:
   -aheight : store calculated depth in alpha channel
   -aclear : store 0.0 in alpha channel
@@ -6036,9 +5778,6 @@ Depth Sprite dxt:
   -scale <float> : scale of depth sprite (default 1.0)
   -alpha_modulate : multiplies color by alpha during filtering
   -pre_modulate : multiplies color by alpha before processing
-
-
-
 
 Examples
   nvdxt -cubeMap -list cubemapfile.lst -output cubemap.dds
@@ -6057,36 +5796,597 @@ Examples
 '''
 
 
+def material_name( mat ):
+    if type(mat) is str: return mat
+    elif not mat.library: return mat.name
+    else: return mat.name + mat.library.filepath.replace('/','_')
 
-'''
-https://svn.blender.org/svnroot/bf-extensions/extern/py/scripts/addons/luxrender/addon_data.py
+def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
+    print('mesh to Ogre mesh XML format', ob.name)
+    if not os.path.isdir( path ):
+        print('creating directory', path )
+        os.makedirs( path )
 
-bl_addon_data = {
-    (2,5,4): {
-        (0,7,1): {
-            'api_compatibility': {
-                32591:{
-                    (0,7,1):    (1105,-1)
-                }
-            },
-            'binary_urls': {
-                'linux-32':        ('http://www.luxrender.net/release/pylux/0.7.1/lin/32/pylux.so.gz',
-                                '4e4fc041da4f90b7b5011fd944437f21'),
-                'linux-64':        ('http://www.luxrender.net/release/pylux/0.7.1/lin/64/pylux.so.gz',
-                                '0ec790ddbdcd295202c0b7b02b37c297'),
-                'windows-32':    ('http://www.luxrender.net/release/pylux/0.7.1/win/32/pylux.pyd.gz',
-                                '38a5621063e5d76fb1a8c8d17f42427e'),
-                'windows-64':    ('http://www.luxrender.net/release/pylux/0.7.1/win/64/pylux.pyd.gz',
-                                '95b352e384810a44fd38580d8ac81a57'),
-                'osx-intel-32':    ('http://www.luxrender.net/release/pylux/0.7.1/mac/intel_32/pylux.so.gz',
-                                'fd88b7ab4c1ea23f932f83ea56b00346'),
-                'osx-intel-64':    ('http://www.luxrender.net/release/pylux/0.7.1/mac/intel_64/pylux.so.gz',
-                                '51c57a3dee3a200ecf34ae98e9372c85'),
-                'osx-ppc':        (),
-            }
-        }
-    }
-}
+    Report.meshes.append( ob.data.name )
+    Report.faces += len( ob.data.faces )
+    Report.orig_vertices += len( ob.data.vertices )
 
-'''
+    cleanup = False
+    if ob.modifiers:
+        cleanup = True
+        copy = ob.copy()
+        #bpy.context.scene.objects.link(copy)
+        rem = []
+        for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
+            if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
+        for mod in rem: copy.modifiers.remove( mod )
+        ## bake mesh ##
+        mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
+    else:
+        copy = ob
+        mesh = ob.data
+
+    print('creating document...')
+
+    #replaced by sax parser
+    #doc = RDocument()
+    #root = doc.createElement('mesh'); doc.appendChild( root )
+    name = force_name or ob.data.name
+    xmlfile = os.path.join(path, '%s.mesh.xml' %name )
+    try:
+        f = open( xmlfile, 'w' )
+        doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
+
+        #//very ugly, have to replace number of vertices later
+        doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
+
+        print('    writing shared geometry')
+        doc.start_tag('vertexbuffer', {
+                'positions':'true',
+                'normals':'true',
+                'colours_diffuse' : str(bool( mesh.vertex_colors )),
+                'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
+        })
+
+        ## vertex colors ##
+        vcolors = None
+        vcolors_alpha = None
+        if len( mesh.vertex_colors ):
+            vcolors = mesh.vertex_colors[0]
+            for bloc in mesh.vertex_colors:
+                if bloc.name.lower().startswith('alpha'):
+                    vcolors_alpha = bloc; break
+
+        ######################################################
+
+        materials = []
+        for mat in ob.data.materials:
+            if mat: materials.append( mat )
+            else:
+                print('warning: bad material data', ob)
+                materials.append( '_missing_material_' )        # fixed dec22, keep proper index
+        if not materials: materials.append( '_missing_material_' )
+        _sm_faces_ = []
+        for matidx, mat in enumerate( materials ):
+            _sm_faces_.append([])
+
+
+        dotextures = False
+        uvcache = []    # should get a little speed boost by this cache
+        if mesh.uv_textures.active:
+            dotextures = True
+            for layer in mesh.uv_textures:
+                uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
+                for uvface in layer.data:
+                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
+
+
+        _sm_vertices_ = {}
+        _remap_verts_ = []
+        numverts = 0
+        for F in mesh.faces:
+            smooth = F.use_smooth
+            #print(F, "is smooth=", smooth)
+            faces = _sm_faces_[ F.material_index ]
+            ## Ogre only supports triangles
+            tris = []
+            tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
+            if len(F.vertices) >= 4: tris.append( (F.vertices[0], F.vertices[2], F.vertices[3]) )
+            if dotextures:
+                a = []; b = []
+                uvtris = [ a, b ]
+                for layer in uvcache:
+                    uv1, uv2, uv3, uv4 = layer[ F.index ]
+                    a.append( (uv1, uv2, uv3) )
+                    b.append( (uv1, uv3, uv4) )
+                    
+                    
+            
+            for tidx, tri in enumerate(tris):
+                face = []
+                for vidx, idx in enumerate(tri):
+                    v = mesh.vertices[ idx ]
+                    
+                    if smooth: nx,ny,nz = swap( v.normal )     # fixed june 17th 2011
+                    else: nx,ny,nz = swap( F.normal )
+                    
+                    r = 1.0
+                    g = 1.0
+                    b = 1.0
+                    ra = 1.0
+                    if vcolors:
+                        k = list(F.vertices).index(idx)
+                        r,g,b = getattr( vcolors.data[ F.index ], 'color%s'%(k+1) )
+                        if vcolors_alpha:
+                            ra,ga,ba = getattr( vcolors_alpha.data[ F.index ], 'color%s'%(k+1) )
+                        else:
+                            ra = 1.0
+
+                    ## texture maps ##
+                    vert_uvs = []
+                    if dotextures:
+                        for layer in uvtris[ tidx ]:
+                            vert_uvs.append(layer[ vidx ])
+                    
+                    
+                    #check if we already exported that vertex with same normal, do not export in that case, (flat shading in blender seems to 
+                    #work with face normals, so we copy each flat face' vertices, if this vertex with same normals was already exported,
+                    #TODO: maybe not best solution, check other ways (let blender do all the work, or only support smooth shading, what about seems, smoothing groups, materials, ...)
+                    vert = VertexNoPos(numverts, nx, ny, nz, r, g, b, ra, vert_uvs)
+                    #print("DEBUG: %i %.9f %.9f %.9f len^2: %.9f" % (numverts, nx, ny, nz, nx*nx+ny*ny+nz*nz))
+                    alreadyExported = False
+                    if idx in _sm_vertices_:
+                        for vert2 in _sm_vertices_[idx]:
+                            #does not compare ogre_vidx (and position at the moment)
+                            if vert == vert2:
+                                face.append(vert2.ogre_vidx)
+                                alreadyExported = True
+                                #print(idx,numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "already exported")
+                                break
+                        if not alreadyExported:
+                            face.append(vert.ogre_vidx)
+                            _sm_vertices_[idx].append(vert)
+                            #print(numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "appended")
+                    else:
+                        face.append(vert.ogre_vidx)
+                        _sm_vertices_[idx] = [vert]
+                        #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "created")
+                    
+                    if alreadyExported:
+                        continue
+                    
+                    numverts += 1
+                    _remap_verts_.append( v )
+
+                    x,y,z = swap( v.co )
+                    
+                    doc.start_tag('vertex', {})
+                    doc.leaf_tag('position', {
+                            'x' : '%6f' % x,
+                            'y' : '%6f' % y,
+                            'z' : '%6f' % z
+                    })
+                    
+                    
+                    doc.leaf_tag('normal', {
+                            'x' : '%6f' % nx,
+                            'y' : '%6f' % ny,
+                            'z' : '%6f' % nz
+                    })
+
+                    if vcolors:
+                        doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
+
+                    ## texture maps ##
+                    if dotextures:
+                        for uv in vert_uvs:
+                            doc.leaf_tag('texcoord', {
+                                    'u' : '%6f' % uv[0],
+                                    'v' : '%6f' % (1.0-uv[1])
+                            })
+                    
+                    
+                    doc.end_tag('vertex')
+                
+                faces.append( (face[0], face[1], face[2]) )
+                
+        del(_sm_vertices_)
+        Report.vertices += numverts
+        
+        doc.end_tag('vertexbuffer')
+        doc.end_tag('sharedgeometry')
+        
+        print('    writing submeshes' )
+        doc.start_tag('submeshes', {})
+        for matidx, mat in enumerate( materials ):
+            doc.start_tag('submesh', {
+                    'usesharedvertices' : 'true',
+                    'material' : material_name(mat),
+                    #maybe better look at index of all faces, if one over 65535 set to true;
+                    #problem: we know it too late, postprocessing of file needed
+                    "use32bitindexes" : str(bool(numverts > 65535))
+            })
+            doc.start_tag('faces', {
+                    'count' : str(len(_sm_faces_[matidx]))
+            })
+            for fidx, (v1, v2, v3) in enumerate(_sm_faces_[matidx]):
+                doc.leaf_tag('face', {
+                    'v1' : str(v1),
+                    'v2' : str(v2),
+                    'v3' : str(v3)
+                })
+            doc.end_tag('faces')
+            doc.end_tag('submesh')
+            Report.triangles += len(_sm_faces_[matidx])
+        del(_sm_faces_)
+        doc.end_tag('submeshes')
+
+        
+        arm = ob.find_armature()
+        if arm:
+            doc.leaf_tag('skeletonlink', {
+                    'name' : '%s.skeleton' %(force_name or ob.data.name)
+            })
+            doc.start_tag('boneassignments', {})
+            badverts = 0
+            for vidx, v in enumerate(_remap_verts_):
+                check = 0
+                for vgroup in v.groups:
+                    if vgroup.weight > opts['trim-bone-weights']:        #self.EX_TRIM_BONE_WEIGHTS:        # optimized
+                        bnidx = find_bone_index(copy,arm,vgroup.group)
+                        if bnidx is not None:        # allows other vertex groups, not just armature vertex groups
+                            doc.leaf_tag('vertexboneassignment', {
+                                    'vertexindex' : str(vidx),
+                                    'boneindex' : str(bnidx),
+                                    'weight' : str(vgroup.weight)
+                            })
+                            check += 1
+                if check > 4:
+                    badverts += 1
+                    print('WARNING: vertex %s is in more than 4 vertex groups (bone weights)\n(this maybe Ogre incompatible)' %vidx)
+            if badverts:
+                Report.warnings.append( '%s has %s vertices weighted to too many bones (Ogre limits a vertex to 4 bones)\n[try increaseing the Trim-Weights threshold option]' %(mesh.name, badverts) )
+            doc.end_tag('boneassignments')
+
+        ############################################
+        ## updated June3 2011 - shape animation works ##
+        if opts['shape-anim'] and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
+            print('    writing shape keys')
+
+            doc.start_tag('poses', {})
+            for sidx, skey in enumerate(ob.data.shape_keys.key_blocks):
+                if sidx == 0: continue
+                if len(skey.data) != len( mesh.vertices ):
+                    failure = 'FAILED to save shape animation - you can not use a modifier that changes the vertex count! '
+                    failure += '[ mesh : %s ]' %mesh.name
+                    Report.warnings.append( failure )
+                    print( failure )
+                    break
+
+                doc.start_tag('pose', {
+                        'name' : skey.name,
+                        # If target is 'mesh', no index needed, if target is submesh then submesh identified by 'index'
+                        #'index' : str(sidx-1),
+                        #'index' : '0',
+                        'target' : 'mesh'
+                })
+
+                for vidx, v in enumerate(_remap_verts_):
+                    pv = skey.data[ v.index ]
+                    x,y,z = swap( pv.co - v.co )
+                    #for i,p in enumerate( skey.data ):
+                    #x,y,z = p.co - ob.data.vertices[i].co
+                    #x,y,z = swap( ob.data.vertices[i].co - p.co )
+                    #if x==.0 and y==.0 and z==.0: continue        # the older exporter optimized this way, is it safe?
+                    doc.leaf_tag('poseoffset', {
+                            'x' : '%6f' % x,
+                            'y' : '%6f' % y,
+                            'z' : '%6f' % z,
+                            'index' : str(vidx)     # is this required?
+                    })
+                doc.end_tag('pose')
+            doc.end_tag('poses')
+
+            if ob.data.shape_keys.animation_data and len(ob.data.shape_keys.animation_data.nla_tracks):
+                print('    writing shape animations')
+                doc.start_tag('animations', {})
+                _fps = float( bpy.context.scene.render.fps )
+                for nla in ob.data.shape_keys.animation_data.nla_tracks:
+                    for idx, strip in enumerate(nla.strips):
+                        doc.start_tag('animation', {
+                                'name' : strip.name,
+                                'length' : str((strip.frame_end-strip.frame_start)/_fps)
+                        })
+                        doc.start_tag('tracks', {})
+                        doc.start_tag('track', {
+                                'type' : 'pose',
+                                'target' : 'mesh'
+                                # If target is 'mesh', no index needed, if target is submesh then submesh identified by 'index'
+                                #'index' : str(idx)
+                                #'index' : '0'
+                        })
+                        doc.start_tag('keyframes', {})
+                        for frame in range( int(strip.frame_start), int(strip.frame_end), bpy.context.scene.frame_step):
+                            bpy.context.scene.frame_set(frame)
+                            doc.start_tag('keyframe', {
+                                    'time' : str((frame-strip.frame_start)/_fps)
+                            })
+                            for sidx, skey in enumerate( ob.data.shape_keys.key_blocks ):
+                                if sidx == 0: continue
+                                doc.leaf_tag('poseref', {
+                                        'poseindex' : str(sidx-1),
+                                        'influence' : str(skey.value)
+                                })
+                            doc.end_tag('keyframe')
+                        doc.end_tag('keyframes')
+                        doc.end_tag('track')
+                        doc.end_tag('tracks')
+                        doc.end_tag('animation')
+                doc.end_tag('animations')
+
+
+        ########## clean up and save #############
+        #bpy.context.scene.meshes.unlink(mesh)
+        if cleanup:
+            #bpy.context.scene.objects.unlink(copy)
+            bpy.data.objects.remove(copy)
+            bpy.data.meshes.remove(mesh)
+            mesh.user_clear()
+            copy.user_clear()
+            del copy
+            del mesh
+
+        del _remap_verts_
+        del uvcache
+    finally:
+        if doc:
+            doc.close()
+        if f:
+            f.close()
+
+
+    #very ugly, find better way
+    def replaceInplace(f,searchExp,replaceExp):
+            import fileinput
+            for line in fileinput.input(f, inplace=1):
+                if searchExp in line:
+                    line = line.replace(searchExp,replaceExp)
+                sys.stdout.write(line)
+            fileinput.close()   # reported by jakob
+    
+    replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
+    del(replaceInplace)
+    
+    
+    OgreXMLConverter( xmlfile, opts )
+
+    
+
+    if arm and opts['armature-anim']:
+        skel = Skeleton( ob )
+        data = skel.to_xml()
+        name = force_name or ob.data.name
+        xmlfile = os.path.join(path, '%s.skeleton.xml' %name )
+        f = open( xmlfile, 'wb' )
+        f.write( bytes(data,'utf-8') )
+        f.close()
+        OgreXMLConverter( xmlfile, opts )
+
+    mats = []
+    for mat in materials:
+        if mat != '_missing_material_': mats.append( mat )
+    return mats
+
+## end dot_mesh ##
+
+class INFO_HT_myheader(bpy.types.Header):
+    bl_space_type = 'INFO'
+    def draw(self, context):
+        layout = self.layout
+        wm = context.window_manager
+        window = context.window
+        scene = context.scene
+        rd = scene.render
+        ob = context.active_object
+        screen = context.screen
+
+        layout.separator()
+        op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='PLUGIN' ); op.mesh = True
+        row = layout.row(align=True)
+        sub = row.row(align=True)
+        sub.menu("INFO_MT_file")
+        sub.menu("INFO_MT_add")
+        if rd.use_game_engine: sub.menu("INFO_MT_game")
+        else: sub.menu("INFO_MT_render")
+
+        row = layout.row(align=True); row.scale_x=1.5
+        row.menu("INFO_MT_instances", icon='NODETREE')
+        row.menu("INFO_MT_groups", icon='GROUP')
+        #row.menu("INFO_MT_actors", icon='GAME')        # not useful?
+        #row.menu("INFO_MT_dynamics", icon='PHYSICS')   # not useful?
+        #layout.separator()
+
+        layout.template_header()
+        if not context.area.show_menus:
+            if window.screen.show_fullscreen: layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
+            else: layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
+            layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
+
+            layout.separator()
+            layout.template_running_jobs()
+            layout.template_reports_banner()
+            layout.separator()
+            if rd.has_multiple_engines: layout.prop(rd, "engine", text="")
+
+            layout.label(text=scene.statistics())
+            layout.menu( "INFO_MT_help" )
+
+        else:
+            layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
+
+            if ob:
+                row = layout.row(align=True)
+                row.prop( ob, 'name', text='' )
+                row.prop( ob, 'draw_type', text='' )
+                row.prop( ob, 'show_x_ray', text='' )
+
+            layout.separator()
+            row = layout.row(align=True)        # align makes buttons compact together
+            row.operator("screen.frame_jump", text="", icon='REW').end = False
+            row.operator("screen.keyframe_jump", text="", icon='PREV_KEYFRAME').next = False
+            if not screen.is_animation_playing: row.operator("screen.animation_play", text="", icon='PLAY')
+            else: sub = row.row(); sub.scale_x = 1.0; sub.operator("screen.animation_play", text="", icon='PAUSE')
+            row.operator("screen.keyframe_jump", text="", icon='NEXT_KEYFRAME').next = True
+            row.operator("screen.frame_jump", text="", icon='FF').end = True
+            row = layout.row(align=True)
+            layout.prop(scene, "frame_current", text="")
+
+
+
+            layout.menu( "INFO_MT_ogre_docs" )
+            layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
+
+
+def export_menu_func_ogre(self, context):
+    path,name = os.path.split( context.blend_data.filepath )
+    op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene and .mesh)")
+    op.filepath = os.path.join( path, name.split('.')[0]+'.scene' )
+
+def export_menu_func_realxtend(self, context):
+    path,name = os.path.split( context.blend_data.filepath )
+    op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="RealXtend (.txml and .mesh)")
+    op.filepath = os.path.join( path, name.split('.')[0]+'.txml' )
+
+def import_menu_func(self, context):
+    self.layout.operator(Ogre_import_op.bl_idname, text="Ogre3D (.scene) | read version control attributes (UUIDs)")
+
+_header_ = None
+class OGRE_toggle_toolbar_op(bpy.types.Operator):
+    '''Toggle Ogre UI'''
+    bl_idname = "ogre.toggle_interface"
+    bl_label = "Ogre"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context): return True
+    def invoke(self, context, event):
+        global _header_
+        if _header_:
+            bpy.utils.unregister_module(__name__)
+            bpy.utils.register_class(_header_)
+            _header_ = None
+            for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
+        else:
+            bpy.utils.register_module(__name__)
+            _header_ = bpy.types.INFO_HT_header
+            bpy.utils.unregister_class(_header_)
+        return {'FINISHED'}
+
+class INFO_HT_microheader(bpy.types.Header):
+    bl_space_type = 'INFO'
+    def draw(self, context):
+        layout = self.layout
+        op = layout.operator( OGRE_toggle_toolbar_op.bl_idname, icon='UI' )
+
+_OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OGRE_toggle_toolbar_op, INFO_HT_microheader, Ogre_User_Report)
+
+MyShaders = None
+def register():
+    print( '-'*80)
+    print(VERSION)
+    global MyShaders, _header_
+    #bpy.utils.register_module(__name__)
+    #_header_ = bpy.types.INFO_HT_header
+    #bpy.utils.unregister_class(_header_)
+    for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
+    readOrCreateConfig()
+    MyShaders = MyShadersSingleton()
+    bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
+    bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
+    bpy.types.INFO_MT_file_import.append(import_menu_func)
+    print( '-'*80)
+
+def unregister():
+    global _header_
+    print('unreg-> ogre exporter')
+    bpy.utils.unregister_module(__name__)
+    if _header_: bpy.utils.register_class(_header_); _header_ = None
+    bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
+    bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
+    bpy.types.INFO_MT_file_import.remove(import_menu_func)
+
+
+if __name__ == "__main__":
+    register()
+
+
+###### RPython xml dom ######
+class RElement(object):
+	def appendChild( self, child ): self.childNodes.append( child )
+	def setAttribute( self, name, value ): self.attributes[name]=value
+
+	def __init__(self, tag):
+		self.tagName = tag
+		self.childNodes = []
+		self.attributes = {}
+
+	def toprettyxml(self, lines, indent ):
+		s = '<%s ' %self.tagName
+		for name in self.attributes:
+			value = self.attributes[name]
+			s += '%s="%s" ' %(name,value)
+		if not self.childNodes:
+			s += '/>'; lines.append( ('\t'*indent)+s )
+		else:
+			s += '>'; lines.append( ('\t'*indent)+s )
+			indent += 1
+			for child in self.childNodes:
+				child.toprettyxml( lines, indent )
+			indent -= 1
+			lines.append( ('\t'*indent)+'</%s>' %self.tagName )
+
+
+class RDocument(object):
+	def __init__(self): self.documentElement = None
+	def createElement(self,tag): return RElement(tag)
+	def appendChild(self,root): self.documentElement = root
+	def toprettyxml(self):
+		indent = 0
+		lines = []
+		self.documentElement.toprettyxml( lines, indent )
+		return '\n'.join( lines )
+
+
+class SimpleSaxWriter():
+    def __init__(self, output, encoding, top_level_tag, attrs):
+        xml_writer = XMLGenerator(output, encoding, True)
+        xml_writer.startDocument()
+        xml_writer.startElement(top_level_tag, attrs)
+        self._xml_writer = xml_writer
+        self.top_level_tag = top_level_tag
+        self.ident=4
+        self._xml_writer.characters('\n')
+
+    def start_tag(self, name, attrs):
+        self._xml_writer.characters(" " * self.ident)
+        self._xml_writer.startElement(name, attrs)
+        self.ident += 4
+        self._xml_writer.characters('\n')
+
+    def end_tag(self, name):
+        self.ident -= 4
+        self._xml_writer.characters(" " * self.ident)
+        self._xml_writer.endElement(name)
+        self._xml_writer.characters('\n')
+
+    def leaf_tag(self, name, attrs):
+        self._xml_writer.characters(" " * self.ident)
+        self._xml_writer.startElement(name, attrs)
+        self._xml_writer.endElement(name)
+        self._xml_writer.characters('\n')
+
+    def close(self):
+        self._xml_writer.endElement(self.top_level_tag)
+        self._xml_writer.endDocument()
+
 
