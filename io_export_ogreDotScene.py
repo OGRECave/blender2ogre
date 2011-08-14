@@ -162,7 +162,7 @@ EPSILON=0.000001
 
 # Hardcoded to Ogre Default #
 def swap( vec ):
-    if len(vec) == 3: return mathutils.Vector( [-vec.x, vec.z, vec.y] )
+    if len(vec) == 3: return mathutils.Vector( [-vec[0], vec[2], vec[1]] )
     elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, -vec.x, vec.z, vec.y] )
     else: assert 0
 
@@ -5804,10 +5804,17 @@ def material_name( mat ):
 
 import array, time
 class FastMesh(object):
+    def get_vertex_position(self, idx ):
+        v = self.vertex_positions; d = idx*3
+        return v[ d ], v[ d+1 ], v[ d+2 ]
 
-    def __init__(self, ob):
+    def get_vertex_normal(self, idx ):
+        v = self.vertex_normals; d = idx*3
+        return v[ d ], v[ d+1 ], v[ d+2 ]
+
+    def __init__(self, data):
         start = time.time()
-        data = ob.data; N = len( data.vertices )
+        N = len( data.vertices )
         self.vertex_positions = array.array( 'f', [.0]*3 ) * N
         data.vertices.foreach_get( 'co', self.vertex_positions )
         print('vert pos ok')
@@ -5819,6 +5826,14 @@ class FastMesh(object):
         self.faces = array.array( 'I', [0]*4 ) * len(data.faces)
         data.faces.foreach_get( 'vertices_raw', self.faces )
         print('faces ok')
+
+        self.faces_smooth = array.array( 'b', [0] * len(data.faces) ) 
+        data.faces.foreach_get( 'use_smooth', self.faces_smooth )
+        print('faces smooth ok')
+
+        self.faces_material_index = array.array( 'B', [0] * len(data.faces) ) 
+        data.faces.foreach_get( 'material_index', self.faces_material_index )
+        print('faces mat idx ok')
 
         self.vertex_colors = []
         if len( data.vertex_colors ):
@@ -5852,12 +5867,247 @@ class FastMesh(object):
         print( 'fast mesh created in:', time.time()-start)
 
 
-
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
-    print('mesh to Ogre mesh XML format', ob.name)
+    print('FastMesh to Ogre mesh XML format', ob.name)
 
-    fastmesh = FastMesh( ob )
-    assert 0
+    if not os.path.isdir( path ):
+        print('creating directory', path )
+        os.makedirs( path )
+
+    Report.meshes.append( ob.data.name )
+    Report.faces += len( ob.data.faces )
+    Report.orig_vertices += len( ob.data.vertices )
+
+    cleanup = False
+    if ob.modifiers:
+        cleanup = True
+        copy = ob.copy()
+        #bpy.context.scene.objects.link(copy)
+        rem = []
+        for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
+            if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
+        for mod in rem: copy.modifiers.remove( mod )
+        ## bake mesh ##
+        mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
+    else:
+        copy = ob
+        mesh = ob.data
+
+    M = FastMesh( mesh )
+
+    name = force_name or ob.data.name
+    xmlfile = os.path.join(path, '%s.mesh.xml' %name )
+
+    f = open( xmlfile, 'w' )
+    doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
+
+    #//very ugly, have to replace number of vertices later
+    doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
+
+    print('    writing shared geometry')
+    doc.start_tag('vertexbuffer', {
+            'positions':'true',
+            'normals':'true',
+            'colours_diffuse' : str(bool( mesh.vertex_colors )),
+            'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
+    })
+
+
+    ######################################################
+
+    materials = []
+    for mat in ob.data.materials:
+        if mat: materials.append( mat )
+        else:
+            print('warning: bad material data', ob)
+            materials.append( '_missing_material_' )        # fixed dec22, keep proper index
+    if not materials: materials.append( '_missing_material_' )
+    _sm_faces_ = []
+    for matidx, mat in enumerate( materials ):
+        _sm_faces_.append([])
+
+    vcolors = dotextures = False
+    uvcache = arm = None
+
+    _sm_vertices_ = {}
+    _remap_verts_ = []
+    numverts = 0
+    #for F in mesh.faces:
+    k = 0
+    for fidx in range( 0, len(M.faces), 4 ):
+        F = mesh.faces[ k ]; k += 1
+        smooth = F.use_smooth
+        matidx = F.material_index
+        #smooth = M.faces_smooth[ k ]
+        #matidx = M.faces_material_index[ k ]
+
+        #print("is smooth=", smooth)
+        #print("material index=", matidx)
+        faces = _sm_faces_[ matidx ]
+
+        ## Ogre only supports triangles
+        tris = []
+        tris.append( (M.faces[fidx], M.faces[fidx+1], M.faces[fidx+2]) )
+        if len(F.vertices) >= 4: tris.append( (M.faces[ fidx ], M.faces[ fidx+2 ], M.faces[ fidx+3 ]) )
+
+        if dotextures:
+            a = []; b = []
+            uvtris = [ a, b ]
+            for layer in uvcache:
+                uv1, uv2, uv3, uv4 = layer[ F.index ]
+                a.append( (uv1, uv2, uv3) )
+                b.append( (uv1, uv3, uv4) )
+                
+                
+        
+        for tidx, tri in enumerate(tris):
+            face = []   # contains Ogre vertex indices
+            for vidx, idx in enumerate(tri):
+                v = mesh.vertices[ idx ]
+                
+                if smooth:
+                    #normal = ( M.vertex_normals[ idx ], M.vertex_normals[ idx+1 ], M.vertex_normals[ idx+2 ] )
+                    nx,ny,nz = swap( M.get_vertex_normal(idx) )
+                else:
+                    nx,ny,nz = swap( F.normal )
+                    #normal = ( M.faces_normals[ idx ], M.faces_normals[ idx+1 ], M.faces_normals[ idx+2 ] )
+
+                r = 1.0
+                g = 1.0
+                b = 1.0
+                ra = 1.0
+
+                ## texture maps ##
+                vert_uvs = []
+                if dotextures and False:
+                    for layer in uvtris[ tidx ]:
+                        vert_uvs.append(layer[ vidx ])
+                                
+                ## opt vert logic here ##
+                face.append( numverts )
+                #if alreadyExported: continue
+                numverts += 1
+                _remap_verts_.append( v )
+
+                x,y,z = swap( M.get_vertex_position(idx) )
+                
+                doc.start_tag('vertex', {})
+                doc.leaf_tag('position', {
+                        'x' : '%6f' % x,
+                        'y' : '%6f' % y,
+                        'z' : '%6f' % z
+                })
+                
+                
+                doc.leaf_tag('normal', {
+                        'x' : '%6f' % nx,
+                        'y' : '%6f' % ny,
+                        'z' : '%6f' % nz
+                })
+
+                if vcolors:
+                    doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
+
+                ## texture maps ##
+                if dotextures:
+                    for uv in vert_uvs:
+                        doc.leaf_tag('texcoord', {
+                                'u' : '%6f' % uv[0],
+                                'v' : '%6f' % (1.0-uv[1])
+                        })
+                
+                
+                doc.end_tag('vertex')
+            
+            faces.append( (face[0], face[1], face[2]) )
+            
+    del(_sm_vertices_)
+    Report.vertices += numverts
+    
+    doc.end_tag('vertexbuffer')
+    doc.end_tag('sharedgeometry')
+    
+    print('    writing submeshes' )
+    doc.start_tag('submeshes', {})
+    for matidx, mat in enumerate( materials ):
+        doc.start_tag('submesh', {
+                'usesharedvertices' : 'true',
+                'material' : material_name(mat),
+                #maybe better look at index of all faces, if one over 65535 set to true;
+                #problem: we know it too late, postprocessing of file needed
+                "use32bitindexes" : str(bool(numverts > 65535))
+        })
+        doc.start_tag('faces', {
+                'count' : str(len(_sm_faces_[matidx]))
+        })
+        for fidx, (v1, v2, v3) in enumerate(_sm_faces_[matidx]):
+            doc.leaf_tag('face', {
+                'v1' : str(v1),
+                'v2' : str(v2),
+                'v3' : str(v3)
+            })
+        doc.end_tag('faces')
+        doc.end_tag('submesh')
+        Report.triangles += len(_sm_faces_[matidx])
+    del(_sm_faces_)
+    doc.end_tag('submeshes')
+
+    
+    ########## clean up and save #############
+    #bpy.context.scene.meshes.unlink(mesh)
+    if cleanup:
+        mesh.user_clear()
+        copy.user_clear()
+        bpy.data.objects.remove(copy)
+        bpy.data.meshes.remove(mesh)
+        del copy
+        del mesh
+
+    del _remap_verts_
+    del uvcache
+
+    doc.close()
+    f.close()
+
+
+    #very ugly, find better way
+    def replaceInplace(f,searchExp,replaceExp):
+            import fileinput
+            for line in fileinput.input(f, inplace=1):
+                if searchExp in line:
+                    line = line.replace(searchExp,replaceExp)
+                sys.stdout.write(line)
+            fileinput.close()   # reported by jakob
+    
+    replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
+    del(replaceInplace)
+    
+    
+    OgreXMLConverter( xmlfile, opts )
+
+    if arm and opts['armature-anim']:
+        skel = Skeleton( ob )
+        data = skel.to_xml()
+        name = force_name or ob.data.name
+        xmlfile = os.path.join(path, '%s.skeleton.xml' %name )
+        f = open( xmlfile, 'wb' )
+        f.write( bytes(data,'utf-8') )
+        f.close()
+        OgreXMLConverter( xmlfile, opts )
+
+    mats = []
+    for mat in materials:
+        if mat != '_missing_material_': mats.append( mat )
+    return mats
+
+## end dot_mesh2 ##
+
+
+
+
+#######################################################################################
+def dot_mesh_old( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
+    print('mesh to Ogre mesh XML format', ob.name)
 
     if not os.path.isdir( path ):
         print('creating directory', path )
