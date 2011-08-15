@@ -4691,16 +4691,16 @@ class _OgreCommonExport_(object):
         c.setAttribute('type', "EC_Placeable")
         c.setAttribute('sync', '1')
 
-        ############ TRANSFORM ####################
+        ############ Tundra TRANSFORM ####################
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Transform" )
-        x,y,z = swap(ob.matrix_world.to_translation())
-        loc = '%6f,%6f,%6f' %(x,y,z)
-        ex,ey,ez = swap( ob.matrix_world.to_euler() )
-        x = math.degrees( ex ); y = math.degrees( ey ); z = math.degrees( ez )
-        rot = '%6f,%6f,%6f' %(x,y,z)
-        x,y,z = swap(ob.matrix_world.to_scale())
-        scl = '%6f,%6f,%6f' %(x,y,z)
+        x,z,y = ob.matrix_world.to_translation()
+        loc = '%6f,%6f,%6f' %(-x,y,z)
+        x,z,y = ob.matrix_world.to_euler()
+        x = math.degrees( x ); y = math.degrees( y ); z = math.degrees( z )
+        rot = '%6f,%6f,%6f' %(-x,y,z)
+        x,z,y = ob.matrix_world.to_scale()
+        scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z))		# Tundra2 clamps any negative to zero
         a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
         #############################################
 

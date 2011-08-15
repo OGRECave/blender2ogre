@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import os, sys, array, time, ctypes
-sys.path.append('..')
+sys.path.append('../../rpythonic')
 import rpythonic
 rpythonic.set_pypy_root( '../../pypy' )
 ################################
@@ -19,7 +19,7 @@ import pypy.rpython.lltypesystem.rffi as rffi
 )
 def dotmesh( facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts ):
 	faces = rffi.cast( rffi.UINTP, facesAddr )
-	facesSmooth = rffi.cast( rffi.BOOLP, facesSmoothAddr )
+	facesSmooth = rffi.cast( rffi.UCHARP, facesSmoothAddr )
 	facesMat = rffi.cast( rffi.USHORTP, facesMatAddr )
 
 	vertsPos = rffi.cast( rffi.FLOATP, vertsPosAddr )
@@ -41,7 +41,7 @@ def dotmesh( facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAdd
 		ci = faces[ i+2 ]; di = faces[ i+3 ]
 
 		triangle = []
-		for J in (ai, bi, ci):
+		for J in [ai, bi, ci]:
 			i = J*3
 			x = -rffi.cast( rffi.DOUBLE, vertsPos[ i ] )
 			z = rffi.cast( rffi.DOUBLE, vertsPos[ i+1 ] )
@@ -53,14 +53,14 @@ def dotmesh( facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAdd
 			nor = (x,y,z)
 
 			ID = (pos,nor)
-			if tag not in fastlookup:
+			if ID not in fastlookup:
 				xml = [
 					'<vertex>',
 					'<position x="%s" y="%s" z="%s" />' %pos,
 					'<normal x="%s" y="%s" z="%s" />' %nor,
 					'</vertex>'
 				]
-				VB.append( '\n'.join(xml) )
+				#VB.append( '\n'.join(xml) )
 
 				fastlookup[ ID ] = ogre_vert_index
 				triangle.append( ogre_vert_index )
