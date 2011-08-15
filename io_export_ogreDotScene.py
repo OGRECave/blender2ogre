@@ -27,7 +27,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.0 Aug13th 2011'
+VERSION = '0.5.1 RDotMesh-test1'
 
 
 __devnotes__ = '''
@@ -5802,8 +5802,12 @@ def material_name( mat ):
     else: return mat.name + mat.library.filepath.replace('/','_')
 
 
-import array, time
-class FastMesh(object):
+
+
+
+import array, time, ctypes
+class CtypesMesh(object):
+
     def get_vertex_position(self, idx ):
         v = self.vertex_positions; d = idx*3
         return v[ d ], v[ d+1 ], v[ d+2 ]
@@ -5813,25 +5817,32 @@ class FastMesh(object):
         return v[ d ], v[ d+1 ], v[ d+2 ]
 
     def __init__(self, data):
-        start = time.time()
         N = len( data.vertices )
-        self.vertex_positions = array.array( 'f', [.0]*3 ) * N
-        data.vertices.foreach_get( 'co', self.vertex_positions )
-        print('vert pos ok')
 
-        self.vertex_normals = array.array( 'f', [.0]*3 ) * N
+        #self.vertex_positions = array.array( 'f', [.0]*3 ) * N
+        self.vertex_positions = (ctypes.c_float * (N * 3))()
+        data.vertices.foreach_get( 'co', self.vertex_positions )
+        v = self.vertex_positions
+
+        #start = time.time()     # 5x slower than doing the same thing with array.array
+        #for i in range(N):
+        #    x,y,z=data.vertices[i].co
+        #print('end slow', time.time()-start )
+
+        self.vertex_normals = (ctypes.c_float * (N * 3))()
         data.vertices.foreach_get( 'normal', self.vertex_normals )
         print('vert normals ok')
 
-        self.faces = array.array( 'I', [0]*4 ) * len(data.faces)
+        Nfaces = len(data.faces)
+        self.faces = (ctypes.c_uint * (Nfaces * 4))()
         data.faces.foreach_get( 'vertices_raw', self.faces )
         print('faces ok')
 
-        self.faces_smooth = array.array( 'b', [0] * len(data.faces) ) 
+        self.faces_smooth = (ctypes.c_bool * Nfaces)() 
         data.faces.foreach_get( 'use_smooth', self.faces_smooth )
         print('faces smooth ok')
 
-        self.faces_material_index = array.array( 'B', [0] * len(data.faces) ) 
+        self.faces_material_index = (ctypes.c_ushort * Nfaces)() 
         data.faces.foreach_get( 'material_index', self.faces_material_index )
         print('faces mat idx ok')
 
@@ -5840,26 +5851,27 @@ class FastMesh(object):
             vc = data.vertex_colors[0]
             n = len(vc.data)
             # no colors_raw !!?
-            self.vcolors1 = array.array( 'f', [.0]*3 ) * n  # face1
+            self.vcolors1 = (ctypes.c_float * (n * 3))()  # face1
             vc.data.foreach_get( 'color1', self.vcolors1 )
             self.vertex_colors.append( self.vcolors1 )
 
-            self.vcolors2 = array.array( 'f', [.0]*3 ) * n  # face2
+            self.vcolors2 = (ctypes.c_float * (n * 3))()  # face2
             vc.data.foreach_get( 'color2', self.vcolors2 )
             self.vertex_colors.append( self.vcolors2 )
 
-            self.vcolors3 = array.array( 'f', [.0]*3 ) * n  # face3
+            self.vcolors3 = (ctypes.c_float * (n * 3))()  # face3
             vc.data.foreach_get( 'color3', self.vcolors3 )
             self.vertex_colors.append( self.vcolors3 )
 
-            self.vcolors4 = array.array( 'f', [.0]*3 ) * n  # face4
+            self.vcolors4 = (ctypes.c_float * (n * 3))()  # face4
             vc.data.foreach_get( 'color4', self.vcolors4 )
             self.vertex_colors.append( self.vcolors4 )
 
         self.uv_textures = []
         if data.uv_textures.active:
             for layer in data.uv_textures:
-                a = array.array( 'f', [.0]*8 ) * len(layer.data)
+                n = len(layer.data) * 8
+                a = (ctypes.c_float * n)()
                 layer.data.foreach_get( 'uv_raw', a )   # 4 faces
                 self.uv_textures.append( a )
 
@@ -5867,246 +5879,13 @@ class FastMesh(object):
         print( 'fast mesh created in:', time.time()-start)
 
 
-def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
-    print('FastMesh to Ogre mesh XML format', ob.name)
-
-    if not os.path.isdir( path ):
-        print('creating directory', path )
-        os.makedirs( path )
-
-    Report.meshes.append( ob.data.name )
-    Report.faces += len( ob.data.faces )
-    Report.orig_vertices += len( ob.data.vertices )
-
-    cleanup = False
-    if ob.modifiers:
-        cleanup = True
-        copy = ob.copy()
-        #bpy.context.scene.objects.link(copy)
-        rem = []
-        for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
-            if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
-        for mod in rem: copy.modifiers.remove( mod )
-        ## bake mesh ##
-        mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
-    else:
-        copy = ob
-        mesh = ob.data
-
-    M = FastMesh( mesh )
-
-    name = force_name or ob.data.name
-    xmlfile = os.path.join(path, '%s.mesh.xml' %name )
-
-    f = open( xmlfile, 'w' )
-    doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
-
-    #//very ugly, have to replace number of vertices later
-    doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
-
-    print('    writing shared geometry')
-    doc.start_tag('vertexbuffer', {
-            'positions':'true',
-            'normals':'true',
-            'colours_diffuse' : str(bool( mesh.vertex_colors )),
-            'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
-    })
-
-
-    ######################################################
-
-    materials = []
-    for mat in ob.data.materials:
-        if mat: materials.append( mat )
-        else:
-            print('warning: bad material data', ob)
-            materials.append( '_missing_material_' )        # fixed dec22, keep proper index
-    if not materials: materials.append( '_missing_material_' )
-    _sm_faces_ = []
-    for matidx, mat in enumerate( materials ):
-        _sm_faces_.append([])
-
-    vcolors = dotextures = False
-    uvcache = arm = None
-
-    _sm_vertices_ = {}
-    _remap_verts_ = []
-    numverts = 0
-    #for F in mesh.faces:
-    k = 0
-    for fidx in range( 0, len(M.faces), 4 ):
-        F = mesh.faces[ k ]; k += 1
-        smooth = F.use_smooth
-        matidx = F.material_index
-        #smooth = M.faces_smooth[ k ]
-        #matidx = M.faces_material_index[ k ]
-
-        #print("is smooth=", smooth)
-        #print("material index=", matidx)
-        faces = _sm_faces_[ matidx ]
-
-        ## Ogre only supports triangles
-        tris = []
-        tris.append( (M.faces[fidx], M.faces[fidx+1], M.faces[fidx+2]) )
-        if len(F.vertices) >= 4: tris.append( (M.faces[ fidx ], M.faces[ fidx+2 ], M.faces[ fidx+3 ]) )
-
-        if dotextures:
-            a = []; b = []
-            uvtris = [ a, b ]
-            for layer in uvcache:
-                uv1, uv2, uv3, uv4 = layer[ F.index ]
-                a.append( (uv1, uv2, uv3) )
-                b.append( (uv1, uv3, uv4) )
-                
-                
-        
-        for tidx, tri in enumerate(tris):
-            face = []   # contains Ogre vertex indices
-            for vidx, idx in enumerate(tri):
-                v = mesh.vertices[ idx ]
-                
-                if smooth:
-                    #normal = ( M.vertex_normals[ idx ], M.vertex_normals[ idx+1 ], M.vertex_normals[ idx+2 ] )
-                    nx,ny,nz = swap( M.get_vertex_normal(idx) )
-                else:
-                    nx,ny,nz = swap( F.normal )
-                    #normal = ( M.faces_normals[ idx ], M.faces_normals[ idx+1 ], M.faces_normals[ idx+2 ] )
-
-                r = 1.0
-                g = 1.0
-                b = 1.0
-                ra = 1.0
-
-                ## texture maps ##
-                vert_uvs = []
-                if dotextures and False:
-                    for layer in uvtris[ tidx ]:
-                        vert_uvs.append(layer[ vidx ])
-                                
-                ## opt vert logic here ##
-                face.append( numverts )
-                #if alreadyExported: continue
-                numverts += 1
-                _remap_verts_.append( v )
-
-                x,y,z = swap( M.get_vertex_position(idx) )
-                
-                doc.start_tag('vertex', {})
-                doc.leaf_tag('position', {
-                        'x' : '%6f' % x,
-                        'y' : '%6f' % y,
-                        'z' : '%6f' % z
-                })
-                
-                
-                doc.leaf_tag('normal', {
-                        'x' : '%6f' % nx,
-                        'y' : '%6f' % ny,
-                        'z' : '%6f' % nz
-                })
-
-                if vcolors:
-                    doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
-
-                ## texture maps ##
-                if dotextures:
-                    for uv in vert_uvs:
-                        doc.leaf_tag('texcoord', {
-                                'u' : '%6f' % uv[0],
-                                'v' : '%6f' % (1.0-uv[1])
-                        })
-                
-                
-                doc.end_tag('vertex')
-            
-            faces.append( (face[0], face[1], face[2]) )
-            
-    del(_sm_vertices_)
-    Report.vertices += numverts
-    
-    doc.end_tag('vertexbuffer')
-    doc.end_tag('sharedgeometry')
-    
-    print('    writing submeshes' )
-    doc.start_tag('submeshes', {})
-    for matidx, mat in enumerate( materials ):
-        doc.start_tag('submesh', {
-                'usesharedvertices' : 'true',
-                'material' : material_name(mat),
-                #maybe better look at index of all faces, if one over 65535 set to true;
-                #problem: we know it too late, postprocessing of file needed
-                "use32bitindexes" : str(bool(numverts > 65535))
-        })
-        doc.start_tag('faces', {
-                'count' : str(len(_sm_faces_[matidx]))
-        })
-        for fidx, (v1, v2, v3) in enumerate(_sm_faces_[matidx]):
-            doc.leaf_tag('face', {
-                'v1' : str(v1),
-                'v2' : str(v2),
-                'v3' : str(v3)
-            })
-        doc.end_tag('faces')
-        doc.end_tag('submesh')
-        Report.triangles += len(_sm_faces_[matidx])
-    del(_sm_faces_)
-    doc.end_tag('submeshes')
-
-    
-    ########## clean up and save #############
-    #bpy.context.scene.meshes.unlink(mesh)
-    if cleanup:
-        mesh.user_clear()
-        copy.user_clear()
-        bpy.data.objects.remove(copy)
-        bpy.data.meshes.remove(mesh)
-        del copy
-        del mesh
-
-    del _remap_verts_
-    del uvcache
-
-    doc.close()
-    f.close()
-
-
-    #very ugly, find better way
-    def replaceInplace(f,searchExp,replaceExp):
-            import fileinput
-            for line in fileinput.input(f, inplace=1):
-                if searchExp in line:
-                    line = line.replace(searchExp,replaceExp)
-                sys.stdout.write(line)
-            fileinput.close()   # reported by jakob
-    
-    replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
-    del(replaceInplace)
-    
-    
-    OgreXMLConverter( xmlfile, opts )
-
-    if arm and opts['armature-anim']:
-        skel = Skeleton( ob )
-        data = skel.to_xml()
-        name = force_name or ob.data.name
-        xmlfile = os.path.join(path, '%s.skeleton.xml' %name )
-        f = open( xmlfile, 'wb' )
-        f.write( bytes(data,'utf-8') )
-        f.close()
-        OgreXMLConverter( xmlfile, opts )
-
-    mats = []
-    for mat in materials:
-        if mat != '_missing_material_': mats.append( mat )
-    return mats
-
-## end dot_mesh2 ##
 
 
 
 
 #######################################################################################
-def dot_mesh_old( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
+def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
+    start = time.time()
     print('mesh to Ogre mesh XML format', ob.name)
 
     if not os.path.isdir( path ):
@@ -6301,7 +6080,7 @@ def dot_mesh_old( ob, path='/tmp', force_name=None, ignore_shape_animation=False
         
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
-        
+        print(' time: ', time.time()-start )
         print('    writing submeshes' )
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
@@ -6481,6 +6260,9 @@ def dot_mesh_old( ob, path='/tmp', force_name=None, ignore_shape_animation=False
     mats = []
     for mat in materials:
         if mat != '_missing_material_': mats.append( mat )
+
+    print('*'*80)
+    print( 'TIME: ', time.time()-start )
     return mats
 
 ## end dot_mesh ##
@@ -6698,7 +6480,168 @@ class SimpleSaxWriter():
 
 
 
+################### Raymond Hettinger's Constant Folding ##################
+# Decorator for BindingConstants at compile time
+# A recipe by Raymond Hettinger, from Python Cookbook:
+# http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/277940
+# updated for Python3 and still compatible with Python2 - by Hart, May17th 2011
+
+try: _BUILTINS_DICT_ = vars(__builtins__)
+except: _BUILTINS_DICT_ = __builtins__
+ISPYTHON2 = sys.version_info[0] == 2
+_HETTINGER_FOLDS_ = 0
+
+def _hettinger_make_constants(f, builtin_only=False, stoplist=[], verbose=0):
+    from opcode import opmap, HAVE_ARGUMENT, EXTENDED_ARG
+    global _HETTINGER_FOLDS_
+    try:
+        if ISPYTHON2: co = f.func_code; fname = f.func_name
+        else: co = f.__code__; fname = f.__name__
+    except AttributeError: return f        # Jython doesn't have a func_code attribute.
+    if ISPYTHON2: newcode = map(ord, co.co_code)
+    else: newcode = list( co.co_code )
+    newconsts = list(co.co_consts)
+    names = co.co_names
+    codelen = len(newcode)
+    if ISPYTHON2:
+        if verbose >= 2: print( f.func_name )
+        func_globals = f.func_globals
+    else:
+        if verbose >= 2: print( f.__name__ )
+        func_globals = f.__globals__
+
+    env = _BUILTINS_DICT_.copy()
+    if builtin_only:
+        stoplist = dict.fromkeys(stoplist)
+        stoplist.update(func_globals)
+    else:
+        env.update(func_globals)
+
+    # First pass converts global lookups into constants
+    i = 0
+    while i < codelen:
+        opcode = newcode[i]
+        if opcode in (EXTENDED_ARG, opmap['STORE_GLOBAL']):
+            if verbose >= 1: print('skipping function', fname)
+            return f    # for simplicity, only optimize common cases
+        if opcode == opmap['LOAD_GLOBAL']:
+            oparg = newcode[i+1] + (newcode[i+2] << 8)
+            name = co.co_names[oparg]
+            if name in env and name not in stoplist:
+                value = env[name]
+                for pos, v in enumerate(newconsts):
+                    if v is value:
+                        break
+                else:
+                    pos = len(newconsts)
+                    newconsts.append(value)
+                newcode[i] = opmap['LOAD_CONST']
+                newcode[i+1] = pos & 0xFF
+                newcode[i+2] = pos >> 8
+                _HETTINGER_FOLDS_ += 1
+                if verbose >= 2:
+                    print( "    global constant fold:", name )
+        i += 1
+        if opcode >= HAVE_ARGUMENT:
+            i += 2
+
+    # Second pass folds tuples of constants and constant attribute lookups
+    i = 0
+    while i < codelen:
+
+        newtuple = []
+        while newcode[i] == opmap['LOAD_CONST']:
+            oparg = newcode[i+1] + (newcode[i+2] << 8)
+            newtuple.append(newconsts[oparg])
+            i += 3
+
+        opcode = newcode[i]
+        if not newtuple:
+            i += 1
+            if opcode >= HAVE_ARGUMENT:
+                i += 2
+            continue
+
+        if opcode == opmap['LOAD_ATTR']:
+            obj = newtuple[-1]
+            oparg = newcode[i+1] + (newcode[i+2] << 8)
+            name = names[oparg]
+            try:
+                value = getattr(obj, name)
+                if verbose >= 2: print( '    folding attribute', name )
+            except AttributeError:
+                continue
+            deletions = 1
+
+        elif opcode == opmap['BUILD_TUPLE']:
+            oparg = newcode[i+1] + (newcode[i+2] << 8)
+            if oparg != len(newtuple): continue
+            deletions = len(newtuple)
+            value = tuple(newtuple)
+
+        else: continue
+
+        reljump = deletions * 3
+        newcode[i-reljump] = opmap['JUMP_FORWARD']
+        newcode[i-reljump+1] = (reljump-3) & 0xFF
+        newcode[i-reljump+2] = (reljump-3) >> 8
+
+        n = len(newconsts)
+        newconsts.append(value)
+        newcode[i] = opmap['LOAD_CONST']
+        newcode[i+1] = n & 0xFF
+        newcode[i+2] = n >> 8
+        i += 3
+        _HETTINGER_FOLDS_ += 1
+        if verbose >= 2:
+            print( "    folded constant:",value )
+
+    if ISPYTHON2:
+        codestr = ''.join(map(chr, newcode))
+        codeobj = type(co)(co.co_argcount, co.co_nlocals, co.co_stacksize,
+                        co.co_flags, codestr, tuple(newconsts), co.co_names,
+                        co.co_varnames, co.co_filename, co.co_name,
+                        co.co_firstlineno, co.co_lnotab, co.co_freevars,
+                        co.co_cellvars)
+        return type(f)(codeobj, f.func_globals, f.func_name, f.func_defaults, f.func_closure)
+    else:
+        codestr = b''
+        for s in newcode: codestr += s.to_bytes(1,'little')
+        codeobj = type(co)(co.co_argcount, co.co_kwonlyargcount, co.co_nlocals, co.co_stacksize,
+                        co.co_flags, codestr, tuple(newconsts), co.co_names,
+                        co.co_varnames, co.co_filename, co.co_name,
+                        co.co_firstlineno, co.co_lnotab, co.co_freevars,
+                        co.co_cellvars)
+        return type(f)(codeobj, f.__globals__, f.__name__, f.__defaults__, f.__closure__)
 
 
+def hettinger_bind_recursive(mc, builtin_only=False, stoplist=[],  verbose=0):
+    """Recursively apply constant binding to functions in a module or class.
 
+    Use as the last line of the module (after everything is defined, but
+    before test code).  In modules that need modifiable globals, set
+    builtin_only to True.
+
+    """
+    import types
+    try: d = vars(mc)
+    except TypeError: return
+    if ISPYTHON2: recursivetypes = (type, types.ClassType)
+    else: recursivetypes = (type,)
+    for k, v in d.items():
+        if type(v) is types.FunctionType:
+            newv = _hettinger_make_constants(v, builtin_only, stoplist,  verbose)
+            setattr(mc, k, newv)
+        elif type(v) in recursivetypes:
+            hettinger_bind_recursive(v, builtin_only, stoplist, verbose)
+
+def hettinger_transform( module=None ):
+    global _HETTINGER_FOLDS_
+    _HETTINGER_FOLDS_ = 0
+    if not module: module = sys.modules[__name__]
+    hettinger_bind_recursive( module, verbose=1 )
+    print( 'HETTINGER: constants folded', _HETTINGER_FOLDS_ )
+
+
+hettinger_transform()
 
