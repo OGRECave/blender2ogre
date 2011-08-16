@@ -2,7 +2,7 @@ Blender2Ogre
 By: Hartshorn, S.Rombauts, PForce and F00bar
 Sponsors: Adminotech Ltd
 License: GNU LGPL
-Version: 0.4.8 - July 27th 2011
+Version: 0.5.1 - August 2011
 Supports:
 	Blender 2.58.1
 	Linux, Windows, OSX
@@ -73,9 +73,14 @@ Dependencies:
 		5. Copy folder 'myshaders' to C:\\myshaders
 			(Linux copy to your home folder)
 
-		6. Copy OgreMeshy to C:\\OgreMeshy
+		6. Copy OgreMeshy to C:\OgreMeshy
 			If your using 64bit Windows, you will need to download a 64bit OgreMeshy
 			(Linux copy to your home folder)
+
+		7. Tundra2
+			Windows: copy Tundra2 to C:\Tundra2
+			Linux: copy Tundra2 to your home directory
+
 
 Changelog:
     0.4.4 small fixes, lamp export fixed, vertex count correct

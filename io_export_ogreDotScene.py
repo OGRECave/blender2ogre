@@ -27,7 +27,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.1 RDotMesh-test1'
+VERSION = '0.5.1 TundraPreview'
 
 
 __devnotes__ = '''
@@ -284,7 +284,7 @@ def readOrCreateConfigValue(config, section, option, default):
 # Read the addon config values from the config blender2ogre.cfg file, or create/update it whith platform specific default values
 def readOrCreateConfig():
     # TODO SRombauts: make a class AddonConfig to store these values
-    global     CONFIG_TEMP_DIR, CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR
+    global CONFIG_TEMP_DIR, CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR, CONFIG_TUNDRA
     
     # Create default options values (platform specific paths)
     DEFAULT_TEMP_DIR = tempfile.gettempdir()
@@ -300,11 +300,13 @@ def readOrCreateConfig():
                 break
         DEFAULT_NVIDIATOOLS_EXE = 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe'
         DEFAULT_MYSHADERS_DIR = 'C:\\myshaders'
+        DEFAULT_TUNDRA = 'C:\\Tundra2'
         
     elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):        # OSX patch by FreqMod June6th 2011
         # DEFAULT_TEMP_PATH = '/tmp' 
         DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXmlConverter'
         DEFAULT_OGRETOOLS_MESH_MAGICK = '/usr/bin/MeshMagick'
+        DEFAULT_TUNDRA = '%s/Tundra2' %os.environ['HOME']
 
         if not os.path.isfile( DEFAULT_OGRETOOLS_XML_CONVERTER ):
             if os.path.isfile( '/usr/local/bin/OgreXMLConverter'):
@@ -341,8 +343,9 @@ def readOrCreateConfig():
     CONFIG_OGRETOOLS_MESH_MAGICK   = readOrCreateConfigValue(config, 'paths', 'OGRETOOLS_MESH_MAGICK',   DEFAULT_OGRETOOLS_MESH_MAGICK)
     CONFIG_OGRE_MESHY              = readOrCreateConfigValue(config, 'paths', 'OGRE_MESHY',              DEFAULT_OGRE_MESHY)
     CONFIG_IMAGE_MAGICK_CONVERT    = readOrCreateConfigValue(config, 'paths', 'IMAGE_MAGICK_CONVERT',    DEFAULT_IMAGE_MAGICK_CONVERT)
-    CONFIG_NVIDIATOOLS_EXE         = readOrCreateConfigValue(config, 'paths', 'NVIDIATOOLS_EXE',         DEFAULT_NVIDIATOOLS_EXE)
-    CONFIG_MYSHADERS_DIR           = readOrCreateConfigValue(config, 'paths', 'MYSHADERS_DIR',           DEFAULT_MYSHADERS_DIR)
+    CONFIG_NVIDIATOOLS_EXE = readOrCreateConfigValue(config, 'paths', 'NVIDIATOOLS_EXE',         DEFAULT_NVIDIATOOLS_EXE)
+    CONFIG_MYSHADERS_DIR = readOrCreateConfigValue(config, 'paths', 'MYSHADERS_DIR',           DEFAULT_MYSHADERS_DIR)
+    CONFIG_TUNDRA = readOrCreateConfigValue(config, 'paths', 'CONFIG_TUNDRA',  DEFAULT_TUNDRA)
 
     # Write the blender2ogre.cfg config file 
     with open(config_filepath, 'w') as configfile:
@@ -357,6 +360,7 @@ def readOrCreateConfig():
     print('CONFIG_IMAGE_MAGICK_CONVERT=%s'    % CONFIG_IMAGE_MAGICK_CONVERT)
     print('CONFIG_NVIDIATOOLS_EXE=%s'         % CONFIG_NVIDIATOOLS_EXE)
     print('CONFIG_MYSHADERS_DIR=%s'           % CONFIG_MYSHADERS_DIR)
+    print('CONFIG_TUNDRA=%s'           % CONFIG_TUNDRA)
 
 
 # 
@@ -2199,6 +2203,10 @@ class _node_panel_mixin_(object):        # bug in bpy_rna.c line: 5005 (/* rare 
                 else:
                     layout.label(text='no material')
 
+
+
+########################################
+############### OgreMeshy ##############
 class Ogre_ogremeshy_op(bpy.types.Operator):
     '''helper to open ogremeshy'''
     bl_idname = 'ogre.preview_ogremeshy'
@@ -4127,23 +4135,46 @@ class _OgreCommonExport_(object):
         return {'RUNNING_MODAL'}
     def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
-
-    #EXPORT_TYPE = StringProperty(default="OGRE")
     ## Options ##
-    _axis_modes =  [
-        ('x z -y', 'x z -y', 'ogre standard'),
-        ('x y z', 'x y z', 'no swapping'),
-        ('-x z y', '-x z y', 'old default'),
-        ('x z y', 'x z y', 'swap y and z'),
-    ]
-
-
     _image_formats =  [
         ('','do not convert', 'default'),
         ('jpg', 'jpg', 'jpeg format'),
         ('png', 'png', 'png format'),
         ('dds', 'dds', 'nvidia dds format'),
     ]
+
+
+    filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
+    #EXPORT_TYPE = 'OGRE'   # defined in subclass
+
+    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
+    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
+    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
+    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=True)
+    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=True)
+    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=True)
+    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=True)
+    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=True)
+    EX_INSTANCES = BoolProperty(name="Optimize Instances", description="optimize instances in OgreDotScene xml", default=True)
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=True)
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=True)
+
+    EX_FORCE_IMAGE = EnumProperty( items=_image_formats, name='Convert Images',  description='convert all textures to format', default='' )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.1)
+    ## Mesh Options ##
+    lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
+    lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
+    lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", default=40, min=0, max=99)
+    nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", default=0, min=0, max=65536)
+    generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=False)
+    generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=False)
+    tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default="uvw")
+    tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", default=4, min=0, max=16)
+    tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=False)
+    tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
+    reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
+    optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
 
 
 
@@ -4743,11 +4774,16 @@ class _OgreCommonExport_(object):
             a.setAttribute('value', str(ob.game.use_ghost).lower() )
 
 
+################################################################
+
+
+
+
 class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
     bl_idname = "ogre.export"
     bl_label = "Export Ogre"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
     EXPORT_TYPE = 'OGRE'
 
@@ -6302,6 +6338,43 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 
 ## end dot_mesh ##
 
+
+class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
+    '''helper to open Tundra2 (realXtend)'''
+    bl_idname = 'ogre.preview_tundra'
+    bl_label = "opens Tundra2 in a non-blocking subprocess"
+    bl_options = {'REGISTER'}
+
+    filepath= StringProperty(name="File Path", description="Filepath used for exporting Tundra .txml file", maxlen=1024, default="/tmp/preview.txml", subtype='FILE_PATH')
+    EXPORT_TYPE = 'REX'
+
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
+            if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
+            else: return True
+
+    def invoke(self, context, event):
+        #Report.reset()
+        #Report.messages.append('running %s' %CONFIG_TUNDRA)
+        #Report.messages.append('please wait...')
+        #Report.show()
+
+        path = '/tmp/preview.txml'
+        self.ogre_export( path, context )
+
+        exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
+        if sys.platform == 'linux2':
+            cmd = ['wine', exe, '--file', '/tmp/preview.txml']
+            subprocess.Popen(cmd)
+        else:
+            cmd = [exe, '--file', '/tmp/preview.txml']
+            subprocess.Popen(cmd)
+
+        return {'FINISHED'}
+
+
+
 class INFO_HT_myheader(bpy.types.Header):
     bl_space_type = 'INFO'
     def draw(self, context):
@@ -6314,7 +6387,9 @@ class INFO_HT_myheader(bpy.types.Header):
         screen = context.screen
 
         layout.separator()
+        if _USE_TUNDRA_: op = layout.operator( Ogre_Tundra_Preview.bl_idname, text='', icon='WORLD' )
         op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='PLUGIN' ); op.mesh = True
+
         row = layout.row(align=True)
         sub = row.row(align=True)
         sub.menu("INFO_MT_file")
@@ -6417,12 +6492,18 @@ MyShaders = None
 def register():
     print( '-'*80)
     print(VERSION)
-    global MyShaders, _header_
+    global MyShaders, _header_, _USE_TUNDRA_
     #bpy.utils.register_module(__name__)
     #_header_ = bpy.types.INFO_HT_header
     #bpy.utils.unregister_class(_header_)
     for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
     readOrCreateConfig()
+
+    ## only test for Tundra2 once ##
+    if os.path.isdir( CONFIG_TUNDRA ): _USE_TUNDRA_ = True
+    else: _USE_TUNDRA_ = False
+
+
     MyShaders = MyShadersSingleton()
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
@@ -6514,169 +6595,4 @@ class SimpleSaxWriter():
 
 
 
-
-################### Raymond Hettinger's Constant Folding ##################
-# Decorator for BindingConstants at compile time
-# A recipe by Raymond Hettinger, from Python Cookbook:
-# http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/277940
-# updated for Python3 and still compatible with Python2 - by Hart, May17th 2011
-
-try: _BUILTINS_DICT_ = vars(__builtins__)
-except: _BUILTINS_DICT_ = __builtins__
-ISPYTHON2 = sys.version_info[0] == 2
-_HETTINGER_FOLDS_ = 0
-
-def _hettinger_make_constants(f, builtin_only=False, stoplist=[], verbose=0):
-    from opcode import opmap, HAVE_ARGUMENT, EXTENDED_ARG
-    global _HETTINGER_FOLDS_
-    try:
-        if ISPYTHON2: co = f.func_code; fname = f.func_name
-        else: co = f.__code__; fname = f.__name__
-    except AttributeError: return f        # Jython doesn't have a func_code attribute.
-    if ISPYTHON2: newcode = map(ord, co.co_code)
-    else: newcode = list( co.co_code )
-    newconsts = list(co.co_consts)
-    names = co.co_names
-    codelen = len(newcode)
-    if ISPYTHON2:
-        if verbose >= 2: print( f.func_name )
-        func_globals = f.func_globals
-    else:
-        if verbose >= 2: print( f.__name__ )
-        func_globals = f.__globals__
-
-    env = _BUILTINS_DICT_.copy()
-    if builtin_only:
-        stoplist = dict.fromkeys(stoplist)
-        stoplist.update(func_globals)
-    else:
-        env.update(func_globals)
-
-    # First pass converts global lookups into constants
-    i = 0
-    while i < codelen:
-        opcode = newcode[i]
-        if opcode in (EXTENDED_ARG, opmap['STORE_GLOBAL']):
-            if verbose >= 1: print('skipping function', fname)
-            return f    # for simplicity, only optimize common cases
-        if opcode == opmap['LOAD_GLOBAL']:
-            oparg = newcode[i+1] + (newcode[i+2] << 8)
-            name = co.co_names[oparg]
-            if name in env and name not in stoplist:
-                value = env[name]
-                for pos, v in enumerate(newconsts):
-                    if v is value:
-                        break
-                else:
-                    pos = len(newconsts)
-                    newconsts.append(value)
-                newcode[i] = opmap['LOAD_CONST']
-                newcode[i+1] = pos & 0xFF
-                newcode[i+2] = pos >> 8
-                _HETTINGER_FOLDS_ += 1
-                if verbose >= 2:
-                    print( "    global constant fold:", name )
-        i += 1
-        if opcode >= HAVE_ARGUMENT:
-            i += 2
-
-    # Second pass folds tuples of constants and constant attribute lookups
-    i = 0
-    while i < codelen:
-
-        newtuple = []
-        while newcode[i] == opmap['LOAD_CONST']:
-            oparg = newcode[i+1] + (newcode[i+2] << 8)
-            newtuple.append(newconsts[oparg])
-            i += 3
-
-        opcode = newcode[i]
-        if not newtuple:
-            i += 1
-            if opcode >= HAVE_ARGUMENT:
-                i += 2
-            continue
-
-        if opcode == opmap['LOAD_ATTR']:
-            obj = newtuple[-1]
-            oparg = newcode[i+1] + (newcode[i+2] << 8)
-            name = names[oparg]
-            try:
-                value = getattr(obj, name)
-                if verbose >= 2: print( '    folding attribute', name )
-            except AttributeError:
-                continue
-            deletions = 1
-
-        elif opcode == opmap['BUILD_TUPLE']:
-            oparg = newcode[i+1] + (newcode[i+2] << 8)
-            if oparg != len(newtuple): continue
-            deletions = len(newtuple)
-            value = tuple(newtuple)
-
-        else: continue
-
-        reljump = deletions * 3
-        newcode[i-reljump] = opmap['JUMP_FORWARD']
-        newcode[i-reljump+1] = (reljump-3) & 0xFF
-        newcode[i-reljump+2] = (reljump-3) >> 8
-
-        n = len(newconsts)
-        newconsts.append(value)
-        newcode[i] = opmap['LOAD_CONST']
-        newcode[i+1] = n & 0xFF
-        newcode[i+2] = n >> 8
-        i += 3
-        _HETTINGER_FOLDS_ += 1
-        if verbose >= 2:
-            print( "    folded constant:",value )
-
-    if ISPYTHON2:
-        codestr = ''.join(map(chr, newcode))
-        codeobj = type(co)(co.co_argcount, co.co_nlocals, co.co_stacksize,
-                        co.co_flags, codestr, tuple(newconsts), co.co_names,
-                        co.co_varnames, co.co_filename, co.co_name,
-                        co.co_firstlineno, co.co_lnotab, co.co_freevars,
-                        co.co_cellvars)
-        return type(f)(codeobj, f.func_globals, f.func_name, f.func_defaults, f.func_closure)
-    else:
-        codestr = b''
-        for s in newcode: codestr += s.to_bytes(1,'little')
-        codeobj = type(co)(co.co_argcount, co.co_kwonlyargcount, co.co_nlocals, co.co_stacksize,
-                        co.co_flags, codestr, tuple(newconsts), co.co_names,
-                        co.co_varnames, co.co_filename, co.co_name,
-                        co.co_firstlineno, co.co_lnotab, co.co_freevars,
-                        co.co_cellvars)
-        return type(f)(codeobj, f.__globals__, f.__name__, f.__defaults__, f.__closure__)
-
-
-def hettinger_bind_recursive(mc, builtin_only=False, stoplist=[],  verbose=0):
-    """Recursively apply constant binding to functions in a module or class.
-
-    Use as the last line of the module (after everything is defined, but
-    before test code).  In modules that need modifiable globals, set
-    builtin_only to True.
-
-    """
-    import types
-    try: d = vars(mc)
-    except TypeError: return
-    if ISPYTHON2: recursivetypes = (type, types.ClassType)
-    else: recursivetypes = (type,)
-    for k, v in d.items():
-        if type(v) is types.FunctionType:
-            newv = _hettinger_make_constants(v, builtin_only, stoplist,  verbose)
-            setattr(mc, k, newv)
-        elif type(v) in recursivetypes:
-            hettinger_bind_recursive(v, builtin_only, stoplist, verbose)
-
-def hettinger_transform( module=None ):
-    global _HETTINGER_FOLDS_
-    _HETTINGER_FOLDS_ = 0
-    if not module: module = sys.modules[__name__]
-    hettinger_bind_recursive( module, verbose=1 )
-    print( 'HETTINGER: constants folded', _HETTINGER_FOLDS_ )
-
-
-hettinger_transform()
 
