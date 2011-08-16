@@ -265,8 +265,13 @@ except ImportError:
     sys.exit("This script is an addon for blender, you must install it from blender.")
 
 
-CONFIG_FILENAME = 'blender2ogre.cfg'
+## make sure we can import from same directory ##
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 
+
+############ CONFIG ##############
+CONFIG_FILENAME = 'blender2ogre.cfg'
 
 # Methode to read a config value from a config file, or update it to the default value
 def readOrCreateConfigValue(config, section, option, default):
@@ -5817,7 +5822,8 @@ class CtypesMesh(object):
         return v[ d ], v[ d+1 ], v[ d+2 ]
 
     def __init__(self, data):
-        N = len( data.vertices )
+        self.numVerts = N = len( data.vertices )
+        self.numFaces = Nfaces = len(data.faces)
 
         #self.vertex_positions = array.array( 'f', [.0]*3 ) * N
         self.vertex_positions = (ctypes.c_float * (N * 3))()
@@ -5833,14 +5839,19 @@ class CtypesMesh(object):
         data.vertices.foreach_get( 'normal', self.vertex_normals )
         print('vert normals ok')
 
-        Nfaces = len(data.faces)
         self.faces = (ctypes.c_uint * (Nfaces * 4))()
         data.faces.foreach_get( 'vertices_raw', self.faces )
         print('faces ok')
 
+        self.faces_normals = (ctypes.c_float * (Nfaces * 3))()
+        data.faces.foreach_get( 'normal', self.faces_normals )
+        print('face normals ok')
+
+
         self.faces_smooth = (ctypes.c_bool * Nfaces)() 
         data.faces.foreach_get( 'use_smooth', self.faces_smooth )
         print('faces smooth ok')
+        #for i in range(self.numFaces): print(' smooth:', self.faces_smooth[i], i )
 
         self.faces_material_index = (ctypes.c_ushort * Nfaces)() 
         data.faces.foreach_get( 'material_index', self.faces_material_index )
@@ -5875,18 +5886,28 @@ class CtypesMesh(object):
                 layer.data.foreach_get( 'uv_raw', a )   # 4 faces
                 self.uv_textures.append( a )
 
-        print('_'*80)
-        print( 'fast mesh created in:', time.time()-start)
 
 
 
 
+try: import io_export_rogremesh.rogremesh as R
+except:
+    R = None
+    print( 'WARNING: "io_export_rogremesh" is missing' )
+
+if R and R.rpy.load(): _USE_RPYTHON_ = True
+else:
+    _USE_RPYTHON_ = False
+    print( 'Rpython module is not cached, you must exit Blender to compile the module:' )
+    print( 'cd io_export_rogremesh; python rogremesh.py' )
 
 
 #######################################################################################
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
     start = time.time()
     print('mesh to Ogre mesh XML format', ob.name)
+
+    if _USE_RPYTHON_ and False: cmesh = CtypesMesh( ob.data ); R.dump( cmesh )
 
     if not os.path.isdir( path ):
         print('creating directory', path )
@@ -6084,6 +6105,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
         print('    writing submeshes' )
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
+            if not len(_sm_faces_[matidx]): continue	# fixes corrupt unused materials
+
             doc.start_tag('submesh', {
                     'usesharedvertices' : 'true',
                     'material' : material_name(mat),
