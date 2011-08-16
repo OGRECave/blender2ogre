@@ -5375,25 +5375,6 @@ class Skeleton(object):
 
 
 
-class VertexNoPos:
-    def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
-        self.ogre_vidx = ogre_vidx
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-        self.r = r
-        self.g = g
-        self.b = b
-        self.ra = ra
-        self.vert_uvs = vert_uvs
-
-    '''does not compare ogre_vidx (and position at the moment)'''
-    def __eq__(self, o):
-        return abs(self.nx - o.nx) < EPSILON and abs(self.ny - o.ny) < EPSILON and abs(self.nz - o.nz) < EPSILON and abs(self.r - o.r) < EPSILON \
-                and abs(self.g - o.g) < EPSILON and abs(self.b - o.b) < EPSILON and abs(self.ra - o.ra) < EPSILON \
-                and ( self.vert_uvs == o.vert_uvs or ( \
-                abs(self.vert_uvs[0][0] - o.vert_uvs[0][0]) < EPSILON and abs(self.vert_uvs[0][1] - o.vert_uvs[0][1]) < EPSILON \
-                and abs(self.vert_uvs[1][0] - o.vert_uvs[1][0]) < EPSILON and abs(self.vert_uvs[1][1] - o.vert_uvs[1][1]) < EPSILON ) )
 
 
 
@@ -5901,6 +5882,37 @@ else:
     print( 'Rpython module is not cached, you must exit Blender to compile the module:' )
     print( 'cd io_export_rogremesh; python rogremesh.py' )
 
+
+class VertexNoPos(object):
+    def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
+        self.ogre_vidx = ogre_vidx
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+        self.r = r
+        self.g = g
+        self.b = b
+        self.ra = ra
+        self.vert_uvs = vert_uvs
+
+    '''does not compare ogre_vidx (and position at the moment) [ no need to compare position ]'''
+    def __eq__(self, o):
+        if self.nx != o.nx or self.ny != o.ny or self.nz != o.nz: return False
+        elif self.r != o.r or self.g != o.g or self.b != o.b or self.ra != o.ra: return False
+        elif len(self.vert_uvs) != len(o.vert_uvs): return False
+        elif self.vert_uvs:
+            for i, uv1 in enumerate( self.vert_uvs ):
+                uv2 = o.vert_uvs[ i ]
+                if uv1 != uv2: return False
+        return True
+
+'''
+        return abs(self.nx - o.nx) < EPSILON and abs(self.ny - o.ny) < EPSILON and abs(self.nz - o.nz) < EPSILON and abs(self.r - o.r) < EPSILON \
+                and abs(self.g - o.g) < EPSILON and abs(self.b - o.b) < EPSILON and abs(self.ra - o.ra) < EPSILON \
+                and ( self.vert_uvs == o.vert_uvs or ( \
+                abs(self.vert_uvs[0][0] - o.vert_uvs[0][0]) < EPSILON and abs(self.vert_uvs[0][1] - o.vert_uvs[0][1]) < EPSILON \
+                and abs(self.vert_uvs[1][0] - o.vert_uvs[1][0]) < EPSILON and abs(self.vert_uvs[1][1] - o.vert_uvs[1][1]) < EPSILON ) )
+'''
 
 #######################################################################################
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
