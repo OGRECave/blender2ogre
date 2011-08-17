@@ -162,8 +162,8 @@ EPSILON=0.000001
 
 # Hardcoded to Ogre Default #
 def swap( vec ):
-    if len(vec) == 3: return mathutils.Vector( [vec[0], vec[2], vec[1]] )
-    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, vec.y] )
+    if len(vec) == 3: return mathutils.Vector( [vec[0], vec[2], -vec[1]] )
+    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
     else: assert 0
 
 ## Deprecated
@@ -4132,7 +4132,225 @@ OptionsEx = {
 }
 
 
-class _OgreCommonExport_(object):
+class _TXML_(object):
+    def create_tundra_document( self, context ):
+        doc = RDocument()
+        scn = doc.createElement('scene')
+        doc.appendChild( scn )
+
+        if context.scene.world.ogre_skyX:
+            e = doc.createElement( 'entity' )
+            e.setAttribute( 'id', '2' )
+            scn.appendChild( e )
+            c = doc.createElement( 'component' )
+            e.appendChild( c )
+            c.setAttribute( 'type', 'EC_SkyX' )
+            c.setAttribute( 'sync', '1' )
+            c.setAttribute( 'name', 'myskyx' )
+
+            a = doc.createElement('attribute'); a.setAttribute('name', 'Weather (volumetric clouds only)')
+            den = (
+                context.scene.world.ogre_skyX_cloud_density_x, 
+                context.scene.world.ogre_skyX_cloud_density_x
+            )
+            a.setAttribute('value', '%s %s' %den)
+            c.appendChild( a )
+
+            config = (
+                ('time', 'Time multiplier'), 
+                ('volumetric_clouds','Volumetric clouds'), 
+                ('wind','Wind direction'),
+            )
+            for bname, aname in config:
+                a = doc.createElement('attribute')
+                a.setAttribute('name', aname)
+                s = str( getattr(context.scene.world, 'ogre_skyX_'+bname) )
+                a.setAttribute('value', s.lower())
+                c.appendChild( a )
+
+        return doc
+
+    ########################################
+    def tundra_entity( self, doc, ob ):
+        # txml has flat hierarchy
+        e = doc.createElement( 'entity' )
+        doc.documentElement.appendChild( e )
+        e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
+
+        c = doc.createElement('component'); e.appendChild( c )
+        c.setAttribute('type', "EC_Name")
+        c.setAttribute('sync', '1')
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "name" )
+        a.setAttribute('value', ob.name )
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "description" )
+        a.setAttribute('value', "" )
+
+
+        ############ Tundra TRANSFORM ####################
+        c = doc.createElement('component'); e.appendChild( c )
+        c.setAttribute('type', "EC_Placeable")
+        c.setAttribute('sync', '1')
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Transform" )
+        x,z,y = ob.matrix_world.to_translation()
+        loc = '%6f,%6f,%6f' %(x,y,-z)
+        x,z,y = ob.matrix_world.to_euler()
+        x = math.degrees( x ); y = math.degrees( y ); z = math.degrees( z )
+        rot = '%6f,%6f,%6f' %(x,y,-z)
+        x,z,y = ob.matrix_world.to_scale()
+        scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z))		# Tundra2 clamps any negative to zero
+        a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Show bounding box" )
+        if ob.show_bounds: a.setAttribute('value', "true" )
+        else: a.setAttribute('value', "false" )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Visible" )
+        a.setAttribute('value', 'true')
+
+        #<attribute value="1" name="Selection layer"/>
+        #<attribute value="" name="Parent entity ref"/>
+        #<attribute value="" name="Parent bone name"/>
+
+        ## any object can have physics ##
+        if ob.game.physics_type == 'RIGID_BODY':
+            com = doc.createElement('component'); e.appendChild( com )
+            com.setAttribute('type', 'EC_RigidBody')
+            com.setAttribute('sync', '1')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Mass')
+            a.setAttribute('value', ob.game.mass)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Shape type')
+            a.setAttribute('value', 0)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Size')
+            x,z,y = ob.matrix_world.to_scale()
+            a.setAttribute('value', '%s %s %s' %(abs(x),abs(y),abs(z)) )
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Collision mesh ref')
+            a.setAttribute('value', '')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Friction')
+            avg = sum( ob.game.friction_coefficients ) / 3.0
+            a.setAttribute('value', avg)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Restitution')
+            a.setAttribute('value', .0)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Linear damping')
+            a.setAttribute('value', ob.game.damping)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Angular damping')
+            a.setAttribute('value', ob.game.rotation_damping)
+
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Linear factor')
+            a.setAttribute('value', '1.0 1.0 1.0')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Angular factor')
+            a.setAttribute('value', '1.0 1.0 1.0')
+
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Kinematic')
+            a.setAttribute('value', 'false' )
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Phantom')        # this must mean no-collide
+            a.setAttribute('value', str(ob.game.use_ghost).lower() )
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Draw Debug')
+            a.setAttribute('value', 'false' )
+
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Linear velocity')
+            a.setAttribute('value', '0.0 0.0 0.0')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Angular velocity')
+            a.setAttribute('value', '0.0 0.0 0.0')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Collision Layer')
+            a.setAttribute('value', -1)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Collision Mask')
+            a.setAttribute('value', -1)
+
+        return e
+
+
+    def tundra_mesh( self, e, ob ):
+        doc = e.document
+        proto = 'local://'      # antont says file:// is also valid
+
+        c = doc.createElement('component'); e.appendChild( c )
+        c.setAttribute('type', "EC_Mesh")
+        c.setAttribute('sync', '1')
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Mesh ref" )
+        a.setAttribute('value', "%s%s.mesh"%(proto,ob.data.name) )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Mesh materials" )
+        #a.setAttribute('value', "%s%s.material"%(proto,bpy.context.scene.name) )       # pre-pforces-patch
+        # Query object its materials and make a proper material ref string of it.
+        # note: We assume blindly here that the 'submesh' indexes are correct in the material list.
+        #       the most common usecase is to have one material per object for rex artists.
+        #       They can now assign multiple and they will at least go to the .txml data but I cant
+        #       guarantee that they are in correct submesh index slots! At least they have the refs and 
+        #       can manually shift them around in the viewer.
+        mymaterials = ob.data.materials
+        if mymaterials is not None and len(mymaterials) > 0:
+            mymatstring = ''
+            # generate ; separated material list
+            for mymat in mymaterials: 
+                if mymat is None:
+                    continue
+                mymatstring += proto + material_name(mymat) + '.material;'
+            mymatstring = mymatstring[:-1]  # strip ending ;
+            a.setAttribute('value', mymatstring )
+        else:
+            # default to nothing to avoid error prints in .txml import
+            a.setAttribute('value', "" ) 
+
+        if ob.find_armature():
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Skeleton ref" )
+            a.setAttribute('value', "%s%s.skeleton"%(proto,ob.data.name) )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Draw distance" )
+        a.setAttribute('value', "0" )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Cast shadows" )	# cast shadows is per object? not per material?
+        a.setAttribute('value', "false" )
+
+
+
+
+
+class _OgreCommonExport_( _TXML_ ):
     @classmethod
     def poll(cls, context): return True
     def invoke(self, context, event):
@@ -4272,6 +4490,7 @@ class _OgreCommonExport_(object):
         dot_mesh( ob, path, force_name, ignore_shape_animation=False, opts=opts )
 
 
+
     def ogre_export(self, url, context ):
         global OPTIONS
         OPTIONS['FORCE_IMAGE_FORMAT'] = None
@@ -4293,13 +4512,11 @@ class _OgreCommonExport_(object):
         print('ogre export->', url)
         prefix = url.split('.')[0]
 
-        #rex = dom.Document()        # realxtend .rex
-        rex = RDocument()
-
-        rex.appendChild( rex.createElement('scene') )
+        ################# TUNDRA #################
+        rex = self.create_tundra_document( context )
+        ##########################################
 
         now = time.time()
-        #doc = dom.Document()
         doc = RDocument()
         scn = doc.createElement('scene'); doc.appendChild( scn )
         scn.setAttribute('export_time', str(now))
@@ -4483,8 +4700,10 @@ class _OgreCommonExport_(object):
             acts.appendChild( WrapActuator(act).xml(doc) )
 
 
+        TE = self.tundra_entity( rex, ob )
+
         if ob.type == 'MESH' and len(ob.data.faces):
-            self.rex_entity( rex, ob )        # is dotREX flat?
+            self.tundra_mesh( TE, ob )
 
             collisionFile = None
             collisionPrim = None
@@ -4663,122 +4882,6 @@ class _OgreCommonExport_(object):
         ## end _node_export
 
 
-    ########################################
-    def rex_entity( self, doc, ob ):        # does rex flatten the hierarchy? or keep it like ogredotscene?
-        proto = 'local://'      # antont says file:// is also valid
-        e = doc.createElement( 'entity' )
-        doc.documentElement.appendChild( e )
-        e.setAttribute('id', str(len(doc.documentElement.childNodes)) )
-
-        c = doc.createElement('component'); e.appendChild( c )
-        c.setAttribute('type', "EC_Mesh")
-        c.setAttribute('sync', '1')
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Mesh ref" )
-        a.setAttribute('value', "%s%s.mesh"%(proto,ob.data.name) )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Mesh materials" )
-        #a.setAttribute('value', "%s%s.material"%(proto,bpy.context.scene.name) )       # pre-pforces-patch
-        # Query object its materials and make a proper material ref string of it.
-        # note: We assume blindly here that the 'submesh' indexes are correct in the material list.
-        #       the most common usecase is to have one material per object for rex artists.
-        #       They can now assign multiple and they will at least go to the .txml data but I cant
-        #       guarantee that they are in correct submesh index slots! At least they have the refs and 
-        #       can manually shift them around in the viewer.
-        mymaterials = ob.data.materials
-        if mymaterials is not None and len(mymaterials) > 0:
-            mymatstring = ''
-            # generate ; separated material list
-            for mymat in mymaterials: 
-                if mymat is None:
-                    continue
-                mymatstring += proto + material_name(mymat) + '.material;'
-            mymatstring = mymatstring[:-1]  # strip ending ;
-            a.setAttribute('value', mymatstring )
-        else:
-            # default to nothing to avoid error prints in .txml import
-            a.setAttribute('value', "" ) 
-
-        if ob.find_armature():
-            a = doc.createElement('attribute'); c.appendChild(a)
-            a.setAttribute('name', "Skeleton ref" )
-            a.setAttribute('value', "%s%s.skeleton"%(proto,ob.data.name) )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Draw distance" )
-        a.setAttribute('value', "0" )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Cast shadows" )	# cast shadows is per object? not per material?
-        a.setAttribute('value', "false" )
-
-        c = doc.createElement('component'); e.appendChild( c )
-        c.setAttribute('type', "EC_Name")
-        c.setAttribute('sync', '1')
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "name" )
-        a.setAttribute('value', ob.data.name )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "description" )
-        a.setAttribute('value', "" )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "user-defined" )
-        a.setAttribute('value', "false" )
-
-        c = doc.createElement('component'); e.appendChild( c )
-        c.setAttribute('type', "EC_Placeable")
-        c.setAttribute('sync', '1')
-
-        ############ Tundra TRANSFORM ####################
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Transform" )
-        x,z,y = ob.matrix_world.to_translation()
-        loc = '%6f,%6f,%6f' %(-x,y,z)
-        x,z,y = ob.matrix_world.to_euler()
-        x = math.degrees( x ); y = math.degrees( y ); z = math.degrees( z )
-        rot = '%6f,%6f,%6f' %(-x,y,z)
-        x,z,y = ob.matrix_world.to_scale()
-        scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z))		# Tundra2 clamps any negative to zero
-        a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
-        #############################################
-
-
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Show bounding box" )
-        if ob.show_bounds: a.setAttribute('value', "true" )
-        else: a.setAttribute('value', "false" )
-
-        ## realXtend internal Naali format ##
-        if ob.game.physics_type == 'RIGID_BODY':
-            com = doc.createElement('component'); e.appendChild( com )
-            com.setAttribute('type', 'EC_RigidBody')
-            com.setAttribute('sync', '1')
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Mass')
-            a.setAttribute('value', str(ob.game.mass))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Friction')
-            avg = sum( ob.game.friction_coefficients ) / 3.0
-            a.setAttribute('value', str(avg))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Linear damping')
-            a.setAttribute('value', str(ob.game.damping))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Angular damping')
-            a.setAttribute('value', str(ob.game.rotation_damping))
-
-            a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Phantom')        # this must mean no-collide
-            a.setAttribute('value', str(ob.game.use_ghost).lower() )
 
 
 ################################################################
@@ -4874,7 +4977,7 @@ def get_parent_matrix( ob, objects ):
             return get_parent_matrix(ob.parent, objects)
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
-    mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
+    mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world   # shouldn't this be matrix_local?
 
     o = doc.createElement('node')
     o.setAttribute('name',prefix+ob.name)
@@ -6123,13 +6226,13 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
                     numverts += 1
                     _remap_verts_.append( v )
 
-                    x,z,y = v.co
+                    x,z,y = v.co        # xz-y is correct!
                     
                     doc.start_tag('vertex', {})
                     doc.leaf_tag('position', {
                             'x' : '%6f' % x,
                             'y' : '%6f' % y,
-                            'z' : '%6f' % z
+                            'z' : '%6f' % -z    # negate z
                     })
                     
                     
@@ -6563,8 +6666,8 @@ class RElement(object):
 
 class RDocument(object):
 	def __init__(self): self.documentElement = None
-	def createElement(self,tag): return RElement(tag)
 	def appendChild(self,root): self.documentElement = root
+	def createElement(self,tag): e = RElement(tag); e.document = self; return e
 	def toprettyxml(self):
 		indent = 0
 		lines = []
@@ -6605,5 +6708,58 @@ class SimpleSaxWriter():
         self._xml_writer.endDocument()
 
 
+
+bpy.types.World.ogre_skyX = BoolProperty(
+    name="enable sky", description="ogre sky",
+    default=True
+)
+
+bpy.types.World.ogre_skyX_time = FloatProperty(
+    name="Time Multiplier",
+    description="change speed of day/night cycle", 
+    default=0.3, min=0.0, max=5.0
+)
+
+bpy.types.World.ogre_skyX_wind = FloatProperty(
+    name="Wind Direction",
+    description="change direction of wind", 
+    default=33.0, min=0.0, max=360.0
+)
+
+bpy.types.World.ogre_skyX_volumetric_clouds = BoolProperty(
+    name="volumetric clouds", description="toggle ogre volumetric clouds",
+    default=True
+)
+bpy.types.World.ogre_skyX_cloud_density_x = FloatProperty(
+    name="Cloud Density X",
+    description="change density of volumetric clouds on X", 
+    default=0.1, min=0.0, max=5.0
+)
+bpy.types.World.ogre_skyX_cloud_density_y = FloatProperty(
+    name="Cloud Density Y",
+    description="change density of volumetric clouds on Y", 
+    default=1.0, min=0.0, max=5.0
+)
+
+
+
+class OgreSkyPanel(bpy.types.Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "world"
+    bl_label = "Ogre Sky Settings"
+    @classmethod
+    def poll(cls, context): return True
+    def draw(self, context):
+        layout = self.layout
+        box = layout.box()
+        box.prop( context.world, 'ogre_skyX' )
+        if context.world.ogre_skyX:
+            box.prop( context.world, 'ogre_skyX_time' )
+            box.prop( context.world, 'ogre_skyX_wind' )
+            box.prop( context.world, 'ogre_skyX_volumetric_clouds' )
+            if context.world.ogre_skyX_volumetric_clouds:
+                box.prop( context.world, 'ogre_skyX_cloud_density_x' )
+                box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
 
