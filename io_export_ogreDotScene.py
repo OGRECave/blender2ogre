@@ -18,7 +18,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
-    "version": (0,5,1),
+    "version": (0,5,2),
     "blender": (2,5,8),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -27,7 +27,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.1 TundraPreview'
+VERSION = '0.5.2 TundraPreview'
 
 
 __devnotes__ = '''
@@ -162,8 +162,8 @@ EPSILON=0.000001
 
 # Hardcoded to Ogre Default #
 def swap( vec ):
-    if len(vec) == 3: return mathutils.Vector( [-vec[0], vec[2], vec[1]] )
-    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, -vec.x, vec.z, vec.y] )
+    if len(vec) == 3: return mathutils.Vector( [vec[0], vec[2], vec[1]] )
+    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, vec.y] )
     else: assert 0
 
 ## Deprecated
@@ -2222,6 +2222,11 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
             else: return True
 
     def execute(self, context):
+        Report.reset()
+        Report.messages.append('running %s' %CONFIG_OGRE_MESHY)
+        Report.messages.append('please wait...')
+        Report.show()
+
         if sys.platform == 'linux2':
             path = '%s/.wine/drive_c/tmp' %os.environ['HOME']
         else:
@@ -2293,10 +2298,12 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
             else:
                 cmd = [CONFIG_OGRE_MESHY, '/tmp/preview.mesh']
             print( cmd )
-            subprocess.call(cmd)
+            #subprocess.call(cmd)
+            subprocess.Popen(cmd)
 
         else:
-            subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
+            #subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
+            subprocess.Popen( [CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'] )
 
         return {'FINISHED'}
 
@@ -5110,7 +5117,12 @@ class Bone(object):
     '''
 
     def __init__(self, matrix, pbone, skeleton):
-        self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+        self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+        #e = mathutils.Euler()
+        #e.rotate_axis('Y', math.radians(90) )
+        #self.flipMat *= e.to_matrix().to_4x4()
+
+        print( self.flipMat )
         self.skeleton = skeleton
         self.name = pbone.name
         #self.matrix = self.flipMat * matrix
@@ -5123,14 +5135,14 @@ class Bone(object):
         self.fixUpAxis = True
 
     def update(self):        # called on frame update
-        pose = self.bone.matrix.copy()
+        pose =  self.bone.matrix.copy()
         #pose = self.bone.matrix * self.skeleton.object_space_transformation
         #pose =  self.skeleton.object_space_transformation * self.bone.matrix
         self._inverse_total_trans_pose = pose.inverted()
 
         # calculate difference to parent bone
         if self.parent:
-            pose = self.parent._inverse_total_trans_pose * pose
+            pose = self.parent._inverse_total_trans_pose* pose
         elif self.fixUpAxis:
             #pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
             pose = self.flipMat * pose
@@ -5140,6 +5152,7 @@ class Bone(object):
         # and as difference to rest pose translation
         #blender2.49#translation -= self.ogreRestPose.translationPart()
         self.pose_location =  pose.to_translation()  -  self.ogre_rest_matrix.to_translation()
+
         # rotation (and scale) relative to local coordiante system
         # calculate difference to rest pose
         #blender2.49#poseTransformation *= self.inverseOgreRestPose
@@ -5151,8 +5164,6 @@ class Bone(object):
         #self.pose_location = self.bone.location.copy()
         #self.pose_rotation = self.bone.rotation_quaternion.copy()
         for child in self.children: child.update()
-
-
 
 
     def rebuild_tree( self ):        # called first on all bones
@@ -6112,7 +6123,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
                     numverts += 1
                     _remap_verts_.append( v )
 
-                    x,y,z = swap( v.co )
+                    x,z,y = v.co
                     
                     doc.start_tag('vertex', {})
                     doc.leaf_tag('position', {
