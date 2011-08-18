@@ -4131,19 +4131,106 @@ OptionsEx = {
 
 }
 
+TUNDRA_GEN_SCRIPT_PATH = '/tmp/blender2ogre_generated_script.py'
+
+TUNDRA_GEN_SCRIPT_HEADER = '''
+import tundra
+
+def get_entity( id ):
+    return tundra.Scene().GetDefaultSceneRaw().GetEntityRaw(id)
+
+def get_entity_component( id, type ):
+    e = tundra.Scene().GetDefaultSceneRaw().GetEntityRaw(id)
+    return e.GetComponentRaw("EC_%s" %type)
+
+print('^'*80)
+print('HELLO WORLD')
+print('^'*80)
+
+'''
+
+with open( TUNDRA_GEN_SCRIPT_PATH, 'wb' ) as fp:
+    fp.write( bytes(TUNDRA_GEN_SCRIPT_HEADER,'utf-8') )
+
+TUNDRA_CONFIG_XML = '''<?xml version="1.0"?>
+<Tundra>
+  <plugin path="OgreRenderingModule" />
+  <plugin path="EnvironmentModule" />          
+  <plugin path="OgreAssetEditorModule" />    
+  <plugin path="PhysicsModule" />         
+  <plugin path="TundraProtocolModule" />     
+  <plugin path="JavascriptModule" />          
+  <plugin path="AssetModule" />         
+  <plugin path="AvatarModule" />               
+  <plugin path="ECEditorModule" />            
+  <plugin path="DebugStatsModule" />         
+  <plugin path="SkyXHydrax" />                 
+  <plugin path="SceneWidgetComponents" />    
+  <plugin path="VlcPlugin" />                
+  <plugin path="PythonScriptModule" />   
+  <jsplugin path="cameraapplication.js" />
+  <jsplugin path="FirstPersonMouseLook.js" />
+  <jsplugin path="MenuBar.js" />
+  <pyplugin path="%s" />
+</Tundra>''' %TUNDRA_GEN_SCRIPT_PATH
+
+TUNDRA_CONFIG_XML_PATH = '/tmp/tundra_config.xml'
+with open( TUNDRA_CONFIG_XML_PATH, 'wb' ) as fp:
+    fp.write( bytes(TUNDRA_CONFIG_XML,'utf-8') )
+
 
 class _TXML_(object):
+
+    '''
+  <component type="EC_Script" sync="1" name="myscript">
+   <attribute value="" name="Script ref"/>
+   <attribute value="false" name="Run on load"/>
+   <attribute value="0" name="Run mode"/>
+   <attribute value="" name="Script application name"/>
+   <attribute value="" name="Script class name"/>
+  </component>
+    '''
+
+
     def create_tundra_document( self, context ):
+        proto = 'local://'      # antont says file:// is also valid
+
         doc = RDocument()
         scn = doc.createElement('scene')
         doc.appendChild( scn )
 
+        e = doc.createElement( 'entity' )
+        doc.documentElement.appendChild( e )
+        e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
+
+        c = doc.createElement( 'component' ); e.appendChild( c )
+        c.setAttribute( 'type', 'EC_Script' )
+        c.setAttribute( 'sync', '1' )
+        c.setAttribute( 'name', 'myscript' )
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Script ref')
+        a.setAttribute('value', "%s%s"%(proto,TUNDRA_GEN_SCRIPT_PATH) )
+        
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Run on load')
+        a.setAttribute('value', 'true' )
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Run mode')
+        a.setAttribute('value', '0' )
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Script application name')
+        a.setAttribute('value', 'blender2ogre' )
+
+
         if context.scene.world.ogre_skyX:
             e = doc.createElement( 'entity' )
-            e.setAttribute( 'id', '2' )
-            scn.appendChild( e )
-            c = doc.createElement( 'component' )
-            e.appendChild( c )
+            doc.documentElement.appendChild( e )
+            e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
+
+            c = doc.createElement( 'component' ); e.appendChild( c )
             c.setAttribute( 'type', 'EC_SkyX' )
             c.setAttribute( 'sync', '1' )
             c.setAttribute( 'name', 'myskyx' )
@@ -4151,7 +4238,7 @@ class _TXML_(object):
             a = doc.createElement('attribute'); a.setAttribute('name', 'Weather (volumetric clouds only)')
             den = (
                 context.scene.world.ogre_skyX_cloud_density_x, 
-                context.scene.world.ogre_skyX_cloud_density_x
+                context.scene.world.ogre_skyX_cloud_density_y
             )
             a.setAttribute('value', '%s %s' %den)
             c.appendChild( a )
@@ -4205,16 +4292,51 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Show bounding box" )
-        if ob.show_bounds: a.setAttribute('value', "true" )
+        if ob.show_bounds or ob.type != 'MESH': a.setAttribute('value', "true" )
         else: a.setAttribute('value', "false" )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Visible" )
         a.setAttribute('value', 'true')
 
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', "Selection layer" )
+        a.setAttribute('value', 1)
+
         #<attribute value="1" name="Selection layer"/>
         #<attribute value="" name="Parent entity ref"/>
         #<attribute value="" name="Parent bone name"/>
+
+        if ob.type != 'MESH':
+            c = doc.createElement('component'); e.appendChild( c )
+            c.setAttribute('type', 'EC_TransformGizmo')
+            c.setAttribute('sync', '1')
+
+        if ob.type == 'CAMERA':
+            c = doc.createElement('component'); e.appendChild( c )
+            c.setAttribute('type', 'EC_Camera')
+            c.setAttribute('sync', '1')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Up vector" )
+            a.setAttribute('value', '0.0 1.0 0.0')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Near plane" )
+            a.setAttribute('value', '0.01')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Far plane" )
+            a.setAttribute('value', '2000')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Vertical FOV" )
+            a.setAttribute('value', '45')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Aspect ratio" )
+            a.setAttribute('value', '')
+
 
         ## any object can have physics ##
         if ob.game.physics_type == 'RIGID_BODY':
@@ -4346,9 +4468,71 @@ class _TXML_(object):
         a.setAttribute('name', "Cast shadows" )	# cast shadows is per object? not per material?
         a.setAttribute('value', "false" )
 
+    def tundra_light( self, e, ob ):
+        '''
+          <component type="EC_Light" sync="1" name="mylight">
+           <attribute value="0.000000 0.000000 1.000000" name="direction"/>
+           <attribute value="0" name="light type"/>
+           <attribute value="1 1 1 1" name="diffuse color"/>
+           <attribute value="0 0 0 1" name="specular color"/>
+           <attribute value="false" name="cast shadows"/>
+           <attribute value="100" name="light range"/>
+           <attribute value="0" name="constant atten"/>
+           <attribute value="0.00999999978" name="linear atten"/>
+           <attribute value="0.00999999978" name="quadratic atten"/>
+           <attribute value="30" name="light inner angle"/>
+           <attribute value="40" name="light outer angle"/>
+          </component>
+        '''
+        doc = e.document
 
+        c = doc.createElement('component'); e.appendChild( c )
+        c.setAttribute('type', "EC_Light")
+        c.setAttribute('sync', '1')
 
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'direction' )
+        a.setAttribute('value', '0.0 0.0 1.0' )
 
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'light type' )
+        a.setAttribute('value', '0' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'diffuse color' )
+        a.setAttribute('value', '1 1 1 1' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'specular color' )
+        a.setAttribute('value', '0 0 0 1' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'cast shadows' )
+        a.setAttribute('value', 'false' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'light range' )
+        a.setAttribute('value', '100' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'constant atten' )
+        a.setAttribute('value', '0' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'linear atten' )
+        a.setAttribute('value', '0.00999999978' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'quadratic atten' )
+        a.setAttribute('value', '0.00999999978' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'light inner angle' )
+        a.setAttribute('value', '30' )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'light outer angle' )
+        a.setAttribute('value', '40' )
 
 class _OgreCommonExport_( _TXML_ ):
     @classmethod
@@ -4806,6 +4990,8 @@ class _OgreCommonExport_( _TXML_ ):
 
 
         elif ob.type == 'LAMP' and ob.data.type in 'POINT SPOT SUN'.split():
+            self.tundra_light( TE, ob )
+
             Report.lights.append( ob.name )
             l = doc.createElement('light')
             o.appendChild(l)
@@ -6479,10 +6665,10 @@ class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
 
         exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
         if sys.platform == 'linux2':
-            cmd = ['wine', exe, '--file', '/tmp/preview.txml']
+            cmd = ['wine', exe, '--file', '/tmp/preview.txml', '--config', TUNDRA_CONFIG_XML_PATH]
             subprocess.Popen(cmd)
         else:
-            cmd = [exe, '--file', '/tmp/preview.txml']
+            cmd = [exe, '--file', '/tmp/preview.txml', '--config', TUNDRA_CONFIG_XML_PATH]
             subprocess.Popen(cmd)
 
         return {'FINISHED'}
