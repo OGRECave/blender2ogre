@@ -1,0 +1,14 @@
+#!/bin/bash
+# 1. sudo add-apt-repository ppa:ogre-team/ogre
+# 2. sudo apt-get update
+# 3. apt-get install libogre-dev ogre-tools
+# 4. then build Tundra2
+
+
+
+
+##########################################
+cp interfaceTundra.py /tmp/.
+#rm /tmp/fifo
+#mkfifo /tmp/fifo
+~/Blender25/blender --python integrateTundra.py
