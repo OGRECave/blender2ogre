@@ -18,7 +18,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
-    "version": (0,5,2),
+    "version": (0,5,3),
     "blender": (2,5,8),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -27,7 +27,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.2 TundraPreview'
+VERSION = '0.5.3 TundraBlender'
 
 
 __devnotes__ = '''
