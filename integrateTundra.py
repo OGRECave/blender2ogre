@@ -2,16 +2,28 @@
 import os, sys, socket, select
 
 PBUFFSIZE = 2048
+PREVIEW_PATH = '/tmp'
 PREVIEW = '/tmp/fastpreview.txml'
-CONFIG_TUNDRA = '%s/Tundra2' %os.environ['HOME']
+if sys.platform == 'linux2':
+	#CONFIG_TUNDRA = '%s/Tundra2' %os.environ['HOME']
+	CONFIG_TUNDRA = '/opt/realxtend-tundra'
+	assert os.path.isdir( CONFIG_TUNDRA )
+else:
+	CONFIG_TUNDRA = 'C:\\Tundra'
+	assert os.path.isdir( CONFIG_TUNDRA )
+
 # might need 1024 bytes to stream: camera, object transform, material updates
 
 
+sys.path.append( os.path.dirname(os.path.abspath(__file__)) )
+
 import bpy
 #sys.path.append( '~/blender2ogre' )
-#import blender2ogre as b2ogre
+import blender2ogre as b2ogre
 #print( b2ogre )
-b2ogre = bpy.ops.ogre
+#b2ogre = bpy.ops.ogre
+print( b2ogre, dir(b2ogre) )
+b2ogre.register()
 
 #print( dir(bpy.app.handlers))
 #def prerender( a ):
@@ -22,10 +34,26 @@ import threading, time, subprocess, pickle
 
 T = time.time()
 
+def get_material_names( ob ):
+	r = []
+	for m in ob.data.materials:
+		if m:	r.append( m.name )
+		else: r.append( None )
+	return r
+
+def get_materials( ob ):
+	r = []
+	for m in ob.data.materials:
+		if m:	r.append( m )
+		else: r.append( None )
+	return r
+
+
 def decompose( mat ):
 	loc, rot, scale = mat.decompose()
 	loc = (loc.x, loc.z, -loc.y)
-	rot = (rot.w, rot.x, rot.z, -rot.y)
+	#rot = (rot.w, rot.x, rot.z, -rot.y)
+	x,z,y = rot.to_euler(); rot = (x,y,z)
 	scale = ( abs(scale.x), abs(scale.z), abs(scale.y) )
 	return loc, rot, scale
 
@@ -69,69 +97,25 @@ TUNDRA_CONFIG_XML = '''<?xml version="1.0"?>
   <plugin path="AvatarModule" />               
   <plugin path="ECEditorModule" />            
   <plugin path="DebugStatsModule" />         
-  <plugin path="SkyXHydrax" />                 
+  <plugin path="SkyXHydrax" />
+  <plugin path="VlcPlugin" />
   <plugin path="SceneWidgetComponents" />    
-  <plugin path="VlcPlugin" />                
   <plugin path="PythonScriptModule" />   
+  <jsplugin path="MenuBar.js" />
   <jsplugin path="cameraapplication.js" />
   <jsplugin path="FirstPersonMouseLook.js" />
-  <jsplugin path="MenuBar.js" />
   <pyplugin path="%s" />
 </Tundra>''' %TUNDRA_GEN_SCRIPT_PATH
+
+
 
 TUNDRA_CONFIG_XML_PATH = '/tmp/tundra_config.xml'
 with open( TUNDRA_CONFIG_XML_PATH, 'wb' ) as fp:
     fp.write( bytes(TUNDRA_CONFIG_XML,'utf-8') )
 
 
-#try: os.unlink('/tmp/my_fifo')
-#except: pass
-#os.mkfifo('/tmp/my_fifo')
 
-class Tundra(object):
-	def __init__(self):
-		exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
-		assert os.path.isfile( exe )
-
-		#os.mkfifo('/tmp/io')
-
-		if 0:	# debug pipe/fifo
-			cmd = ['python', '/tmp/interfaceTundra.py']
-			print( cmd )
-			p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-
-		elif sys.platform == 'linux2':
-			#cmd = ['wine', exe, '--file', PREVIEW, '--config', TUNDRA_CONFIG_XML_PATH]
-			cmd = ['wine', exe, '--config', TUNDRA_CONFIG_XML_PATH, '--fpslimit', '100']
-			print( cmd )
-			p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-		else:
-			cmd = [exe, '--file', PREVIEW, '--config', TUNDRA_CONFIG_XML_PATH]
-			p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-		print( '--------------------tundra subprocess-------------------', p )
-		self.proc = p
-		#self.pipe = p.stdin
-
-		#r,w=os.pipe()
-		#print('PIPES', r, w)
-		#r,w=os.fdopen(r,'rb',2048), os.fdopen(w,'wb',2048)
-		#self.pipe = w
-		#r.close()
-
-		time.sleep(0.1)
-		print('trying to open fifo for write')
-
-		#self.pipe = TPIPE = open( '/tmp/io', 'wb' )	# OPEN AFTER client 'r+'
-		#print( TPIPE )
-
-		self.socket = sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		host='localhost'; port = 9978
-		sock.connect((host, port))
-		print('socket connected', sock)
-
-
-
-class SafeThread(object):
+class TundraServer(object):
 	def update_view( self, msg, sel ):
 		msg['view'] = get_view_matrix()
 	def update_selected( self, msg, sel ):
@@ -140,19 +124,71 @@ class SafeThread(object):
 		msg['data-name'] = sel.data.name
 		msg['transform'] =  decompose( sel.matrix_world.copy() )
 		if sel.name not in self._objects:
-			bpy.ops.ogre.export_realxtend( filepath=PREVIEW)
-			self._objects[ sel.name ] = True
-			if not self._scene_loaded:
-				self._scene_loaded = True
-				self.stream( {'command':'load', 'arg':PREVIEW} )
+			#bpy.ops.ogre.export_realxtend( filepath=PREVIEW, EX_MESH_OVERWRITE=False)
+			self._objects[ sel.name ] = sel.type
+			if sel.type == 'MESH':
+				mats = b2ogre.dot_mesh( sel, path=PREVIEW_PATH )
+				self.sync_material( sel )
+
+			#if not self._scene_loaded:
+			#	self._scene_loaded = True
+			#	self.stream( {'command':'load', 'arg':PREVIEW} )
+
+
+	def update_materials( self, msg, sel ):
+		if sel.type != 'MESH': return
+
+		msg['materials'] = get_material_names( sel )
+		if not all( self._materials.values() ):
+			for name in self._materials:
+				if not self._materials[name]:
+					self._materials[name] = True
+					m = bpy.data.materials[ name ]
+					data = b2ogre.generate_material( m, PREVIEW_PATH )
+					print( data )
+					with open(os.path.join(PREVIEW_PATH, name+'.material'), 'wb' ) as fp:
+						fp.write( bytes(data,'utf-8') )
+
+
+	def sync_mesh( self, ob ):
+		if ob.name in self._objects:
+			self._objects.pop( ob.name )
+		print( self._area, dir(self._area) )
+		print( self._region, dir(self._region) )
+		self._region.tag_redraw()
+
+	def sync_material( self, ob ):
+		for m in get_materials( ob ):
+			self._materials[ m.name ] = False
+		self._region.tag_redraw()
+
 
 	def __init__(self):
 		self._scene_loaded = False
 		self._objects = {}
+		self._materials = {}
 		self.buffer = []	# cmd buffer
-		self.callbacks = [ self.update_view, self.update_selected ]
-		self.slave = Tundra()
-		#self.pipe = self.slave.pipe
+		self.callbacks = [ self.update_view, self.update_selected, self.update_materials ]
+
+		## launch Tundra ##
+		if sys.platform == 'linux2':
+			exe = os.path.join( CONFIG_TUNDRA, 'run-server.sh' )
+			assert os.path.isfile( exe )
+			cmd = [exe, '--config', TUNDRA_CONFIG_XML_PATH, '--fpslimit', '100', '--storage', '/tmp/']
+			print( cmd )
+			p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+		else:
+			exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
+			assert os.path.isfile( exe )
+			cmd = [exe, '--file', PREVIEW, '--config', TUNDRA_CONFIG_XML_PATH]
+			p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+
+		self.proc = p
+		self.socket = sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		host='localhost'; port = 9978
+		sock.connect((host, port))
+		print('socket connected', sock)
+
 
 		self._handle = None
 		self.setup_callback( bpy.context )
@@ -164,17 +200,10 @@ class SafeThread(object):
 
 	def loop(self, none):
 		self.active = True
-		i = 0; prev = time.time()
+		prev = time.time()
 		while self.active:
-			if not self.ready.locked(): time.sleep(0.001)
+			if not self.ready.locked(): time.sleep(0.001)	# not threadsafe
 			else:	# threadsafe start
-				#elif hasattr(bpy.context, 'active_object'):	# thread safe now
-				#poll = select.select( [], [self.slave.socket], [] )
-				#print( 'BLENDER POLL', poll )
-				#if not poll[1]:
-				#	print('waiting for tundra....')
-				#	time.sleep(0.01)
-				#	continue
 
 				if not bpy.context.active_object: continue
 
@@ -186,15 +215,13 @@ class SafeThread(object):
 					msg = {}
 					for cb in self.callbacks:
 						cb( msg, sel )
-					self.stream( msg )
-					self.ready.release()	# thread release
-					time.sleep(0.00001)	# release to blender
-					#print( i ); i = 0
+					self.ready.release()	      # thread release
+
+					self.stream( msg )	# releases GIL
 					if self.buffer:
-						#print( 'sendall socket' )
 						bin = self.buffer.pop()
 						try:
-							self.slave.socket.sendall( bin )
+							self.socket.sendall( bin )
 						except:
 							print('send all error!')
 							time.sleep(0.5)
@@ -205,18 +232,10 @@ class SafeThread(object):
 					self.ready.release()
 
 
-				################
-				#print( time.time()-T )
-				#time.sleep( 0.001)
-
-
-
-			i += 1
 		print('thread exit')
 
-	def preview( self, reg ):
-		pass
-	def postpixel( self, reg ):
+
+	def threadsafe( self, reg ):
 		if not self.ready.locked():
 			self.ready.acquire()
 			time.sleep(0.0001)
@@ -232,50 +251,83 @@ class SafeThread(object):
 				for reg in area.regions:
 					if reg.type == 'WINDOW':
 						# PRE_VIEW, POST_VIEW, POST_PIXEL
-						## thread safe from pre_view to post_pixel?
-						self._handle = reg.callback_add(		# better performance
-							self.postpixel, (reg,), 'PRE_VIEW' )
-						#self._handle = reg.callback_add(
-						#	self.postpixel, (reg,), 'POST_PIXEL' )
-
+						self._handle = reg.callback_add(
+							self.threadsafe, (reg,), 'PRE_VIEW' )
+						self._area = area
+						self._region = reg
 						break
 
 
 	def stream( self, o ):
 		b = pickle.dumps( o, protocol=2 )
 		print( 'streaming bytes', len(b) )
-		n = len( b ); d = PBUFFSIZE - n -3
+		n = len( b ); d = PBUFFSIZE - n -4
 		if n > PBUFFSIZE:
 			print( 'STREAM ERROR', n )
 			return
 
 		padding = b'#' * d
 
-		if n < 10: header = '00%s' %n
-		elif n < 100: header = '0%s' %n
+		if n < 10: header = '000%s' %n
+		elif n < 100: header = '00%s' %n
+		elif n < 1000: header = '0%s' %n
 		else: header = '%s' %n
 		header = bytes( header, 'utf-8' )
-		assert len(header) == 3
+		assert len(header) == 4
 
-		print( 'to pipe', len(b))
-		print( 'pickle', n )
-		print( 'delta', d )
 		w = header + b + padding
 		assert len(w) == PBUFFSIZE
 		self.buffer.insert(0, w )
 		return w
 
 
-t = SafeThread()
+TundraSingleton = TundraServer()
 print( 'ok' )
 
+class _sync_mesh_op(bpy.types.Operator):
+	'''sync mesh in tundra'''
+	bl_idname = 'tundra.sync_mesh'
+	bl_label = "sync mesh in tundra"
+	bl_options = {'REGISTER'}
+	@classmethod
+	def poll(cls, context):
+		if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
+			if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
+			else: return True
+
+	def invoke(self, context, event):
+		TundraSingleton.sync_mesh( context.active_object )
+		return {'FINISHED'}
+bpy.utils.register_class( _sync_mesh_op )
+
+class _sync_material_op(bpy.types.Operator):
+	'''sync material in tundra'''
+	bl_idname = 'tundra.sync_material'
+	bl_label = "sync material in tundra"
+	bl_options = {'REGISTER'}
+	@classmethod
+	def poll(cls, context):
+		if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
+			if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
+			else: return True
+
+	def invoke(self, context, event):
+		TundraSingleton.sync_material( context.active_object )
+		return {'FINISHED'}
+bpy.utils.register_class( _sync_material_op )
 
 
 class tundraheader(bpy.types.Header):
 	bl_space_type = 'INFO'
+	def poll( self, context ):
+		if context.active_object.type == 'MESH': return True
+
 	def draw(self, context):
 		layout = self.layout
-		#op = layout.operator( OGRE_toggle_toolbar_op.bl_idname, icon='UI' )
-		layout.label( 'TundraBlender' )
+		op = layout.operator( 'tundra.sync_mesh', text='mesh', icon='PLUG' )
+		op = layout.operator( 'tundra.sync_material', text='material', icon='PLUG' )
+
 bpy.utils.register_class( tundraheader )
+
+
 

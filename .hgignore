@@ -18,3 +18,6 @@ syntax: glob
 
 # python bytecode
 *.pyc
+
+__pycache__
+_ogre_debug.txt

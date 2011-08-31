@@ -1,14 +1,21 @@
 #!/bin/bash
+
+## hacks for Tundra1 ##
+# sudo chmod 777 /opt/realxtend-tundra/pymodules
+# sudo apt-get install ogre-tools
+
+
+########### Tundra2 - not working yet ########
 # 1. sudo add-apt-repository ppa:ogre-team/ogre
 # 2. sudo apt-get update
 # 3. apt-get install libogre-dev ogre-tools
 # 4. then build Tundra2
 
 
-
-
 ##########################################
-cp interfaceTundra.py /tmp/.
-#rm /tmp/fifo
-#mkfifo /tmp/fifo
-~/Blender25/blender --python integrateTundra.py
+#cp interfaceTundra.py /tmp/.
+cp interfaceTundra.py /opt/realxtend-tundra/pymodules/.
+echo "[interfaceTundra.Dummy]" > /opt/realxtend-tundra/pymodules/b2ogre.ini
+rm /tmp/*.mesh
+rm /tmp/*.material
+~/Blender25/blender --python integrateTundra.py --window-geometry 20 15 1390 480

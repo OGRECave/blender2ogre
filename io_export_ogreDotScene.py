@@ -30,6 +30,17 @@ bl_info = {
 VERSION = '0.5.3 TundraBlender'
 
 
+# options yet to be added to the config file
+OPTIONS = {
+    'FORCE_IMAGE_FORMAT' : None,
+    'TEXTURES_SUBDIR' : False,
+    'PATH' : '/tmp',    			# TODO SRombauts: use the CONFIG_TEMP_DIR variable
+    'TOUCH_TEXTURES' : False,
+    #'SWAP_AXIS' : 'x z -y',         # Tundra1 standard
+    'SWAP_AXIS' : '-x z y',         # ogre standard
+}
+
+
 __devnotes__ = '''
 
 ## b2rex touches these, so keep the names! ##
@@ -153,6 +164,9 @@ August 13th (Hart):
     . shape animation now respects bpy.context.scene.frame_step
     . shadeless material sets emissive to 1.0
 
+August 31st (Hart):
+    . putting back axis swap
+    . fixed shadeless material sets emissive to diffuse color
 
 '''
 
@@ -161,13 +175,12 @@ August 13th (Hart):
 EPSILON=0.000001
 
 # Hardcoded to Ogre Default #
-def swap( vec ):
-    if len(vec) == 3: return mathutils.Vector( [vec[0], vec[2], -vec[1]] )
-    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
-    else: assert 0
+#def swap( vec ):
+#    if len(vec) == 3: return mathutils.Vector( [vec[0], vec[2], -vec[1]] )
+#    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
+#    else: assert 0
 
-## Deprecated
-def swap_old(vec):
+def swap(vec):
     if OPTIONS['SWAP_AXIS'] == 'x y z': return vec
     elif OPTIONS['SWAP_AXIS'] == 'x z y':
         if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, vec.y] )
@@ -304,7 +317,7 @@ def readOrCreateConfig():
         
     elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):        # OSX patch by FreqMod June6th 2011
         # DEFAULT_TEMP_PATH = '/tmp' 
-        DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXmlConverter'
+        DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'	# apt-get ogre-tools
         DEFAULT_OGRETOOLS_MESH_MAGICK = '/usr/bin/MeshMagick'
         DEFAULT_TUNDRA = '%s/Tundra2' %os.environ['HOME']
 
@@ -314,8 +327,6 @@ def readOrCreateConfig():
             if os.path.isfile( '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME'] ):
                 DEFAULT_OGRETOOLS_XML_CONVERTER = '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME']
                 DEFAULT_OGRETOOLS_MESH_MAGICK = '%s/.wine/drive_c/OgreCommandLineTools/MeshMagick.exe' %os.environ['HOME']
-            elif os.path.isfile( '/usr/bin/OgreXMLConverter'):   # ubuntu ogre-tools package changes name of OgreXmlConverter to OgreXMLConverter
-                DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'
 
 
         DEFAULT_OGRE_MESHY = '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME']
@@ -363,22 +374,6 @@ def readOrCreateConfig():
     print('CONFIG_TUNDRA=%s'           % CONFIG_TUNDRA)
 
 
-# 
-
-
-
-
-
-# options yet to be added to the config file
-OPTIONS = {
-    'FORCE_IMAGE_FORMAT' : None,
-    'TEXTURES_SUBDIR' : False,
-    'PATH' : '/tmp',    # TODO SRombauts: use the CONFIG_TEMP_DIR variable
-    'TOUCH_TEXTURES' : False,
-    #'SWAP_AXIS' : '-x z y',        # this was not correct when viewed in OgreMeshy
-    #'SWAP_AXIS' : 'x z -y',         # this is ogre standard?
-    'SWAP_AXIS' : '-x z y',         # ogre standard
-}
 
 
 # customize missing material - red flags for users so they can quickly see what they forgot to assign a material to.
@@ -2021,7 +2016,7 @@ class ShaderTree(object):
         elif mat.use_vertex_color_light:
             M += indent(3, 'emissive vertexcolour' )
         elif mat.use_shadeless:     # requested by Borris
-            M += indent(3, 'emissive 1.0 1.0 1.0 1.0' )
+            M += indent(3, 'emissive %s %s %s 1.0' %(color.r, color.g, color.b) )
         else:
             M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
@@ -4131,52 +4126,6 @@ OptionsEx = {
 
 }
 
-TUNDRA_GEN_SCRIPT_PATH = '/tmp/blender2ogre_generated_script.py'
-
-TUNDRA_GEN_SCRIPT_HEADER = '''
-import tundra
-
-def get_entity( id ):
-    return tundra.Scene().GetDefaultSceneRaw().GetEntityRaw(id)
-
-def get_entity_component( id, type ):
-    e = tundra.Scene().GetDefaultSceneRaw().GetEntityRaw(id)
-    return e.GetComponentRaw("EC_%s" %type)
-
-print('^'*80)
-print('HELLO WORLD')
-print('^'*80)
-
-'''
-
-with open( TUNDRA_GEN_SCRIPT_PATH, 'wb' ) as fp:
-    fp.write( bytes(TUNDRA_GEN_SCRIPT_HEADER,'utf-8') )
-
-TUNDRA_CONFIG_XML = '''<?xml version="1.0"?>
-<Tundra>
-  <plugin path="OgreRenderingModule" />
-  <plugin path="EnvironmentModule" />          
-  <plugin path="OgreAssetEditorModule" />    
-  <plugin path="PhysicsModule" />         
-  <plugin path="TundraProtocolModule" />     
-  <plugin path="JavascriptModule" />          
-  <plugin path="AssetModule" />         
-  <plugin path="AvatarModule" />               
-  <plugin path="ECEditorModule" />            
-  <plugin path="DebugStatsModule" />         
-  <plugin path="SkyXHydrax" />                 
-  <plugin path="SceneWidgetComponents" />    
-  <plugin path="VlcPlugin" />                
-  <plugin path="PythonScriptModule" />   
-  <jsplugin path="cameraapplication.js" />
-  <jsplugin path="FirstPersonMouseLook.js" />
-  <jsplugin path="MenuBar.js" />
-  <pyplugin path="%s" />
-</Tundra>''' %TUNDRA_GEN_SCRIPT_PATH
-
-TUNDRA_CONFIG_XML_PATH = '/tmp/tundra_config.xml'
-with open( TUNDRA_CONFIG_XML_PATH, 'wb' ) as fp:
-    fp.write( bytes(TUNDRA_CONFIG_XML,'utf-8') )
 
 
 class _TXML_(object):
@@ -4615,18 +4564,16 @@ class _OgreCommonExport_( _TXML_ ):
         f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
         print('saved', url)
 
-    ## python note: classmethods prefer attributes defined at the classlevel, kinda makes sense, (even if called by an instance)
+    ## python note: classmethods prefer attributes defined at the classlevel, 
+    ## kinda makes sense, (even if called by an instance)
     @classmethod
-    def gen_dot_material( self, mat, path='/tmp', convert_textures=False ):        # TODO deprecated context_textures...
+    def gen_dot_material( self, mat, path='/tmp', convert_textures=False ):
         M = ''
         M += 'material %s \n{\n'        %material_name(mat)     # supports blender library linking
         if mat.use_shadows: M += indent(1, 'receive_shadows on')
         else: M += indent(1, 'receive_shadows off')
-
         M += indent(1, 'technique', '{' )    # technique GLSL
-        #if mat.use_vertex_color_paint:
         M += self.gen_dot_material_pass( mat, path, convert_textures )
-
         M += indent(1, '}' )    # end technique
         M += '}\n'    # end material
         return M
@@ -5073,7 +5020,9 @@ class _OgreCommonExport_( _TXML_ ):
 ################################################################
 
 
-
+## helper that calls the classmethod, sane API ##
+def generate_material( mat, path ):
+    return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
 
 class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
@@ -6412,13 +6361,13 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
                     numverts += 1
                     _remap_verts_.append( v )
 
-                    x,z,y = v.co        # xz-y is correct!
+                    x,y,z = swap(v.co)        # xz-y is correct!
                     
                     doc.start_tag('vertex', {})
                     doc.leaf_tag('position', {
                             'x' : '%6f' % x,
                             'y' : '%6f' % y,
-                            'z' : '%6f' % -z    # negate z
+                            'z' : '%6f' % z
                     })
                     
                     
@@ -6665,10 +6614,10 @@ class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
 
         exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
         if sys.platform == 'linux2':
-            cmd = ['wine', exe, '--file', '/tmp/preview.txml', '--config', TUNDRA_CONFIG_XML_PATH]
+            cmd = ['wine', exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
             subprocess.Popen(cmd)
         else:
-            cmd = [exe, '--file', '/tmp/preview.txml', '--config', TUNDRA_CONFIG_XML_PATH]
+            cmd = [exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
             subprocess.Popen(cmd)
 
         return {'FINISHED'}
