@@ -12,6 +12,10 @@ class Dummy(object): pass	# only needed for Tundra1
 
 T = time.time()
 
+## compact tags ##
+TAGS = {}
+for i,tag in enumerate('object type name transform data-name selected materials'.split()):
+	TAGS[ tag ] = chr(i)		# up to 256
 
 def get_entity( id ):
     return tundra.Scene().GetDefaultSceneRaw().GetEntityRaw(id)
@@ -50,22 +54,22 @@ class TundraClient(object):
 
 		header = data[ : 4]
 		s = data[ 4 : int(header)+4 ]
-		p = pickle.loads( s )
-		self.process( p )
+		objects = pickle.loads( s )	# protocol - blender sends a list of selected
+		for o in objects: self.update_object( o )
 		return True
 
-	def process( self, d ):
+	def update_object( self, o ):
 		#scn = tundra.Scene().GetDefaultSceneRaw()
 		#print( scn )
 
-		if 'object' in d:
-			name = d['object']
-			if name not in self.objects:
-				print('CreateEntity', name)
-				e = Entity( d )
-				self.objects[ name ] = e
-			e = self.objects[ name ]
-			e.update( d )
+		name = o[ P.name ]
+		if name not in self.objects:
+			print('CreateEntity', name)
+			e = Entity( o )
+			self.objects[ name ] = e
+
+		e = self.objects[ name ]
+		e.update( d )
 
 class Entity(object):
 	"""
@@ -79,17 +83,17 @@ PythonScriptModule: (Entity (Entity 0x0C22B410), ['Action', 'Actions', 'AddCompo
 		#self.entity.SetName( info['object'] )
 		self.components = {}
 		extras = []
-		if 'type' in info:
-			T = info['type']
-			self.data_name = info['data-name']
 
-			if T == 'MESH':
-				extras.append( 'EC_Mesh' )
-				self._mesh_url = 'local://%s.mesh' %self.data_name
-				self._materials = info['materials']
+		T = info[ P.type ]
+		self.data_name = info[ P.data ][ P.name ]
 
-			elif T == 'LAMP':
-				extras.append( 'EC_Light' )
+		if T == 'MESH':
+			extras.append( 'EC_Mesh' )
+			self._mesh_url = 'local://%s.mesh' %self.data_name
+			self._materials = info['materials']
+
+		elif T == 'LAMP':
+			extras.append( 'EC_Light' )
 
 		#EC_TransformGizmo
 		for tag in 'EC_Name EC_Placeable'.split() + extras:
@@ -100,7 +104,7 @@ PythonScriptModule: (Entity (Entity 0x0C22B410), ['Action', 'Actions', 'AddCompo
 
 			if tag == 'EC_Light':
 				ec.castShadows = True
-				print( ec.diffColor )
+				print( ec.diffColor, dir(ec.diffColor) )
 				ec.constAtten = 1.0	# sane default
 
 			if tag == 'EC_Mesh':
@@ -119,7 +123,8 @@ PythonScriptModule: (Entity (Entity 0x0C22B410), ['Action', 'Actions', 'AddCompo
 
 
 	"""
-PythonScriptModule: (EC_Mesh (EC_Mesh 0x0C3C47AC), ['ApplyMaterial', 'AttributeChanged', 'AutoSetPlaceable', 'ComponentChanged', 'ComponentNameChanged', 'EmitAttributeChanged', 'ForceSkeletonUpdate', 'GetAdjustOrientation', 'GetAdjustPosition', 'GetAdjustScale', 'GetAdjustmentSceneNode', 'GetAttachmentEntity', 'GetAttachmentMaterialName', 'GetAttachmentMorphWeight', 'GetAttachmentNumMaterials', 'GetAttachmentOrientation', 'GetAttachmentPosition', 'GetAttachmentScale', 'GetAttributeNames', 'GetAttributeQVariant', 'GetAvailableBones', 'GetBone', 'GetBoneDerivedOrientation', 'GetBoneDerivedPosition', 'GetBoneOrientation', 'GetBonePosition', 'GetBoundingBox', 'GetDrawDistance', 'GetEntity', 'GetFramework', 'GetMatName', 'GetMaterialName', 'GetMeshName', 'GetMorphWeight', 'GetNumAttachments', 'GetNumMaterials', 'GetNumSubMeshes', 'GetPlaceable', 'GetSkeletonName', 'GetWorldSize', 'HasAttachmentMesh', 'HasDynamicStructure', 'HasMesh', 'IsTemporary', 'LocalToParent', 'LocalToWorld', 'MaterialChanged', 'MeshAboutToBeDestroyed', 'MeshChanged', 'NetworkSyncEnabled', 'NumAttributes', 'ParentEntity', 'ParentEntityDetached', 'ParentEntitySet', 'ParentScene', 'RemoveAllAttachments', 'RemoveAttachmentMesh', 'RemoveMesh', 'SetAdjustOrientation', 'SetAdjustPosition', 'SetAdjustScale', 'SetAttachmentMaterial', 'SetAttachmentMesh', 'SetAttachmentMorphWeight', 'SetAttachmentOrientation', 'SetAttachmentPosition', 'SetAttachmentScale', 'SetCastShadows', 'SetDrawDistance', 'SetMaterial', 'SetMesh', 'SetMeshRef', 'SetMeshWithSkeleton', 'SetMorphWeight', 'SetNetworkSyncEnabled', 'SetPlaceable', 'SetTemporary', 'SetUpdateMode', 'SkeletonChanged', 'UpdateMode', 'View', 'ViewEnabled', '__dict__', '__doc__', '__module__', '__weakref__', 'blockSignals', 'castShadows', 'childEvent', 'children', 'className', 'connect', 'customEvent', 'delete', 'deleteLater', 'destroyed', 'disconnect', 'drawDistance', 'dumpObjectInfo', 'dumpObjectTree', 'dynamicPropertyNames', 'emit', 'event', 'eventFilter', 'findChild', 'findChildren', 'help', 'installEventFilter', 'isWidgetType', 'killTimer', 'meshMaterial', 'meshRef', 'moveToThread', 'name', 'networkSyncEnabled', 'nodeTransformation', 'objectName', 'parent', 'property', 'removeEventFilter', 'setObjectName', 'setParent', 'setProperty', 'signalsBlocked', 'skeletonRef', 'startTimer', 'thread', 'timerEvent', 'tr', 'typeName', 'updateMode'])
+(EC_Mesh (EC_Mesh 0x0C3C47AC), 
+['ApplyMaterial', 'AttributeChanged', 'AutoSetPlaceable', 'ComponentChanged', 'ComponentNameChanged', 'EmitAttributeChanged', 'ForceSkeletonUpdate', 'GetAdjustOrientation', 'GetAdjustPosition', 'GetAdjustScale', 'GetAdjustmentSceneNode', 'GetAttachmentEntity', 'GetAttachmentMaterialName', 'GetAttachmentMorphWeight', 'GetAttachmentNumMaterials', 'GetAttachmentOrientation', 'GetAttachmentPosition', 'GetAttachmentScale', 'GetAttributeNames', 'GetAttributeQVariant', 'GetAvailableBones', 'GetBone', 'GetBoneDerivedOrientation', 'GetBoneDerivedPosition', 'GetBoneOrientation', 'GetBonePosition', 'GetBoundingBox', 'GetDrawDistance', 'GetEntity', 'GetFramework', 'GetMatName', 'GetMaterialName', 'GetMeshName', 'GetMorphWeight', 'GetNumAttachments', 'GetNumMaterials', 'GetNumSubMeshes', 'GetPlaceable', 'GetSkeletonName', 'GetWorldSize', 'HasAttachmentMesh', 'HasDynamicStructure', 'HasMesh', 'IsTemporary', 'LocalToParent', 'LocalToWorld', 'MaterialChanged', 'MeshAboutToBeDestroyed', 'MeshChanged', 'NetworkSyncEnabled', 'NumAttributes', 'ParentEntity', 'ParentEntityDetached', 'ParentEntitySet', 'ParentScene', 'RemoveAllAttachments', 'RemoveAttachmentMesh', 'RemoveMesh', 'SetAdjustOrientation', 'SetAdjustPosition', 'SetAdjustScale', 'SetAttachmentMaterial', 'SetAttachmentMesh', 'SetAttachmentMorphWeight', 'SetAttachmentOrientation', 'SetAttachmentPosition', 'SetAttachmentScale', 'SetCastShadows', 'SetDrawDistance', 'SetMaterial', 'SetMesh', 'SetMeshRef', 'SetMeshWithSkeleton', 'SetMorphWeight', 'SetNetworkSyncEnabled', 'SetPlaceable', 'SetTemporary', 'SetUpdateMode', 'SkeletonChanged', 'UpdateMode', 'View', 'ViewEnabled', '__dict__', '__doc__', '__module__', '__weakref__', 'blockSignals', 'castShadows', 'childEvent', 'children', 'className', 'connect', 'customEvent', 'delete', 'deleteLater', 'destroyed', 'disconnect', 'drawDistance', 'dumpObjectInfo', 'dumpObjectTree', 'dynamicPropertyNames', 'emit', 'event', 'eventFilter', 'findChild', 'findChildren', 'help', 'installEventFilter', 'isWidgetType', 'killTimer', 'meshMaterial', 'meshRef', 'moveToThread', 'name', 'networkSyncEnabled', 'nodeTransformation', 'objectName', 'parent', 'property', 'removeEventFilter', 'setObjectName', 'setParent', 'setProperty', 'signalsBlocked', 'skeletonRef', 'startTimer', 'thread', 'timerEvent', 'tr', 'typeName', 'updateMode'])
 
 	"""
 

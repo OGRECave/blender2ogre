@@ -19,7 +19,7 @@ bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
     "version": (0,5,3),
-    "blender": (2,5,8),
+    "blender": (2,5,9),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "warning": "Quick Start: '.mesh' output requires OgreCommandLineTools (http://www.ogre3d.org/download/tools) - install to the default path.",
@@ -36,9 +36,10 @@ OPTIONS = {
     'TEXTURES_SUBDIR' : False,
     'PATH' : '/tmp',    			# TODO SRombauts: use the CONFIG_TEMP_DIR variable
     'TOUCH_TEXTURES' : False,
-    #'SWAP_AXIS' : 'x z -y',         # Tundra1 standard
-    'SWAP_AXIS' : '-x z y',         # ogre standard
+    #'SWAP_AXIS' : 'xz-y',         # Tundra2 standard
+    'SWAP_AXIS' : '-xzy',         # Tundra1 standard
 }
+
 
 
 __devnotes__ = '''
@@ -181,18 +182,19 @@ EPSILON=0.000001
 #    else: assert 0
 
 def swap(vec):
-    if OPTIONS['SWAP_AXIS'] == 'x y z': return vec
-    elif OPTIONS['SWAP_AXIS'] == 'x z y':
+    if OPTIONS['SWAP_AXIS'] == 'xyz': return vec
+    elif OPTIONS['SWAP_AXIS'] == 'xzy':
         if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, vec.y] )
         elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, vec.y] )
-    elif OPTIONS['SWAP_AXIS'] == '-x z y':
+    elif OPTIONS['SWAP_AXIS'] == '-xzy':
         if len(vec) == 3: return mathutils.Vector( [-vec.x, vec.z, vec.y] )
         elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, -vec.x, vec.z, vec.y] )
-    elif OPTIONS['SWAP_AXIS'] == 'x z -y':
+    elif OPTIONS['SWAP_AXIS'] == 'xz-y':
         if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, -vec.y] )
         elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
     else:
         print( 'unknown swap axis mode', OPTIONS['SWAP_AXIS'] )
+        assert 0
 
 _faq_ = '''
 
@@ -4148,30 +4150,31 @@ class _TXML_(object):
         scn = doc.createElement('scene')
         doc.appendChild( scn )
 
-        e = doc.createElement( 'entity' )
-        doc.documentElement.appendChild( e )
-        e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
+        if 0:
+            e = doc.createElement( 'entity' )
+            doc.documentElement.appendChild( e )
+            e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
 
-        c = doc.createElement( 'component' ); e.appendChild( c )
-        c.setAttribute( 'type', 'EC_Script' )
-        c.setAttribute( 'sync', '1' )
-        c.setAttribute( 'name', 'myscript' )
+            c = doc.createElement( 'component' ); e.appendChild( c )
+            c.setAttribute( 'type', 'EC_Script' )
+            c.setAttribute( 'sync', '1' )
+            c.setAttribute( 'name', 'myscript' )
 
-        a = doc.createElement('attribute'); c.appendChild( a )
-        a.setAttribute('name', 'Script ref')
-        a.setAttribute('value', "%s%s"%(proto,TUNDRA_GEN_SCRIPT_PATH) )
-        
-        a = doc.createElement('attribute'); c.appendChild( a )
-        a.setAttribute('name', 'Run on load')
-        a.setAttribute('value', 'true' )
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Script ref')
+            #a.setAttribute('value', "%s%s"%(proto,TUNDRA_GEN_SCRIPT_PATH) )
+            
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Run on load')
+            a.setAttribute('value', 'true' )
 
-        a = doc.createElement('attribute'); c.appendChild( a )
-        a.setAttribute('name', 'Run mode')
-        a.setAttribute('value', '0' )
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Run mode')
+            a.setAttribute('value', '0' )
 
-        a = doc.createElement('attribute'); c.appendChild( a )
-        a.setAttribute('name', 'Script application name')
-        a.setAttribute('value', 'blender2ogre' )
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Script application name')
+            a.setAttribute('value', 'blender2ogre' )
 
 
         if context.scene.world.ogre_skyX:
@@ -4494,6 +4497,13 @@ class _OgreCommonExport_( _TXML_ ):
     def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
     ## Options ##
+    _axis_modes =  [
+        ('xz-y', 'xz-y', 'ogre standard'),
+        ('xyz', 'xyz', 'no swapping'),
+        ('-xzy', '-xzy', 'old default'),
+        ('xzy', 'xzy', 'swap y and z'),
+    ]
+
     _image_formats =  [
         ('','do not convert', 'default'),
         ('jpg', 'jpg', 'jpeg format'),
@@ -4626,7 +4636,7 @@ class _OgreCommonExport_( _TXML_ ):
         global OPTIONS
         OPTIONS['FORCE_IMAGE_FORMAT'] = None
         OPTIONS['TOUCH_TEXTURES'] = True
-        #OPTIONS['SWAP_AXIS'] = self.EX_SWAP_MODE
+        OPTIONS['SWAP_AXIS'] = self.EX_SWAP_MODE
         Report.reset()
 
         ShaderTree.EX_DDS_MIPS = self.EX_DDS_MIPS
@@ -5032,7 +5042,13 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
     EXPORT_TYPE = 'OGRE'
 
-    #EX_SWAP_MODE = EnumProperty( items=_OgreCommonExport_._axis_modes, name='swap axis',  description='axis swapping mode', default='x z -y' )
+    EX_SWAP_MODE = EnumProperty( 
+        items=_OgreCommonExport_._axis_modes, 
+        name='swap axis',  
+        description='axis swapping mode', 
+        default='-xzy' 
+    )
+
     EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
     EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
     EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
@@ -5071,7 +5087,13 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_ ):
     filepath= StringProperty(name="File Path", description="Filepath used for exporting .txml file", maxlen=1024, default="", subtype='FILE_PATH')
     EXPORT_TYPE = 'REX'
 
-    #EX_SWAP_MODE = EnumProperty( items=_OgreCommonExport_._axis_modes, name='swap axis',  description='axis swapping mode', default='x z -y' )
+    EX_SWAP_MODE = EnumProperty( 
+        items=_OgreCommonExport_._axis_modes, 
+        name='swap axis',  
+        description='axis swapping mode', 
+        default='xz-y' 
+    )
+
     EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
     EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
     EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
@@ -5351,11 +5373,22 @@ def mesh_is_smooth( mesh ):
 class Bone(object):
     ''' EditBone
     ['__doc__', '__module__', '__slots__', 'align_orientation', 'align_roll', 'bbone_in', 'bbone_out', 'bbone_segments', 'bl_rna', 'envelope_distance', 'envelope_weight', 'head', 'head_radius', 'hide', 'hide_select', 'layers', 'lock', 'matrix', 'name', 'parent', 'rna_type', 'roll', 'select', 'select_head', 'select_tail', 'show_wire', 'tail', 'tail_radius', 'transform', 'use_connect', 'use_cyclic_offset', 'use_deform', 'use_envelope_multiply', 'use_inherit_rotation', 'use_inherit_scale', 'use_local_location']
-
     '''
 
     def __init__(self, matrix, pbone, skeleton):
-        self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+        if OPTIONS['SWAP_AXIS'] == 'xyz':
+            self.fixUpAxis = False
+
+        else:
+            self.fixUpAxis = True
+            if OPTIONS['SWAP_AXIS'] == '-xzy':      # Tundra1
+                self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+            elif OPTIONS['SWAP_AXIS'] == 'xz-y':    # Tundra2
+                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+            else:
+                print( 'ERROR: axis swap mode not supported with armature animation' )
+                assert 0
+
         #e = mathutils.Euler()
         #e.rotate_axis('Y', math.radians(90) )
         #self.flipMat *= e.to_matrix().to_4x4()
@@ -5370,7 +5403,6 @@ class Bone(object):
         #TODO test#if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
         self.parent = pbone.parent
         self.children = []
-        self.fixUpAxis = True
 
     def update(self):        # called on frame update
         pose =  self.bone.matrix.copy()
@@ -5384,6 +5416,8 @@ class Bone(object):
         elif self.fixUpAxis:
             #pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
             pose = self.flipMat * pose
+        else:
+            pass
 
         # get transformation values
         # translation relative to parent coordinate system orientation
@@ -5412,7 +5446,7 @@ class Bone(object):
     def compute_rest( self ):    # called after rebuild_tree, recursive roots to leaves
         if self.parent:
             inverseParentMatrix = self.parent.inverse_total_trans
-        elif (self.fixUpAxis):
+        elif self.fixUpAxis:
             inverseParentMatrix = self.flipMat
         else:
             inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))
@@ -5450,7 +5484,7 @@ class Skeleton(object):
         self.arm = arm = ob.find_armature()
         arm.hide = False
         self._restore_layers = list(arm.layers)
-        arm.layers = [True]*20      # can not have anything hidden - just to be sure
+        #arm.layers = [True]*20      # can not have anything hidden - REQUIRED?
         prev = bpy.context.scene.objects.active
         bpy.context.scene.objects.active = arm        # arm needs to be in edit mode to get to .edit_bones
         bpy.ops.object.mode_set(mode='OBJECT', toggle=False)

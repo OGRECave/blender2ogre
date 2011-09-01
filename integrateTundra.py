@@ -1,5 +1,6 @@
 # RUN: ./blender --python /path/to/integrateTundra.py
 import os, sys, socket, select
+import threading, time, subprocess, pickle
 
 PBUFFSIZE = 2048
 PREVIEW_PATH = '/tmp'
@@ -12,16 +13,12 @@ else:
 	CONFIG_TUNDRA = 'C:\\Tundra'
 	assert os.path.isdir( CONFIG_TUNDRA )
 
-# might need 1024 bytes to stream: camera, object transform, material updates
-
-
-sys.path.append( os.path.dirname(os.path.abspath(__file__)) )
 
 import bpy
-#sys.path.append( '~/blender2ogre' )
+
+sys.path.append( os.path.dirname(os.path.abspath(__file__)) )
 import blender2ogre as b2ogre
-#print( b2ogre )
-#b2ogre = bpy.ops.ogre
+
 print( b2ogre, dir(b2ogre) )
 b2ogre.register()
 
@@ -30,9 +27,16 @@ b2ogre.register()
 #	print( 'callback' )
 #bpy.app.handlers.render_pre.append( prerender )
 
-import threading, time, subprocess, pickle
 
 T = time.time()
+
+
+## compact tags ##
+class CompactByteCode(object): pass
+P = CompactByteCode()
+for i,tag in enumerate('name type transform data active materials'.split()):
+	TAGS[ tag ] = chr(i)		# up to 256
+
 
 def get_material_names( ob ):
 	r = []
