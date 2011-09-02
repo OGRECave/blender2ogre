@@ -6496,6 +6496,13 @@ class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
     filepath= StringProperty(name="File Path", description="Filepath used for exporting Tundra .txml file", maxlen=1024, default="/tmp/preview.txml", subtype='FILE_PATH')
     EXPORT_TYPE = 'REX'
 
+    EX_SWAP_MODE = EnumProperty( 
+        items=_OgreCommonExport_._axis_modes, 
+        name='swap axis',  
+        description='axis swapping mode', 
+        default='-xzy' 
+    )
+
     @classmethod
     def poll(cls, context):
         if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
