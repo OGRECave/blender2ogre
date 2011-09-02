@@ -33,153 +33,14 @@ VERSION = '0.5.3 TundraBlender'
 # options yet to be added to the config file
 OPTIONS = {
     'FORCE_IMAGE_FORMAT' : None,
-    'TEXTURES_SUBDIR' : False,
     'PATH' : '/tmp',    			# TODO SRombauts: use the CONFIG_TEMP_DIR variable
     'TOUCH_TEXTURES' : False,
     #'SWAP_AXIS' : 'xz-y',         # Tundra2 standard
     'SWAP_AXIS' : '-xzy',         # Tundra1 standard
+    #'SWAP_AXIS' : 'xyz'
 }
 
 
-
-__devnotes__ = '''
-
-## b2rex touches these, so keep the names! ##
-ogre_mesh_entity_helper = addon_ogreDotScene.INFO_OT_createOgreExport._node_export
-ogre_material_export = addon_ogreDotScene.INFO_OT_createOgreExport.gen_dot_material
-
-
-Jan 6th 2011 (Hart):
-    . updated for blender256
-    . fixed Nvidia DDS output
-    . add swap axis options
-
-March 18th (SRombauts):
-    . issue1: os.getlogin() unreliable; using getpass.getuser() instead
-    . issue5: speed optimization O(n^2) into O(n log n)
-
-March 20th (SRombauts):
-    . correction to bl_info
-    
-March 21th (SRombauts):
-    . Blender SVN compatibility : using bl_info for printing version when registering
-    . Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
-    . Blender SVN compatibility : registering the module is requiered in Blender SVN >2.56 to use operators
-    . Blender SVN compatibility : mathutils.Matrix format changed in Blender SVN >2.56
-
-March 25th (SRombauts):
-    . issue7: Need for an add-on config file with user preferences
-    . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
-    
-March 31th (SRombauts):
-    . Issue 14: DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
-    . 0.3.2 release
-
-April 3rd (SRombauts):
-    . Issue 9:  Blender script/addon name must be changed
-    . Issue 15: Use an appropriate path for the addon config file
-    . 0.3.3 release
-
-May 11th (Hart):
-    . small fixes
-
-May 12th (Hart):
-    . fixed ogre-export being forced to .txml
-    . fixed multi-track animation export, cleaned up doc, added examples.    
-
-May 16th (Hart):
-    . tested again in OgreMeshy under linux, fixed works again.
-    . really fixed multi-track animation
-    . confirmed that shape-animation is badly broken, needs redesign.
-
-June 2nd (Hart):
-    . mesh export speedup
-    . fixed shape animation export
-
-June 6th (Hart):
-    . fixed merge groups
-    . added OSX patch
-    . dot scene more conformant to spec
-    . closed several issues on the tracker
-    . fixed multiple materials on single mesh
-    . fixed uv textures
-
-June 7th (Hart):
-    . really fixed uvs
-    . fixed ubuntu (different naming for OgreXMLConverter when using apt-get ogre-tools)
-    . fixed Texture Panel and rotation animation option changed to use_from_dupli
-
-June 12th (Hart):
-    . fixed collision panel - if not ob.show_bounds: ob.show_bounds = True
-    . fixed sharp face normals
-    . fixed badverts
-    . supports library linking with name collisions
-
-June 18th (Hart):
-    . fixed usealpha line: 1959
-    . fixed floating bones
-    . changed default axis to x z -y
-    . fixed ogre_user_report not found if toolbar not enabled
-
-June 30th (Hart):
-    . Fixed Lamp export "color" to British "colour" - reported by Mohdakra
-    . New spotLightRange inner and outer options
-    . Fixed sharedGeometry vertexcount, compatible with jMonkeyEngine
-    . New Lamp option powerScale taken from Lamp energy
-    . OgreMeshy preview disabled when in mesh-edit mode.
-
-July 2nd (Hart):
-    . Fixed fog settings - reported by junode
-July 3rd (Hart):
-    . Fixed lamp direction - reported by Mohdakra
-July 22nd (Hart):
-    . Fixed (untested) 32bit indices - should be on submesh not sharedgeo
-July 25th (Hart):
-    . Improved memory and performance - replaced xml.dom.minidom with custom microdom
-
-July 26th (f00bar):
-    . mesh.xml is directly written to file [class SimpleSaxWriter() at end of script]
-    . material file name is derived from .scene file name (bpy.context.scene.name always returns "Scene" for me)
-    . [shape keys] bpy.context.scene.frame_current did not work (so all values were from current time), now using bpy.context.scene.frame_set(frame)
-    . [shape keys] poseindex: need to subtract 1, because shape 0 is base and not written to the file
-    . not writing an "index" on "pose" and "track", the index is for the case where "target" is "submesh"
-    . "use32bitindexes" : str(bool(numverts > 65535)) is used, that means it is set in cases not needed, but that way it needs no postprocessing of file
-    . ugly: function replaceInplace, using fileinput module to write number of vertices into file at end (could write into it without processing the whole file)
-
-July 27th (Hart):
-    . reviewed F00bar's changes
-    . replaced bpy.data.objects with bpy.context.scene.objects - and tested multiple scene export
-
-August 12th (f00bar):
-    . using (nx,ny,nz, r,g,b,ra, vert_uvs) to check if vertex must be duplicated.
-         - this is overkill, but it can be replaced when bmesh comes out
-    . hopefully fixed bug with deleted materials which blender returns as None
-    . small fixes (e.g. Report, being sure mesh.xml file is closed,...)
-
-August 13th (Hart):
-    . went back to axis swap "-x z y" - this is the Ogre default
-    . fixed swap axis for .txml output
-    . removed swap axis option - from now on its always Ogre default
-    . merged with f00bar's updates
-    . export armature and shape animation now respects FPS
-    . shape animation now respects bpy.context.scene.frame_step
-    . shadeless material sets emissive to 1.0
-
-August 31st (Hart):
-    . putting back axis swap
-    . fixed shadeless material sets emissive to diffuse color
-
-'''
-
-# to compare floats (e.g. to decide if vertex in two faces has similar normal, uvs, ... or if vertex must be duplicated)
-# tested by looking at normals of subdivided cube, errors in that example were up to 0.000000581
-EPSILON=0.000001
-
-# Hardcoded to Ogre Default #
-#def swap( vec ):
-#    if len(vec) == 3: return mathutils.Vector( [vec[0], vec[2], -vec[1]] )
-#    elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
-#    else: assert 0
 
 def swap(vec):
     if OPTIONS['SWAP_AXIS'] == 'xyz': return vec
@@ -196,6 +57,9 @@ def swap(vec):
         print( 'unknown swap axis mode', OPTIONS['SWAP_AXIS'] )
         assert 0
 
+
+
+#########################################################33
 _faq_ = '''
 
 Q: i have hundres of objects, is there a way i can merge them on export only?
@@ -398,6 +262,52 @@ material _missing_material_
 '''
 
 
+############# helper functions ##############
+
+def get_image_textures( mat ):
+    r = []
+    for s in mat.texture_slots:
+        if s and s.texture.type == 'IMAGE': r.append( s )
+    return r
+
+
+def indent( level, *args ):
+    if not args: return '\t' * level
+    else:
+        a = ''
+        for line in args:
+            a += '\t' * level
+            a += line
+            a += '\n'
+        return a
+
+def gather_instances():
+    instances = {}
+    for ob in bpy.context.scene.objects:
+        if ob.data and ob.data.users > 1:
+            if ob.data not in instances: instances[ ob.data ] = []
+            instances[ ob.data ].append( ob )
+    return instances
+
+def select_instances( context, name ):
+    for ob in bpy.context.scene.objects: ob.select = False
+    ob = bpy.context.scene.objects[ name ]
+    if ob.data:
+        inst = gather_instances()
+        for ob in inst[ ob.data ]: ob.select = True
+        bpy.context.scene.objects.active = ob
+
+
+def select_group( context, name, options={} ):
+    for ob in bpy.context.scene.objects: ob.select = False
+    for grp in bpy.data.groups:
+        if grp.name == name:
+            #context.scene.objects.active = grp.objects
+            #Note that the context is read-only. These values cannot be modified directly, though they may be changed by running API functions or by using the data API. So bpy.context.object = obj will raise an error. But bpy.context.scene.objects.active = obj will work as expected. - http://wiki.blender.org/index.php?title=Dev:2.5/Py/API/Intro&useskin=monobook
+            bpy.context.scene.objects.active = grp.objects[0]
+            for ob in grp.objects: ob.select = True
+        else: pass
+
 
 def get_objects_using_materials( mats ):
     obs = []
@@ -417,6 +327,9 @@ def get_materials_using_image( img ):
                 if mat not in mats: mats.append( mat )
     return mats
 
+
+
+###############################################
 class Ogre_relocate_textures_op(bpy.types.Operator):
     '''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
     bl_idname = "ogre.relocate_textures"  
@@ -1661,73 +1574,11 @@ def guess_uv_layer( layer ):
     if '.' in layer:
         a = layer.split('.')[-1]
         if a.isdigit(): idx = int(a)+1
-        else: print('warning: it is not allowed to give custom names to UVTexture channels ->', layer)
+        else: print('WARNING: it is not allowed to give custom names to UVTexture channels ->', layer)
     return idx
 
-class ShaderTree(object):
-    '''
-    Sometimes high resolution renderings may be required.  The user has the option of using multiple Output nodes, blender will only consider the first one, the second if named starting with 'ogre' will be used by the exporter.  This allows the user to have two branches in their node setup, one for blender software rendering, the other for Ogre output.  Also useful for baking procedurals, which then can be used by the ogre branch.
-    '''
-    @staticmethod
-    def valid_node_material( mat ):        # just incase the user enabled nodes but didn't do anything, then disabled nodes
-        if mat.node_tree and len(mat.node_tree.nodes):
-            for node in mat.node_tree.nodes:
-                if node.type == 'MATERIAL':
-                    if node.material: return True
 
-    Materials = []
-    Output = None
-    @staticmethod
-    def parse( mat ):        # only called for noded materials
-        print('        parsing node_tree')
-        ShaderTree.Materials = []
-        ShaderTree.Output = None
-        outputs = []
-        for link in mat.node_tree.links:
-            if link.to_node and link.to_node.type == 'OUTPUT': outputs.append( link )
-
-        root = None
-        for link in outputs:
-            if root is None or link.to_node.name.lower().startswith('ogre'): root = link
-        if root:
-            ShaderTree.Output = root.to_node
-            print('setting Output node', root.to_node)
-            #tree = ShaderTree( root.from_node, mat )
-            #tree.parents.append( root.to_node )
-            tree = ShaderTree( node=root.to_node, parent_material=mat )
-            return tree
-        else:
-            print('warning: no Output shader node found')
-
-    def __init__(self, node=None, material=None, parent_material=None ):
-        if node: print('        shader node ->', node)
-        if node and node.type.startswith('MATERIAL'):
-            ShaderTree.Materials.append( self )
-            self.material = node.material
-        elif material:        # standard material
-            self.material = material
-            self.textures = []
-
-        self.node = node
-        if node:
-            self.type = node.type
-            self.name = node.name
-        self.children = []
-        self.parents = []
-        self.inputs = {}        # socket name : child
-        self.outputs = {}    # parent : socket name
-        if parent_material:
-            for link in parent_material.node_tree.links:
-                if link.to_node and link.to_node.name == self.name:
-                    branch = ShaderTree(
-                        node=link.from_node, 
-                        parent_material=parent_material
-                    )
-                    self.children.append( branch )
-                    self.inputs[ link.to_socket.name ] = branch
-                    branch.outputs[ self ] = link.from_socket.name
-                    branch.parents.append( self )
-
+class _MatNodes_(object):       # Material Node methods
     def ancestors(self):
         if not self.parents: return []
         else: c = []; self._ancestors(c); return c
@@ -1798,6 +1649,74 @@ class ShaderTree(object):
 
         return M
 
+
+
+class ShaderTree( _MatNodes_ ):
+
+    Materials = []
+    Output = None
+
+
+    @staticmethod
+    def is_valid_node_material( mat ):  # just incase the user enabled nodes but didn't do anything, then disabled nodes
+        if mat.node_tree and len(mat.node_tree.nodes):
+            for node in mat.node_tree.nodes:
+                if node.type == 'MATERIAL':
+                    if node.material: return True
+
+
+    @staticmethod
+    def parse( mat ):        # only called for noded materials
+        print('        parsing node_tree')
+        ShaderTree.Materials = []
+        ShaderTree.Output = None
+        outputs = []
+        for link in mat.node_tree.links:
+            if link.to_node and link.to_node.type == 'OUTPUT': outputs.append( link )
+
+        root = None
+        for link in outputs:
+            if root is None or link.to_node.name.lower().startswith('ogre'): root = link
+        if root:
+            ShaderTree.Output = root.to_node
+            print('setting Output node', root.to_node)
+            #tree = ShaderTree( root.from_node, mat )
+            #tree.parents.append( root.to_node )
+            tree = ShaderTree( node=root.to_node, parent_material=mat )
+            return tree
+        else:
+            print('warning: no Output shader node found')
+
+    def __init__(self, node=None, material=None, parent_material=None ):
+        if node: print('        shader node ->', node)
+        if node and node.type.startswith('MATERIAL'):
+            ShaderTree.Materials.append( self )
+            self.material = node.material
+        elif material:        # standard material
+            self.material = material
+            self.textures = []
+
+        self.node = node
+        if node:
+            self.type = node.type
+            self.name = node.name
+        self.children = []
+        self.parents = []
+        self.inputs = {}        # socket name : child
+        self.outputs = {}    # parent : socket name
+        if parent_material:
+            for link in parent_material.node_tree.links:
+                if link.to_node and link.to_node.name == self.name:
+                    branch = ShaderTree(
+                        node=link.from_node, 
+                        parent_material=parent_material
+                    )
+                    self.children.append( branch )
+                    self.inputs[ link.to_socket.name ] = branch
+                    branch.outputs[ self ] = link.from_socket.name
+                    branch.parents.append( self )
+
+
     def dotmat_texture(self, texture, texwrapper=None, slot=None):
         if not hasattr(texture, 'image'):
             print('WARNING: texture must be of type IMAGE->', texture)
@@ -1834,13 +1753,14 @@ class ShaderTree(object):
             else:
                 print('MESSAGE: packed image already in temp, not updating', iurl)
 
-        if OPTIONS['FORCE_IMAGE_FORMAT']: postname = self._reformat( texname )        #texname.split('.')[0]+'.dds'
-        if OPTIONS['TEXTURES_SUBDIR']:
-            destpath = os.path.join(path,'textures')
-            if not os.path.isdir( destpath ): os.mkdir( destpath )
-            M += indent(4, 'texture textures/%s' %postname )    
-        else: 
-            M += indent(4, 'texture %s' %postname )    
+        if OPTIONS['FORCE_IMAGE_FORMAT']:
+            postname = self._reformat( texname )        #texname.split('.')[0]+'.dds'
+        #if OPTIONS['TEXTURES_SUBDIR']:
+        #    destpath = os.path.join(path,'textures')
+        #    if not os.path.isdir( destpath ): os.mkdir( destpath )
+        #    M += indent(4, 'texture textures/%s' %postname )    
+        #else: 
+        M += indent(4, 'texture %s' %postname )    
 
         exmode = texture.extension
         if exmode == 'REPEAT':
@@ -1958,6 +1878,9 @@ class ShaderTree(object):
         ## textures ##
         if not self.textures:        ## class style materials
             slots = get_image_textures( mat )        # returns texture_slot object
+            print('*'*80)
+            print('TEXTURE SLOTS', slots)
+            print('*'*80)
             usealpha = False
             for slot in slots:
                 if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
@@ -4594,7 +4517,7 @@ class _OgreCommonExport_( _TXML_ ):
         OPTIONS['PATH'] = path
         M = ''
         #if mat.node_tree and len(mat.node_tree.nodes):
-        if ShaderTree.valid_node_material( mat ):
+        if ShaderTree.is_valid_node_material( mat ):
             print('        NODES MATERIAL')
             tree = ShaderTree.parse( mat )
             passes = tree.get_passes()
@@ -5385,15 +5308,12 @@ class Bone(object):
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
             elif OPTIONS['SWAP_AXIS'] == 'xz-y':    # Tundra2
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+            elif OPTIONS['SWAP_AXIS'] == 'TODO':    # no swap - fix up axis
+                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,-1,0),(0,0,0,1)))
             else:
                 print( 'ERROR: axis swap mode not supported with armature animation' )
                 assert 0
 
-        #e = mathutils.Euler()
-        #e.rotate_axis('Y', math.radians(90) )
-        #self.flipMat *= e.to_matrix().to_4x4()
-
-        print( self.flipMat )
         self.skeleton = skeleton
         self.name = pbone.name
         #self.matrix = self.flipMat * matrix
@@ -5695,55 +5615,6 @@ class Skeleton(object):
 
 
 
-
-
-def get_image_textures( mat ):
-    r = []
-    for s in mat.texture_slots:
-        if s and s.texture.type == 'IMAGE': r.append( s )
-    return r
-
-
-def indent( level, *args ):
-    if not args: return '\t' * level
-    else:
-        a = ''
-        for line in args:
-            a += '\t' * level
-            a += line
-            a += '\n'
-
-        return a
-
-############ extra tools ##############
-
-
-def gather_instances():
-    instances = {}
-    for ob in bpy.context.scene.objects:
-        if ob.data and ob.data.users > 1:
-            if ob.data not in instances: instances[ ob.data ] = []
-            instances[ ob.data ].append( ob )
-    return instances
-
-def select_instances( context, name ):
-    for ob in bpy.context.scene.objects: ob.select = False
-    ob = bpy.context.scene.objects[ name ]
-    if ob.data:
-        inst = gather_instances()
-        for ob in inst[ ob.data ]: ob.select = True
-        bpy.context.scene.objects.active = ob
-
-
-def select_group( context, name, options={} ):
-    for ob in bpy.context.scene.objects: ob.select = False
-    for grp in bpy.data.groups:
-        if grp.name == name:
-            #context.scene.objects.active = grp.objects
-            #Note that the context is read-only. These values cannot be modified directly, though they may be changed by running API functions or by using the data API. So bpy.context.object = obj will raise an error. But bpy.context.scene.objects.active = obj will work as expected. - http://wiki.blender.org/index.php?title=Dev:2.5/Py/API/Intro&useskin=monobook
-            bpy.context.scene.objects.active = grp.objects[0]
-            for ob in grp.objects: ob.select = True
-        else: pass
 
 class INFO_MT_instances(bpy.types.Menu):
     bl_label = "Instances"
@@ -6225,13 +6096,7 @@ class VertexNoPos(object):
                 if uv1 != uv2: return False
         return True
 
-'''
-        return abs(self.nx - o.nx) < EPSILON and abs(self.ny - o.ny) < EPSILON and abs(self.nz - o.nz) < EPSILON and abs(self.r - o.r) < EPSILON \
-                and abs(self.g - o.g) < EPSILON and abs(self.b - o.b) < EPSILON and abs(self.ra - o.ra) < EPSILON \
-                and ( self.vert_uvs == o.vert_uvs or ( \
-                abs(self.vert_uvs[0][0] - o.vert_uvs[0][0]) < EPSILON and abs(self.vert_uvs[0][1] - o.vert_uvs[0][1]) < EPSILON \
-                and abs(self.vert_uvs[1][0] - o.vert_uvs[1][0]) < EPSILON and abs(self.vert_uvs[1][1] - o.vert_uvs[1][1]) < EPSILON ) )
-'''
+
 
 #######################################################################################
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
@@ -6931,4 +6796,135 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_x' )
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
+
+
+
+__devnotes__ = '''
+
+## b2rex touches these, so keep the names! ##
+ogre_mesh_entity_helper = addon_ogreDotScene.INFO_OT_createOgreExport._node_export
+ogre_material_export = addon_ogreDotScene.INFO_OT_createOgreExport.gen_dot_material
+
+
+Jan 6th 2011 (Hart):
+    . updated for blender256
+    . fixed Nvidia DDS output
+    . add swap axis options
+
+March 18th (SRombauts):
+    . issue1: os.getlogin() unreliable; using getpass.getuser() instead
+    . issue5: speed optimization O(n^2) into O(n log n)
+
+March 20th (SRombauts):
+    . correction to bl_info
+    
+March 21th (SRombauts):
+    . Blender SVN compatibility : using bl_info for printing version when registering
+    . Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
+    . Blender SVN compatibility : registering the module is requiered in Blender SVN >2.56 to use operators
+    . Blender SVN compatibility : mathutils.Matrix format changed in Blender SVN >2.56
+
+March 25th (SRombauts):
+    . issue7: Need for an add-on config file with user preferences
+    . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
+    
+March 31th (SRombauts):
+    . Issue 14: DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
+    . 0.3.2 release
+
+April 3rd (SRombauts):
+    . Issue 9:  Blender script/addon name must be changed
+    . Issue 15: Use an appropriate path for the addon config file
+    . 0.3.3 release
+
+May 11th (Hart):
+    . small fixes
+
+May 12th (Hart):
+    . fixed ogre-export being forced to .txml
+    . fixed multi-track animation export, cleaned up doc, added examples.    
+
+May 16th (Hart):
+    . tested again in OgreMeshy under linux, fixed works again.
+    . really fixed multi-track animation
+    . confirmed that shape-animation is badly broken, needs redesign.
+
+June 2nd (Hart):
+    . mesh export speedup
+    . fixed shape animation export
+
+June 6th (Hart):
+    . fixed merge groups
+    . added OSX patch
+    . dot scene more conformant to spec
+    . closed several issues on the tracker
+    . fixed multiple materials on single mesh
+    . fixed uv textures
+
+June 7th (Hart):
+    . really fixed uvs
+    . fixed ubuntu (different naming for OgreXMLConverter when using apt-get ogre-tools)
+    . fixed Texture Panel and rotation animation option changed to use_from_dupli
+
+June 12th (Hart):
+    . fixed collision panel - if not ob.show_bounds: ob.show_bounds = True
+    . fixed sharp face normals
+    . fixed badverts
+    . supports library linking with name collisions
+
+June 18th (Hart):
+    . fixed usealpha line: 1959
+    . fixed floating bones
+    . changed default axis to x z -y
+    . fixed ogre_user_report not found if toolbar not enabled
+
+June 30th (Hart):
+    . Fixed Lamp export "color" to British "colour" - reported by Mohdakra
+    . New spotLightRange inner and outer options
+    . Fixed sharedGeometry vertexcount, compatible with jMonkeyEngine
+    . New Lamp option powerScale taken from Lamp energy
+    . OgreMeshy preview disabled when in mesh-edit mode.
+
+July 2nd (Hart):
+    . Fixed fog settings - reported by junode
+July 3rd (Hart):
+    . Fixed lamp direction - reported by Mohdakra
+July 22nd (Hart):
+    . Fixed (untested) 32bit indices - should be on submesh not sharedgeo
+July 25th (Hart):
+    . Improved memory and performance - replaced xml.dom.minidom with custom microdom
+
+July 26th (f00bar):
+    . mesh.xml is directly written to file [class SimpleSaxWriter() at end of script]
+    . material file name is derived from .scene file name (bpy.context.scene.name always returns "Scene" for me)
+    . [shape keys] bpy.context.scene.frame_current did not work (so all values were from current time), now using bpy.context.scene.frame_set(frame)
+    . [shape keys] poseindex: need to subtract 1, because shape 0 is base and not written to the file
+    . not writing an "index" on "pose" and "track", the index is for the case where "target" is "submesh"
+    . "use32bitindexes" : str(bool(numverts > 65535)) is used, that means it is set in cases not needed, but that way it needs no postprocessing of file
+    . ugly: function replaceInplace, using fileinput module to write number of vertices into file at end (could write into it without processing the whole file)
+
+July 27th (Hart):
+    . reviewed F00bar's changes
+    . replaced bpy.data.objects with bpy.context.scene.objects - and tested multiple scene export
+
+August 12th (f00bar):
+    . using (nx,ny,nz, r,g,b,ra, vert_uvs) to check if vertex must be duplicated.
+         - this is overkill, but it can be replaced when bmesh comes out
+    . hopefully fixed bug with deleted materials which blender returns as None
+    . small fixes (e.g. Report, being sure mesh.xml file is closed,...)
+
+August 13th (Hart):
+    . went back to axis swap "-x z y" - this is the Ogre default
+    . fixed swap axis for .txml output
+    . removed swap axis option - from now on its always Ogre default
+    . merged with f00bar's updates
+    . export armature and shape animation now respects FPS
+    . shape animation now respects bpy.context.scene.frame_step
+    . shadeless material sets emissive to 1.0
+
+August 31st (Hart):
+    . putting back axis swap
+    . fixed shadeless material sets emissive to diffuse color
+
+'''
 
