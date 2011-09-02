@@ -1157,23 +1157,25 @@ class _WrapLogic(object):
         g.setAttribute('name', self.name)
         g.setAttribute('type', self.type)
 
-        for name in self.TYPES[ self.type ]:
-            attr = getattr( self.node, name )
-            if name in self.SwapName: name = self.SwapName[name]
-            a = doc.createElement( 'component' )
-            g.appendChild(a)
-            a.setAttribute('name', name)
-            if attr is None: a.setAttribute('type', 'POINTER' )
-            else: a.setAttribute('type', type(attr).__name__)
+        if self.type in self.TYPES:
+            for name in self.TYPES[ self.type ]:
+                attr = getattr( self.node, name )
+                if name in self.SwapName: name = self.SwapName[name]
+                a = doc.createElement( 'component' )
+                g.appendChild(a)
+                a.setAttribute('name', name)
+                if attr is None: a.setAttribute('type', 'POINTER' )
+                else: a.setAttribute('type', type(attr).__name__)
 
-            if type(attr) in (float, int, str, bool): a.setAttribute('value', str(attr))
-            elif not attr: a.setAttribute('value', '')        # None case
-            elif hasattr(attr,'filepath'): a.setAttribute('value', attr.filepath)
-            elif hasattr(attr,'name'): a.setAttribute('value', attr.name)
-            elif hasattr(attr,'x') and hasattr(attr,'y') and hasattr(attr,'z'):
-                a.setAttribute('value', '%s %s %s' %(attr.x, attr.y, attr.z))
-            else:
-                print('ERROR: unknown type', attr)
+                if type(attr) in (float, int, str, bool): a.setAttribute('value', str(attr))
+                elif not attr: a.setAttribute('value', '')        # None case
+                elif hasattr(attr,'filepath'): a.setAttribute('value', attr.filepath)
+                elif hasattr(attr,'name'): a.setAttribute('value', attr.name)
+                elif hasattr(attr,'x') and hasattr(attr,'y') and hasattr(attr,'z'):
+                    a.setAttribute('value', '%s %s %s' %(attr.x, attr.y, attr.z))
+                else:
+                    print('ERROR: unknown type', attr)
+
         return g
 
 class WrapSensor( _WrapLogic ):
