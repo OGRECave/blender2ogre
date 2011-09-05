@@ -716,29 +716,31 @@ class Ogre_update_mod_time(bpy.types.Operator):
         ob['_version_'] += 1
         return {'FINISHED'}
 
-class Ogre_toggle_collision(bpy.types.Operator):
-    '''enables collision'''  
-    bl_idname = "ogre.toggle_collision"  
+class OgreCollisionOp(bpy.types.Operator):
+    '''ogre collision'''  
+    bl_idname = "ogre.set_collision"  
     bl_label = "modify collision"
     bl_options = {'REGISTER'}
 
     MODE = StringProperty(name="toggle mode", description="...", maxlen=32, default="disable")
 
     @classmethod
-    def poll(cls, context): return True
+    def poll(cls, context):
+        if context.active_object and context.active_object.type == 'MESH': return True
+
     def invoke(self, context, event):
         ob = context.active_object
         game = ob.game
 
-        colchild = None
+        proxy = None
         for child in ob.children:
-            if child.name.startswith('collision'): colchild = child; break
+            if child.name.startswith('collision'): proxy = child; break
 
-        if self.MODE != 'disable' and not colchild:
+        if self.MODE != 'disable' and not proxy:    # create new proxy and hide it
             parent = context.active_object
             child = parent.copy()
             bpy.context.scene.objects.link( child )
-            child.name = 'collision'
+            child.name = 'collision.%s' %parent.name
             child.matrix_local = mathutils.Matrix()
             child.parent = parent
             child.hide_select = True
@@ -747,55 +749,72 @@ class Ogre_toggle_collision(bpy.types.Operator):
             child.lock_location = [True]*3
             child.lock_rotation = [True]*3
             child.lock_scale = [True]*3
-            colchild = child
+            proxy = child
 
         decmod = None
-        if colchild:
-            for mod in colchild.modifiers:
+        if proxy:
+            for mod in proxy.modifiers:
                 if mod.type == 'DECIMATE': decmod = mod; break
             if not decmod:
-                decmod = colchild.modifiers.new('LOD', type='DECIMATE')
+                decmod = proxy.modifiers.new('LOD', type='DECIMATE')
                 decmod.ratio = 0.5
-
 
         if self.MODE == 'disable':
             game.use_ghost = True
             if ob.show_bounds: ob.show_bounds = False
             if ob.show_wire: ob.show_wire = False
-            if colchild and not colchild.hide: colchild.hide = True
-
-        elif self.MODE.startswith('primitive'):
-            game.use_ghost = False
-            game.use_collision_bounds = True
-            colchild.hide = False
-            if colchild and not colchild.hide: colchild.hide = True
-            btype = self.MODE.split(':')[-1]
-            game.collision_bounds_type = btype
-            if btype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
-                if not ob.show_bounds: ob.show_bounds = True
-                if ob.draw_bounds_type != btype: ob.draw_bounds_type = btype
-                if ob.show_wire: ob.show_wire = False
-            elif btype == 'TRIANGLE_MESH':
-                if ob.show_bounds: ob.show_bounds = False
-                if not ob.show_wire: ob.show_wire = True
-                ob.draw_bounds_type = 'POLYHEDRON'    #whats this?
-            else: game.collision_bounds_type = 'BOX'
-
-        elif self.MODE == 'proxy':
-            decmod.show_viewport = True
-            game.use_ghost = False
+            if proxy and not proxy.hide: proxy.hide = True
             game.use_collision_bounds = False
 
-            if ob.show_bounds: ob.show_bounds = False
-            if ob.show_wire: ob.show_wire = False
+        else:
+            btype = self.MODE.split(':')[-1]
+            game.use_ghost = False
+            game.use_collision_bounds = True
+            print( 'setting', btype)
+            game.collision_bounds_type = btype
+            print( game.collision_bounds_type )
 
-            if colchild.hide: colchild.hide = False
-            if not colchild.select:
-                colchild.hide_select = False
-                colchild.select = True
-                colchild.hide_select = True
+            if self.MODE.startswith( 'proxy' ):        # decimated proxy
+                game.use_collision_compound = True  # proxy
 
+                ob.data.show_all_edges = False
+                ob.show_texture_space = False
 
+                if proxy.hide: proxy.hide = False
+                decmod.show_viewport = True
+
+                if ob.show_bounds: ob.show_bounds = False
+                if ob.show_wire: ob.show_wire = False
+
+                if not proxy.select:    # ugly (but works)
+                    proxy.hide_select = False
+                    proxy.select = True
+                    proxy.hide_select = True
+
+            elif self.MODE.startswith( 'direct' ):      # directly use mesh as collision or primitive
+                game.use_collision_compound = False     # direct
+
+                if proxy and not proxy.hide: proxy.hide = True
+                if not ob.show_bounds: ob.show_bounds = True
+
+                if btype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
+                    if ob.show_wire: ob.show_wire = False
+                    if ob.draw_bounds_type != btype: ob.draw_bounds_type = btype
+                    ob.show_texture_space = False
+
+                elif btype == 'CONVEX_HULL':
+                    if not ob.show_wire: ob.show_wire = True
+                    ob.draw_bounds_type = 'POLYHEDRON'
+                    ob.data.show_all_edges = False
+                    ob.show_texture_space = True
+
+                elif btype == 'TRIANGLE_MESH':
+                    if not ob.show_wire: ob.show_wire = True
+                    ob.draw_bounds_type = 'POLYHEDRON'
+                    ob.data.show_all_edges = True
+                    ob.show_texture_space = False
+
+                else: assert 0
 
         return {'FINISHED'}
 
@@ -815,58 +834,59 @@ class Ogre_Physics_LOD(bpy.types.Panel):
         layout = self.layout
         ob = context.active_object
         if ob.type != 'MESH': return
-        game = ob.game
-
-        if ob.name.startswith('collision'):
+        elif ob.name.startswith('collision'):
             box = layout.box()
             if ob.parent:
                 box.label(text='object is a collision proxy for: %s' %ob.parent.name)
             else:
                 box.label(text='WARNING: collision proxy missing parent')
+            return
 
-        else:   # valid parent
+
+        #####################
+        game = ob.game
+        if not game.use_collision_bounds:
             box = layout.box()
-            if not game.use_ghost:  # HAS collision
-                op = box.operator( 'ogre.toggle_collision', text='Disable' )
+            op = box.operator( 'ogre.set_collision', text='Enable Collision' )
+            op.MODE = 'direct:%s' %game.collision_bounds_type
+        else:
+            if not game.use_ghost:  # has collision
+                box = layout.box()
+                op = box.operator( 'ogre.set_collision', text='Disable Collision' )
                 op.MODE = 'disable'
+                box.prop(game, "collision_margin", text="Collision Margin", slider=True)
 
-                if not game.use_collision_bounds:
-                    box = layout.box()
-                    colchild = None
-                    for child in ob.children:
-                        if child.name.startswith('collision'): colchild = child; break
-                    if colchild:
-                        decmod = None
-                        for mod in colchild.modifiers:
-                            if mod.type == 'DECIMATE': decmod = mod; break
-                        if decmod:
-                            box.prop( decmod, 'ratio', 'vertex reduction ratio' )
-                            box.label(text='faces: %s' %decmod.face_count )
-                    else:
-                        op = box.operator( 'ogre.toggle_collision', text='Enable Proxy' )
-                        op.MODE = 'proxy'
-                        op = box.operator( 'ogre.toggle_collision', text='Enable Primitive' )
-                        op.MODE = 'primitive:%s' %game.collision_bounds_type
+            box = layout.box()
+            for btype in 'BOX SPHERE CYLINDER CONE CAPSULE TRIANGLE_MESH CONVEX_HULL'.split():
+                if game.collision_bounds_type == btype and not game.use_collision_compound and not game.use_ghost:
+                    op = box.operator( 'ogre.set_collision', text=btype, icon='X' )
+                    op.MODE = 'direct:%s' %btype
+                else:
+                    op = box.operator( 'ogre.set_collision', text=btype )
+                    op.MODE = 'direct:%s' %btype
 
-                elif game.use_collision_bounds:
-                    box = layout.box()
-                    box.prop(game, "collision_margin", text="Collision Margin", slider=True)
-                    for btype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
-                        if game.collision_bounds_type == btype:
-                            box.label(text='<%s>' %btype )
-                        else:
-                            op = box.operator( 'ogre.toggle_collision', text=btype )
-                            op.MODE = 'primitive:%s' %btype
+            box = layout.box()
+            for btype in 'TRIANGLE_MESH CONVEX_HULL'.split():
+                if game.collision_bounds_type == btype and game.use_collision_compound and not game.use_ghost:
+                    op = box.operator( 'ogre.set_collision', text=btype+' (proxy)', icon='X' )
+                    op.MODE = 'proxy:%s' %btype
+                else:
+                    op = box.operator( 'ogre.set_collision', text=btype+' (proxy)' )
+                    op.MODE = 'proxy:%s' %btype
 
 
-            else:   # NO collision
-
-                op = box.operator( 'ogre.toggle_collision', text='Enable Proxy' )
-                op.MODE = 'proxy'
-                op = box.operator( 'ogre.toggle_collision', text='Enable Primitive' )
-                op.MODE = 'primitive:%s' %game.collision_bounds_type
-
-
+            if game.use_collision_compound:
+                box = layout.box()
+                proxy = None
+                for child in ob.children:
+                    if child.name.startswith('collision'): proxy = child; break
+                if proxy:
+                    decmod = None
+                    for mod in proxy.modifiers:
+                        if mod.type == 'DECIMATE': decmod = mod; break
+                    if decmod:
+                        box.prop( decmod, 'ratio', 'vertex reduction ratio' )
+                        box.label(text='faces: %s' %decmod.face_count )
 
 
 
@@ -6562,7 +6582,7 @@ class INFO_HT_myheader(bpy.types.Header):
         if rd.use_game_engine: sub.menu("INFO_MT_game")
         else: sub.menu("INFO_MT_render")
 
-        row = layout.row(align=True); row.scale_x=1.5
+        row = layout.row(align=True)
         row.menu("INFO_MT_instances", icon='NODETREE')
         row.menu("INFO_MT_groups", icon='GROUP')
         #row.menu("INFO_MT_actors", icon='GAME')        # not useful?
