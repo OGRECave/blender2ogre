@@ -767,6 +767,9 @@ class OgreCollisionOp(bpy.types.Operator):
             game.use_collision_bounds = False
 
         else:
+            if game.physics_type not in 'RIGID_BODY SENSOR'.split():
+                game.physics_type = 'SENSOR'
+
             btype = self.MODE.split(':')[-1]
             game.use_ghost = False
             game.use_collision_bounds = True
@@ -4242,27 +4245,52 @@ class _TXML_(object):
 
 
         ## any object can have physics ##
-        if ob.game.physics_type == 'RIGID_BODY':
+        #if ob.game.physics_type == 'RIGID_BODY':
+        if not ob.game.use_ghost and ob.game.physics_type in 'RIGID_BODY SENSOR'.split():
+            TundraTypes = {
+                'BOX' : 0,
+                'SPHERE' : 1,
+                'CYLINDER' : 2,
+                'CONE' : 0,    # tundra is missing
+                'CAPSULE' : 3,
+                'TRIANGLE_MESH' : 4,
+                #'HEIGHT_FIELD': 5, #blender is missing
+                'CONVEX_HULL' : 6
+            }
+
+
             com = doc.createElement('component'); e.appendChild( com )
             com.setAttribute('type', 'EC_RigidBody')
             com.setAttribute('sync', '1')
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Mass')
-            a.setAttribute('value', ob.game.mass)
+            if ob.game.physics_type == 'RIGID_BODY':
+                a.setAttribute('value', ob.game.mass)
+            else:
+                a.setAttribute('value', '0.0')
+
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Shape type')
-            a.setAttribute('value', 0)
+            a.setAttribute('value', TundraTypes[ ob.game.collision_bounds_type ] )
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Size')
-            x,z,y = ob.matrix_world.to_scale()
+            x,y,z = swap(ob.matrix_world.to_scale())
             a.setAttribute('value', '%s %s %s' %(abs(x),abs(y),abs(z)) )
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Collision mesh ref')
-            a.setAttribute('value', '')
+            if ob.game.use_collision_compound:
+                box = layout.box()
+                proxy = None
+                for child in ob.children:
+                    if child.name.startswith('collision'): proxy = child; break
+                if proxy:
+                    a.setAttribute('value', 'local://%s.mesh' %proxy.data.name)
+            elif ob.type == 'MESH':
+                a.setAttribute('value', 'local://%s.mesh' %ob.data.name)
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Friction')
@@ -4301,7 +4329,7 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Draw Debug')
-            a.setAttribute('value', 'false' )
+            a.setAttribute('value', 'true' )
 
 
             a = doc.createElement('attribute'); com.appendChild( a )
