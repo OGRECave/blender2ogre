@@ -18,7 +18,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
-    "version": (0,5,3),
+    "version": (0,5,4),
     "blender": (2,5,9),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -27,17 +27,23 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.3 TundraBlender'
+VERSION = '0.5.4 Dev1'
 
+## Options ##
+AXIS_MODES =  [
+    ('xyz', 'xyz', 'no swapping'),
+    ('xz-y', 'xz-y', 'ogre standard'),
+    ('-xzy', '-xzy', 'non standard'),
+]
 
 # options yet to be added to the config file
 OPTIONS = {
+    'EX_ONLY_ANIMATED_BONES' : False,
     'FORCE_IMAGE_FORMAT' : None,
     'PATH' : '/tmp',    			# TODO SRombauts: use the CONFIG_TEMP_DIR variable
     'TOUCH_TEXTURES' : False,
-    #'SWAP_AXIS' : 'xz-y',         # Tundra2 standard
-    'SWAP_AXIS' : '-xzy',         # Tundra1 standard
-    #'SWAP_AXIS' : 'xyz'
+    'SWAP_AXIS' : 'xz-y',         # Tundra2 standard
+    #'SWAP_AXIS' : '-xzy',         # Tundra1 standard
 }
 
 
@@ -4421,13 +4427,7 @@ class _OgreCommonExport_( _TXML_ ):
         return {'RUNNING_MODAL'}
     def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
-    ## Options ##
-    _axis_modes =  [
-        ('xz-y', 'xz-y', 'ogre standard'),
-        ('xyz', 'xyz', 'no swapping'),
-        ('-xzy', '-xzy', 'old default'),
-        ('xzy', 'xzy', 'swap y and z'),
-    ]
+
 
     _image_formats =  [
         ('','do not convert', 'default'),
@@ -4439,6 +4439,10 @@ class _OgreCommonExport_( _TXML_ ):
 
     filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
     #EXPORT_TYPE = 'OGRE'   # defined in subclass
+    EX_ONLY_ANIMATED_BONES = BoolProperty(
+        name="Only Animated Bones", 
+        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
+        default=False)
 
     EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
     EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
@@ -4562,6 +4566,7 @@ class _OgreCommonExport_( _TXML_ ):
         OPTIONS['FORCE_IMAGE_FORMAT'] = None
         OPTIONS['TOUCH_TEXTURES'] = True
         OPTIONS['SWAP_AXIS'] = self.EX_SWAP_MODE
+        OPTIONS['ONLY_ANIMATED_BONES'] = self.EX_ONLY_ANIMATED_BONES
         Report.reset()
 
         ShaderTree.EX_DDS_MIPS = self.EX_DDS_MIPS
@@ -4968,7 +4973,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     EXPORT_TYPE = 'OGRE'
 
     EX_SWAP_MODE = EnumProperty( 
-        items=_OgreCommonExport_._axis_modes, 
+        items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
         default='-xzy' 
@@ -5013,7 +5018,7 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_ ):
     EXPORT_TYPE = 'REX'
 
     EX_SWAP_MODE = EnumProperty( 
-        items=_OgreCommonExport_._axis_modes, 
+        items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
         default='xz-y' 
@@ -5310,8 +5315,6 @@ class Bone(object):
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
             elif OPTIONS['SWAP_AXIS'] == 'xz-y':    # Tundra2
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
-            elif OPTIONS['SWAP_AXIS'] == 'TODO':    # no swap - fix up axis
-                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,-1,0),(0,0,0,1)))
             else:
                 print( 'ERROR: axis swap mode not supported with armature animation' )
                 assert 0
@@ -5560,10 +5563,15 @@ class Skeleton(object):
                     ## the exporter will not be smart enough to know which bones are active for a given track...
                     ## can hijack blender NLA, user sets a single keyframe for only selected bones, and keys last frame
                     stripbones = []
-                    for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
-                        if group.name in arm.pose.bones: stripbones.append( group.name )
-                    if not stripbones:                                    # otherwise we use all bones
-                        for bone in arm.pose.bones: stripbones.append( bone.name )
+                    if OPTIONS['EX_ONLY_ANIMATED_BONES']:
+                        for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
+                            if group.name in arm.pose.bones: stripbones.append( group.name )
+
+                        if not stripbones:                                    # otherwise we use all bones
+                            stripbones = [ bone.name for bone in arm.pose.bones ]
+                    else:
+                        stripbones = [ bone.name for bone in arm.pose.bones ]
+
                     print('NLA-strip:',  nla.name)
                     _keyframes = {}
                     for bonename in stripbones:
@@ -6499,7 +6507,7 @@ class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
     EXPORT_TYPE = 'REX'
 
     EX_SWAP_MODE = EnumProperty( 
-        items=_OgreCommonExport_._axis_modes, 
+        items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
         default='-xzy' 
