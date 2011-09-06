@@ -1596,8 +1596,19 @@ class Ogre_Texture_Panel(bpy.types.Panel):
         #for param in TextureUnitAnimOps[ 'scroll_anim' ]:
         #    box.prop( node.texture, '["%s"]' % param, text='' )
 
+def find_uv_layer_index( material, uvname ):
+    idx = 0
+    for mesh in bpy.data.meshes:
+        if material.name in mesh.materials:
+            if mesh.uv_textures:
+                names = [ uv.name for uv in mesh.uv_textures ]
+                if uvname in names:
+                    idx = names.index( uvname )
+                    break   # should we check all objects using material and enforce the same index?
+    return idx
 
-def guess_uv_layer( layer ):
+
+def guess_uv_layer( layer ):    # DEPRECATED - this fails because the users will often change the UV name
     ## small issue: in blender layer is a string, multiple objects may have the same material assigned, 
     ## but having different named UVTex slots, most often the user will never rename these so they get
     ## named UVTex.000 etc...   assume this to always be true.
@@ -1831,7 +1842,8 @@ class ShaderTree( _MatNodes_ ):
 
             ## set uv layer
             if slot.uv_layer:
-                idx = guess_uv_layer( slot.uv_layer )
+                idx = find_uv_layer_index( self.material, slot.uv_layer )
+                #idx = guess_uv_layer( slot.uv_layer )
                 M += indent(4, 'tex_coord_set %s' %idx)
 
             rgba = False
@@ -4165,6 +4177,7 @@ class _TXML_(object):
 
     ########################################
     def tundra_entity( self, doc, ob ):
+        assert not ob.name.startswith('collision')
         # txml has flat hierarchy
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
@@ -4187,12 +4200,12 @@ class _TXML_(object):
         c.setAttribute('sync', '1')
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Transform" )
-        x,z,y = ob.matrix_world.to_translation()
-        loc = '%6f,%6f,%6f' %(x,y,-z)
-        x,z,y = ob.matrix_world.to_euler()
+        x,y,z = swap(ob.matrix_world.to_translation())
+        loc = '%6f,%6f,%6f' %(x,y,z)
+        x,y,z = swap(ob.matrix_world.to_euler())
         x = math.degrees( x ); y = math.degrees( y ); z = math.degrees( z )
-        rot = '%6f,%6f,%6f' %(x,y,-z)
-        x,z,y = ob.matrix_world.to_scale()
+        rot = '%6f,%6f,%6f' %(x,y,z)
+        x,y,z = swap(ob.matrix_world.to_scale())
         scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z))		# Tundra2 clamps any negative to zero
         a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
 
@@ -4351,7 +4364,19 @@ class _TXML_(object):
         return e
 
 
-    def tundra_mesh( self, e, ob ):
+    def tundra_mesh( self, e, ob, url, exported_meshes ):
+        if self.EX_MESH:
+            murl = os.path.join( os.path.split(url)[0], '%s.mesh'%ob.data.name )
+            exists = os.path.isfile( murl )
+            if not exists or (exists and self.EX_MESH_OVERWRITE):
+                if ob.data.name not in exported_meshes:
+                    if '_update_mesh_' in ob.data.keys() and not ob.data['_update_mesh_']: print('    skipping', ob.data)
+                    else:
+                        exported_meshes.append( ob.data.name )
+                        self.dot_mesh( ob, os.path.split(url)[0] )
+
+
+
         doc = e.document
         proto = 'local://'      # antont says file:// is also valid
 
@@ -4631,63 +4656,6 @@ class _OgreCommonExport_( _TXML_ ):
         print('ogre export->', url)
         prefix = url.split('.')[0]
 
-        ################# TUNDRA #################
-        rex = self.create_tundra_document( context )
-        ##########################################
-
-        now = time.time()
-        doc = RDocument()
-        scn = doc.createElement('scene'); doc.appendChild( scn )
-        scn.setAttribute('export_time', str(now))
-        scn.setAttribute('formatVersion', '1.0.1')
-        bscn = bpy.context.scene
-        if '_previous_export_time_' in bscn.keys(): scn.setAttribute('previous_export_time', str(bscn['_previous_export_time_']))
-        else: scn.setAttribute('previous_export_time', '0')
-        bscn[ '_previous_export_time_' ] = now
-        scn.setAttribute('exported_by', getpass.getuser())
-
-        nodes = doc.createElement('nodes')
-        extern = doc.createElement('externals')
-        environ = doc.createElement('environment')
-        for n in (nodes,extern,environ): scn.appendChild( n )
-        ############################
-
-        ## extern files ##
-        item = doc.createElement('item'); extern.appendChild( item )
-        item.setAttribute('type','material')
-        a = doc.createElement('file'); item.appendChild( a )
-        #does return "Scene" always
-        #material_file_name_base=context.scene.name
-        material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
-        a.setAttribute('name', '%s.material' % material_file_name_base)    # .material file (scene mats)
-
-
-        ## environ settings ##
-        world = context.scene.world
-        if world:   # multiple scenes - other scenes may not have a world
-            _c = {'colourAmbient':world.ambient_color, 'colourBackground':world.horizon_color, 'colourDiffuse':world.horizon_color}
-            for ctag in _c:
-                a = doc.createElement(ctag); environ.appendChild( a )
-                color = _c[ctag]
-                a.setAttribute('r', '%s'%color.r)
-                a.setAttribute('g', '%s'%color.g)
-                a.setAttribute('b', '%s'%color.b)
-
-        if world and world.mist_settings.use_mist:
-            a = doc.createElement('fog'); environ.appendChild( a )
-            a.setAttribute('linearStart', '%s'%world.mist_settings.start )
-            mist_falloff = world.mist_settings.falloff
-            if mist_falloff == 'QUADRATIC': a.setAttribute('mode', 'exp')	# on DTD spec (none | exp | exp2 | linear)
-            elif mist_falloff == 'LINEAR': a.setAttribute('mode', 'linear')
-            else: a.setAttribute('mode', 'exp2')
-            #a.setAttribute('mode', world.mist_settings.falloff.lower() )	# not on DTD spec
-            a.setAttribute('linearEnd', '%s' %(world.mist_settings.start+world.mist_settings.depth))
-            a.setAttribute('expDensity', world.mist_settings.intensity)
-            a.setAttribute('colourR', world.horizon_color.r)
-            a.setAttribute('colourG', world.horizon_color.g)
-            a.setAttribute('colourB', world.horizon_color.b)
-
-
         ## nodes (objects) ##
         objects = []        # gather because macros will change selection state
         linkedgroups = []
@@ -4743,37 +4711,115 @@ class _OgreCommonExport_( _TXML_ ):
             if root not in roots: roots.append( root )
 
         exported_meshes = []        # don't export same data multiple times
-        for root in roots:
-            print('--------------- exporting root ->', root )
-            self._node_export( root, 
-                url=url, doc = doc, rex = rex, 
-                exported_meshes = exported_meshes, 
-                meshes = meshes,
-                mesh_collision_prims = mesh_collision_prims,
-                mesh_collision_files = mesh_collision_files,
-                prefix = prefix,
-                objects=objects, 
-                xmlparent=nodes 
-            )
 
-        if self.EX_SCENE:
-            if self.EXPORT_TYPE == 'REX':
+
+        if self.EXPORT_TYPE == 'REX':
+            ################# TUNDRA #################
+            rex = self.create_tundra_document( context )
+            ##########################################
+            for ob in objects:
+                TE = self.tundra_entity( rex, ob )
+                if ob.type == 'MESH' and len(ob.data.faces):
+                    self.tundra_mesh( TE, ob, url, exported_meshes )
+                    meshes.append( ob )
+
+            if self.EX_SCENE:
                 if not url.endswith('.txml'): url += '.txml'
                 data = rex.toprettyxml()
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
                 print('realxtend scene dumped', url)
-            else:
+
+
+        elif self.EXPORT_TYPE == 'OGRE':       # ogre-dot-scene
+            ############# OgreDotScene ###############
+            doc = self.create_ogre_document( context )
+            ##########################################
+
+
+            for root in roots:
+                print('--------------- exporting root ->', root )
+                self._node_export( 
+                    root, 
+                    url=url,
+                    doc = doc,
+                    exported_meshes = exported_meshes, 
+                    meshes = meshes,
+                    mesh_collision_prims = mesh_collision_prims,
+                    mesh_collision_files = mesh_collision_files,
+                    prefix = prefix,
+                    objects=objects, 
+                    xmlparent=nodes 
+                )
+
+
+            if self.EX_SCENE:
                 if not url.endswith('.scene'): url += '.scene'
                 data = doc.toprettyxml()
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
                 print('ogre scene dumped', url)
 
 
-        if self.EX_MATERIALS: self.dot_material( meshes, os.path.split(url)[0], material_file_name_base)
+        if self.EX_MATERIALS:
+            material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
+            self.dot_material( meshes, os.path.split(url)[0], material_file_name_base)
 
         for ob in temps:context.scene.objects.unlink( ob )
         bpy.ops.wm.call_menu( name='Ogre_User_Report' )
 
+    def create_ogre_document(self, context):
+        now = time.time()
+        doc = RDocument()
+        scn = doc.createElement('scene'); doc.appendChild( scn )
+        scn.setAttribute('export_time', str(now))
+        scn.setAttribute('formatVersion', '1.0.1')
+        bscn = bpy.context.scene
+        if '_previous_export_time_' in bscn.keys(): scn.setAttribute('previous_export_time', str(bscn['_previous_export_time_']))
+        else: scn.setAttribute('previous_export_time', '0')
+        bscn[ '_previous_export_time_' ] = now
+        scn.setAttribute('exported_by', getpass.getuser())
+
+        nodes = doc.createElement('nodes')
+        extern = doc.createElement('externals')
+        environ = doc.createElement('environment')
+        for n in (nodes,extern,environ): scn.appendChild( n )
+        ############################
+
+        ## extern files ##
+        item = doc.createElement('item'); extern.appendChild( item )
+        item.setAttribute('type','material')
+        a = doc.createElement('file'); item.appendChild( a )
+        #does return "Scene" always
+        #material_file_name_base=context.scene.name
+        material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
+        a.setAttribute('name', '%s.material' % material_file_name_base)    # .material file (scene mats)
+
+
+        ## environ settings ##
+        world = context.scene.world
+        if world:   # multiple scenes - other scenes may not have a world
+            _c = {'colourAmbient':world.ambient_color, 'colourBackground':world.horizon_color, 'colourDiffuse':world.horizon_color}
+            for ctag in _c:
+                a = doc.createElement(ctag); environ.appendChild( a )
+                color = _c[ctag]
+                a.setAttribute('r', '%s'%color.r)
+                a.setAttribute('g', '%s'%color.g)
+                a.setAttribute('b', '%s'%color.b)
+
+        if world and world.mist_settings.use_mist:
+            a = doc.createElement('fog'); environ.appendChild( a )
+            a.setAttribute('linearStart', '%s'%world.mist_settings.start )
+            mist_falloff = world.mist_settings.falloff
+            if mist_falloff == 'QUADRATIC': a.setAttribute('mode', 'exp')	# on DTD spec (none | exp | exp2 | linear)
+            elif mist_falloff == 'LINEAR': a.setAttribute('mode', 'linear')
+            else: a.setAttribute('mode', 'exp2')
+            #a.setAttribute('mode', world.mist_settings.falloff.lower() )	# not on DTD spec
+            a.setAttribute('linearEnd', '%s' %(world.mist_settings.start+world.mist_settings.depth))
+            a.setAttribute('expDensity', world.mist_settings.intensity)
+            a.setAttribute('colourR', world.horizon_color.r)
+            a.setAttribute('colourG', world.horizon_color.g)
+            a.setAttribute('colourB', world.horizon_color.b)
+
+        return doc
 
     ############# node export - recursive ###############
     def _node_export( self, ob, url='', doc=None, rex=None, exported_meshes=[], meshes=[], mesh_collision_prims={}, mesh_collision_files={}, prefix='', objects=[], xmlparent=None ):
@@ -4818,11 +4864,7 @@ class _OgreCommonExport_( _TXML_ ):
         for act in ob.game.actuators:
             acts.appendChild( WrapActuator(act).xml(doc) )
 
-
-        TE = self.tundra_entity( rex, ob )
-
         if ob.type == 'MESH' and len(ob.data.faces):
-            self.tundra_mesh( TE, ob )
 
             collisionFile = None
             collisionPrim = None
@@ -5024,7 +5066,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
-        default='-xzy' 
+        default='xz-y' 
     )
 
     EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
@@ -6558,7 +6600,7 @@ class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
         items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
-        default='-xzy' 
+        default='xz-y' 
     )
 
     @classmethod
