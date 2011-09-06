@@ -27,7 +27,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.4 Dev1'
+VERSION = '0.5.4'
 
 ## Options ##
 AXIS_MODES =  [
@@ -4288,14 +4288,15 @@ class _TXML_(object):
             a.setAttribute('name', 'Shape type')
             a.setAttribute('value', TundraTypes[ ob.game.collision_bounds_type ] )
 
+            M = ob.game.collision_margin
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Size')
             if ob.game.collision_bounds_type in 'TRIANGLE_MESH CONVEX_HULL'.split():
-                a.setAttribute('value', '%s %s %s' %(1.0, 1.0, 1.0) )
+                a.setAttribute('value', '%s %s %s' %(1.0+M, 1.0+M, 1.0+M) )
             else:
                 #x,y,z = swap(ob.matrix_world.to_scale())
                 x,y,z = swap(ob.dimensions)
-                a.setAttribute('value', '%s %s %s' %(abs(x),abs(y),abs(z)) )
+                a.setAttribute('value', '%s %s %s' %(abs(x)+M,abs(y)+M,abs(z)+M) )
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Collision mesh ref')
@@ -4306,7 +4307,9 @@ class _TXML_(object):
                 if proxy:
                     a.setAttribute('value', 'local://_collision_%s.mesh' %proxy.data.name)
                     if proxy not in collision_proxies: collision_proxies.append( proxy )
-                else: assert 0
+                else:
+                    print( 'WARN: collision proxy mesh not found' )
+
             elif ob.type == 'MESH':
                 a.setAttribute('value', 'local://%s.mesh' %ob.data.name)
 
@@ -4505,7 +4508,10 @@ class _OgreCommonExport_( _TXML_ ):
         return {'RUNNING_MODAL'}
     def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
-
+    EX_SEP_MATS = BoolProperty(
+        name="Separate Materials", 
+        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
+        default=True)
 
     _image_formats =  [
         ('','do not convert', 'default'),
@@ -4554,32 +4560,39 @@ class _OgreCommonExport_( _TXML_ ):
 
 
     def dot_material( self, meshes, path='/tmp', mat_file_name='SceneMaterial'):
-        print('updating .material')
+        material_files = []
         mats = []
         for ob in meshes:
             if len(ob.data.materials):
                 for mat in ob.data.materials:
                     if mat not in mats: mats.append( mat )
-        if not mats: print('WARNING: no materials, not writting .material script'); return
+
+        if not mats:
+            print('WARNING: no materials, not writting .material script'); return []
+
         M = MISSING_MATERIAL + '\n'
         for mat in mats:
-            if mat is None:
-                continue
+            if mat is None: continue
             Report.materials.append( material_name(mat) )
             data = self.gen_dot_material( mat, path, convert_textures=True )
             M += data
-            if self.EXPORT_TYPE == 'REX': self.dot_material_write_separate( mat, data, path )
+            if self.EX_SEP_MATS:
+                url = self.dot_material_write_separate( mat, data, path )
+                material_files.append( url )
 
-        #always sets "Scene.material", not so good if exporting all stuff to same directory
-        #url = os.path.join(path, '%s.material' %bpy.context.scene.name)
-        url = os.path.join(path, '%s.material' % mat_file_name)
-        f = open( url, 'wb' ); f.write( bytes(M,'utf-8') ); f.close()
-        print('saved', url)
+        if not self.EX_SEP_MATS:
+            url = os.path.join(path, '%s.material' % mat_file_name)
+            f = open( url, 'wb' ); f.write( bytes(M,'utf-8') ); f.close()
+            print('saved', url)
+            material_files.append( url )
+
+        return material_files
 
     def dot_material_write_separate( self, mat, data, path = '/tmp' ):      # thanks Pforce
         url = os.path.join(path, '%s.material' % material_name(mat))
         f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
         print('saved', url)
+        return url
 
     ## python note: classmethods prefer attributes defined at the classlevel, 
     ## kinda makes sense, (even if called by an instance)
@@ -4654,9 +4667,6 @@ class _OgreCommonExport_( _TXML_ ):
             if not fmt.startswith('.'): fmt = '.'+fmt
             OPTIONS['FORCE_IMAGE_FORMAT'] = fmt
 
-        meshes = []
-        mesh_collision_prims = {}
-        mesh_collision_files = {}
 
         print('ogre export->', url)
         prefix = url.split('.')[0]
@@ -4709,13 +4719,26 @@ class _OgreCommonExport_( _TXML_ ):
             else: _f.append( _c )
 
         roots = []
+        meshes = []
+
         for ob in objects:
             flat = []
             _flatten( ob, flat )
             root = flat[-1]
             if root not in roots: roots.append( root )
 
+            if ob.type=='MESH': meshes.append( ob )
+
+        mesh_collision_prims = {}
+        mesh_collision_files = {}
+
         exported_meshes = []        # don't export same data multiple times
+
+        if self.EX_MATERIALS:
+            material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
+            material_files = self.dot_material( meshes, os.path.split(url)[0], material_file_name_base)
+        else:
+            material_files = []
 
 
         if self.EXPORT_TYPE == 'REX':
@@ -4727,7 +4750,10 @@ class _OgreCommonExport_( _TXML_ ):
                 TE = self.tundra_entity( rex, ob, collision_proxies=proxies )
                 if ob.type == 'MESH' and len(ob.data.faces):
                     self.tundra_mesh( TE, ob, url, exported_meshes )
-                    meshes.append( ob )
+                    #meshes.append( ob )
+                elif ob.type == 'LAMP':
+                    self.tundra_light( TE, ob )
+
 
             for proxy in proxies:
                 self.dot_mesh( 
@@ -4746,7 +4772,7 @@ class _OgreCommonExport_( _TXML_ ):
 
         elif self.EXPORT_TYPE == 'OGRE':       # ogre-dot-scene
             ############# OgreDotScene ###############
-            doc = self.create_ogre_document( context )
+            doc = self.create_ogre_document( context, material_files )
             ##########################################
 
 
@@ -4762,7 +4788,7 @@ class _OgreCommonExport_( _TXML_ ):
                     mesh_collision_files = mesh_collision_files,
                     prefix = prefix,
                     objects=objects, 
-                    xmlparent=nodes 
+                    xmlparent=doc._scene_nodes 
                 )
 
 
@@ -4772,15 +4798,10 @@ class _OgreCommonExport_( _TXML_ ):
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
                 print('ogre scene dumped', url)
 
-
-        if self.EX_MATERIALS:
-            material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
-            self.dot_material( meshes, os.path.split(url)[0], material_file_name_base)
-
-        for ob in temps:context.scene.objects.unlink( ob )
+        for ob in temps: context.scene.objects.unlink( ob )
         bpy.ops.wm.call_menu( name='Ogre_User_Report' )
 
-    def create_ogre_document(self, context):
+    def create_ogre_document(self, context, material_files=[] ):
         now = time.time()
         doc = RDocument()
         scn = doc.createElement('scene'); doc.appendChild( scn )
@@ -4793,19 +4814,18 @@ class _OgreCommonExport_( _TXML_ ):
         scn.setAttribute('exported_by', getpass.getuser())
 
         nodes = doc.createElement('nodes')
+        doc._scene_nodes = nodes
         extern = doc.createElement('externals')
         environ = doc.createElement('environment')
         for n in (nodes,extern,environ): scn.appendChild( n )
         ############################
 
         ## extern files ##
-        item = doc.createElement('item'); extern.appendChild( item )
-        item.setAttribute('type','material')
-        a = doc.createElement('file'); item.appendChild( a )
-        #does return "Scene" always
-        #material_file_name_base=context.scene.name
-        material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
-        a.setAttribute('name', '%s.material' % material_file_name_base)    # .material file (scene mats)
+        for url in material_files:
+            item = doc.createElement('item'); extern.appendChild( item )
+            item.setAttribute('type','material')
+            a = doc.createElement('file'); item.appendChild( a )
+            a.setAttribute('name', url)
 
 
         ## environ settings ##
@@ -4885,7 +4905,7 @@ class _OgreCommonExport_( _TXML_ ):
             if ob.data.name in mesh_collision_prims: collisionPrim = mesh_collision_prims[ ob.data.name ]
             if ob.data.name in mesh_collision_files: collisionFile = mesh_collision_files[ ob.data.name ]
 
-            meshes.append( ob )
+            #meshes.append( ob )
             e = doc.createElement('entity') 
             o.appendChild(e); e.setAttribute('name', ob.data.name)
             prefix = ''
@@ -4981,7 +5001,6 @@ class _OgreCommonExport_( _TXML_ ):
 
 
         elif ob.type == 'LAMP' and ob.data.type in 'POINT SPOT SUN'.split():
-            self.tundra_light( TE, ob )
 
             Report.lights.append( ob.name )
             l = doc.createElement('light')
