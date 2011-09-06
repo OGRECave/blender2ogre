@@ -4290,7 +4290,8 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Size')
-            x,y,z = swap(ob.matrix_world.to_scale())
+            #x,y,z = swap(ob.matrix_world.to_scale())
+            x,y,z = swap(ob.dimensions)
             a.setAttribute('value', '%s %s %s' %(abs(x),abs(y),abs(z)) )
 
             a = doc.createElement('attribute'); com.appendChild( a )
