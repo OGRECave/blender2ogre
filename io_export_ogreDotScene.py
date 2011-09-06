@@ -4176,7 +4176,7 @@ class _TXML_(object):
         return doc
 
     ########################################
-    def tundra_entity( self, doc, ob ):
+    def tundra_entity( self, doc, ob, collision_proxies=[] ):
         assert not ob.name.startswith('collision')
         # txml has flat hierarchy
         e = doc.createElement( 'entity' )
@@ -4300,12 +4300,13 @@ class _TXML_(object):
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Collision mesh ref')
             if ob.game.use_collision_compound:
-                box = layout.box()
                 proxy = None
                 for child in ob.children:
                     if child.name.startswith('collision'): proxy = child; break
                 if proxy:
-                    a.setAttribute('value', 'local://%s.mesh' %proxy.data.name)
+                    a.setAttribute('value', 'local://_collision_%s.mesh' %proxy.data.name)
+                    if proxy not in collision_proxies: collision_proxies.append( proxy )
+                else: assert 0
             elif ob.type == 'MESH':
                 a.setAttribute('value', 'local://%s.mesh' %ob.data.name)
 
@@ -4721,11 +4722,20 @@ class _OgreCommonExport_( _TXML_ ):
             ################# TUNDRA #################
             rex = self.create_tundra_document( context )
             ##########################################
+            proxies = []
             for ob in objects:
-                TE = self.tundra_entity( rex, ob )
+                TE = self.tundra_entity( rex, ob, collision_proxies=proxies )
                 if ob.type == 'MESH' and len(ob.data.faces):
                     self.tundra_mesh( TE, ob, url, exported_meshes )
                     meshes.append( ob )
+
+            for proxy in proxies:
+                self.dot_mesh( 
+                    proxy, 
+                    path=os.path.split(url)[0], 
+                    force_name='_collision_%s' %proxy.data.name
+                )
+
 
             if self.EX_SCENE:
                 if not url.endswith('.txml'): url += '.txml'
