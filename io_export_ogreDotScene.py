@@ -4290,9 +4290,12 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Size')
-            #x,y,z = swap(ob.matrix_world.to_scale())
-            x,y,z = swap(ob.dimensions)
-            a.setAttribute('value', '%s %s %s' %(abs(x),abs(y),abs(z)) )
+            if ob.game.collision_bounds_type in 'TRIANGLE_MESH CONVEX_HULL'.split():
+                a.setAttribute('value', '%s %s %s' %(1.0, 1.0, 1.0) )
+            else:
+                #x,y,z = swap(ob.matrix_world.to_scale())
+                x,y,z = swap(ob.dimensions)
+                a.setAttribute('value', '%s %s %s' %(abs(x),abs(y),abs(z)) )
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Collision mesh ref')
