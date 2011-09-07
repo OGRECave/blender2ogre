@@ -1,4 +1,3 @@
-# Copyright (C) 2005  Michel Reimpell    [ blender24 version ]
 # Copyright (C) 2010 Brett Hartshorn    [ blender25 version ]
 #
 # This library is free software; you can redistribute it and/or
@@ -18,7 +17,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
-    "version": (0,5,4),
+    "version": (0,5,5),
     "blender": (2,5,9),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -27,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.4'
+VERSION = '0.5.5 Dev'
 
 ## Options ##
 AXIS_MODES =  [
@@ -80,23 +79,11 @@ A: no.
 Q: i don't see any objects when i export?
 A: you must select the objects you wish to export.
 
-Q: how can i change the name of my .material file, it is always named Scene.material?
-A: rename your scene in blender.  The .material script will follow the name of the scene.
-
 Q: i don't see my animations when exported?
-A: make sure you created an NLA strip on the armature, and if you keyed bones in pose mode then only those will be exported.
+A: make sure you created an NLA strip on the armature.
 
 Q: do i need to bake my IK and other constraints into FK on my armature before export?
 A: no.
-
-Q: how do i export extra information to my game engine via OgreDotScene?
-A: You can assign 'Custom Properties' to objects in blender, and these will be saved to the .scene file.
-
-Q: i want to use a low-resolution mesh as a collision proxy for my high-resolution mesh, how?
-A: make the lowres mesh the child of the hires mesh, and name the low res mesh starting with "collision"
-
-Q: i do not want to use triangle mesh collision, can i use simple collision primitives?
-A: yes, go to View3D->Tools->Ogre Physics.  This gets save to the OgreDotScene file.
 
 '''
 
@@ -110,7 +97,7 @@ Installing:
         (its a good idea to delete the old version first)
 
     Required:
-        1. blender2.58
+        1. blender2.59
 
         2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
             http://www.ogre3d.org/download/tools
@@ -137,7 +124,7 @@ Installing:
 ######
 # imports
 ######
-import os, sys, time, hashlib, getpass, tempfile , configparser
+import os, sys, time, hashlib, getpass, tempfile, configparser
 import math, subprocess
 #sax xml:
 from xml.sax.saxutils import XMLGenerator
@@ -268,7 +255,16 @@ material _missing_material_
 '''
 
 
+
 ############# helper functions ##############
+
+def is_terrain( ob ):   # a default plane, with simple-subsurf and displace modifier on Z
+    if len(ob.data.vertices) != 4 and len(ob.data.faces) != 1: return False
+    elif len(ob.modifiers) < 2: return False
+    elif ob.modifiers[0].type != 'SUBSURF' or ob.modifiers[1].type != 'DISPLACE': return False
+    elif ob.modifiers[0].subdivision_type != 'SIMPLE': return False
+    elif ob.modifiers[1].direction != 'Z': return False # disallow NORMAL and other modes
+    else: return True
 
 def get_image_textures( mat ):
     r = []
@@ -568,153 +564,54 @@ class Ogre_User_Report(bpy.types.Menu):
         for line in txt.splitlines():
             layout.label(text=line)
 
-############## Lite Version Control ###############
-VersionControl = '_version_  _modified_  _created_'.split()
-VersionControlUser = '_category_  _title_  _notes_  _owner_'.split()
-VersionControlMesh = '_update_mesh_  _update_material_'.split()
+#################################################
+## Collision ##
 
-def UUID( ob ):
-    #s = ''
-    keys = ob.keys()
-    #for tag in VersionControl + VersionControlUser
-    if '_UUID_' in keys: return ob[ '_UUID_' ]
-    else:
-        s = str(time.time()) + ob.name
-        uid = hashlib.md5(bytes(s, 'utf-8')).hexdigest()
-        ob[ '_UUID_' ] = uid
-        return uid
+class HeightMapSampler(object):
+    def __init__(self, ob, x=64, y=64):
+        self.x_steps = x
+        self.y_steps = y
+        pos = ob.matrix_world.to_translation()
+        bpy.ops.mesh.primitive_grid_add( x_subdivisions=x, y_subdivisions=y, size=1.0, location=pos )
+        grid = bpy.context.active_object
+        assert grid.name.startswith('Grid')
+        grid.name = 'collision-map.%s' %ob.name
+        grid.data.show_all_edges = True
+        grid.draw_type = 'WIRE'
+        self.grid = grid
 
-class Ogre_setup_version_control_op(bpy.types.Operator):
-    '''operator: setup version control helper'''  
-    bl_idname = "ogre.setup_version_control"  
-    bl_label = "setup version control"
-    bl_options = {'REGISTER'}
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        ob = context.active_object
-        if ob:
-            keys = ob.keys()
-            now = time.time()
-            if '_created_' not in keys: ob['_created_'] = now
-            if '_modified_' not in keys: ob['_modified_'] = now
-            if '_version_' not in keys: ob['_version_'] = 0
-            if '_category_' not in keys: ob['_category_'] = 'my category'
-            if '_title_' not in keys: ob['_title_'] = 'my title'
-            if '_notes_' not in keys: ob['_notes_'] = 'my notes'
-            if '_owner_' not in keys: ob['_owner_'] = getpass.getuser()
+        mod = grid.modifiers.new(name='temp', type='SHRINKWRAP')
+        mod.wrap_method = 'PROJECT'
+        mod.use_project_z = True
+        mod.target = ob
 
-            if ob.type == 'MESH':
-                mesh = ob.data
-                mkeys = mesh.keys()
-                for tag in VersionControlMesh:
-                    if tag not in mkeys: mesh[tag] = True    # converted to 1
-
-        return {'FINISHED'}
-
-class Ogre_VC_Panel(bpy.types.Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    #bl_context = "object"
-    bl_label = "Ogre Version Control"
-    @classmethod
-    def poll(cls, context):
-        if context.active_object: return True
-        else: return False
-    def draw(self, context):
-        layout = self.layout
-        ob = context.active_object
-
-        if ob.type == 'MESH':
-            mesh = ob.data
-            mkeys = mesh.keys()
-            box = layout.box()
-            box.label(text='mesh: %s' %mesh.name)
-            row = box.row()
-            for tag in VersionControlMesh:
-                #if tag not in mkeys: mesh[tag] = True    # converted to 1
-                if tag in mkeys: v = mesh[tag]
-                else: v = True
-                if v: icon = 'CHECKBOX_HLT'
-                else: icon = 'CHECKBOX_DEHLT'
-                op = row.operator( 'ogre.toggle_prop', text=tag.replace('_',' '), icon=icon )
-                op.propname = tag
-
-        keys = ob.keys()
-        box = layout.box()
-        issetup = True
-        for tag in VersionControl:
-            if tag not in keys: issetup=False; continue
-            a = tag.replace('_','')
-            row = box.row()
-            if tag == '_version_':
-                row.label( text='version: %s'%ob[tag] )
-                op = row.operator( 'ogre.update_modify_time', text='', icon='TIME' )
-            else:
-                v = ob[ tag ]
-                if not v: row.label( text='%s: <undefined>'%a )
-                else: row.label( text='%s: %s' %(a, time.asctime(time.localtime(v))) )
-        if not issetup:
-            op = box.operator('ogre.setup_version_control')
-        else:
-            box = layout.box()
-        for tag in VersionControlUser:
-            if tag not in keys: continue
-            a = tag.replace('_','')
-            row = box.row()
-            row.prop( ob, '["%s"]' %tag, text=a )
-            op = row.operator( 'ogre.select_by_prop_value', text='', icon='GROUP' )
-            op.propname = tag
-            op.propvalue = str( ob[tag] )
+    def bake(self):
+        self.min = self.max = None
+        self.map = []
+        i = 0
+        for x in range(self.x_steps):
+            row = []
+            for y in range(self.y_steps):
+                v = data.vertices[ i ]
+                if self.min is None or self.min > v.z: self.min = v.z
+                if self.max is None or self.max < v.z: self.max = v.z
+                row.append( v.z )
+                i += 1
+            if x%2: row.reverse()   # blender grid prim zig-zags
+            self.map.append( row )
 
 
+    def save_ntf( self, url ):
+        f = open(url, "wb")
+        buf = array.array("I")  # header
+        buf.fromlist( [self.x_steps, self.y_steps] )
+        buf.tofile(f)
+        for row in self.map:
+            buf = array.array("f")
+            buf.fromlist( row )
+            buf.tofile(f)
+        f.close()
 
-class Ogre_toggle_prop_op(bpy.types.Operator):
-    '''operator: prop toggle helper'''  
-    bl_idname = "ogre.toggle_prop"  
-    bl_label = "toggle"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
-    propname = StringProperty(name="property name", description="...", maxlen=32, default="")
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        ob = context.active_object
-        if self.propname not in ob.keys(): a = ob.data
-        else: a = ob
-        if self.propname not in a.keys(): a[ self.propname ] = True
-        a[ self.propname ] = not a[ self.propname ]
-        return {'FINISHED'}
-
-class Ogre_select_by_prop_value(bpy.types.Operator):
-    '''select other objects with the same property value'''  
-    bl_idname = "ogre.select_by_prop_value"  
-    bl_label = "select by prop"
-    bl_options = {'REGISTER', 'UNDO'}
-    propname = StringProperty(name="property name", description="...", maxlen=32, default="")
-    propvalue = StringProperty(name="property value", maxlen=128, default="")
-
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        #ob = context.active_object
-        for ob in bpy.context.scene.objects:
-            if self.propname in ob.keys():
-                if str(ob[self.propname]) == self.propvalue: ob.select = True
-        return {'FINISHED'}
-
-class Ogre_update_mod_time(bpy.types.Operator):
-    '''set modified time and bump the version number up'''  
-    bl_idname = "ogre.update_modify_time"  
-    bl_label = "update mod time"
-    bl_options = {'REGISTER'}
-
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        ob = context.active_object
-        ob['_modified_'] = time.time()
-        ob['_version_'] += 1
-        return {'FINISHED'}
 
 class OgreCollisionOp(bpy.types.Operator):
     '''ogre collision'''  
@@ -738,18 +635,22 @@ class OgreCollisionOp(bpy.types.Operator):
 
         if self.MODE != 'disable' and not proxy:    # create new proxy and hide it
             parent = context.active_object
-            child = parent.copy()
-            bpy.context.scene.objects.link( child )
-            child.name = 'collision.%s' %parent.name
-            child.matrix_local = mathutils.Matrix()
-            child.parent = parent
-            child.hide_select = True
-            child.draw_type = 'WIRE'
-            #child.select = False
-            child.lock_location = [True]*3
-            child.lock_rotation = [True]*3
-            child.lock_scale = [True]*3
-            proxy = child
+            if self.MODE == 'terrain':
+                hms = HeightMapSampler( parent )
+
+            else:
+                child = parent.copy()
+                bpy.context.scene.objects.link( child )
+                child.name = 'collision.%s' %parent.name
+                child.matrix_local = mathutils.Matrix()
+                child.parent = parent
+                child.hide_select = True
+                child.draw_type = 'WIRE'
+                #child.select = False
+                child.lock_location = [True]*3
+                child.lock_rotation = [True]*3
+                child.lock_scale = [True]*3
+                proxy = child
 
         decmod = None
         if proxy:
@@ -765,6 +666,8 @@ class OgreCollisionOp(bpy.types.Operator):
             if ob.show_wire: ob.show_wire = False
             if proxy and not proxy.hide: proxy.hide = True
             game.use_collision_bounds = False
+
+        elif self.MODE == 'terrain': pass
 
         else:
             if game.physics_type not in 'RIGID_BODY SENSOR'.split():
@@ -852,6 +755,10 @@ class Ogre_Physics_LOD(bpy.types.Panel):
             box = layout.box()
             op = box.operator( 'ogre.set_collision', text='Enable Collision' )
             op.MODE = 'direct:%s' %game.collision_bounds_type
+
+            op = box.operator( 'ogre.set_collision', text='Terrain Collision' )
+            op.MODE = 'terrain'
+
         else:
             if not game.use_ghost:  # has collision
                 box = layout.box()
@@ -4013,52 +3920,6 @@ def _mesh_entity_helper( doc, ob, o ):
             user.setAttribute( 'type', type(propvalue).__name__ )
 
 
-class Ogre_import_op(bpy.types.Operator):
-    '''Import Ogre Scene'''
-    bl_idname = "ogre.import"
-    bl_label = "Import Ogre"
-    bl_options = {'REGISTER'}
-    filepath= StringProperty(name="File Path", description="Filepath used for importing Ogre .scene file", maxlen=1024, default="")
-    COPY_ATTRIBUTES = BoolProperty(name="Copy Attributes", description="copy version control attributes: category, title, owner, etc.", default=True)
-
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        wm= context.window_manager; wm.fileselect_add(self)        # writes to filepath
-        return {'RUNNING_MODAL'}
-    def execute(self, context):
-        Report.reset()
-        doc = dom.parse( self.filepath )
-        nodes = doc.getElementsByTagName('node')
-        for node in nodes:
-            print( node )
-            name = node.getAttribute('name')
-            if node.hasAttribute('uuid') and name in bpy.data.objects.keys():
-                ob = bpy.data.objects[ name ]
-                uuid = node.getAttribute('uuid')
-                print(name, uuid)
-                if '_UUID_' in ob.keys():
-                    if ob['_UUID_'] == uuid:
-                        Report.messages.append( '%s: already has matching UUID' %name )
-                    else:
-                        Report.messages.append( '%s: syncing UUID' %name )
-                else:
-                    Report.messages.append( '%s: updating UUID' %name )
-
-                ob[ '_UUID_' ] = uuid
-                if self.COPY_ATTRIBUTES:
-                    vcs = node.getElementsByTagName('version_control')
-                    d = {}
-                    for vc in vcs:
-                        n = vc.getAttribute('name')
-                        v = vc.getAttribute('value')
-                        t = vc.getAttribute('type')
-                        if t == 'int': v = int( v )
-                        elif t == 'float': v = float( v )
-                        d[ n ] = v
-
-        Report.show()
-        return {'FINISHED'}
 
 
 # Ogre supports .dds in both directx and opengl
@@ -6651,16 +6512,25 @@ class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
         path = '/tmp/preview.txml'
         self.ogre_export( path, context )
 
-        exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
-        if sys.platform == 'linux2':
-            cmd = ['wine', exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
-            subprocess.Popen(cmd)
-        else:
-            cmd = [exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
-            subprocess.Popen(cmd)
+        slave = TundraPipe()
 
         return {'FINISHED'}
 
+class TundraPipe(object):
+    def __init__(self):
+        exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
+        if sys.platform == 'linux2':
+            cmd = ['wine', exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
+            self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        else:
+            cmd = [exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
+            self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+
+    def load( self, url ):
+        self.proc.stdin.write( 'loadscene(/tmp/preview.txml, true, true)')
+
+    def reset( self ):
+        self.proc.stdin.write( 'startphysics' )
 
 
 class INFO_HT_myheader(bpy.types.Header):
@@ -6937,134 +6807,4 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
 
-
-
-__devnotes__ = '''
-
-## b2rex touches these, so keep the names! ##
-ogre_mesh_entity_helper = addon_ogreDotScene.INFO_OT_createOgreExport._node_export
-ogre_material_export = addon_ogreDotScene.INFO_OT_createOgreExport.gen_dot_material
-
-
-Jan 6th 2011 (Hart):
-    . updated for blender256
-    . fixed Nvidia DDS output
-    . add swap axis options
-
-March 18th (SRombauts):
-    . issue1: os.getlogin() unreliable; using getpass.getuser() instead
-    . issue5: speed optimization O(n^2) into O(n log n)
-
-March 20th (SRombauts):
-    . correction to bl_info
-    
-March 21th (SRombauts):
-    . Blender SVN compatibility : using bl_info for printing version when registering
-    . Blender SVN compatibility : using prefix "ogre." in bl_idname of any custom bpy.types.Operator (and using this definition instead of a string)
-    . Blender SVN compatibility : registering the module is requiered in Blender SVN >2.56 to use operators
-    . Blender SVN compatibility : mathutils.Matrix format changed in Blender SVN >2.56
-
-March 25th (SRombauts):
-    . issue7: Need for an add-on config file with user preferences
-    . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
-    
-March 31th (SRombauts):
-    . Issue 14: DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
-    . 0.3.2 release
-
-April 3rd (SRombauts):
-    . Issue 9:  Blender script/addon name must be changed
-    . Issue 15: Use an appropriate path for the addon config file
-    . 0.3.3 release
-
-May 11th (Hart):
-    . small fixes
-
-May 12th (Hart):
-    . fixed ogre-export being forced to .txml
-    . fixed multi-track animation export, cleaned up doc, added examples.    
-
-May 16th (Hart):
-    . tested again in OgreMeshy under linux, fixed works again.
-    . really fixed multi-track animation
-    . confirmed that shape-animation is badly broken, needs redesign.
-
-June 2nd (Hart):
-    . mesh export speedup
-    . fixed shape animation export
-
-June 6th (Hart):
-    . fixed merge groups
-    . added OSX patch
-    . dot scene more conformant to spec
-    . closed several issues on the tracker
-    . fixed multiple materials on single mesh
-    . fixed uv textures
-
-June 7th (Hart):
-    . really fixed uvs
-    . fixed ubuntu (different naming for OgreXMLConverter when using apt-get ogre-tools)
-    . fixed Texture Panel and rotation animation option changed to use_from_dupli
-
-June 12th (Hart):
-    . fixed collision panel - if not ob.show_bounds: ob.show_bounds = True
-    . fixed sharp face normals
-    . fixed badverts
-    . supports library linking with name collisions
-
-June 18th (Hart):
-    . fixed usealpha line: 1959
-    . fixed floating bones
-    . changed default axis to x z -y
-    . fixed ogre_user_report not found if toolbar not enabled
-
-June 30th (Hart):
-    . Fixed Lamp export "color" to British "colour" - reported by Mohdakra
-    . New spotLightRange inner and outer options
-    . Fixed sharedGeometry vertexcount, compatible with jMonkeyEngine
-    . New Lamp option powerScale taken from Lamp energy
-    . OgreMeshy preview disabled when in mesh-edit mode.
-
-July 2nd (Hart):
-    . Fixed fog settings - reported by junode
-July 3rd (Hart):
-    . Fixed lamp direction - reported by Mohdakra
-July 22nd (Hart):
-    . Fixed (untested) 32bit indices - should be on submesh not sharedgeo
-July 25th (Hart):
-    . Improved memory and performance - replaced xml.dom.minidom with custom microdom
-
-July 26th (f00bar):
-    . mesh.xml is directly written to file [class SimpleSaxWriter() at end of script]
-    . material file name is derived from .scene file name (bpy.context.scene.name always returns "Scene" for me)
-    . [shape keys] bpy.context.scene.frame_current did not work (so all values were from current time), now using bpy.context.scene.frame_set(frame)
-    . [shape keys] poseindex: need to subtract 1, because shape 0 is base and not written to the file
-    . not writing an "index" on "pose" and "track", the index is for the case where "target" is "submesh"
-    . "use32bitindexes" : str(bool(numverts > 65535)) is used, that means it is set in cases not needed, but that way it needs no postprocessing of file
-    . ugly: function replaceInplace, using fileinput module to write number of vertices into file at end (could write into it without processing the whole file)
-
-July 27th (Hart):
-    . reviewed F00bar's changes
-    . replaced bpy.data.objects with bpy.context.scene.objects - and tested multiple scene export
-
-August 12th (f00bar):
-    . using (nx,ny,nz, r,g,b,ra, vert_uvs) to check if vertex must be duplicated.
-         - this is overkill, but it can be replaced when bmesh comes out
-    . hopefully fixed bug with deleted materials which blender returns as None
-    . small fixes (e.g. Report, being sure mesh.xml file is closed,...)
-
-August 13th (Hart):
-    . went back to axis swap "-x z y" - this is the Ogre default
-    . fixed swap axis for .txml output
-    . removed swap axis option - from now on its always Ogre default
-    . merged with f00bar's updates
-    . export armature and shape animation now respects FPS
-    . shape animation now respects bpy.context.scene.frame_step
-    . shadeless material sets emissive to 1.0
-
-August 31st (Hart):
-    . putting back axis swap
-    . fixed shadeless material sets emissive to diffuse color
-
-'''
 
