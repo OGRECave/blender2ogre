@@ -63,8 +63,44 @@ def swap(vec):
         assert 0
 
 
+###########################################################
+###### imports #####
+import os, sys, time, hashlib, getpass, tempfile, configparser
+import math, subprocess
+from xml.sax.saxutils import XMLGenerator
 
-#########################################################33
+try:
+    import bpy, mathutils
+    from bpy.props import *
+except ImportError:
+    sys.exit("This script is an addon for blender, you must install it from blender.")
+
+
+######################### bpy RNA #########################
+
+#    exmodes = 'one zero dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split()
+_ogre_scene_blend_types =  [
+    ('one zero', 'one zero', 'solid default'),
+    ('alpha_blend', 'alpha_blend', 'basic alpha'),
+    ('add', 'add', 'additive'),
+    ('modulate', 'modulate', 'multiply'),
+    ('colour_blend', 'colour_blend', 'blend colors'),
+]
+for mode in 'dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split():
+    _ogre_scene_blend_types.append( ('one %s'%mode, 'one %s'%mode, '') )
+del mode
+
+bpy.types.Material.ogre_scene_blend = EnumProperty(
+    items=_ogre_scene_blend_types, 
+    name='scene blend', 
+    description='blending operation of material to scene', 
+    default='one zero'
+)
+
+
+
+
+###########################################################
 _faq_ = '''
 
 Q: i have hundres of objects, is there a way i can merge them on export only?
@@ -121,20 +157,6 @@ Installing:
 '''
 
 
-######
-# imports
-######
-import os, sys, time, hashlib, getpass, tempfile, configparser
-import math, subprocess
-#sax xml:
-from xml.sax.saxutils import XMLGenerator
-
-
-try:
-    import bpy, mathutils
-    from bpy.props import *
-except ImportError:
-    sys.exit("This script is an addon for blender, you must install it from blender.")
 
 
 ## make sure we can import from same directory ##
@@ -567,25 +589,77 @@ class Ogre_User_Report(bpy.types.Menu):
 #################################################
 ## Collision ##
 
+bpy.types.Object.collision_terrain_x_steps = IntProperty(
+    name="Ogre Terrain: x samples", description="resolution in X of height map", 
+    default=64, min=4, max=8192)
+bpy.types.Object.collision_terrain_y_steps = IntProperty(
+    name="Ogre Terrain: y samples", description="resolution in Y of height map", 
+    default=64, min=4, max=8192)
+
+_collision_modes =  [
+    ('NONE', 'NONE', 'no collision'),
+    ('PRIMITIVE', 'PRIMITIVE', 'primitive collision type'),
+    ('MESH', 'MESH', 'triangle-mesh or convex-hull collision type'),
+    ('DECIMATED', 'DECIMATED', 'auto-decimated collision type'),
+    ('COMPOUND', 'COMPOUND', 'children primitive compound collision type'),
+    ('TERRAIN', 'TERRAIN', 'terrain (height map) collision type'),
+]
+
+bpy.types.Object.collision_mode = EnumProperty(
+    items = _collision_modes, 
+    name = 'primary collision mode', 
+    description='collision mode', 
+    default='NONE'
+)
+
+
+bpy.types.Object.subcollision = BoolProperty(
+    name="collision compound", description="member of a collision compound", default=False)
+
+
+
 class HeightMapSampler(object):
-    def __init__(self, ob, x=64, y=64):
-        self.x_steps = x
-        self.y_steps = y
+    def __init__(self, ob):
+        self.object = ob
+        self.x_steps = ob.collision_terrain_x_steps
+        self.y_steps = ob.collision_terrain_y_steps
+        proxy = None
+        for child in ob.children:
+            if child.name.startswith('collision-map'):
+                proxy = child; break
+
+        if proxy: self.grid = proxy
+        else: self.build()
+
+    def build(self):
+        x = ob.game.terrain_x_steps
+        y = ob.game.terrain_y_steps
+
         pos = ob.matrix_world.to_translation()
-        bpy.ops.mesh.primitive_grid_add( x_subdivisions=x, y_subdivisions=y, size=1.0, location=pos )
-        grid = bpy.context.active_object
+        bpy.ops.mesh.primitive_grid_add( x_subdivisions=x, y_subdivisions=y, size=1.0 )#, location=pos )
+        self.grid = grid = bpy.context.active_object
         assert grid.name.startswith('Grid')
         grid.name = 'collision-map.%s' %ob.name
+        x,y,z = self.object.dimensions
+        grid.scale.x = x
+        grid.scale.y = y
         grid.data.show_all_edges = True
         grid.draw_type = 'WIRE'
-        self.grid = grid
+        grid.hide_select = True
+        grid.select = False
+        grid.lock_location = [True]*3
+        grid.lock_rotation = [True]*3
+        grid.lock_scale = [True]*3
+        grid.parent = ob
 
         mod = grid.modifiers.new(name='temp', type='SHRINKWRAP')
         mod.wrap_method = 'PROJECT'
         mod.use_project_z = True
         mod.target = ob
 
+
     def bake(self):
+        data = self.grid.to_mesh(bpy.context.scene, True, "PREVIEW")
         self.min = self.max = None
         self.map = []
         i = 0
@@ -625,9 +699,86 @@ class OgreCollisionOp(bpy.types.Operator):
     def poll(cls, context):
         if context.active_object and context.active_object.type == 'MESH': return True
 
+    def get_proxies( self, ob, create=True ):
+        prefix = '%s.' %ob.collision_mode
+
+        r = []
+        for child in ob.children:
+            if child.subcollision and child.name.startswith( prefix ):
+                r.append( child )
+
+        #################### create ###############
+        if not r and create:
+            method = getattr(self, 'create_%s'%ob.game.collision_mode)
+            r.append( method(ob) )
+
+
+    def create_DECIMATED(self):
+        child = ob.copy()
+        bpy.context.scene.objects.link( child )
+        child.name = 'DECIMATED.%s' %parent.name
+        child.matrix_local = mathutils.Matrix()
+        child.parent = ob
+        child.hide_select = True
+        child.draw_type = 'WIRE'
+        #child.select = False
+        child.lock_location = [True]*3
+        child.lock_rotation = [True]*3
+        child.lock_scale = [True]*3
+        child.game.subcollision = True
+        return child
+
+
+
     def invoke(self, context, event):
         ob = context.active_object
         game = ob.game
+
+        subtype = None
+        if ':' in self.MODE:
+            mode, subtype = self.MODE.split(':')
+            game.collision_bounds_type = subtype
+
+        else:
+            mode = self.MODE
+        ob.collision_mode = mode
+        print('OKKKKKKKKKKKK')
+
+        if mode == 'NONE':
+            game.use_ghost = True
+            game.use_collision_bounds = False
+
+            if ob.show_bounds: ob.show_bounds = False
+            if ob.show_wire: ob.show_wire = False
+            for child in ob.children:
+                if child.subcollision: child.hide = True
+
+        elif mode == 'PRIMITIVE':
+            game.use_ghost = False
+            game.use_collision_bounds = True
+
+        elif mode == 'MESH':
+            game.use_ghost = False
+            game.use_collision_bounds = True
+
+        elif mode == 'DECIMATED':
+            game.use_ghost = True
+            game.use_collision_bounds = False
+
+
+        elif mode == 'TERRAIN':
+            game.use_ghost = True
+            game.use_collision_bounds = True
+
+        elif mode == 'COMPOUND':
+            game.use_ghost = True
+            game.use_collision_bounds = True
+            game.use_collision_compound = True
+
+
+
+
+
 
         proxy = None
         for child in ob.children:
@@ -727,11 +878,11 @@ class OgreCollisionOp(bpy.types.Operator):
 
 
 ############## mesh LOD physics #############
-class Ogre_Physics_LOD(bpy.types.Panel):
+class PhysicsPanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     #bl_context = "data"
-    bl_label = "Ogre Collision"
+    bl_label = "Collision"
     @classmethod
     def poll(cls, context):
         if context.active_object: return True
@@ -740,7 +891,7 @@ class Ogre_Physics_LOD(bpy.types.Panel):
         layout = self.layout
         ob = context.active_object
         if ob.type != 'MESH': return
-        elif ob.name.startswith('collision'):
+        elif ob.subcollision == True: #ob.name.startswith('collision'):
             box = layout.box()
             if ob.parent:
                 box.label(text='object is a collision proxy for: %s' %ob.parent.name)
@@ -751,15 +902,101 @@ class Ogre_Physics_LOD(bpy.types.Panel):
 
         #####################
         game = ob.game
-        if not game.use_collision_bounds:
-            box = layout.box()
-            op = box.operator( 'ogre.set_collision', text='Enable Collision' )
-            op.MODE = 'direct:%s' %game.collision_bounds_type
+        mode = ob.collision_mode
 
-            op = box.operator( 'ogre.set_collision', text='Terrain Collision' )
-            op.MODE = 'terrain'
+
+        #if not game.use_collision_bounds:
+        if mode == 'NONE':
+            box = layout.box()
+            op = box.operator( 'ogre.set_collision', text='Enable Collision', icon='PLUS' )
+            op.MODE = 'PRIMITIVE:%s' %game.collision_bounds_type
 
         else:
+            prim = game.collision_bounds_type
+
+            box = layout.box()
+            op = box.operator( 'ogre.set_collision', text='Disable Collision', icon='X' )
+            op.MODE = 'NONE'
+            box.prop(game, "collision_margin", text="Collision Margin", slider=True)
+
+            if mode == 'DECIMATED':
+                box = layout.box()
+                decmod = self.get_decimate_modifier( ob )
+                box.prop( decmod, 'ratio', 'vertex reduction ratio' )
+                box.label(text='faces: %s' %decmod.face_count )
+
+            box = layout.box()
+            if mode == 'PRIMITIVE': box.label(text='Primitive: %s' %prim)
+            else: box.label(text='Primitive')
+            row = box.row()
+            _icons = {
+                'BOX':'MESH_CUBE', 'SPHERE':'MESH_UVSPHERE', 'CYLINDER':'MESH_CYLINDER',
+                'CONE':'MESH_CONE', 'CAPSULE':'META_CAPSULE'}
+            for a in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
+                if prim == a and mode == 'PRIMITIVE':
+                    op = row.operator( 'ogre.set_collision', text='', icon=_icons[a], emboss=True )
+                    op.MODE = 'PRIMITIVE:%s' %a
+                else:
+                    op = row.operator( 'ogre.set_collision', text='', icon=_icons[a], emboss=False )
+                    op.MODE = 'PRIMITIVE:%s' %a
+
+            box = layout.box()
+            if mode == 'MESH': box.label(text='Mesh: %s' %prim.split('_')[0] )
+            else: box.label(text='Mesh')
+            row = box.row()
+            row.label(text='- - - - - - - - - - - - - -')
+            _icons = {'TRIANGLE_MESH':'MESH_ICOSPHERE', 'CONVEX_HULL':'SURFACE_NCURVE'}
+            for a in 'TRIANGLE_MESH CONVEX_HULL'.split():
+                if prim == a and mode == 'MESH':
+                    op = row.operator( 'ogre.set_collision', text='', icon=_icons[a], emboss=True )
+                    op.MODE = 'MESH:%s' %a
+                else:
+                    op = row.operator( 'ogre.set_collision', text='', icon=_icons[a], emboss=False )
+                    op.MODE = 'MESH:%s' %a
+
+            box = layout.box()
+            if mode == 'DECIMATED': box.label(text='Decimate: %s' %prim.split('_')[0] )
+            else: box.label(text='Decimate')
+            row = box.row()
+            row.label(text='- - - - - - - - - - - - - -')
+            _icons = {'TRIANGLE_MESH':'MESH_ICOSPHERE', 'CONVEX_HULL':'SURFACE_NCURVE'}
+            for a in 'TRIANGLE_MESH CONVEX_HULL'.split():
+                if prim == a and mode == 'DECIMATED':
+                    op = row.operator( 'ogre.set_collision', text='', icon=_icons[a], emboss=True )
+                    op.MODE = 'DECIMATED:%s' %a
+                else:
+                    op = row.operator( 'ogre.set_collision', text='', icon=_icons[a], emboss=False )
+                    op.MODE = 'DECIMATED:%s' %a
+
+            box = layout.box()
+            if mode == 'TERRAIN':
+                op = box.operator( 'ogre.set_collision', text='Terrain Collision', icon='X' )
+            else:
+                op = box.operator( 'ogre.set_collision', text='Terrain Collision' )
+            op.MODE = 'TERRAIN'
+
+            box = layout.box()
+            if mode == 'COMPOUND':
+                op = box.operator( 'ogre.set_collision', text='Compound Collision', icon='X' )
+            else:
+                op = box.operator( 'ogre.set_collision', text='Compound Collision' )
+            op.MODE = 'COMPOUND'
+
+
+
+    def get_decimate_modifier( self, ob ):
+        proxy = None
+        for child in ob.children:
+            if child.name.startswith('collision'): proxy = child; break
+
+        if proxy:
+            decmod = None
+            for mod in proxy.modifiers:
+                if mod.type == 'DECIMATE': decmod = mod; break
+            return decmod
+
+
+    def dummy():
             if not game.use_ghost:  # has collision
                 box = layout.box()
                 op = box.operator( 'ogre.set_collision', text='Disable Collision' )
@@ -1351,24 +1588,6 @@ TextureUnitAnimOps = {    ## DEPRECATED
     'wave_xform' : '_xform_type _wave_type _base _freq _phase _amp'.split(),
 }
 
-#    exmodes = 'one zero dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split()
-ogre_scene_blend_types =  [
-    ('one zero', 'one zero', 'solid default'),
-    ('alpha_blend', 'alpha_blend', 'basic alpha'),
-    ('add', 'add', 'additive'),
-    ('modulate', 'modulate', 'multiply'),
-    ('colour_blend', 'colour_blend', 'blend colors'),
-]
-for mode in 'dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split():
-    ogre_scene_blend_types.append( ('one %s'%mode, 'one %s'%mode, '') )
-del mode
-
-bpy.types.Material.scene_blend = EnumProperty(
-    items=ogre_scene_blend_types, 
-    name='scene blend', 
-    description='blending operation of material to scene', 
-    default='one zero'
-)
 
 class Ogre_Material_Panel( bpy.types.Panel ):
     bl_space_type = 'PROPERTIES'
@@ -1409,7 +1628,7 @@ class Ogre_Material_Panel( bpy.types.Panel ):
         row = box.row()
         row.prop(mat, "use_transparency", text="Transparent")
         if mat.use_transparency: row.prop(mat, "alpha")
-        box.prop(mat, 'scene_blend')
+        box.prop(mat, 'ogre_scene_blend')
 
 
 def has_property( a, name ):
@@ -1895,7 +2114,7 @@ class ShaderTree( _MatNodes_ ):
         else:
             M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
-        M += indent( 3, 'scene_blend %s' %mat.scene_blend )
+        M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
         for prop in mat.items():
             name,val = prop
             if not name.startswith('_'): M += indent( 3, '%s %s' %prop )
