@@ -686,6 +686,45 @@ class HeightMapSampler(object):
             buf.tofile(f)
         f.close()
 
+######################
+
+def _get_proxy_decimate_mod( ob ):
+    proxy = None
+    for child in ob.children:
+        if child.subcollision and child.name.startswith('DECIMATED'):
+            for mod in child.modifiers:
+                if mod.type == 'DECIMATE': return mod
+
+def bake_terrain( ob ):
+    assert ob.collision_mode == 'TERRAIN'
+    terrain = None
+    for child in ob.children:
+        if child.subcollision and child.name.startswith('TERRAIN'):
+            terrain = child
+            break
+    assert terrain
+    data = terrain.to_mesh(bpy.context.scene, True, "PREVIEW")
+    raw = [ v.z for v in data.vertices ]
+    Zmin = min( raw )
+    Zmax = max( raw )
+    diff = Zmax-Zmin
+    m = 1.0 / diff
+
+    rows = []
+    i = 0
+    for x in range( ob.collision_terrain_x_steps ):
+        row = []
+        for y in range( ob.collision_terrain_y_steps ):
+            v = data.vertices[ i ]
+            z = (v.z - Zmin) * m
+            row.append( z )
+            i += 1
+        if x%2: row.reverse()   # blender grid prim zig-zags
+        rows.append( row )
+        print(row)
+
+    return rows
+
 
 class OgreCollisionOp(bpy.types.Operator):
     '''ogre collision'''  
@@ -699,24 +738,23 @@ class OgreCollisionOp(bpy.types.Operator):
     def poll(cls, context):
         if context.active_object and context.active_object.type == 'MESH': return True
 
-    def get_proxies( self, ob, create=True ):
+    def get_subcollisions( self, ob, create=True ):
         prefix = '%s.' %ob.collision_mode
-
         r = []
         for child in ob.children:
             if child.subcollision and child.name.startswith( prefix ):
                 r.append( child )
-
-        #################### create ###############
         if not r and create:
-            method = getattr(self, 'create_%s'%ob.game.collision_mode)
-            r.append( method(ob) )
+            method = getattr(self, 'create_%s'%ob.collision_mode)
+            p = method(ob)
+            p.name = '%s.%s' %(ob.collision_mode, ob.name)
+            p.subcollision = True
+            r.append( p )
+        return r
 
-
-    def create_DECIMATED(self):
+    def create_DECIMATED(self, ob):
         child = ob.copy()
         bpy.context.scene.objects.link( child )
-        child.name = 'DECIMATED.%s' %parent.name
         child.matrix_local = mathutils.Matrix()
         child.parent = ob
         child.hide_select = True
@@ -725,9 +763,47 @@ class OgreCollisionOp(bpy.types.Operator):
         child.lock_location = [True]*3
         child.lock_rotation = [True]*3
         child.lock_scale = [True]*3
-        child.game.subcollision = True
+        decmod = child.modifiers.new('proxy', type='DECIMATE')
+        decmod.ratio = 0.5
         return child
 
+    def create_TERRAIN(self, ob):
+        x = ob.collision_terrain_x_steps
+        y = ob.collision_terrain_y_steps
+        #################################
+        #pos = ob.matrix_world.to_translation()
+        bpy.ops.mesh.primitive_grid_add(
+            x_subdivisions=x, 
+            y_subdivisions=y, 
+            size=1.0 )      #, location=pos )
+        grid = bpy.context.active_object
+        assert grid.name.startswith('Grid')
+        grid.collision_terrain_x_steps = x
+        grid.collision_terrain_y_steps = y
+        #############################
+        x,y,z = ob.dimensions
+        sx,sy,sz = ob.scale
+        x *= 1.0/sx
+        y *= 1.0/sy
+        z *= 1.0/sz
+        grid.scale.x = x/2
+        grid.scale.y = y/2
+        grid.location.z -= z/2
+        grid.data.show_all_edges = True
+        grid.draw_type = 'WIRE'
+        grid.hide_select = True
+        #grid.select = False
+        grid.lock_location = [True]*3
+        grid.lock_rotation = [True]*3
+        grid.lock_scale = [True]*3
+        grid.parent = ob
+        bpy.context.scene.objects.active = ob
+        mod = grid.modifiers.new(name='temp', type='SHRINKWRAP')
+        mod.wrap_method = 'PROJECT'
+        mod.use_project_z = True
+        mod.target = ob
+        mod.cull_face = 'FRONT'
+        return grid
 
 
     def invoke(self, context, event):
@@ -737,147 +813,83 @@ class OgreCollisionOp(bpy.types.Operator):
         subtype = None
         if ':' in self.MODE:
             mode, subtype = self.MODE.split(':')
-            game.collision_bounds_type = subtype
-
+            ##BLENDERBUG##ob.game.collision_bounds_type = subtype   # BUG this can not come before
+            if subtype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
+                ob.draw_bounds_type = subtype
+            else:
+                ob.draw_bounds_type = 'POLYHEDRON'
+            ob.game.collision_bounds_type = subtype  # BLENDERBUG - this must come after draw_bounds_type assignment
         else:
             mode = self.MODE
         ob.collision_mode = mode
-        print('OKKKKKKKKKKKK')
+
+        if ob.data.show_all_edges: ob.data.show_all_edges = False
+        if ob.show_texture_space: ob.show_texture_space = False
+        if ob.show_bounds: ob.show_bounds = False
+        if ob.show_wire: ob.show_wire = False
+        for child in ob.children:
+            if child.subcollision and not child.hide: child.hide = True
+
 
         if mode == 'NONE':
             game.use_ghost = True
             game.use_collision_bounds = False
 
-            if ob.show_bounds: ob.show_bounds = False
-            if ob.show_wire: ob.show_wire = False
-            for child in ob.children:
-                if child.subcollision: child.hide = True
-
         elif mode == 'PRIMITIVE':
             game.use_ghost = False
             game.use_collision_bounds = True
+            ob.show_bounds = True
 
         elif mode == 'MESH':
             game.use_ghost = False
             game.use_collision_bounds = True
+            ob.show_wire = True
+
+            if game.collision_bounds_type == 'CONVEX_HULL':
+                ob.show_texture_space = True
+            else:
+                ob.data.show_all_edges = True
 
         elif mode == 'DECIMATED':
             game.use_ghost = True
             game.use_collision_bounds = False
+            game.use_collision_compound = True
+
+            proxy = self.get_subcollisions(ob)[0]
+            if proxy.hide: proxy.hide = False
+            ob.game.use_collision_compound = True  # proxy
+            mod = _get_proxy_decimate_mod( ob )
+            mod.show_viewport = True
+            if not proxy.select:    # ugly (but works)
+                proxy.hide_select = False
+                proxy.select = True
+                proxy.hide_select = True
+
+            if game.collision_bounds_type == 'CONVEX_HULL':
+                ob.show_texture_space = True
 
 
         elif mode == 'TERRAIN':
             game.use_ghost = True
-            game.use_collision_bounds = True
+            game.use_collision_bounds = False
+            game.use_collision_compound = True
+
+            proxy = self.get_subcollisions(ob)[0]
+            if proxy.hide: proxy.hide = False
+
 
         elif mode == 'COMPOUND':
             game.use_ghost = True
-            game.use_collision_bounds = True
+            game.use_collision_bounds = False
             game.use_collision_compound = True
 
-
-
-
-
-
-        proxy = None
-        for child in ob.children:
-            if child.name.startswith('collision'): proxy = child; break
-
-        if self.MODE != 'disable' and not proxy:    # create new proxy and hide it
-            parent = context.active_object
-            if self.MODE == 'terrain':
-                hms = HeightMapSampler( parent )
-
-            else:
-                child = parent.copy()
-                bpy.context.scene.objects.link( child )
-                child.name = 'collision.%s' %parent.name
-                child.matrix_local = mathutils.Matrix()
-                child.parent = parent
-                child.hide_select = True
-                child.draw_type = 'WIRE'
-                #child.select = False
-                child.lock_location = [True]*3
-                child.lock_rotation = [True]*3
-                child.lock_scale = [True]*3
-                proxy = child
-
-        decmod = None
-        if proxy:
-            for mod in proxy.modifiers:
-                if mod.type == 'DECIMATE': decmod = mod; break
-            if not decmod:
-                decmod = proxy.modifiers.new('LOD', type='DECIMATE')
-                decmod.ratio = 0.5
-
-        if self.MODE == 'disable':
-            game.use_ghost = True
-            if ob.show_bounds: ob.show_bounds = False
-            if ob.show_wire: ob.show_wire = False
-            if proxy and not proxy.hide: proxy.hide = True
-            game.use_collision_bounds = False
-
-        elif self.MODE == 'terrain': pass
-
-        else:
-            if game.physics_type not in 'RIGID_BODY SENSOR'.split():
-                game.physics_type = 'SENSOR'
-
-            btype = self.MODE.split(':')[-1]
-            game.use_ghost = False
-            game.use_collision_bounds = True
-            print( 'setting', btype)
-            game.collision_bounds_type = btype
-            print( game.collision_bounds_type )
-
-            if self.MODE.startswith( 'proxy' ):        # decimated proxy
-                game.use_collision_compound = True  # proxy
-
-                ob.data.show_all_edges = False
-                ob.show_texture_space = False
-
-                if proxy.hide: proxy.hide = False
-                decmod.show_viewport = True
-
-                if ob.show_bounds: ob.show_bounds = False
-                if ob.show_wire: ob.show_wire = False
-
-                if not proxy.select:    # ugly (but works)
-                    proxy.hide_select = False
-                    proxy.select = True
-                    proxy.hide_select = True
-
-            elif self.MODE.startswith( 'direct' ):      # directly use mesh as collision or primitive
-                game.use_collision_compound = False     # direct
-
-                if proxy and not proxy.hide: proxy.hide = True
-                if not ob.show_bounds: ob.show_bounds = True
-
-                if btype in 'BOX SPHERE CYLINDER CONE CAPSULE'.split():
-                    if ob.show_wire: ob.show_wire = False
-                    if ob.draw_bounds_type != btype: ob.draw_bounds_type = btype
-                    ob.show_texture_space = False
-
-                elif btype == 'CONVEX_HULL':
-                    if not ob.show_wire: ob.show_wire = True
-                    ob.draw_bounds_type = 'POLYHEDRON'
-                    ob.data.show_all_edges = False
-                    ob.show_texture_space = True
-
-                elif btype == 'TRIANGLE_MESH':
-                    if not ob.show_wire: ob.show_wire = True
-                    ob.draw_bounds_type = 'POLYHEDRON'
-                    ob.data.show_all_edges = True
-                    ob.show_texture_space = False
-
-                else: assert 0
+        else: assert 0    # unknown mode
 
         return {'FINISHED'}
 
 
 
-############## mesh LOD physics #############
+################################
 class PhysicsPanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
@@ -891,7 +903,7 @@ class PhysicsPanel(bpy.types.Panel):
         layout = self.layout
         ob = context.active_object
         if ob.type != 'MESH': return
-        elif ob.subcollision == True: #ob.name.startswith('collision'):
+        elif ob.subcollision == True:
             box = layout.box()
             if ob.parent:
                 box.label(text='object is a collision proxy for: %s' %ob.parent.name)
@@ -919,11 +931,6 @@ class PhysicsPanel(bpy.types.Panel):
             op.MODE = 'NONE'
             box.prop(game, "collision_margin", text="Collision Margin", slider=True)
 
-            if mode == 'DECIMATED':
-                box = layout.box()
-                decmod = self.get_decimate_modifier( ob )
-                box.prop( decmod, 'ratio', 'vertex reduction ratio' )
-                box.label(text='faces: %s' %decmod.face_count )
 
             box = layout.box()
             if mode == 'PRIMITIVE': box.label(text='Primitive: %s' %prim)
@@ -955,10 +962,19 @@ class PhysicsPanel(bpy.types.Panel):
                     op.MODE = 'MESH:%s' %a
 
             box = layout.box()
-            if mode == 'DECIMATED': box.label(text='Decimate: %s' %prim.split('_')[0] )
-            else: box.label(text='Decimate')
-            row = box.row()
-            row.label(text='- - - - - - - - - - - - - -')
+            if mode == 'DECIMATED':
+                box.label(text='Decimate: %s' %prim.split('_')[0] )
+                row = box.row()
+                mod = _get_proxy_decimate_mod( ob )
+                assert mod  # decimate modifier is missing
+                row.label(text='Faces: %s' %mod.face_count )
+                box.prop( mod, 'ratio', text='' )
+
+            else:
+                box.label(text='Decimate')
+                row = box.row()
+                row.label(text='- - - - - - - - - - - - - -')
+
             _icons = {'TRIANGLE_MESH':'MESH_ICOSPHERE', 'CONVEX_HULL':'SURFACE_NCURVE'}
             for a in 'TRIANGLE_MESH CONVEX_HULL'.split():
                 if prim == a and mode == 'DECIMATED':
@@ -969,71 +985,22 @@ class PhysicsPanel(bpy.types.Panel):
                     op.MODE = 'DECIMATED:%s' %a
 
             box = layout.box()
+            row = box.row()
             if mode == 'TERRAIN':
-                op = box.operator( 'ogre.set_collision', text='Terrain Collision', icon='X' )
+                row.prop( ob, 'collision_terrain_x_steps', 'X' )
+                row.prop( ob, 'collision_terrain_y_steps', 'Y' )
+                op = row.operator( 'ogre.set_collision', text='update', icon='MESH_GRID' )
             else:
-                op = box.operator( 'ogre.set_collision', text='Terrain Collision' )
+                op = row.operator( 'ogre.set_collision', text='Terrain Collision', icon='MESH_GRID' )
             op.MODE = 'TERRAIN'
 
             box = layout.box()
             if mode == 'COMPOUND':
-                op = box.operator( 'ogre.set_collision', text='Compound Collision', icon='X' )
+                op = box.operator( 'ogre.set_collision', text='Compound Collision', icon='ROTATECOLLECTION' )
             else:
-                op = box.operator( 'ogre.set_collision', text='Compound Collision' )
+                op = box.operator( 'ogre.set_collision', text='Compound Collision', icon='ROTATECOLLECTION' )
             op.MODE = 'COMPOUND'
 
-
-
-    def get_decimate_modifier( self, ob ):
-        proxy = None
-        for child in ob.children:
-            if child.name.startswith('collision'): proxy = child; break
-
-        if proxy:
-            decmod = None
-            for mod in proxy.modifiers:
-                if mod.type == 'DECIMATE': decmod = mod; break
-            return decmod
-
-
-    def dummy():
-            if not game.use_ghost:  # has collision
-                box = layout.box()
-                op = box.operator( 'ogre.set_collision', text='Disable Collision' )
-                op.MODE = 'disable'
-                box.prop(game, "collision_margin", text="Collision Margin", slider=True)
-
-            box = layout.box()
-            for btype in 'BOX SPHERE CYLINDER CONE CAPSULE TRIANGLE_MESH CONVEX_HULL'.split():
-                if game.collision_bounds_type == btype and not game.use_collision_compound and not game.use_ghost:
-                    op = box.operator( 'ogre.set_collision', text=btype, icon='X' )
-                    op.MODE = 'direct:%s' %btype
-                else:
-                    op = box.operator( 'ogre.set_collision', text=btype )
-                    op.MODE = 'direct:%s' %btype
-
-            box = layout.box()
-            for btype in 'TRIANGLE_MESH CONVEX_HULL'.split():
-                if game.collision_bounds_type == btype and game.use_collision_compound and not game.use_ghost:
-                    op = box.operator( 'ogre.set_collision', text=btype+' (proxy)', icon='X' )
-                    op.MODE = 'proxy:%s' %btype
-                else:
-                    op = box.operator( 'ogre.set_collision', text=btype+' (proxy)' )
-                    op.MODE = 'proxy:%s' %btype
-
-
-            if game.use_collision_compound:
-                box = layout.box()
-                proxy = None
-                for child in ob.children:
-                    if child.name.startswith('collision'): proxy = child; break
-                if proxy:
-                    decmod = None
-                    for mod in proxy.modifiers:
-                        if mod.type == 'DECIMATE': decmod = mod; break
-                    if decmod:
-                        box.prop( decmod, 'ratio', 'vertex reduction ratio' )
-                        box.label(text='faces: %s' %decmod.face_count )
 
 
 
@@ -4257,7 +4224,7 @@ class _TXML_(object):
 
     ########################################
     def tundra_entity( self, doc, ob, collision_proxies=[] ):
-        assert not ob.name.startswith('collision')
+        assert not ob.subcollision
         # txml has flat hierarchy
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
@@ -4339,7 +4306,8 @@ class _TXML_(object):
 
         ## any object can have physics ##
         #if ob.game.physics_type == 'RIGID_BODY':
-        if not ob.game.use_ghost and ob.game.physics_type in 'RIGID_BODY SENSOR'.split():
+        #if not ob.game.use_ghost and ob.game.physics_type in 'RIGID_BODY SENSOR'.split():
+        if ob.collision_mode != 'NONE':
             TundraTypes = {
                 'BOX' : 0,
                 'SPHERE' : 1,
@@ -4380,15 +4348,20 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Collision mesh ref')
-            if ob.game.use_collision_compound:
+            #if ob.game.use_collision_compound:
+            if ob.collision_mode == 'DECIMATED':
                 proxy = None
                 for child in ob.children:
-                    if child.name.startswith('collision'): proxy = child; break
+                    if child.subcollision and child.name.startswith('DECIMATED'):
+                        proxy = child; break
                 if proxy:
                     a.setAttribute('value', 'local://_collision_%s.mesh' %proxy.data.name)
                     if proxy not in collision_proxies: collision_proxies.append( proxy )
                 else:
                     print( 'WARN: collision proxy mesh not found' )
+                    assert 0
+
+            elif ob.collision_mode == 'TERRAIN': assert 0
 
             elif ob.type == 'MESH':
                 a.setAttribute('value', 'local://%s.mesh' %ob.data.name)
@@ -4755,7 +4728,7 @@ class _OgreCommonExport_( _TXML_ ):
         objects = []        # gather because macros will change selection state
         linkedgroups = []
         for ob in bpy.context.scene.objects:
-            if ob.name.startswith('collision'): continue
+            if ob.subcollision: continue
             if self.EX_SELONLY and not ob.select:
                 if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA: pass
                 elif ob.type == 'LAMP' and self.EX_FORCE_LAMPS: pass
@@ -4998,7 +4971,7 @@ class _OgreCommonExport_( _TXML_ ):
                     mesh_collision_prims[ ob.data.name ] = collisionPrim
                 else:
                     for child in ob.children:
-                        if child.name.startswith('collision'):        # double check, instances with decimate modifier are ok?
+                        if child.subcollision and child.name.startswith('DECIMATE'):
                             collisionFile = '%s_collision_%s.mesh' %(prefix,ob.data.name)
                             break
                     if collisionFile:
