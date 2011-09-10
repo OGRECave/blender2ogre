@@ -21,7 +21,7 @@ bl_info = {
     "blender": (2,5,9),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
-    "warning": "Quick Start: '.mesh' output requires OgreCommandLineTools (http://www.ogre3d.org/download/tools) - install to the default path.",
+    #"warning": "Quick Start: '.mesh' output requires OgreCommandLineTools (http://www.ogre3d.org/download/tools) - install to the default path.",
     "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
@@ -695,7 +695,7 @@ def _get_proxy_decimate_mod( ob ):
             for mod in child.modifiers:
                 if mod.type == 'DECIMATE': return mod
 
-def bake_terrain( ob ):
+def bake_terrain( ob, normalize=True ):
     assert ob.collision_mode == 'TERRAIN'
     terrain = None
     for child in ob.children:
@@ -704,11 +704,11 @@ def bake_terrain( ob ):
             break
     assert terrain
     data = terrain.to_mesh(bpy.context.scene, True, "PREVIEW")
-    raw = [ v.z for v in data.vertices ]
+    raw = [ v.co.z for v in data.vertices ]
     Zmin = min( raw )
     Zmax = max( raw )
-    diff = Zmax-Zmin
-    m = 1.0 / diff
+    depth = Zmax-Zmin
+    m = 1.0 / depth
 
     rows = []
     i = 0
@@ -716,15 +716,47 @@ def bake_terrain( ob ):
         row = []
         for y in range( ob.collision_terrain_y_steps ):
             v = data.vertices[ i ]
-            z = (v.z - Zmin) * m
+            if normalize: z = (v.co.z - Zmin) * m
+            else: z = v.co.z
             row.append( z )
             i += 1
         if x%2: row.reverse()   # blender grid prim zig-zags
         rows.append( row )
-        print(row)
 
-    return rows
+    return {'data':rows, 'min':Zmin, 'max':Zmax, 'depth':depth}
 
+def save_terrain_as_NTF( path, ob ):    # Tundra format - hardcoded 16x16 patch format
+    info = bake_terrain( ob )
+    url = os.path.join( path, '%s.ntf'%ob.data.name )
+    f = open(url, "wb")
+    buf = array.array("I")  # header
+    xs = ob.collision_terrain_x_steps
+    ys = ob.collision_terrain_y_steps
+    xpatches = int(xs/16)
+    ypatches = int(ys/16)
+    header = [ xpatches, ypatches ]
+    buf.fromlist( header )
+    buf.tofile(f)
+    ########## body ###########
+    rows = info['data']
+    for x in range( xpatches ):
+        for y in range( ypatches ):
+            patch = []
+            for i in range(16):
+                for j in range(16):
+                    v = rows[ (x*16)+i ][ (y*16)+j ]
+                    patch.append( v )
+            buf = array.array("f")
+            buf.fromlist( patch )
+            buf.tofile(f)
+    f.close()
+    path,name = os.path.split(url)
+    R = {
+        'url':url, 'min':info['min'], 'max':info['max'], 'path':path, 'name':name,
+        'xpatches': xpatches, 'ypatches': ypatches,
+        'depth':info['depth'],
+    }
+    return R
 
 class OgreCollisionOp(bpy.types.Operator):
     '''ogre collision'''  
@@ -4223,7 +4255,7 @@ class _TXML_(object):
         return doc
 
     ########################################
-    def tundra_entity( self, doc, ob, collision_proxies=[] ):
+    def tundra_entity( self, doc, ob, path='/tmp', collision_proxies=[] ):
         assert not ob.subcollision
         # txml has flat hierarchy
         e = doc.createElement( 'entity' )
@@ -4307,6 +4339,7 @@ class _TXML_(object):
         ## any object can have physics ##
         #if ob.game.physics_type == 'RIGID_BODY':
         #if not ob.game.use_ghost and ob.game.physics_type in 'RIGID_BODY SENSOR'.split():
+        NTF = None
         if ob.collision_mode != 'NONE':
             TundraTypes = {
                 'BOX' : 0,
@@ -4332,7 +4365,7 @@ class _TXML_(object):
                 a.setAttribute('value', '0.0')
 
 
-            a = doc.createElement('attribute'); com.appendChild( a )
+            SHAPE = a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Shape type')
             a.setAttribute('value', TundraTypes[ ob.game.collision_bounds_type ] )
 
@@ -4361,7 +4394,9 @@ class _TXML_(object):
                     print( 'WARN: collision proxy mesh not found' )
                     assert 0
 
-            elif ob.collision_mode == 'TERRAIN': assert 0
+            elif ob.collision_mode == 'TERRAIN':
+                NTF = save_terrain_as_NTF( path, ob )
+                SHAPE.setAttribute( 'value', '5' )  # HEIGHT_FIELD
 
             elif ob.type == 'MESH':
                 a.setAttribute('value', 'local://%s.mesh' %ob.data.name)
@@ -4421,6 +4456,54 @@ class _TXML_(object):
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Collision Mask')
             a.setAttribute('value', -1)
+
+        if NTF:     # Terrain
+            x = NTF['xpatches']
+            y = NTF['ypatches']
+            depth = NTF['depth']
+            com = doc.createElement('component'); e.appendChild( com )
+            com.setAttribute('type', 'EC_Terrain')
+            com.setAttribute('sync', '1')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Transform')
+            trans = '%s,0,%s,' %(-x/4, -y/4)
+            #trans = '0,0,0,'
+            sx,sy,sz = ob.dimensions
+            nx = sx/(x*16)
+            ny = sy/(y*16)
+            trans += '0,0,0,%s,%s,%s' %(nx,depth, ny)
+            a.setAttribute('value', trans )
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Grid Width')
+            a.setAttribute('value', x)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Grid Height')
+            a.setAttribute('value', y)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Tex. U scale')
+            a.setAttribute('value', 1.0)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Tex. V scale')
+            a.setAttribute('value', 1.0)
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Material')
+            a.setAttribute('value', '')
+
+            for i in range(4):
+                a = doc.createElement('attribute'); com.appendChild( a )
+                a.setAttribute('name', 'Texture %s' %i)
+                a.setAttribute('value', '')
+
+            a = doc.createElement('attribute'); com.appendChild( a )
+            a.setAttribute('name', 'Heightmap')
+            a.setAttribute('value', NTF['name'] )
+
 
         return e
 
@@ -4723,6 +4806,7 @@ class _OgreCommonExport_( _TXML_ ):
 
         print('ogre export->', url)
         prefix = url.split('.')[0]
+        path = os.path.split(url)[0]
 
         ## nodes (objects) ##
         objects = []        # gather because macros will change selection state
@@ -4733,7 +4817,8 @@ class _OgreCommonExport_( _TXML_ ):
                 if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA: pass
                 elif ob.type == 'LAMP' and self.EX_FORCE_LAMPS: pass
                 else: continue
-            if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP': linkedgroups.append( ob )
+            if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP': 
+                linkedgroups.append( ob )
             else: objects.append( ob )
 
         temps = []
@@ -4789,7 +4874,7 @@ class _OgreCommonExport_( _TXML_ ):
 
         if self.EX_MATERIALS:
             material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
-            material_files = self.dot_material( meshes, os.path.split(url)[0], material_file_name_base)
+            material_files = self.dot_material( meshes, path, material_file_name_base)
         else:
             material_files = []
 
@@ -4800,7 +4885,7 @@ class _OgreCommonExport_( _TXML_ ):
             ##########################################
             proxies = []
             for ob in objects:
-                TE = self.tundra_entity( rex, ob, collision_proxies=proxies )
+                TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
                 if ob.type == 'MESH' and len(ob.data.faces):
                     self.tundra_mesh( TE, ob, url, exported_meshes )
                     #meshes.append( ob )
