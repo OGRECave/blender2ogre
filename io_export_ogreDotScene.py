@@ -953,18 +953,22 @@ class PhysicsPanel(bpy.types.Panel):
                     op.MODE = 'DECIMATED:%s' %a
 
             box = layout.box()
-            row = box.row()
             if mode == 'TERRAIN':
-                op = row.operator( 'ogre.set_collision', text='Rebuild Terrain', icon='MESH_GRID' )
+                terrain = get_subcollisions( ob )[0]
+                if ob.collision_terrain_x_steps != terrain.collision_terrain_x_steps or ob.collision_terrain_y_steps != terrain.collision_terrain_y_steps:
+                    op = box.operator( 'ogre.set_collision', text='Rebuild Terrain', icon='MESH_GRID' )
+                    op.MODE = 'TERRAIN'
+
                 row = box.row()
                 row.prop( ob, 'collision_terrain_x_steps', 'X' )
                 row.prop( ob, 'collision_terrain_y_steps', 'Y' )
-                terrain = get_subcollisions( ob )[0]
-                box.prop( terrain, 'location' )
+                #box.prop( terrain.modifiers[0], 'offset' ) # gets normalized away
+                box.prop( terrain.modifiers[0], 'cull_face', text='Cull' )
+                box.prop( terrain, 'location' )     # TODO hide X and Y
 
             else:
-                op = row.operator( 'ogre.set_collision', text='Terrain Collision', icon='MESH_GRID' )
-            op.MODE = 'TERRAIN'
+                op = box.operator( 'ogre.set_collision', text='Terrain Collision', icon='MESH_GRID' )
+                op.MODE = 'TERRAIN'
 
             box = layout.box()
             if mode == 'COMPOUND':
@@ -6777,9 +6781,9 @@ class INFO_HT_myheader(bpy.types.Header):
         if rd.use_game_engine: sub.menu("INFO_MT_game")
         else: sub.menu("INFO_MT_render")
 
-        row = layout.row(align=True)
-        row.menu("INFO_MT_instances", icon='NODETREE')
-        row.menu("INFO_MT_groups", icon='GROUP')
+        row = layout.row(align=True); row.scale_x = 2.0
+        row.menu("INFO_MT_instances", icon='NODETREE', text='')
+        row.menu("INFO_MT_groups", icon='GROUP', text='')
         #row.menu("INFO_MT_actors", icon='GAME')        # not useful?
         #row.menu("INFO_MT_dynamics", icon='PHYSICS')   # not useful?
         #layout.separator()
@@ -6807,17 +6811,14 @@ class INFO_HT_myheader(bpy.types.Header):
                 row.prop( ob, 'name', text='' )
                 row.prop( ob, 'draw_type', text='' )
                 row.prop( ob, 'show_x_ray', text='' )
+                row = layout.row()
+                row.scale_y = 0.75
+                row.prop( ob, 'layers', text='' )
 
             layout.separator()
-            row = layout.row(align=True)        # align makes buttons compact together
-            row.operator("screen.frame_jump", text="", icon='REW').end = False
-            row.operator("screen.keyframe_jump", text="", icon='PREV_KEYFRAME').next = False
-            if not screen.is_animation_playing: row.operator("screen.animation_play", text="", icon='PLAY')
-            else: sub = row.row(); sub.scale_x = 1.0; sub.operator("screen.animation_play", text="", icon='PAUSE')
-            row.operator("screen.keyframe_jump", text="", icon='NEXT_KEYFRAME').next = True
-            row.operator("screen.frame_jump", text="", icon='FF').end = True
-            row = layout.row(align=True)
-            layout.prop(scene, "frame_current", text="")
+            row = layout.row(align=True); row.scale_x = 1.1
+            row.prop(scene.game_settings, 'material_mode', text='')
+            row.prop(scene, 'camera', text='')
 
 
 
