@@ -280,7 +280,8 @@ material _missing_material_
 
 ############# helper functions ##############
 
-def is_terrain( ob ):   # a default plane, with simple-subsurf and displace modifier on Z
+# a default plane, with simple-subsurf and displace modifier on Z
+def is_strictly_simple_terrain( ob ):
     if len(ob.data.vertices) != 4 and len(ob.data.faces) != 1: return False
     elif len(ob.modifiers) < 2: return False
     elif ob.modifiers[0].type != 'SUBSURF' or ob.modifiers[1].type != 'DISPLACE': return False
@@ -587,7 +588,7 @@ class Ogre_User_Report(bpy.types.Menu):
             layout.label(text=line)
 
 #################################################
-## Collision ##
+#################### Collision ####################
 
 bpy.types.Object.collision_terrain_x_steps = IntProperty(
     name="Ogre Terrain: x samples", description="resolution in X of height map", 
@@ -616,75 +617,6 @@ bpy.types.Object.collision_mode = EnumProperty(
 bpy.types.Object.subcollision = BoolProperty(
     name="collision compound", description="member of a collision compound", default=False)
 
-
-
-class HeightMapSampler(object):
-    def __init__(self, ob):
-        self.object = ob
-        self.x_steps = ob.collision_terrain_x_steps
-        self.y_steps = ob.collision_terrain_y_steps
-        proxy = None
-        for child in ob.children:
-            if child.name.startswith('collision-map'):
-                proxy = child; break
-
-        if proxy: self.grid = proxy
-        else: self.build()
-
-    def build(self):
-        x = ob.game.terrain_x_steps
-        y = ob.game.terrain_y_steps
-
-        pos = ob.matrix_world.to_translation()
-        bpy.ops.mesh.primitive_grid_add( x_subdivisions=x, y_subdivisions=y, size=1.0 )#, location=pos )
-        self.grid = grid = bpy.context.active_object
-        assert grid.name.startswith('Grid')
-        grid.name = 'collision-map.%s' %ob.name
-        x,y,z = self.object.dimensions
-        grid.scale.x = x
-        grid.scale.y = y
-        grid.data.show_all_edges = True
-        grid.draw_type = 'WIRE'
-        grid.hide_select = True
-        grid.select = False
-        grid.lock_location = [True]*3
-        grid.lock_rotation = [True]*3
-        grid.lock_scale = [True]*3
-        grid.parent = ob
-
-        mod = grid.modifiers.new(name='temp', type='SHRINKWRAP')
-        mod.wrap_method = 'PROJECT'
-        mod.use_project_z = True
-        mod.target = ob
-
-
-    def bake(self):
-        data = self.grid.to_mesh(bpy.context.scene, True, "PREVIEW")
-        self.min = self.max = None
-        self.map = []
-        i = 0
-        for x in range(self.x_steps):
-            row = []
-            for y in range(self.y_steps):
-                v = data.vertices[ i ]
-                if self.min is None or self.min > v.z: self.min = v.z
-                if self.max is None or self.max < v.z: self.max = v.z
-                row.append( v.z )
-                i += 1
-            if x%2: row.reverse()   # blender grid prim zig-zags
-            self.map.append( row )
-
-
-    def save_ntf( self, url ):
-        f = open(url, "wb")
-        buf = array.array("I")  # header
-        buf.fromlist( [self.x_steps, self.y_steps] )
-        buf.tofile(f)
-        for row in self.map:
-            buf = array.array("f")
-            buf.fromlist( row )
-            buf.tofile(f)
-        f.close()
 
 ######################
 
@@ -758,6 +690,14 @@ def save_terrain_as_NTF( path, ob ):    # Tundra format - hardcoded 16x16 patch 
     }
     return R
 
+def get_subcollisions(ob):
+    prefix = '%s.' %ob.collision_mode
+    r = []
+    for child in ob.children:
+        if child.subcollision and child.name.startswith( prefix ):
+            r.append( child )
+    return r
+
 class OgreCollisionOp(bpy.types.Operator):
     '''ogre collision'''  
     bl_idname = "ogre.set_collision"  
@@ -771,11 +711,7 @@ class OgreCollisionOp(bpy.types.Operator):
         if context.active_object and context.active_object.type == 'MESH': return True
 
     def get_subcollisions( self, ob, create=True ):
-        prefix = '%s.' %ob.collision_mode
-        r = []
-        for child in ob.children:
-            if child.subcollision and child.name.startswith( prefix ):
-                r.append( child )
+        r = get_subcollisions( ob )
         if not r and create:
             method = getattr(self, 'create_%s'%ob.collision_mode)
             p = method(ob)
@@ -1019,9 +955,13 @@ class PhysicsPanel(bpy.types.Panel):
             box = layout.box()
             row = box.row()
             if mode == 'TERRAIN':
+                op = row.operator( 'ogre.set_collision', text='Rebuild Terrain', icon='MESH_GRID' )
+                row = box.row()
                 row.prop( ob, 'collision_terrain_x_steps', 'X' )
                 row.prop( ob, 'collision_terrain_y_steps', 'Y' )
-                op = row.operator( 'ogre.set_collision', text='update', icon='MESH_GRID' )
+                terrain = get_subcollisions( ob )[0]
+                box.prop( terrain, 'location' )
+
             else:
                 op = row.operator( 'ogre.set_collision', text='Terrain Collision', icon='MESH_GRID' )
             op.MODE = 'TERRAIN'
@@ -4458,8 +4398,8 @@ class _TXML_(object):
             a.setAttribute('value', -1)
 
         if NTF:     # Terrain
-            x = NTF['xpatches']
-            y = NTF['ypatches']
+            xp = NTF['xpatches']
+            yp = NTF['ypatches']
             depth = NTF['depth']
             com = doc.createElement('component'); e.appendChild( com )
             com.setAttribute('type', 'EC_Terrain')
@@ -4467,21 +4407,26 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Transform')
-            trans = '%s,0,%s,' %(-x/4, -y/4)
-            #trans = '0,0,0,'
-            sx,sy,sz = ob.dimensions
-            nx = sx/(x*16)
-            ny = sy/(y*16)
+            x,y,z = ob.dimensions
+            sx,sy,sz = ob.scale
+            x *= 1.0/sx
+            y *= 1.0/sy
+            z *= 1.0/sz
+            #trans = '%s,%s,%s,' %(-xp/4, -z/2, -yp/4)
+            trans = '%s,%s,%s,' %(-xp/4, -depth, -yp/4)
+            # scaling in Tundra happens after translation
+            nx = x/(xp*16)
+            ny = y/(yp*16)
             trans += '0,0,0,%s,%s,%s' %(nx,depth, ny)
             a.setAttribute('value', trans )
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Grid Width')
-            a.setAttribute('value', x)
+            a.setAttribute('value', xp)
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Grid Height')
-            a.setAttribute('value', y)
+            a.setAttribute('value', yp)
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Tex. U scale')
