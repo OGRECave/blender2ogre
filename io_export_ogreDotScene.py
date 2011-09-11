@@ -587,8 +587,28 @@ class Ogre_User_Report(bpy.types.Menu):
         for line in txt.splitlines():
             layout.label(text=line)
 
-#################################################
-#################### Collision ####################
+
+#################### New Physics ####################
+
+_physics_modes =  [
+    ('NONE', 'NONE', 'no physics'),
+    ('RIGED_BODY', 'RIGED_BODY', 'riged body'),
+    ('SOFT_BODY', 'SOFT_BODY', 'soft body'),
+]
+
+bpy.types.Object.physics_mode = EnumProperty(
+    items = _physics_modes, 
+    name = 'physics mode', 
+    description='physics mode', 
+    default='NONE'
+)
+
+bpy.types.Object.physics_friction = FloatProperty(
+    name='Simple Friction', description='physics friction', default=0.1, min=0.0, max=1.0)
+
+bpy.types.Object.physics_bounce = FloatProperty(
+    name='Simple Bounce', description='physics bounce', default=0.01, min=0.0, max=1.0)
+
 
 bpy.types.Object.collision_terrain_x_steps = IntProperty(
     name="Ogre Terrain: x samples", description="resolution in X of height map", 
@@ -690,13 +710,6 @@ def save_terrain_as_NTF( path, ob ):    # Tundra format - hardcoded 16x16 patch 
     }
     return R
 
-def get_subcollisions(ob):
-    prefix = '%s.' %ob.collision_mode
-    r = []
-    for child in ob.children:
-        if child.subcollision and child.name.startswith( prefix ):
-            r.append( child )
-    return r
 
 class OgreCollisionOp(bpy.types.Operator):
     '''ogre collision'''  
@@ -855,21 +868,21 @@ class OgreCollisionOp(bpy.types.Operator):
 
         return {'FINISHED'}
 
-
-
 ################################
 class PhysicsPanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    #bl_context = "data"
-    bl_label = "Collision"
+    bl_label = "Physics"
     @classmethod
     def poll(cls, context):
         if context.active_object: return True
         else: return False
+
     def draw(self, context):
         layout = self.layout
         ob = context.active_object
+        game = ob.game
+
         if ob.type != 'MESH': return
         elif ob.subcollision == True:
             box = layout.box()
@@ -879,13 +892,49 @@ class PhysicsPanel(bpy.types.Panel):
                 box.label(text='WARNING: collision proxy missing parent')
             return
 
+        #####################
+        box = layout.box()
+        box.prop(ob, 'physics_mode')
+        if ob.physics_mode != 'NONE':
+            box.prop(game, 'mass', text='Mass')
+            box.prop(ob, 'physics_friction', text='Friction', slider=True)
+            box.prop(ob, 'physics_bounce', text='Bounce', slider=True)
+
+            box.label(text="Damping:")
+            box.prop(game, 'damping', text='Translation', slider=True)
+            box.prop(game, 'rotation_damping', text='Rotation', slider=True)
+
+            box.label(text="Velocity:")
+            box.prop(game, "velocity_min", text="Minimum")
+            box.prop(game, "velocity_max", text="Maximum")
+
+
+################################
+class CollisionPanel(bpy.types.Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_label = "Collision"
+    @classmethod
+    def poll(cls, context):
+        if context.active_object: return True
+        else: return False
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+        game = ob.game
+
+        if ob.type != 'MESH': return
+        elif ob.subcollision == True:
+            box = layout.box()
+            if ob.parent:
+                box.label(text='object is a collision proxy for: %s' %ob.parent.name)
+            else:
+                box.label(text='WARNING: collision proxy missing parent')
+            return
 
         #####################
-        game = ob.game
         mode = ob.collision_mode
-
-
-        #if not game.use_collision_bounds:
         if mode == 'NONE':
             box = layout.box()
             op = box.operator( 'ogre.set_collision', text='Enable Collision', icon='PLUS' )
@@ -958,6 +1007,8 @@ class PhysicsPanel(bpy.types.Panel):
                 if ob.collision_terrain_x_steps != terrain.collision_terrain_x_steps or ob.collision_terrain_y_steps != terrain.collision_terrain_y_steps:
                     op = box.operator( 'ogre.set_collision', text='Rebuild Terrain', icon='MESH_GRID' )
                     op.MODE = 'TERRAIN'
+                else:
+                    box.label(text='Terrain:')
 
                 row = box.row()
                 row.prop( ob, 'collision_terrain_x_steps', 'X' )
@@ -978,31 +1029,6 @@ class PhysicsPanel(bpy.types.Panel):
             op.MODE = 'COMPOUND'
 
 
-
-
-
-class Ogre_create_collision_op(bpy.types.Operator):
-    '''operator: creates new collision'''  
-    bl_idname = "ogre.create_collision"  
-    bl_label = "create collision mesh"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
-
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        parent = context.active_object
-        child = parent.copy()
-        bpy.context.scene.objects.link( child )
-        child.name = 'collision'
-        child.matrix_local = mathutils.Matrix()
-        child.parent = parent
-        child.hide_select = True
-        child.draw_type = 'WIRE'
-        #child.select = False
-        child.lock_location = [True]*3
-        child.lock_rotation = [True]*3
-        child.lock_scale = [True]*3
-        return {'FINISHED'}
 
 
 ############### extra tools #############
@@ -1173,58 +1199,6 @@ The most common thing a designer will want to do is have an event trigger an ani
 '''
 
 
-class Ogre_Physics(bpy.types.Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    #bl_context = "physics"
-    bl_label = "Ogre Physics"
-
-    @classmethod
-    def poll(cls, context):
-        if context.active_object: return True
-        else: return False
-
-    def draw(self, context):
-        layout = self.layout
-        ob = context.active_object
-        game = ob.game
-        #nothing useful here?#soft = ob.game.soft_body
-
-        box = layout.box()
-        box.prop(game, "physics_type", text='Type')
-        box.prop(game, "use_actor")
-
-        box.separator()
-
-        box.label(text="Attributes:")
-        box.prop(game, "mass")
-        box.prop(game, "radius")
-        box.prop(game, "form_factor")
-
-
-        box.prop(game, "use_anisotropic_friction")
-        subsub = box.column()
-        subsub.active = game.use_anisotropic_friction
-        subsub.prop(game, "friction_coefficients", text="", slider=True)
-
-
-        box.label(text="Velocity:")
-        box.prop(game, "velocity_min", text="Minimum")
-        box.prop(game, "velocity_max", text="Maximum")
-
-        box.label(text="Damping:")
-        box.prop(game, "damping", text="Translation", slider=True)
-        box.prop(game, "rotation_damping", text="Rotation", slider=True)
-
-        box.separator()
-
-        box.prop(game, "lock_location_x", text="Lock Translation: X")
-        box.prop(game, "lock_location_y", text="Lock Translation: Y")
-        box.prop(game, "lock_location_z", text="Lock Translation: Z")
-
-        box.prop(game, "lock_rotation_x", text="Lock Rotation: X")
-        box.prop(game, "lock_rotation_y", text="Lock Rotation: Y")
-        box.prop(game, "lock_rotation_z", text="Lock Rotation: Z")
 
 
 
@@ -5170,9 +5144,6 @@ class _OgreCommonExport_( _TXML_ ):
 ################################################################
 
 
-## helper that calls the classmethod, sane API ##
-def generate_material( mat, path ):
-    return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
 
 class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
@@ -6317,7 +6288,6 @@ class VertexNoPos(object):
         return True
 
 
-
 #######################################################################################
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
     start = time.time()
@@ -7030,4 +7000,38 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
 
+#####################################################################################
+###################################### Public API #####################################
+
+def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
+    ''' returns materials used by the mesh '''
+    return dot_mesh( ob, path, force_name, ignore_shape_animation, opts, normals )
+
+
+def generate_material( mat, path ):
+    ''' returns generated material string '''
+    return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
+
+def get_subcollision_meshes():
+    ''' returns all collision meshes found in the scene '''
+    r = []
+    for ob in bpy.context.scene.objects:
+        if ob.type=='MESH' and ob.subcollision: r.append( ob )
+    return r
+
+def get_objects_with_subcollision():
+    ''' returns objects that have active sub-collisions '''
+    r = []
+    for ob in bpy.context.scene.objects:
+        if ob.type=='MESH' and ob.collision_mode not in ('NONE', 'PRIMITIVE'):
+            r.append( ob )
+    return r
+
+def get_subcollisions(ob):
+    prefix = '%s.' %ob.collision_mode
+    r = []
+    for child in ob.children:
+        if child.subcollision and child.name.startswith( prefix ):
+            r.append( child )
+    return r
 

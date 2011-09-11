@@ -22,6 +22,8 @@ import blender2ogre as b2ogre
 print( b2ogre, dir(b2ogre) )
 b2ogre.register()
 
+print(dir(b2ogre))
+
 #print( dir(bpy.app.handlers))
 #def prerender( a ):
 #	print( 'callback' )
