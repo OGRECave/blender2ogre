@@ -1920,10 +1920,18 @@ class ShaderTree( _MatNodes_ ):
             #if slot.use_map_color_diffuse:
             factor = 1.0 - slot.diffuse_color_factor
 
+            #M += indent(4, 'alpha_op_ex source1 src_manual src_current %s' %factor )
+            #M += indent(4, 'alpha_op_ex modulate src_texture src_manual %s' %factor )
+            #M += indent(4, 'alpha_op_ex subtract src_manual src_current %s' %factor )
+
             if texop == 'blend_manual':
                 M += indent(4, 'colour_op_ex %s src_current src_texture %s' %(texop, factor) )
             else:
-                M += indent(4, 'colour_op_ex %s src_current src_texture' %texop )
+                #M += indent(4, 'colour_op_ex %s src_manual src_current %s' %(texop, factor) )
+                M += indent(4, 'colour_op_ex %s src_texture src_current' %texop )
+                #M += indent(4, 'colour_op_ex blend_current_alpha src_texture src_current' )
+
+
                 #M += indent(4, 'colour_op_ex %s src_manual src_diffuse %s' %(texop, 1.0-factor) )
                 #M += indent(4, 'alpha_op_ex blend_manual src_current src_current %s' %factor )
             if slot.use_map_alpha:
@@ -6754,7 +6762,10 @@ class TundraPreviewOp(bpy.types.Operator,  _OgreCommonExport_):
         global TundraSingleton
         path = '/tmp/preview.txml'
         self.ogre_export( path, context )
-        TundraSingleton = TundraPipe()
+        if not TundraSingleton:
+            TundraSingleton = TundraPipe()
+        else:   # TODO
+            pass    #TundraSingleton.load( path )
         return {'FINISHED'}
 
 TundraSingleton = None
