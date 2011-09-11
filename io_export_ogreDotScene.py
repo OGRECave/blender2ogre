@@ -1897,7 +1897,7 @@ class ShaderTree( _MatNodes_ ):
             if rgba and slot.use_stencil:
                 texop =     'blend_current_alpha'        # 'blend_texture_alpha' shadeless
             elif btype == 'MIX':
-                texop = 'blend_manual'
+                texop = 'add_signed'    #'blend_manual'  # problem with blend manual it kills shading at 1.0
             elif btype == 'MULTIPLY':
                 texop = 'modulate'
             elif btype == 'SCREEN':
@@ -1909,12 +1909,13 @@ class ShaderTree( _MatNodes_ ):
             elif btype == 'SUBTRACT':
                 texop = 'subtract'
             elif btype == 'OVERLAY':
-                texop = 'add_signed'        # add_smooth not very useful?
+                texop = 'blend_manual'  #'add_signed'        
             elif btype == 'DIFFERENCE':
                 texop = 'dotproduct'        # nothing closely matches blender
             else:
                 texop = 'blend_diffuse_colour'
 
+            # add_smooth not very useful?
             #factor = .0
             #if slot.use_map_color_diffuse:
             factor = 1.0 - slot.diffuse_color_factor
@@ -4141,10 +4142,50 @@ class _TXML_(object):
 
 
         if context.scene.world.ogre_skyX:
+
+            ############### environment light ################
             e = doc.createElement( 'entity' )
             doc.documentElement.appendChild( e )
             e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
 
+            c = doc.createElement( 'component' ); e.appendChild( c )
+            c.setAttribute( 'type', 'EC_EnvironmentLight' )
+            c.setAttribute( 'sync', '1' )
+            c.setAttribute( 'name', 'blender-environment-light' )
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Sun color')
+            a.setAttribute('value', '0.638999999 0.638999999 0.638999999 1')
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Ambient color')
+            a.setAttribute('value', '0.363999993 0.363999993 0.363999993 1')
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Sun diffuse color')
+            a.setAttribute('value', '0.930000007 0.930000007 0.930000007 1')
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Sun direction vector')
+            a.setAttribute('value', '-1.0 -1.0 -1.0')
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Use fixed time')
+            a.setAttribute('value', 'false')
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Current time')
+            a.setAttribute('value', '0.67')
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Sun cast shadows')
+            a.setAttribute('value', 'true')
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Use Caelum')
+            a.setAttribute('value', 'true')
+
+            ################# SKYX ################
             c = doc.createElement( 'component' ); e.appendChild( c )
             c.setAttribute( 'type', 'EC_SkyX' )
             c.setAttribute( 'sync', '1' )
@@ -4528,21 +4569,25 @@ class _TXML_(object):
         a.setAttribute('name', 'light type' )
         a.setAttribute('value', '0' )
 
+        R,G,B = ob.data.color
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'diffuse color' )
-        a.setAttribute('value', '1 1 1 1' )
+        if ob.data.use_diffuse: a.setAttribute('value', '%s %s %s 1' %(R,G,B) )
+        else: a.setAttribute('value', '0 0 0 1' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'specular color' )
-        a.setAttribute('value', '0 0 0 1' )
+        if ob.data.use_specular: a.setAttribute('value', '%s %s %s 1' %(R,G,B) )
+        else: a.setAttribute('value', '0 0 0 1' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'cast shadows' )
-        a.setAttribute('value', 'false' )
+        if ob.data.shadow_method != 'NOSHADOW': a.setAttribute('value', 'true' )
+        else: a.setAttribute('value', 'false' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'light range' )
-        a.setAttribute('value', '100' )
+        a.setAttribute('value', ob.data.distance*2 )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'constant atten' )
@@ -4550,11 +4595,12 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'linear atten' )
-        a.setAttribute('value', '0.00999999978' )
+        #a.setAttribute('value', (1.0/ob.data.distance)*ob.data.energy )
+        a.setAttribute('value', 0.05*ob.data.energy )   # sane default
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'quadratic atten' )
-        a.setAttribute('value', '0.00999999978' )
+        a.setAttribute('value', '0.0' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'light inner angle' )
@@ -6702,9 +6748,7 @@ class TundraPreviewOp(bpy.types.Operator,  _OgreCommonExport_):
 
     @classmethod
     def poll(cls, context):
-        if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
-            if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
-            else: return True
+        if context.active_object: return True
 
     def invoke(self, context, event):
         global TundraSingleton
@@ -6763,6 +6807,8 @@ class TundraPipe(object):
         else:
             cmd = [exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        time.sleep(0.1)
+        self.stop()
 
     def load( self, url ):
         self.proc.stdin.write( b'loadscene(/tmp/preview.txml, true, true)\n')
@@ -6873,7 +6919,7 @@ _header_ = None
 class OGRE_toggle_toolbar_op(bpy.types.Operator):
     '''Toggle Ogre UI'''
     bl_idname = "ogre.toggle_interface"
-    bl_label = "Ogre Interface"
+    bl_label = "Ogre UI"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
