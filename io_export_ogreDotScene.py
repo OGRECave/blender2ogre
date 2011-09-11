@@ -37,7 +37,7 @@ AXIS_MODES =  [
 
 # options yet to be added to the config file
 OPTIONS = {
-    'EX_ONLY_ANIMATED_BONES' : False,
+    'ONLY_ANIMATED_BONES' : False,
     'FORCE_IMAGE_FORMAT' : None,
     'PATH' : '/tmp',    			# TODO SRombauts: use the CONFIG_TEMP_DIR variable
     'TOUCH_TEXTURES' : False,
@@ -5805,7 +5805,7 @@ class Skeleton(object):
                     ## the exporter will not be smart enough to know which bones are active for a given track...
                     ## can hijack blender NLA, user sets a single keyframe for only selected bones, and keys last frame
                     stripbones = []
-                    if OPTIONS['EX_ONLY_ANIMATED_BONES']:
+                    if OPTIONS['ONLY_ANIMATED_BONES']:
                         for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
                             if group.name in arm.pose.bones: stripbones.append( group.name )
 
