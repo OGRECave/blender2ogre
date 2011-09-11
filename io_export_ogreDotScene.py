@@ -592,7 +592,7 @@ class Ogre_User_Report(bpy.types.Menu):
 
 _physics_modes =  [
     ('NONE', 'NONE', 'no physics'),
-    ('RIGED_BODY', 'RIGED_BODY', 'riged body'),
+    ('RIGID_BODY', 'RIGID_BODY', 'rigid body'),
     ('SOFT_BODY', 'SOFT_BODY', 'soft body'),
 ]
 
@@ -937,7 +937,7 @@ class CollisionPanel(bpy.types.Panel):
         mode = ob.collision_mode
         if mode == 'NONE':
             box = layout.box()
-            op = box.operator( 'ogre.set_collision', text='Enable Collision', icon='PLUS' )
+            op = box.operator( 'ogre.set_collision', text='Enable Collision', icon='PHYSICS' )
             op.MODE = 'PRIMITIVE:%s' %game.collision_bounds_type
 
         else:
@@ -4258,7 +4258,8 @@ class _TXML_(object):
         #if ob.game.physics_type == 'RIGID_BODY':
         #if not ob.game.use_ghost and ob.game.physics_type in 'RIGID_BODY SENSOR'.split():
         NTF = None
-        if ob.collision_mode != 'NONE':
+
+        if ob.physics_mode != 'NONE' or ob.collision_mode != 'NONE':
             TundraTypes = {
                 'BOX' : 0,
                 'SPHERE' : 1,
@@ -4277,10 +4278,10 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Mass')
-            if ob.game.physics_type == 'RIGID_BODY':
+            if ob.physics_mode == 'RIGID_BODY':
                 a.setAttribute('value', ob.game.mass)
             else:
-                a.setAttribute('value', '0.0')
+                a.setAttribute('value', '0.0')  # disables physics in Tundra?
 
 
             SHAPE = a = doc.createElement('attribute'); com.appendChild( a )
@@ -4321,12 +4322,12 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Friction')
-            avg = sum( ob.game.friction_coefficients ) / 3.0
-            a.setAttribute('value', avg)
+            #avg = sum( ob.game.friction_coefficients ) / 3.0
+            a.setAttribute('value', ob.physics_friction)
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Restitution')
-            a.setAttribute('value', .0)
+            a.setAttribute('value', ob.physics_bounce)
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Linear damping')
@@ -4352,11 +4353,17 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Phantom')        # this must mean no-collide
-            a.setAttribute('value', str(ob.game.use_ghost).lower() )
+            if ob.collision_mode == 'NONE':
+                a.setAttribute('value', 'true' )
+            else:
+                a.setAttribute('value', 'false' )
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Draw Debug')
-            a.setAttribute('value', 'true' )
+            if ob.collision_mode == 'NONE':
+                a.setAttribute('value', 'false' )
+            else:
+                a.setAttribute('value', 'true' )
 
 
             a = doc.createElement('attribute'); com.appendChild( a )
@@ -6677,9 +6684,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 ## end dot_mesh ##
 
 
-class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
+class TundraPreviewOp(bpy.types.Operator,  _OgreCommonExport_):
     '''helper to open Tundra2 (realXtend)'''
-    bl_idname = 'ogre.preview_tundra'
+    bl_idname = 'tundra.preview'
     bl_label = "opens Tundra2 in a non-blocking subprocess"
     bl_options = {'REGISTER'}
 
@@ -6700,20 +6707,55 @@ class Ogre_Tundra_Preview(bpy.types.Operator,  _OgreCommonExport_):
             else: return True
 
     def invoke(self, context, event):
-        #Report.reset()
-        #Report.messages.append('running %s' %CONFIG_TUNDRA)
-        #Report.messages.append('please wait...')
-        #Report.show()
-
+        global TundraSingleton
         path = '/tmp/preview.txml'
         self.ogre_export( path, context )
-
-        slave = TundraPipe()
-
+        TundraSingleton = TundraPipe()
         return {'FINISHED'}
+
+TundraSingleton = None
+
+class Tundra_StartPhysicsOp(bpy.types.Operator):
+    '''TundraSingleton helper'''
+    bl_idname = 'tundra.start_physics'
+    bl_label = "start physics"
+    bl_options = {'REGISTER'}
+    @classmethod
+    def poll(cls, context):
+        if TundraSingleton: return True
+    def invoke(self, context, event):
+        TundraSingleton.start()
+        return {'FINISHED'}
+
+class Tundra_StopPhysicsOp(bpy.types.Operator):
+    '''TundraSingleton helper'''
+    bl_idname = 'tundra.stop_physics'
+    bl_label = "stop physics"
+    bl_options = {'REGISTER'}
+    @classmethod
+    def poll(cls, context):
+        if TundraSingleton: return True
+    def invoke(self, context, event):
+        TundraSingleton.stop()
+        return {'FINISHED'}
+
+class Tundra_PhysicsDebugOp(bpy.types.Operator):
+    '''TundraSingleton helper'''
+    bl_idname = 'tundra.toggle_physics_debug'
+    bl_label = "stop physics"
+    bl_options = {'REGISTER'}
+    @classmethod
+    def poll(cls, context):
+        if TundraSingleton: return True
+    def invoke(self, context, event):
+        TundraSingleton.toggle_physics_debug()
+        return {'FINISHED'}
+
+
 
 class TundraPipe(object):
     def __init__(self):
+        self._physics_debug = True
         exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
         if sys.platform == 'linux2':
             cmd = ['wine', exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
@@ -6723,10 +6765,21 @@ class TundraPipe(object):
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
     def load( self, url ):
-        self.proc.stdin.write( 'loadscene(/tmp/preview.txml, true, true)')
+        self.proc.stdin.write( b'loadscene(/tmp/preview.txml, true, true)\n')
+        self.proc.stdin.flush()
 
-    def reset( self ):
-        self.proc.stdin.write( 'startphysics' )
+    def start( self ):
+        self.proc.stdin.write( b'startphysics\n' )
+        self.proc.stdin.flush()
+
+    def stop( self ):
+        self.proc.stdin.write( b'stopphysics\n' )
+        self.proc.stdin.flush()
+
+    def toggle_physics_debug( self ):
+        self._physics_debug = not self._physics_debug
+        self.proc.stdin.write( b'physicsdebug\n' )
+        self.proc.stdin.flush()
 
 
 class INFO_HT_myheader(bpy.types.Header):
@@ -6741,8 +6794,13 @@ class INFO_HT_myheader(bpy.types.Header):
         screen = context.screen
 
         layout.separator()
-        if _USE_TUNDRA_: op = layout.operator( Ogre_Tundra_Preview.bl_idname, text='', icon='WORLD' )
-        op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='PLUGIN' ); op.mesh = True
+        if _USE_TUNDRA_:
+            row = layout.row(align=True)
+            op = row.operator( 'tundra.preview', text='', icon='WORLD' )
+            if TundraSingleton:
+                op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
+                op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
+                op = row.operator( 'tundra.toggle_physics_debug', text='', icon='WIRE' )
 
         row = layout.row(align=True)
         sub = row.row(align=True)
@@ -6751,7 +6809,9 @@ class INFO_HT_myheader(bpy.types.Header):
         if rd.use_game_engine: sub.menu("INFO_MT_game")
         else: sub.menu("INFO_MT_render")
 
-        row = layout.row(align=True); row.scale_x = 2.0
+        op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='PLUGIN' ); op.mesh = True
+
+        row = layout.row(align=False); row.scale_x = 1.25
         row.menu("INFO_MT_instances", icon='NODETREE', text='')
         row.menu("INFO_MT_groups", icon='GROUP', text='')
         #row.menu("INFO_MT_actors", icon='GAME')        # not useful?
@@ -6813,7 +6873,7 @@ _header_ = None
 class OGRE_toggle_toolbar_op(bpy.types.Operator):
     '''Toggle Ogre UI'''
     bl_idname = "ogre.toggle_interface"
-    bl_label = "Ogre"
+    bl_label = "Ogre Interface"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -6825,19 +6885,22 @@ class OGRE_toggle_toolbar_op(bpy.types.Operator):
             bpy.utils.register_class(_header_)
             _header_ = None
             for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
+            bpy.utils.register_class( INFO_HT_microheader )
         else:
             bpy.utils.register_module(__name__)
             _header_ = bpy.types.INFO_HT_header
             bpy.utils.unregister_class(_header_)
+            bpy.utils.unregister_class( INFO_HT_microheader )
+
         return {'FINISHED'}
 
 class INFO_HT_microheader(bpy.types.Header):
     bl_space_type = 'INFO'
     def draw(self, context):
         layout = self.layout
-        op = layout.operator( OGRE_toggle_toolbar_op.bl_idname, icon='UI' )
+        op = layout.operator( OGRE_toggle_toolbar_op.bl_idname )
 
-_OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OGRE_toggle_toolbar_op, INFO_HT_microheader, Ogre_User_Report)
+_OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OGRE_toggle_toolbar_op, Ogre_User_Report)
 
 MyShaders = None
 def register():
@@ -6848,6 +6911,8 @@ def register():
     #_header_ = bpy.types.INFO_HT_header
     #bpy.utils.unregister_class(_header_)
     for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
+    bpy.utils.register_class( INFO_HT_microheader )
+
     readOrCreateConfig()
 
     ## only test for Tundra2 once ##
