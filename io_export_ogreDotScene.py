@@ -2041,9 +2041,9 @@ class ShaderTree( _MatNodes_ ):
             M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
         M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
-        for prop in mat.items():
-            name,val = prop
-            if not name.startswith('_'): M += indent( 3, '%s %s' %prop )
+        #for prop in mat.items():
+        #    name,val = prop
+        #    if not name.startswith('_'): M += indent( 3, '%s %s' %prop )
 
         ## textures ##
         if not self.textures:        ## class style materials
