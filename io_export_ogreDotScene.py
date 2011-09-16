@@ -2265,11 +2265,13 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
                 subs = []
                 for o in grp.objects:
                     if o.type=='MESH': subs.append( o )
-                m = merge_objects( subs, transform=e.matrix_world )
-                obs.append( m )
-            merged = merge_objects( obs )
-            umaterials = dot_mesh( merged, path=path, force_name='preview' )
-            for o in obs: context.scene.objects.unlink(o)
+                if subs:
+                    m = merge_objects( subs, transform=e.matrix_world )
+                    obs.append( m )
+            if obs:
+                merged = merge_objects( obs )
+                umaterials = dot_mesh( merged, path=path, force_name='preview' )
+                for o in obs: context.scene.objects.unlink(o)
 
         
         if not self.mesh:
@@ -2287,7 +2289,7 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
                     merged = merge_group( group )
                 else:
                     print('--------------- NO merge group ---------------' )
-            elif len(context.selected_objects)>1:
+            elif len(context.selected_objects)>1 and context.selected_objects:
                 merged = merge_objects( context.selected_objects )
 
             if mgroup:
@@ -4817,9 +4819,10 @@ class _OgreCommonExport_( _TXML_ ):
             subs = []
             for o in grp.objects:
                 if o.type=='MESH': subs.append( o )
-            m = merge_objects( subs, name=e.name, transform=e.matrix_world )
-            objects.append( m )
-            temps.append( m )
+            if subs:
+                m = merge_objects( subs, name=e.name, transform=e.matrix_world )
+                objects.append( m )
+                temps.append( m )
 
 
         ## find merge groups
