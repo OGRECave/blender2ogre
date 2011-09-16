@@ -97,7 +97,7 @@ bpy.types.Material.ogre_scene_blend = EnumProperty(
     default='one zero'
 )
 
-
+bpy.types.Material.ogre_disable_depth_write = BoolProperty( name='force disable depth write', default=False )
 
 
 ###########################################################
@@ -1546,6 +1546,7 @@ class Ogre_Material_Panel( bpy.types.Panel ):
         row.prop(mat, "use_transparency", text="Transparent")
         if mat.use_transparency: row.prop(mat, "alpha")
         box.prop(mat, 'ogre_scene_blend')
+        box.prop(mat, 'ogre_disable_depth_write' )
 
 
 def has_property( a, name ):
@@ -2001,7 +2002,11 @@ class ShaderTree( _MatNodes_ ):
         else:
             M += indent(2, 'pass', '{' )
 
-        M += indent(3, 'cull_hardware none' )        # directx and opengl are reversed, how to deal with this? TODO
+        M += indent(3, 'cull_hardware none' )        # directx and opengl are reversed? TODO
+
+        if mat.ogre_disable_depth_write:
+            M += indent(3, 'depth_write off' ) # once per pass (global attributes)
+
 
         f = mat.ambient
         if 'Ambient' in self.inputs:
@@ -2045,27 +2050,27 @@ class ShaderTree( _MatNodes_ ):
         #    name,val = prop
         #    if not name.startswith('_'): M += indent( 3, '%s %s' %prop )
 
+
         ## textures ##
-        if not self.textures:        ## class style materials
+        if not self.textures:        ## classic materials
             slots = get_image_textures( mat )        # returns texture_slot object
             usealpha = False
             for slot in slots:
                 #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
                 if slot.use_map_alpha: usealpha = True; break
-
             if usealpha:
-                if mat.use_transparency: M += indent(3, 'depth_write off' ) # defined only once per pass (global attributes)
-
+                if mat.use_transparency:
+                    M += indent(3, 'depth_write off' ) # once per pass (global attributes)
             ## write shader programs before textures
             M += self._write_shader_programs( mat )
             for slot in slots: M += self.dotmat_texture( slot.texture, slot=slot )
 
-
-        elif self.node:        # shader nodes
-
+        elif self.node:        # TODO redo shader nodes - new rule: unconnect only
             M += self._write_shader_programs( mat )
             for wrap in self.textures:
                 M += self.dotmat_texture( wrap.node.texture, texwrapper=wrap )
+
+
 
         M += indent(2, '}' )    # end pass
         return M
@@ -6923,8 +6928,7 @@ def export_menu_func_realxtend(self, context):
     op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="RealXtend (.txml and .mesh)")
     op.filepath = os.path.join( path, name.split('.')[0]+'.txml' )
 
-def import_menu_func(self, context):
-    self.layout.operator(Ogre_import_op.bl_idname, text="Ogre3D (.scene) | read version control attributes (UUIDs)")
+
 
 _header_ = None
 class OGRE_toggle_toolbar_op(bpy.types.Operator):
@@ -6976,11 +6980,10 @@ def register():
     if os.path.isdir( CONFIG_TUNDRA ): _USE_TUNDRA_ = True
     else: _USE_TUNDRA_ = False
 
-
     MyShaders = MyShadersSingleton()
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
-    bpy.types.INFO_MT_file_import.append(import_menu_func)
+
     print( '-'*80)
 
 def unregister():
@@ -6990,7 +6993,6 @@ def unregister():
     if _header_: bpy.utils.register_class(_header_); _header_ = None
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
-    bpy.types.INFO_MT_file_import.remove(import_menu_func)
 
 
 if __name__ == "__main__":
