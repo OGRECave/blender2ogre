@@ -26,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 Dev'
+VERSION = '0.5.5 Dev-2'
 
 ## Options ##
 AXIS_MODES =  [
@@ -78,13 +78,136 @@ except ImportError:
 
 ######################### bpy RNA #########################
 
-#    exmodes = 'one zero dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split()
+# ..Material.ogre_depth_write = AUTO|ON|OFF
+bpy.types.Material.ogre_disable_depth_write = BoolProperty( name='force disable depth write', default=False )
+
+#If depth-buffer checking is on, whenever a pixel is about to be written to the frame buffer the depth buffer is checked to see if the pixel is in front of all other pixels written at that point. If not, the pixel is not written. If depth checking is off, pixels are written no matter what has been rendered before.
+bpy.types.Material.ogre_depth_check = BoolProperty( name='depth check', default=False )
+
+#Sets whether this pass will use 'alpha to coverage', a way to multisample alpha texture edges so they blend more seamlessly with the background. This facility is typically only available on cards from around 2006 onwards, but it is safe to enable it anyway - Ogre will just ignore it if the hardware does not support it. The common use for alpha to coverage is foliage rendering and chain-link fence style textures.
+bpy.types.Material.ogre_alpha_to_coverage = BoolProperty( name='multisample alpha edges', default=False )
+
+#This option is usually only useful if this pass is an additive lighting pass, and is at least the second one in the technique. Ie areas which are not affected by the current light(s) will never need to be rendered. If there is more than one light being passed to the pass, then the scissor is defined to be the rectangle which covers all lights in screen-space. Directional lights are ignored since they are infinite.
+#This option does not need to be specified if you are using a standard additive shadow mode, i.e. SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE, since it is the default behaviour to use a scissor for each additive shadow pass. However, if you're not using shadows, or you're using Integrated Texture Shadows where passes are specified in a custom manner, then this could be of use to you.
+bpy.types.Material.ogre_light_scissor = BoolProperty( name='light scissor', default=False )
+
+
+bpy.types.Material.ogre_light_clip_planes = BoolProperty( name='light clip planes', default=False )
+
+#Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.
+bpy.types.Material.ogre_normalize_normals = BoolProperty( name='normalize normals', default=False )
+
+#Sets whether or not dynamic lighting is turned on for this pass or not. If lighting is turned off, all objects rendered using the pass will be fully lit. This attribute has no effect if a vertex program is used.
+bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', default=True )
+
+#If colour writing is off no visible pixels are written to the screen during this pass. You might think this is useless, but if you render with colour writing off, and with very minimal other settings, you can use this pass to initialise the depth buffer before subsequently rendering other passes which fill in the colour data. This can give you significant performance boosts on some newer cards, especially when using complex fragment programs, because if the depth check fails then the fragment program is never run. 
+bpy.types.Material.ogre_colour_write = BoolProperty( name='color-write', default=True )
+
+
+
+bpy.types.Material.ogre_polygon_mode = EnumProperty(
+    items=[
+            ('solid', 'solid', 'SOLID'),
+            ('wireframe', 'wireframe', 'WIREFRAME'),
+            ('points', 'points', 'POINTS'),
+    ],
+    name='faces draw type', 
+    description="ogre face draw mode", 
+    default='solid'
+)
+
+bpy.types.Material.ogre_shading = EnumProperty(
+    items=[
+            ('flat', 'flat', 'FLAT'),
+            ('gouraud', 'gouraud', 'GOURAUD'),
+            ('phong', 'phong', 'PHONG'),
+    ],
+    name='hardware shading', 
+    description="Sets the kind of shading which should be used for representing dynamic lighting for this pass.", 
+    default='gouraud'
+)
+
+
+bpy.types.Material.ogre_cull_hardware = EnumProperty(
+    items=[
+            ('clockwise', 'clockwise', 'CLOCKWISE'),
+            ('anticlockwise', 'anticlockwise', 'COUNTER CLOCKWISE'),
+            ('none', 'none', 'NONE'),
+    ],
+    name='hardware culling', 
+    description="If the option 'cull_hardware clockwise' is set, all triangles whose vertices are viewed in clockwise order from the camera will be culled by the hardware.", 
+    default='clockwise'
+)
+
+
+bpy.types.Material.ogre_transparent_sorting = EnumProperty(
+    items=[
+            ('on', 'on', 'ON'),
+            ('off', 'off', 'OFF'),
+            ('force', 'force', 'FORCE ON'),
+    ],
+    name='transparent sorting', 
+    description="By default all transparent materials are sorted such that renderables furthest away from the camera are rendered first. This is usually the desired behaviour but in certain cases this depth sorting may be unnecessary and undesirable. If for example it is necessary to ensure the rendering order does not change from one frame to the next. In this case you could set the value to 'off' to prevent sorting.", 
+    default='on'
+)
+
+
+
+bpy.types.Material.ogre_illumination_stage = EnumProperty(
+    items=[
+            ('none', 'none', 'autodetect'),
+            ('ambient', 'ambient', 'ambient'),
+            ('per_light', 'per_light', 'lights'),
+            ('decal', 'decal', 'decal')
+    ],
+    name='illumination stage', 
+    description='When using an additive lighting mode (SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE), the scene is rendered in 3 discrete stages, ambient (or pre-lighting), per-light (once per light, with shadowing) and decal (or post-lighting). Usually OGRE figures out how to categorise your passes automatically, but there are some effects you cannot achieve without manually controlling the illumination.', 
+    default='none'
+)
+
+
+
+
+_ogre_depth_func =  [
+    ('less_equal', 'less_equal', '<='),
+    ('less', 'less', '<'),
+    ('equal', 'equal', '=='),
+    ('not_equal', 'not_equal', '!='),
+    ('greater_equal', 'greater_equal', '>='),
+    ('greater', 'greater', '>'),
+    ('always_fail', 'always_fail', 'false'),
+    ('always_pass', 'always_pass', 'true'),
+]
+bpy.types.Material.ogre_depth_func = EnumProperty(
+    items=_ogre_depth_func, 
+    name='depth buffer function', 
+    description='If depth checking is enabled (see depth_check) a comparison occurs between the depth value of the pixel to be written and the current contents of the buffer. This comparison is normally less_equal, i.e. the pixel is written if it is closer (or at the same distance) than the current contents', 
+    default='less_equal'
+)
+
+
+
+_ogre_scene_blend_ops =  [
+    ('add', 'add', 'DEFAULT'),
+    ('subtract', 'subtract', 'SUBTRACT'),
+    ('reverse_subtract', 'reverse_subtract', 'REVERSE SUBTRACT'),
+    ('min', 'min', 'MIN'),
+    ('max', 'max', 'MAX'),
+
+]
+bpy.types.Material.ogre_scene_blend_op = EnumProperty(
+    items=_ogre_scene_blend_ops, 
+    name='scene blending operation', 
+    description='This directive changes the operation which is applied between the two components of the scene blending equation', 
+    default='add'
+)
+
 _ogre_scene_blend_types =  [
-    ('one zero', 'one zero', 'solid default'),
-    ('alpha_blend', 'alpha_blend', 'basic alpha'),
-    ('add', 'add', 'additive'),
-    ('modulate', 'modulate', 'multiply'),
-    ('colour_blend', 'colour_blend', 'blend colors'),
+    ('one zero', 'one zero', 'DEFAULT'),
+    ('alpha_blend', 'alpha_blend', "The alpha value of the rendering output is used as a mask. Equivalent to 'scene_blend src_alpha one_minus_src_alpha'"),
+    ('add', 'add', "The colour of the rendering output is added to the scene. Good for explosions, flares, lights, ghosts etc. Equivalent to 'scene_blend one one'."),
+    ('modulate', 'modulate', "The colour of the rendering output is multiplied with the scene contents. Generally colours and darkens the scene, good for smoked glass, semi-transparent objects etc. Equivalent to 'scene_blend dest_colour zero'"),
+    ('colour_blend', 'colour_blend', 'Colour the scene based on the brightness of the input colours, but dont darken. Equivalent to "scene_blend src_colour one_minus_src_colour"'),
 ]
 for mode in 'dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split():
     _ogre_scene_blend_types.append( ('one %s'%mode, 'one %s'%mode, '') )
@@ -97,7 +220,6 @@ bpy.types.Material.ogre_scene_blend = EnumProperty(
     default='one zero'
 )
 
-bpy.types.Material.ogre_disable_depth_write = BoolProperty( name='force disable depth write', default=False )
 
 
 ###########################################################
@@ -1545,8 +1667,16 @@ class Ogre_Material_Panel( bpy.types.Panel ):
         row = box.row()
         row.prop(mat, "use_transparency", text="Transparent")
         if mat.use_transparency: row.prop(mat, "alpha")
+
+        ## OGRE RNA ##
         box.prop(mat, 'ogre_scene_blend')
         box.prop(mat, 'ogre_disable_depth_write' )
+
+        for tag in 'ogre_colour_write ogre_lighting ogre_normalize_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
+            box.prop(mat, tag)
+
+        for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
+            box.prop(mat, tag)
 
 
 def has_property( a, name ):
@@ -5566,7 +5696,7 @@ class Bone(object):
             elif OPTIONS['SWAP_AXIS'] == 'xz-y':    # Tundra2
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
             else:
-                print( 'ERROR: axis swap mode not supported with armature animation' )
+                print( 'ERROR - TODO: axis swap mode not supported with armature animation' )
                 assert 0
 
         self.skeleton = skeleton
