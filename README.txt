@@ -2,9 +2,11 @@ Blender2Ogre
 By: Hartshorn, S.Rombauts, PForce and F00bar
 Sponsors: Adminotech Ltd
 License: GNU LGPL
-Version: 0.5.1 - August 2011
+
+Version: 0.5.5 2011
+
 Supports:
-	Blender 2.58.1
+	Blender 2.59
 	Linux, Windows, OSX
 
 Upgrading?
@@ -17,8 +19,8 @@ Getting Started:
 
 Installing:
 	Installing the Addon:
-		. You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.58/scripts/addons_contrib/
-		. Or you can use blenders interface, under user-prefs, click addons, click 'install-addon', and select: io_export_ogreDotScene.py
+		. Use blenders interface, under user-prefs, click addons, click 'install-addon', and select: io_export_ogreDotScene.py
+		. or you can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.59/scripts/addons_contrib/
 
 	Installing Dependencies:
 		Linux:
@@ -58,7 +60,7 @@ Add-on installation:
 
 Dependencies:
 	Required:
-		1. blender2.58
+		1. blender2.59
 		2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
 			http://www.ogre3d.org/download/tools
 
@@ -82,22 +84,4 @@ Dependencies:
 			Linux: copy Tundra2 to your home directory
 
 
-Changelog:
-    0.4.4 small fixes, lamp export fixed, vertex count correct
-    0.4.3 small fixes, default axis now x z -y, fixed floating bones
-    0.4.0 fixed uv textures
-    0.3.8 fixed merge groups, OSX support
-    0.3.7 big speed up for mesh export, and fixed shape animation - june 3rd
-    0.3.6 more small fixes - may 16th
-	0.3.4 small fixes - may11th
-	0.3.2 added a config file - first Blender 2.57 release
-    . issue7: Need for an add-on config file with user preferences
-    . issue10: No more tabulation, using the standard 4 spaces recommanded by the Python PEP-8
-    . Issue 14:	DEFAULT_IMAGE_MAGICK_CONVERT uninitialized under Windows
-
-	0.3.1 small bug fix and optimization (Sébastien Rombauts)
-		. issue1: os.getlogin() unreliable; using getpass.getuser() instead
-		. issue5: speed optimization O(n^2) into O(n log n)
-		
-	0.3.0 milestone (Brett Hartshorn)
 	

@@ -26,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 Shaders'
+VERSION = '0.5.5 Tundra Shaders'
 
 ## Options ##
 AXIS_MODES =  [
@@ -2183,7 +2183,7 @@ class ShaderTree( _MatNodes_ ):
         #M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
         for name in dir(mat):   #mat.items():
             var = getattr(mat,name)
-            if name.startswith('ogre_'):
+            if name.startswith('ogre_') and name != 'ogre_parent_material':
                 op = name.replace('ogre_', '')
                 val = var
                 if type(var) == bool:
@@ -4866,9 +4866,13 @@ class _OgreCommonExport_( _TXML_ ):
 
     @classmethod
     def gen_dot_material( self, mat, path='/tmp', convert_textures=False ):
+
         safename = material_name(mat)     # supports blender library linking
-        M = ''
+        M = '// blender material: %s\n' %(mat.name)
         if mat.ogre_parent_material:    ## NEW: script inheritance
+            assert mat.ogre_parent_material in _OGRE_MATERIAL_CLASS_SCRIPT
+            dotmaterial = _OGRE_MATERIAL_CLASS_SCRIPT[ mat.ogre_parent_material ]
+            M += 'import %s from "%s"\n' %(mat.ogre_parent_material, dotmaterial)
             M += 'material %s : %s \n{\n' %(safename, mat.ogre_parent_material)
         else: M += 'material %s \n{\n'        %safename
 
@@ -7278,6 +7282,20 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
 
+
+_OGRE_MATERIAL_CLASS_SCRIPT = {}
+
+#####################################################################################
+
+
+
+
+
+
+
+
+
+
 #####################################################################################
 ###################################### Public API #####################################
 
@@ -7289,6 +7307,39 @@ def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False,
 def generate_material( mat, path ):
     ''' returns generated material string '''
     return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
+
+
+## updates RNA ##
+def update_parent_material_path( path ):
+    global _OGRE_MATERIAL_CLASS_SCRIPT
+    print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
+    items = [ ('', '', 'none') ]
+    classes = []
+    for sub in os.listdir( path ):
+        a = os.path.join( path, sub )
+        for name in os.listdir( a ):
+            if name.endswith( '.material' ):
+                print( '>>', name )
+                url = os.path.join( a, name )
+                data = open( url, 'rb' ).read()
+                for line in data.splitlines():
+                    line = line.strip()
+                    if line.startswith(b'material'):
+                        cls = line.split()[-1].decode('utf-8')
+                        print('>>>>', cls )
+                        if cls not in classes:
+                            classes.append( cls )
+                            items.append( (cls,cls,url) )
+                            _OGRE_MATERIAL_CLASS_SCRIPT[ cls ] = name   # name.material
+
+    bpy.types.Material.ogre_parent_material = EnumProperty(
+        name="Script Inheritence", 
+        description='ogre parent material class', default='',
+        items=items,
+    )
+
+
+
 
 def get_subcollision_meshes():
     ''' returns all collision meshes found in the scene '''
@@ -7313,21 +7364,6 @@ def get_subcollisions(ob):
             r.append( child )
     return r
 
-## updates RNA ##
-def update_parent_material_path( path ):
-    print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
-    items = [ ('', '', 'none') ]
-    for sub in os.listdir( path ):
-        a = os.path.join( path, sub )
-        for name in os.listdir( a ):
-            if name.endswith( '.material' ):
-                print( '>>', name )
-                url = os.path.join( a, name )
-                items.append( (name,name,url) )
 
-    bpy.types.Material.ogre_parent_material = EnumProperty(
-        name="Script Inheritence", 
-        description='ogre parent material class', default='',
-        items=items,
-    )
+
 
