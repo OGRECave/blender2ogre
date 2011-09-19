@@ -82,7 +82,7 @@ except ImportError:
 bpy.types.Material.ogre_disable_depth_write = BoolProperty( name='force disable depth write', default=False )
 
 #If depth-buffer checking is on, whenever a pixel is about to be written to the frame buffer the depth buffer is checked to see if the pixel is in front of all other pixels written at that point. If not, the pixel is not written. If depth checking is off, pixels are written no matter what has been rendered before.
-bpy.types.Material.ogre_depth_check = BoolProperty( name='depth check', default=False )
+bpy.types.Material.ogre_depth_check = BoolProperty( name='depth check', default=True )
 
 #Sets whether this pass will use 'alpha to coverage', a way to multisample alpha texture edges so they blend more seamlessly with the background. This facility is typically only available on cards from around 2006 onwards, but it is safe to enable it anyway - Ogre will just ignore it if the hardware does not support it. The common use for alpha to coverage is foliage rendering and chain-link fence style textures.
 bpy.types.Material.ogre_alpha_to_coverage = BoolProperty( name='multisample alpha edges', default=False )
@@ -104,6 +104,13 @@ bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', defaul
 bpy.types.Material.ogre_colour_write = BoolProperty( name='color-write', default=True )
 
 
+bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=True )
+
+#http://blenderpython.svn.sourceforge.net/viewvc/blenderpython/259/scripts/addons_extern/io_scene_assimp/import_assimp.py?revision=4&view=markup
+#bpy.types.Material.pass1 = PointerProperty(
+#    name = 'ogre pass 1',
+#    type = bpy.types.Material,
+#)
 
 bpy.types.Material.ogre_polygon_mode = EnumProperty(
     items=[
@@ -1646,28 +1653,9 @@ class Ogre_Material_Panel( bpy.types.Panel ):
         layout = self.layout
 
         box = layout.box()
-        row = box.row()
-        row.prop(mat, "diffuse_color")
-        row.prop(mat, "diffuse_intensity")
-        row = box.row()
-        row.prop(mat, "specular_color")
-        row.prop(mat, "specular_intensity")
-        row = box.row()
-        row.prop(mat, "specular_hardness")
-
-        row = box.row()
-        row.prop(mat, "emit")
-        row.prop(mat, "ambient")
-
-        row = box.row()
-        row.prop(mat, "use_shadows")
-        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
-
-
-        box = layout.box()
-
         box.prop(mat, 'ogre_parent_material')
         box.prop(mat, 'ogre_scene_blend')
+        box.prop(mat, "use_shadows")
 
         row = box.row()
         row.prop(mat, "use_transparency", text="Transparent")
@@ -1680,6 +1668,27 @@ class Ogre_Material_Panel( bpy.types.Panel ):
 
         for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
             box.prop(mat, tag)
+
+        box = layout.box()
+        #box.prop(mat, 'pass1' )
+
+
+        box = layout.box()
+        box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline' )
+        if mat.use_fixed_pipeline:
+            row = box.row()
+            row.prop(mat, "diffuse_color")
+            row.prop(mat, "diffuse_intensity")
+            row = box.row()
+            row.prop(mat, "specular_color")
+            row.prop(mat, "specular_intensity")
+            row = box.row()
+            row.prop(mat, "specular_hardness")
+            row = box.row()
+            row.prop(mat, "emit")
+            row.prop(mat, "ambient")
+            row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
+
 
 
 def has_property( a, name ):
@@ -1951,7 +1960,7 @@ class ShaderTree( _MatNodes_ ):
 
         path = OPTIONS['PATH']
         M = ''; _alphahack = None
-        M += indent(3, 'texture_unit', '{' )
+        M += indent(3, 'texture_unit b2ogre_%s' %time.time(), '{' )
 
         iurl = bpy.path.abspath( texture.image.filepath )
         postname = texname = os.path.split(iurl)[-1]
@@ -2136,49 +2145,49 @@ class ShaderTree( _MatNodes_ ):
             passname = passname.replace(' ','_')
             M += indent(2, 'pass %s' %passname, '{' )        # be careful with pass names
         else:
-            M += indent(2, 'pass', '{' )
+            M += indent(2, 'pass b2ogre_%s'%time.time(), '{' )
 
         #M += indent(3, 'cull_hardware none' )        # directx and opengl are reversed? TODO
         #if mat.ogre_disable_depth_write:
         #    M += indent(3, 'depth_write off' ) # once per pass (global attributes)
 
+        if mat.use_fixed_pipeline:
+            f = mat.ambient
+            if 'Ambient' in self.inputs:
+                child = self.inputs['Ambient']
+                M += _helper( child, 'ambient', f )
+            elif mat.use_vertex_color_paint:
+                M += indent(3, 'ambient vertexcolour' )
+            else:        # fall back to basic material
+                M += indent(3, 'ambient %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
-        f = mat.ambient
-        if 'Ambient' in self.inputs:
-            child = self.inputs['Ambient']
-            M += _helper( child, 'ambient', f )
-        elif mat.use_vertex_color_paint:
-            M += indent(3, 'ambient vertexcolour' )
-        else:        # fall back to basic material
-            M += indent(3, 'ambient %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
+            f = mat.diffuse_intensity
+            if 'Color' in self.inputs:
+                child = self.inputs['Color']
+                M += _helper( child, 'diffuse', f )
+            elif mat.use_vertex_color_paint:
+                M += indent(3, 'diffuse vertexcolour' )
+            else:        # fall back to basic material 
+                M += indent(3, 'diffuse %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
-        f = mat.diffuse_intensity
-        if 'Color' in self.inputs:
-            child = self.inputs['Color']
-            M += _helper( child, 'diffuse', f )
-        elif mat.use_vertex_color_paint:
-            M += indent(3, 'diffuse vertexcolour' )
-        else:        # fall back to basic material 
-            M += indent(3, 'diffuse %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
+            f = mat.specular_intensity
+            if 'Spec' in self.inputs:
+                child = self.inputs['Spec']
+                M += _helper( child, 'specular', f ) + ' %s'%(mat.specular_hardness/4.0)
+            else:
+                s = mat.specular_color
+                M += indent(3, 'specular %s %s %s %s %s' %(s.r*f, s.g*f, s.b*f, alpha, mat.specular_hardness/4.0) )
 
-        f = mat.specular_intensity
-        if 'Spec' in self.inputs:
-            child = self.inputs['Spec']
-            M += _helper( child, 'specular', f ) + ' %s'%(mat.specular_hardness/4.0)
-        else:
-            s = mat.specular_color
-            M += indent(3, 'specular %s %s %s %s %s' %(s.r*f, s.g*f, s.b*f, alpha, mat.specular_hardness/4.0) )
-
-        f = mat.emit        # remains valid even if material_ex inputs a color node
-        if 'Emit' in self.inputs:
-            child = self.inputs['Emit']
-            M += _helper( child, 'emissive', f )
-        elif mat.use_vertex_color_light:
-            M += indent(3, 'emissive vertexcolour' )
-        elif mat.use_shadeless:     # requested by Borris
-            M += indent(3, 'emissive %s %s %s 1.0' %(color.r, color.g, color.b) )
-        else:
-            M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
+            f = mat.emit        # remains valid even if material_ex inputs a color node
+            if 'Emit' in self.inputs:
+                child = self.inputs['Emit']
+                M += _helper( child, 'emissive', f )
+            elif mat.use_vertex_color_light:
+                M += indent(3, 'emissive vertexcolour' )
+            elif mat.use_shadeless:     # requested by Borris
+                M += indent(3, 'emissive %s %s %s 1.0' %(color.r, color.g, color.b) )
+            else:
+                M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
         #M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
         for name in dir(mat):   #mat.items():
@@ -2211,12 +2220,10 @@ class ShaderTree( _MatNodes_ ):
             for wrap in self.textures:
                 M += self.dotmat_texture( wrap.node.texture, texwrapper=wrap )
 
-
-
         M += indent(2, '}' )    # end pass
         return M
 
-    def _write_shader_programs( self, mat ):
+    def _write_shader_programs( self, mat ):    # DEPRECATED TODO
         M = ''
         for prop in mat.items():
             name,val = prop
@@ -4879,7 +4886,7 @@ class _OgreCommonExport_( _TXML_ ):
         if mat.use_shadows: M += indent(1, 'receive_shadows on')
         else: M += indent(1, 'receive_shadows off')
 
-        M += indent(1, 'technique', '{' )    # technique GLSL
+        M += indent(1, 'technique b2ogre_%s'%time.time(), '{' )    # technique GLSL
         M += self.gen_dot_material_pass( mat, path, convert_textures )
         M += indent(1, '}' )    # end technique
 
