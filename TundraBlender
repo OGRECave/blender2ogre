@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm ~/.blender/2.59/config/scripts/blender2ogre.cfg
+
 ## hacks for Tundra1 ##
 # sudo chmod 777 /opt/realxtend-tundra/pymodules
 # sudo apt-get install ogre-tools

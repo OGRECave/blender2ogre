@@ -26,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 Dev-2'
+VERSION = '0.5.5 Shaders'
 
 ## Options ##
 AXIS_MODES =  [
@@ -315,14 +315,16 @@ def readOrCreateConfig():
                 DEFAULT_IMAGE_MAGICK_CONVERT = os.path.join(image_magick_path, 'convert.exe');
                 break
         DEFAULT_NVIDIATOOLS_EXE = 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe'
-        DEFAULT_MYSHADERS_DIR = 'C:\\myshaders'
+
         DEFAULT_TUNDRA = 'C:\\Tundra2'
+        DEFAULT_MYSHADERS_DIR = 'C:\\Tundra2\\media\\materials'
         
     elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):        # OSX patch by FreqMod June6th 2011
         # DEFAULT_TEMP_PATH = '/tmp' 
         DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'	# apt-get ogre-tools
         DEFAULT_OGRETOOLS_MESH_MAGICK = '/usr/bin/MeshMagick'
         DEFAULT_TUNDRA = '%s/Tundra2' %os.environ['HOME']
+        DEFAULT_MYSHADERS_DIR = '%s/Tundra2/media/materials' %os.environ['HOME']
 
         if not os.path.isfile( DEFAULT_OGRETOOLS_XML_CONVERTER ):
             if os.path.isfile( '/usr/local/bin/OgreXMLConverter'):
@@ -338,7 +340,6 @@ def readOrCreateConfig():
         if not os.path.isfile( DEFAULT_IMAGE_MAGICK_CONVERT ): DEFAULT_IMAGE_MAGICK_CONVERT = '/usr/local/bin/convert/convert'
 
         DEFAULT_NVIDIATOOLS_EXE = '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME']
-        DEFAULT_MYSHADERS_DIR = '%s/myshaders' %os.environ['HOME']
         
     # Compose the path to the config file, in the config/scripts subfolder
     config_path = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
@@ -1664,12 +1665,14 @@ class Ogre_Material_Panel( bpy.types.Panel ):
 
 
         box = layout.box()
+
+        box.prop(mat, 'ogre_parent_material')
+        box.prop(mat, 'ogre_scene_blend')
+
         row = box.row()
         row.prop(mat, "use_transparency", text="Transparent")
         if mat.use_transparency: row.prop(mat, "alpha")
 
-        ## OGRE RNA ##
-        box.prop(mat, 'ogre_scene_blend')
         box.prop(mat, 'ogre_disable_depth_write' )
 
         for tag in 'ogre_colour_write ogre_lighting ogre_normalize_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
@@ -1792,6 +1795,9 @@ def guess_uv_layer( layer ):    # DEPRECATED - this fails because the users will
         if a.isdigit(): idx = int(a)+1
         else: print('WARNING: it is not allowed to give custom names to UVTexture channels ->', layer)
     return idx
+
+
+###################
 
 
 class _MatNodes_(object):       # Material Node methods
@@ -2132,10 +2138,9 @@ class ShaderTree( _MatNodes_ ):
         else:
             M += indent(2, 'pass', '{' )
 
-        M += indent(3, 'cull_hardware none' )        # directx and opengl are reversed? TODO
-
-        if mat.ogre_disable_depth_write:
-            M += indent(3, 'depth_write off' ) # once per pass (global attributes)
+        #M += indent(3, 'cull_hardware none' )        # directx and opengl are reversed? TODO
+        #if mat.ogre_disable_depth_write:
+        #    M += indent(3, 'depth_write off' ) # once per pass (global attributes)
 
 
         f = mat.ambient
@@ -2175,10 +2180,16 @@ class ShaderTree( _MatNodes_ ):
         else:
             M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
-        M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
-        #for prop in mat.items():
-        #    name,val = prop
-        #    if not name.startswith('_'): M += indent( 3, '%s %s' %prop )
+        #M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
+        for name in dir(mat):   #mat.items():
+            var = getattr(mat,name)
+            if name.startswith('ogre_'):
+                op = name.replace('ogre_', '')
+                val = var
+                if type(var) == bool:
+                    if var: val = 'on'
+                    else: val = 'off'
+                M += indent( 3, '%s %s' %(op,val) )
 
 
         ## textures ##
@@ -4851,17 +4862,23 @@ class _OgreCommonExport_( _TXML_ ):
         print('saved', url)
         return url
 
-    ## python note: classmethods prefer attributes defined at the classlevel, 
-    ## kinda makes sense, (even if called by an instance)
+
+
     @classmethod
     def gen_dot_material( self, mat, path='/tmp', convert_textures=False ):
+        safename = material_name(mat)     # supports blender library linking
         M = ''
-        M += 'material %s \n{\n'        %material_name(mat)     # supports blender library linking
+        if mat.ogre_parent_material:    ## NEW: script inheritance
+            M += 'material %s : %s \n{\n' %(safename, mat.ogre_parent_material)
+        else: M += 'material %s \n{\n'        %safename
+
         if mat.use_shadows: M += indent(1, 'receive_shadows on')
         else: M += indent(1, 'receive_shadows off')
+
         M += indent(1, 'technique', '{' )    # technique GLSL
         M += self.gen_dot_material_pass( mat, path, convert_textures )
         M += indent(1, '}' )    # end technique
+
         M += '}\n'    # end material
         return M
 
@@ -7117,6 +7134,10 @@ def register():
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
 
+    if os.path.isdir( CONFIG_MYSHADERS_DIR ):
+        update_parent_material_path( CONFIG_MYSHADERS_DIR )
+    else: assert 0
+
     print( '-'*80)
 
 def unregister():
@@ -7291,4 +7312,22 @@ def get_subcollisions(ob):
         if child.subcollision and child.name.startswith( prefix ):
             r.append( child )
     return r
+
+## updates RNA ##
+def update_parent_material_path( path ):
+    print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
+    items = [ ('', '', 'none') ]
+    for sub in os.listdir( path ):
+        a = os.path.join( path, sub )
+        for name in os.listdir( a ):
+            if name.endswith( '.material' ):
+                print( '>>', name )
+                url = os.path.join( a, name )
+                items.append( (name,name,url) )
+
+    bpy.types.Material.ogre_parent_material = EnumProperty(
+        name="Script Inheritence", 
+        description='ogre parent material class', default='',
+        items=items,
+    )
 
