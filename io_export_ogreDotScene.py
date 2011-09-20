@@ -5189,7 +5189,7 @@ class _OgreCommonExport_( _TXML_ ):
         xmlparent.appendChild(o)
 
         ## UUID ##
-        o.setAttribute('uuid', UUID(ob))
+        #o.setAttribute('uuid', UUID(ob))
 
         ## custom user props ##
         for prop in ob.items():
