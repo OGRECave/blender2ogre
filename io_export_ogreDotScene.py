@@ -106,6 +106,14 @@ bpy.types.Material.ogre_colour_write = BoolProperty( name='color-write', default
 
 bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=True )
 
+# hidden option - gets turned on by operator
+bpy.types.Material.use_material_passes = BoolProperty( name='use ogre extra material passes (layers)', default=False )
+
+
+bpy.types.Material.use_in_ogre_material_pass = BoolProperty( name='Layer Toggle', default=True )
+
+
+
 #http://blenderpython.svn.sourceforge.net/viewvc/blenderpython/259/scripts/addons_extern/io_scene_assimp/import_assimp.py?revision=4&view=markup
 #bpy.types.Material.pass1 = PointerProperty(
 #    name = 'ogre pass 1',
@@ -1670,7 +1678,6 @@ class Ogre_Material_Panel( bpy.types.Panel ):
             box.prop(mat, tag)
 
         box = layout.box()
-        #box.prop(mat, 'pass1' )
 
 
         box = layout.box()
@@ -1689,6 +1696,38 @@ class Ogre_Material_Panel( bpy.types.Panel ):
             row.prop(mat, "ambient")
             row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
 
+        box = layout.box()
+
+        if mat.use_material_passes:
+            nodes = get_or_create_material_passes( mat )
+            for i,node in enumerate(nodes):
+                layout.box()    # line
+                split = layout.row()
+                split.label( text='%s:' %i )
+                if node.material: split.prop( node.material, 'use_in_ogre_material_pass', text='' )
+                sub = layout.box()
+                row = sub.row( align=True )
+                box = row.box()
+                box.prop( node, 'material', text='' )
+                if node.material and node.material.use_in_ogre_material_pass:
+                    box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline' )
+                    if mat.use_fixed_pipeline:
+                        row = box.row()
+                        row.prop(mat, "diffuse_color")
+                        row.prop(mat, "diffuse_intensity")
+                        row = box.row()
+                        row.prop(mat, "specular_color")
+                        row.prop(mat, "specular_intensity")
+                        row = box.row()
+                        row.prop(mat, "specular_hardness")
+                        row = box.row()
+                        row.prop(mat, "emit")
+                        row.prop(mat, "ambient")
+                        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
+
+
+        else:
+            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers" )
 
 
 def has_property( a, name ):
@@ -7372,5 +7411,37 @@ def get_subcollisions(ob):
     return r
 
 
+def _create_material_passes( mat ):
+    mat.use_nodes = True
+    tree = mat.node_tree	# valid pointer
+    #<tree bpy.data.node_groups['Shader Nodetree']>
+    for i in range( 8 ):
+        node = tree.nodes.new( type='MATERIAL' )
+        node.name = 'GEN.%s' %i
+    mat.use_nodes = False
+
+def get_or_create_material_passes( mat ):
+    if not mat.node_tree: _create_material_passes( mat )
+    r = []
+    for node in mat.node_tree.nodes:
+        if node.type == 'MATERIAL' and node.name.startswith('GEN.'):
+            r.append( node )
+    return r
+
+class CreateMaterialPassesOp(bpy.types.Operator):
+    '''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
+    bl_idname = "ogre.force_setup_material_passes"  
+    bl_label = "relocate textures"
+    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
+
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.active_material: return True
+
+    def invoke(self, context, event):
+        mat = context.active_object.active_material
+        mat.use_material_passes = True
+        _create_material_passes( mat )
+        return {'FINISHED'}
 
 
