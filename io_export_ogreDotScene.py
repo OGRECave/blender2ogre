@@ -112,6 +112,9 @@ bpy.types.Material.use_material_passes = BoolProperty( name='use ogre extra mate
 
 bpy.types.Material.use_in_ogre_material_pass = BoolProperty( name='Layer Toggle', default=True )
 
+bpy.types.Material.use_ogre_advanced_options = BoolProperty( name='Show Advanced Options', default=False )
+
+
 
 
 #http://blenderpython.svn.sourceforge.net/viewvc/blenderpython/259/scripts/addons_extern/io_scene_assimp/import_assimp.py?revision=4&view=markup
@@ -417,6 +420,12 @@ material _missing_material_
 
 
 ############# helper functions ##############
+
+def has_property( a, name ):
+    for prop in a.items():
+        n,val = prop
+        if n == name: return True
+
 
 # a default plane, with simple-subsurf and displace modifier on Z
 def is_strictly_simple_terrain( ob ):
@@ -1644,11 +1653,54 @@ TextureUnitAnimOps = {    ## DEPRECATED
 }
 
 
+
+def _helper_ogre_material_draw_options( parent, mat ):
+    box = parent.box()
+    box.prop(mat, 'ogre_parent_material')
+    box.prop(mat, 'ogre_scene_blend')
+    box.prop(mat, "use_shadows")
+
+    row = box.row()
+    row.prop(mat, "use_transparency", text="Transparent")
+    if mat.use_transparency: row.prop(mat, "alpha")
+
+    box = parent.box()
+    box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline', icon='LAMP_SUN' )
+    if mat.use_fixed_pipeline:
+        row = box.row()
+        row.prop(mat, "diffuse_color")
+        row.prop(mat, "diffuse_intensity")
+        row = box.row()
+        row.prop(mat, "specular_color")
+        row.prop(mat, "specular_intensity")
+        row = box.row()
+        row.prop(mat, "specular_hardness")
+        row = box.row()
+        row.prop(mat, "emit")
+        row.prop(mat, "ambient")
+        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
+
+
+    box.prop(mat, 'use_ogre_advanced_options', text='----------------------advanced options----------------------' )
+
+    if mat.use_ogre_advanced_options:
+        box.prop(mat, 'ogre_disable_depth_write' )
+
+        for tag in 'ogre_colour_write ogre_lighting ogre_normalize_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
+            box.prop(mat, tag)
+
+        for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
+            box.prop(mat, tag)
+
+        box = parent.box()
+
+
+
 class Ogre_Material_Panel( bpy.types.Panel ):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "material"
-    bl_label = "Ogre Material"
+    bl_label = "Ogre Material (pass0)"
 
     def draw(self, context):
         if not hasattr(context, "material"): return
@@ -1660,80 +1712,59 @@ class Ogre_Material_Panel( bpy.types.Panel ):
         slot = context.material_slot
         layout = self.layout
 
-        box = layout.box()
-        box.prop(mat, 'ogre_parent_material')
-        box.prop(mat, 'ogre_scene_blend')
-        box.prop(mat, "use_shadows")
+        _helper_ogre_material_draw_options( layout, mat )
 
-        row = box.row()
-        row.prop(mat, "use_transparency", text="Transparent")
-        if mat.use_transparency: row.prop(mat, "alpha")
-
-        box.prop(mat, 'ogre_disable_depth_write' )
-
-        for tag in 'ogre_colour_write ogre_lighting ogre_normalize_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
-            box.prop(mat, tag)
-
-        for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
-            box.prop(mat, tag)
-
-        box = layout.box()
+        if not mat.use_material_passes:
+            box = layout.box()
+            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers", icon='SCENE_DATA' )
 
 
-        box = layout.box()
-        box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline' )
-        if mat.use_fixed_pipeline:
-            row = box.row()
-            row.prop(mat, "diffuse_color")
-            row.prop(mat, "diffuse_intensity")
-            row = box.row()
-            row.prop(mat, "specular_color")
-            row.prop(mat, "specular_intensity")
-            row = box.row()
-            row.prop(mat, "specular_hardness")
-            row = box.row()
-            row.prop(mat, "emit")
-            row.prop(mat, "ambient")
-            row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
 
-        box = layout.box()
+class _OgreMatPass( object ):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "material"
+
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.active_material and context.active_object.active_material.use_material_passes:
+            return True
+
+
+    def draw(self, context):
+        if not hasattr(context, "material"): return
+        if not context.active_object: return
+        if not context.active_object.active_material: return
+
+        mat = context.material
+        ob = context.object
+        slot = context.material_slot
+        layout = self.layout
 
         if mat.use_material_passes:
+            db = layout.box()
             nodes = get_or_create_material_passes( mat )
-            for i,node in enumerate(nodes):
-                layout.box()    # line
-                split = layout.row()
-                split.label( text='%s:' %i )
-                if node.material: split.prop( node.material, 'use_in_ogre_material_pass', text='' )
-                sub = layout.box()
-                row = sub.row( align=True )
-                box = row.box()
-                box.prop( node, 'material', text='' )
-                if node.material and node.material.use_in_ogre_material_pass:
-                    box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline' )
-                    if mat.use_fixed_pipeline:
-                        row = box.row()
-                        row.prop(mat, "diffuse_color")
-                        row.prop(mat, "diffuse_intensity")
-                        row = box.row()
-                        row.prop(mat, "specular_color")
-                        row.prop(mat, "specular_intensity")
-                        row = box.row()
-                        row.prop(mat, "specular_hardness")
-                        row = box.row()
-                        row.prop(mat, "emit")
-                        row.prop(mat, "ambient")
-                        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
+            node = nodes[ self.INDEX ]
+            split = db.row()
+            if node.material: split.prop( node.material, 'use_in_ogre_material_pass', text='' )
+            split.prop( node, 'material' )
+            dbb = db.box()
+            if node.material and node.material.use_in_ogre_material_pass:
+                _helper_ogre_material_draw_options( dbb, node.material )
 
 
-        else:
-            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers" )
+class MatPass1( _OgreMatPass, bpy.types.Panel ): INDEX = 0; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+class MatPass2( _OgreMatPass, bpy.types.Panel ): INDEX = 1; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+class MatPass3( _OgreMatPass, bpy.types.Panel ): INDEX = 2; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+class MatPass4( _OgreMatPass, bpy.types.Panel ): INDEX = 3; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+class MatPass5( _OgreMatPass, bpy.types.Panel ): INDEX = 4; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+class MatPass6( _OgreMatPass, bpy.types.Panel ): INDEX = 5; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+class MatPass7( _OgreMatPass, bpy.types.Panel ): INDEX = 6; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
 
 
-def has_property( a, name ):
-    for prop in a.items():
-        n,val = prop
-        if n == name: return True
+
+
 
 
 class Ogre_Texture_Panel(bpy.types.Panel):
