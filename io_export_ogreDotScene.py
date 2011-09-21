@@ -26,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 Tundra Shaders'
+VERSION = '0.5.5 eightpass'
 
 ## Options ##
 AXIS_MODES =  [
@@ -1765,8 +1765,6 @@ class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Mat
 
 
 
-
-
 class Ogre_Texture_Panel(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -1991,6 +1989,7 @@ class ShaderTree( _MatNodes_ ):
     def __init__(self, node=None, material=None, parent_material=None ):
         if node: print('        shader node ->', node)
         if node and node.type.startswith('MATERIAL'):
+            assert 0    # DEPRECATED - TODO clean up
             ShaderTree.Materials.append( self )
             self.material = node.material
         elif material:        # standard material
@@ -2005,7 +2004,8 @@ class ShaderTree( _MatNodes_ ):
         self.parents = []
         self.inputs = {}        # socket name : child
         self.outputs = {}    # parent : socket name
-        if parent_material:
+        #if parent_material:
+        if False:   # DEPRECATED - TODO cleanup
             for link in parent_material.node_tree.links:
                 if link.to_node and link.to_node.name == self.name:
                     branch = ShaderTree(
@@ -2177,11 +2177,26 @@ class ShaderTree( _MatNodes_ ):
         return M
 
 
-    def dotmat_pass(self):    # must be a material
+    ## this writes multiple passes ##
+    def dotmat_pass(self):    # must be a standard-material
         if not self.material:
             print('ERROR: material node with no submaterial block chosen')
             return ''
-        mat = self.material
+
+        passes = []
+        passes.append( self._helper_dotmat_pass( self.material ) )
+        ########## Material Layers ###########
+        if self.material.use_material_passes:
+            nodes = get_or_create_material_passes( self.material )
+            for i,node in enumerate(nodes):
+                if node.material and node.material.use_in_ogre_material_pass:
+                    s = self._helper_dotmat_pass(node.material, pass_name='b2ogre_pass%s'%str(i))
+                    print( s )
+                    passes.append( s )
+
+        return '\n'.join( passes )
+
+    def _helper_dotmat_pass( self, mat, pass_name=None ):
         color = mat.diffuse_color
         alpha = 1.0
         if mat.use_transparency: alpha = mat.alpha
@@ -2210,7 +2225,10 @@ class ShaderTree( _MatNodes_ ):
                 return indent(3, '%s %s %s %s %s' %(opname, color.r*f, color.g*f, color.b*f, alpha) )
 
         M = ''
-        if self.node:        # ogre combines passes with the same name, be careful!
+        if pass_name:
+            M += indent(2, 'pass %s'%pass_name, '{' )
+
+        elif self.node:        # ogre combines passes with the same name, be careful!   # TODO DEPRECATED
             passname = '%s__%s' %(self.node.name,material_name(mat))
             passname = passname.replace(' ','_')
             M += indent(2, 'pass %s' %passname, '{' )        # be careful with pass names
@@ -2291,7 +2309,11 @@ class ShaderTree( _MatNodes_ ):
                 M += self.dotmat_texture( wrap.node.texture, texwrapper=wrap )
 
         M += indent(2, '}' )    # end pass
+
         return M
+
+
+
 
     def _write_shader_programs( self, mat ):    # DEPRECATED TODO
         M = ''
@@ -2304,6 +2326,9 @@ class ShaderTree( _MatNodes_ ):
                     else:
                         M += indent( 3, 'fragment_program_ref %s' %progname, '{', '}' )
         return M
+
+
+
 
     ############################################
     def _reformat( self, image ): return image[ : image.rindex('.') ] + OPTIONS['FORCE_IMAGE_FORMAT']
@@ -4968,18 +4993,9 @@ class _OgreCommonExport_( _TXML_ ):
         print('GEN DOT MATERIAL...', mat)
         OPTIONS['PATH'] = path
         M = ''
-        #if mat.node_tree and len(mat.node_tree.nodes):
-        if ShaderTree.is_valid_node_material( mat ):
-            print('        NODES MATERIAL')
-            tree = ShaderTree.parse( mat )
-            passes = tree.get_passes()
-            for P in passes:
-                print('        SHADER PASS:', P)
-                M += P.dotmat_pass()
-        else:
-            print('        STANDARD MATERIAL')
-            tree = ShaderTree( material=mat )
-            M += tree.dotmat_pass()
+        print('        STANDARD MATERIAL')
+        tree = ShaderTree( material=mat )
+        M += tree.dotmat_pass()
         return M
 
 
@@ -7190,7 +7206,8 @@ class INFO_HT_microheader(bpy.types.Header):
     bl_space_type = 'INFO'
     def draw(self, context):
         layout = self.layout
-        op = layout.operator( OGRE_toggle_toolbar_op.bl_idname )
+        try: op = layout.operator( 'ogre.toggle_interface' )
+        except: pass    # reported by Reyn
 
 _OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OGRE_toggle_toolbar_op, Ogre_User_Report)
 
