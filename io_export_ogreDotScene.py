@@ -4861,7 +4861,8 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'cast shadows' )
-        if ob.data.shadow_method != 'NOSHADOW': a.setAttribute('value', 'true' )
+        if ob.data.type=='HEMI' or ob.data.shadow_method != 'NOSHADOW': # HEMI reported by Reyn
+            a.setAttribute('value', 'true' )
         else: a.setAttribute('value', 'false' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
