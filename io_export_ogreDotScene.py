@@ -6946,6 +6946,10 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 
         del _remap_verts_
         del uvcache
+
+        doc.close()     # reported by Reyn
+        f.close()
+
     #finally:
     #    if doc:
     #        doc.close()
