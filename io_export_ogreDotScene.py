@@ -26,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 eightpass'
+VERSION = '0.5.5 preview4'
 
 ## Options ##
 AXIS_MODES =  [
@@ -1748,10 +1748,31 @@ class _OgreMatPass( object ):
             split = db.row()
             if node.material: split.prop( node.material, 'use_in_ogre_material_pass', text='' )
             split.prop( node, 'material' )
+            op = split.operator( 'ogre.helper_create_attach_material_layer', icon="PLUS", text='' )
+            op.INDEX = self.INDEX
+
             dbb = db.box()
             if node.material and node.material.use_in_ogre_material_pass:
                 _helper_ogre_material_draw_options( dbb, node.material )
 
+## operator ##
+class _create_new_material_layer_helper(bpy.types.Operator):
+    '''helper to create new material layer'''
+    bl_idname = "ogre.helper_create_attach_material_layer"
+    bl_label = "creates and assigns new material to layer"
+    bl_options = {'REGISTER', 'UNDO'}
+    INDEX = IntProperty(name="material layer index", description="index", default=0, min=0, max=8)
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.active_material and context.active_object.active_material.use_material_passes:
+            return True
+
+    def execute(self, context):
+        mat = context.active_object.active_material
+        nodes = get_or_create_material_passes( mat )
+        node = nodes[ self.INDEX ]
+        node.material = bpy.data.materials.new( name='OgreLayer' )
+        return {'FINISHED'}
 
 class MatPass1( _OgreMatPass, bpy.types.Panel ): INDEX = 0; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
 class MatPass2( _OgreMatPass, bpy.types.Panel ): INDEX = 1; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)

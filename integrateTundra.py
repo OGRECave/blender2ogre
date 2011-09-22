@@ -8,7 +8,7 @@ PREVIEW = '/tmp/fastpreview.txml'
 if sys.platform == 'linux2':
 	#CONFIG_TUNDRA = '%s/Tundra2' %os.environ['HOME']
 	CONFIG_TUNDRA = '/opt/realxtend-tundra'
-	assert os.path.isdir( CONFIG_TUNDRA )
+	#assert os.path.isdir( CONFIG_TUNDRA )
 else:
 	CONFIG_TUNDRA = 'C:\\Tundra'
 	assert os.path.isdir( CONFIG_TUNDRA )
