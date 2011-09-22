@@ -6638,7 +6638,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
     #root = doc.createElement('mesh'); doc.appendChild( root )
     name = force_name or ob.data.name
     xmlfile = os.path.join(path, '%s.mesh.xml' %name )
-    try:
+    #try:
+    if True:
         f = open( xmlfile, 'w' )
         doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
 
@@ -6945,11 +6946,11 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 
         del _remap_verts_
         del uvcache
-    finally:
-        if doc:
-            doc.close()
-        if f:
-            f.close()
+    #finally:
+    #    if doc:
+    #        doc.close()
+    #    if f:
+    #        f.close()
 
 
     #very ugly, find better way
