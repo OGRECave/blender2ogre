@@ -2,7 +2,6 @@ Blender2Ogre
 By: Hartshorn, S.Rombauts, PForce and F00bar
 Sponsors: Adminotech Ltd
 License: GNU LGPL
-
 Version: 0.5.5 2011
 
 Supports:
@@ -11,7 +10,7 @@ Supports:
 
 Upgrading?
 	. if you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .cfg file:
-		example linux: rm ~/.blender/2.58/config/scripts/blender2ogre.cfg
+		example linux: rm ~/.blender/2.59/config/scripts/blender2ogre.cfg
 
 Getting Started:
 	. After installing the addon (see below), enable it from "User Preferences->Add-Ons->Import-Export"
@@ -34,7 +33,30 @@ Installing:
 
 		Get the latest Ogre Meshy from: http://sourceforge.net/projects/ogremeshy/
 
+Dependencies:
+	Required:
+		1. blender2.59
+		2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
+			http://www.ogre3d.org/download/tools
 
+	Optional:
+		3. Install NVIDIA DDS Legacy Utilities	( install to default path )
+			http://developer.nvidia.com/object/dds_utilities_legacy.html
+			(Linux users will need to use Wine)
+
+		4. Install Image Magick
+			http://www.imagemagick.org
+
+		5. Copy OgreMeshy to C:\OgreMeshy
+			If your using 64bit Windows, you will need to download a 64bit OgreMeshy
+			(Linux copy to your home folder)
+
+		6. Tundra2
+			Windows: copy Tundra2 to C:\Tundra2
+			Linux: copy Tundra2 to your home directory
+
+
+################################### OSX ########################################
 Installing OSX - by Night Elf:
     Compile OgreXMLConverter from source, and "make install"
     "So, apparently OgreXMLConverter wasn't working because it couldn't find Ogre.framework. 
@@ -53,35 +75,9 @@ Add-on installation:
     Finder will open on the /usr/bin folder (There may be an easier way, I'm quite new to Mac OS...)
     Drag the OgreMeshConverter file over to that folder
     Ogre framework:
-    Get the Ogre.framework by building Ogre form source or form the pre-built SDK. I built form soruce and it's in <Ogre Folder>/build/lib/Release. It shows like a folder.
+    Get the Ogre.framework by building Ogre from source or from the pre-built SDK. I built form soruce and it's in <Ogre Folder>/build/lib/Release. It shows like a folder.
     Copy Ogre.framework to your /Library/Frameworks folder.
 
-
-
-Dependencies:
-	Required:
-		1. blender2.59
-		2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
-			http://www.ogre3d.org/download/tools
-
-	Optional:
-		3. Install NVIDIA DDS Legacy Utilities	( install to default path )
-			http://developer.nvidia.com/object/dds_utilities_legacy.html
-			(Linux users will need to use Wine)
-
-		4. Install Image Magick
-			http://www.imagemagick.org
-
-		5. Copy folder 'myshaders' to C:\\myshaders
-			(Linux copy to your home folder)
-
-		6. Copy OgreMeshy to C:\OgreMeshy
-			If your using 64bit Windows, you will need to download a 64bit OgreMeshy
-			(Linux copy to your home folder)
-
-		7. Tundra2
-			Windows: copy Tundra2 to C:\Tundra2
-			Linux: copy Tundra2 to your home directory
 
 
 	
