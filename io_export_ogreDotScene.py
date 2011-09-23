@@ -2301,7 +2301,7 @@ class ShaderTree( _MatNodes_ ):
         #M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
         for name in dir(mat):   #mat.items():
             if name.startswith('ogre_') and name != 'ogre_parent_material':
-	          var = getattr(mat,name)
+                var = getattr(mat,name)
                 op = name.replace('ogre_', '')
                 val = var
                 if type(var) == bool:
