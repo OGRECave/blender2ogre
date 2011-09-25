@@ -4331,14 +4331,6 @@ def _mesh_entity_helper( doc, ob, o ):
             user.setAttribute( 'name', propname )
             user.setAttribute( 'value', str(propvalue) )
             user.setAttribute( 'type', type(propvalue).__name__ )
-        elif propname in VersionControlMesh:
-            user = doc.createElement('version_control')
-            o.appendChild( user )
-            user.setAttribute( 'name', propname )
-            user.setAttribute( 'value', str(propvalue) )
-            user.setAttribute( 'type', type(propvalue).__name__ )
-
-
 
 
 # Ogre supports .dds in both directx and opengl
@@ -5260,9 +5252,6 @@ class _OgreCommonExport_( _TXML_ ):
         o = _ogre_node_helper( doc, ob, objects )
         xmlparent.appendChild(o)
 
-        ## UUID ##
-        #o.setAttribute('uuid', UUID(ob))
-
         ## custom user props ##
         for prop in ob.items():
             propname, propvalue = prop
@@ -5272,18 +5261,6 @@ class _OgreCommonExport_( _TXML_ ):
                 user.setAttribute( 'name', propname )
                 user.setAttribute( 'value', str(propvalue) )
                 user.setAttribute( 'type', type(propvalue).__name__ )
-            elif propname in VersionControl+VersionControlUser:
-                user = doc.createElement('version_control')
-                o.appendChild( user )
-                user.setAttribute( 'name', propname )
-                user.setAttribute( 'value', str(propvalue) )
-                user.setAttribute( 'type', type(propvalue).__name__ )
-
-        # no need to store _exported_ time per object?? #
-        #if '_modified_' in ob.keys():
-        #    #if ob['_modified_'] >= ob['_exported_']:
-        #    ob['_exported_'] = time.time()        # Ogre engine can test if _modified_ is newer than _exported_, and decide if to reload
-
 
         ## BGE subset ##
         game = doc.createElement('game')
