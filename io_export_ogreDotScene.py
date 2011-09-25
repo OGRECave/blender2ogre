@@ -1,4 +1,4 @@
-# Copyright (C) 2010 Brett Hartshorn    [ blender25 version ]
+# Copyright (C) 2010 Brett Hartshorn
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -26,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 preview4'
+VERSION = '0.5.5 preview5'
 
 ## Options ##
 AXIS_MODES =  [
@@ -339,15 +339,18 @@ def readOrCreateConfig():
         
     elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):        # OSX patch by FreqMod June6th 2011
         # DEFAULT_TEMP_PATH = '/tmp' 
-        DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'	# apt-get ogre-tools
+        # ogre-tools from andrews repo is broken
+        #DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'	# apt-get ogre-tools
+        DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/local/bin/OgreXMLConverter' # prefer source builds
+
         DEFAULT_OGRETOOLS_MESH_MAGICK = '/usr/bin/MeshMagick'
         DEFAULT_TUNDRA = '%s/Tundra2' %os.environ['HOME']
         DEFAULT_MYSHADERS_DIR = '%s/Tundra2/media/materials' %os.environ['HOME']
 
         if not os.path.isfile( DEFAULT_OGRETOOLS_XML_CONVERTER ):
-            if os.path.isfile( '/usr/local/bin/OgreXMLConverter'):
-                DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/local/bin/OgreXMLConverter'
-            if os.path.isfile( '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME'] ):
+            if os.path.isfile( '/usr/bin/OgreXMLConverter'):
+                DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'
+            elif os.path.isfile( '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME'] ):
                 DEFAULT_OGRETOOLS_XML_CONVERTER = '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME']
                 DEFAULT_OGRETOOLS_MESH_MAGICK = '%s/.wine/drive_c/OgreCommandLineTools/MeshMagick.exe' %os.environ['HOME']
 
