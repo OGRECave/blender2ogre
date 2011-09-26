@@ -374,14 +374,31 @@ def readOrCreateConfig():
         config.add_section('paths')
 
     # Read (or create default) config values
-    CONFIG_TEMP_DIR                = readOrCreateConfigValue(config, 'paths', 'TEMP_DIR',                DEFAULT_TEMP_DIR)
-    CONFIG_OGRETOOLS_XML_CONVERTER = readOrCreateConfigValue(config, 'paths', 'OGRETOOLS_XML_CONVERTER', DEFAULT_OGRETOOLS_XML_CONVERTER)
-    CONFIG_OGRETOOLS_MESH_MAGICK   = readOrCreateConfigValue(config, 'paths', 'OGRETOOLS_MESH_MAGICK',   DEFAULT_OGRETOOLS_MESH_MAGICK)
-    CONFIG_OGRE_MESHY              = readOrCreateConfigValue(config, 'paths', 'OGRE_MESHY',              DEFAULT_OGRE_MESHY)
-    CONFIG_IMAGE_MAGICK_CONVERT    = readOrCreateConfigValue(config, 'paths', 'IMAGE_MAGICK_CONVERT',    DEFAULT_IMAGE_MAGICK_CONVERT)
-    CONFIG_NVIDIATOOLS_EXE = readOrCreateConfigValue(config, 'paths', 'NVIDIATOOLS_EXE',         DEFAULT_NVIDIATOOLS_EXE)
-    CONFIG_MYSHADERS_DIR = readOrCreateConfigValue(config, 'paths', 'MYSHADERS_DIR',           DEFAULT_MYSHADERS_DIR)
-    CONFIG_TUNDRA = readOrCreateConfigValue(config, 'paths', 'CONFIG_TUNDRA',  DEFAULT_TUNDRA)
+    CONFIG_TEMP_DIR = readOrCreateConfigValue(
+        config, 'paths', 'TEMP_DIR', DEFAULT_TEMP_DIR)
+    bpy.context.window_manager['CONFIG_TEMP_DIR'] = CONFIG_TEMP_DIR
+
+    CONFIG_OGRETOOLS_XML_CONVERTER = readOrCreateConfigValue(
+        config, 'paths', 'OGRETOOLS_XML_CONVERTER', DEFAULT_OGRETOOLS_XML_CONVERTER)
+    bpy.context.window_manager['CONFIG_OGRETOOLS_XML_CONVERTER'] = CONFIG_OGRETOOLS_XML_CONVERTER
+
+    CONFIG_OGRETOOLS_MESH_MAGICK = readOrCreateConfigValue(
+        config, 'paths', 'OGRETOOLS_MESH_MAGICK', DEFAULT_OGRETOOLS_MESH_MAGICK)
+
+    CONFIG_OGRE_MESHY = readOrCreateConfigValue(
+        config, 'paths', 'OGRE_MESHY', DEFAULT_OGRE_MESHY)
+
+    CONFIG_IMAGE_MAGICK_CONVERT = readOrCreateConfigValue(
+        config, 'paths', 'IMAGE_MAGICK_CONVERT', DEFAULT_IMAGE_MAGICK_CONVERT)
+
+    CONFIG_NVIDIATOOLS_EXE = readOrCreateConfigValue(
+        config, 'paths', 'NVIDIATOOLS_EXE', DEFAULT_NVIDIATOOLS_EXE)
+
+    CONFIG_MYSHADERS_DIR = readOrCreateConfigValue(
+        config, 'paths', 'MYSHADERS_DIR', DEFAULT_MYSHADERS_DIR)
+
+    CONFIG_TUNDRA = readOrCreateConfigValue(
+        config, 'paths', 'CONFIG_TUNDRA',  DEFAULT_TUNDRA)
 
     # Write the blender2ogre.cfg config file 
     with open(config_filepath, 'w') as configfile:
@@ -1179,6 +1196,14 @@ class CollisionPanel(bpy.types.Panel):
             op.MODE = 'COMPOUND'
 
 
+class PathsConfigPanel(bpy.types.Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "scene"
+    bl_label = "Configure Ogre Paths"
+    def draw(self, context):
+        layout = self.layout
+        layout.prop( context.window_manager, '["CONFIG_TEMP_DIR"]' )
 
 
 ############### extra tools #############
@@ -2056,7 +2081,12 @@ class ShaderTree( _MatNodes_ ):
         M = ''; _alphahack = None
         M += indent(3, 'texture_unit b2ogre_%s' %time.time(), '{' )
 
-        iurl = bpy.path.abspath( texture.image.filepath )
+        if texture.library: # support library linked textures
+            libpath = os.path.split( bpy.path.abspath(texture.library.filepath) )[0]
+            iurl = bpy.path.abspath( texture.image.filepath, libpath )
+        else:
+            iurl = bpy.path.abspath( texture.image.filepath )
+
         postname = texname = os.path.split(iurl)[-1]
         destpath = path
 
