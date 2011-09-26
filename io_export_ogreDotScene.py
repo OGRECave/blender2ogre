@@ -287,10 +287,7 @@ Installing:
         4. Install Image Magick
             http://www.imagemagick.org
 
-        5. Copy folder 'myshaders' to C:\\myshaders
-            (Linux copy to your home folder)
-
-        6. Copy OgreMeshy to C:\\OgreMeshy
+        5. Copy OgreMeshy to C:\\OgreMeshy
             If your using 64bit Windows, you may need to download a 64bit OgreMeshy
             (Linux copy to your home folder)
 
@@ -318,7 +315,7 @@ def readOrCreateConfigValue(config, section, option, default):
 # Read the addon config values from the config blender2ogre.cfg file, or create/update it whith platform specific default values
 def readOrCreateConfig():
     # TODO SRombauts: make a class AddonConfig to store these values
-    global CONFIG_TEMP_DIR, CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR, CONFIG_TUNDRA
+    global CONFIG_TEMP_DIR, CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR, CONFIG_TUNDRA_ROOT
     
     # Create default options values (platform specific paths)
     DEFAULT_TEMP_DIR = tempfile.gettempdir()
@@ -334,7 +331,7 @@ def readOrCreateConfig():
                 break
         DEFAULT_NVIDIATOOLS_EXE = 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe'
 
-        DEFAULT_TUNDRA = 'C:\\Tundra2'
+        DEFAULT_TUNDRA_ROOT = 'C:\\Tundra2'
         DEFAULT_MYSHADERS_DIR = 'C:\\Tundra2\\media\\materials'
         
     elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):        # OSX patch by FreqMod June6th 2011
@@ -344,7 +341,7 @@ def readOrCreateConfig():
         DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/local/bin/OgreXMLConverter' # prefer source builds
 
         DEFAULT_OGRETOOLS_MESH_MAGICK = '/usr/bin/MeshMagick'
-        DEFAULT_TUNDRA = '%s/Tundra2' %os.environ['HOME']
+        DEFAULT_TUNDRA_ROOT = '%s/Tundra2' %os.environ['HOME']
         DEFAULT_MYSHADERS_DIR = '%s/Tundra2/media/materials' %os.environ['HOME']
 
         if not os.path.isfile( DEFAULT_OGRETOOLS_XML_CONVERTER ):
@@ -373,49 +370,50 @@ def readOrCreateConfig():
     if not config.has_section('paths'):
         config.add_section('paths')
 
-    # Read (or create default) config values
-    CONFIG_TEMP_DIR = readOrCreateConfigValue(
-        config, 'paths', 'TEMP_DIR', DEFAULT_TEMP_DIR)
-    bpy.context.window_manager['CONFIG_TEMP_DIR'] = CONFIG_TEMP_DIR
-
-    CONFIG_OGRETOOLS_XML_CONVERTER = readOrCreateConfigValue(
-        config, 'paths', 'OGRETOOLS_XML_CONVERTER', DEFAULT_OGRETOOLS_XML_CONVERTER)
-    bpy.context.window_manager['CONFIG_OGRETOOLS_XML_CONVERTER'] = CONFIG_OGRETOOLS_XML_CONVERTER
-
-    CONFIG_OGRETOOLS_MESH_MAGICK = readOrCreateConfigValue(
-        config, 'paths', 'OGRETOOLS_MESH_MAGICK', DEFAULT_OGRETOOLS_MESH_MAGICK)
-
-    CONFIG_OGRE_MESHY = readOrCreateConfigValue(
-        config, 'paths', 'OGRE_MESHY', DEFAULT_OGRE_MESHY)
-
-    CONFIG_IMAGE_MAGICK_CONVERT = readOrCreateConfigValue(
-        config, 'paths', 'IMAGE_MAGICK_CONVERT', DEFAULT_IMAGE_MAGICK_CONVERT)
-
-    CONFIG_NVIDIATOOLS_EXE = readOrCreateConfigValue(
-        config, 'paths', 'NVIDIATOOLS_EXE', DEFAULT_NVIDIATOOLS_EXE)
-
-    CONFIG_MYSHADERS_DIR = readOrCreateConfigValue(
-        config, 'paths', 'MYSHADERS_DIR', DEFAULT_MYSHADERS_DIR)
-
-    CONFIG_TUNDRA = readOrCreateConfigValue(
-        config, 'paths', 'CONFIG_TUNDRA',  DEFAULT_TUNDRA)
+    ################ Read (or create default) config values ##################
+    for tag in 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split():
+        default = readOrCreateConfigValue( config, 'paths', tag, locals()['DEFAULT_'+tag] )
+        globals().update( {'CONFIG_'+tag : default})
+        func = eval( 'lambda self,con: globals().update( {"CONFIG_%s" : self.%s} )' %(tag,tag) )
+        prop = StringProperty(
+            name=tag, description='updates path setting', maxlen=128, default=default, 
+            options={'SKIP_SAVE'}, update=func
+        )
+        setattr( bpy.types.WindowManager, tag, prop )
+        print( 'CONFIG: %s = %s' %(tag, default) )
 
     # Write the blender2ogre.cfg config file 
     with open(config_filepath, 'w') as configfile:
         config.write(configfile)
         print('config file %s written.' % config_filepath)
 
-    # Print config values
-    print('CONFIG_TEMP_DIR=%s'                % CONFIG_TEMP_DIR)
-    print('CONFIG_OGRETOOLS_XML_CONVERTER=%s' % CONFIG_OGRETOOLS_XML_CONVERTER)
-    print('CONFIG_OGRETOOLS_MESH_MAGICK=%s'   % CONFIG_OGRETOOLS_MESH_MAGICK)
-    print('CONFIG_OGRE_MESHY=%s'              % CONFIG_OGRE_MESHY)
-    print('CONFIG_IMAGE_MAGICK_CONVERT=%s'    % CONFIG_IMAGE_MAGICK_CONVERT)
-    print('CONFIG_NVIDIATOOLS_EXE=%s'         % CONFIG_NVIDIATOOLS_EXE)
-    print('CONFIG_MYSHADERS_DIR=%s'           % CONFIG_MYSHADERS_DIR)
-    print('CONFIG_TUNDRA=%s'           % CONFIG_TUNDRA)
 
+class Blender2Ogre_ConfigOp(bpy.types.Operator):
+    '''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
+    bl_idname = "ogre.save_config"  
+    bl_label = "save config file"
+    bl_options = {'REGISTER'}
+    @classmethod
+    def poll(cls, context): return True
+    def invoke(self, context, event):
+        config_path = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
+        config_filepath = os.path.join(config_path, CONFIG_FILENAME)
+        config = configparser.ConfigParser()
+        config.add_section('paths')
 
+        for tag in 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split():
+            value = globals()['CONFIG_'+tag]
+            config.set('paths', tag, value)
+
+        with open(config_filepath, 'w') as configfile:
+            config.write(configfile)
+            print('config file %s written.' % config_filepath)
+
+        Report.reset()
+        Report.messages.append('SAVED %s' %config_filepath)
+        Report.show()
+
+        return {'FINISHED'}
 
 
 # customize missing material - red flags for users so they can quickly see what they forgot to assign a material to.
@@ -1196,14 +1194,17 @@ class CollisionPanel(bpy.types.Panel):
             op.MODE = 'COMPOUND'
 
 
-class PathsConfigPanel(bpy.types.Panel):
+class ConfigurePanel(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "scene"
-    bl_label = "Configure Ogre Paths"
+    bl_label = "Ogre Configuration File"
     def draw(self, context):
         layout = self.layout
-        layout.prop( context.window_manager, '["CONFIG_TEMP_DIR"]' )
+        op = layout.operator( 'ogre.save_config', text='update config file', icon='FILE' )
+        for tag in 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split():
+            layout.prop( context.window_manager, tag )
+
 
 
 ############### extra tools #############
@@ -4921,7 +4922,6 @@ class _OgreCommonExport_( _TXML_ ):
     def invoke(self, context, event):
         wm = context.window_manager
         fs = wm.fileselect_add(self)        # writes to filepath
-        print( 'fs', fs )
         return {'RUNNING_MODAL'}
     def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
@@ -7107,7 +7107,7 @@ class Tundra_PhysicsDebugOp(bpy.types.Operator):
 class TundraPipe(object):
     def __init__(self):
         self._physics_debug = True
-        exe = os.path.join( CONFIG_TUNDRA, 'Tundra.exe' )
+        exe = os.path.join( CONFIG_TUNDRA_ROOT, 'Tundra.exe' )
         if sys.platform == 'linux2':
             cmd = ['wine', exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
@@ -7254,6 +7254,7 @@ class INFO_HT_microheader(bpy.types.Header):
         except: pass    # reported by Reyn
 
 _OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OGRE_toggle_toolbar_op, Ogre_User_Report)
+_USE_TUNDRA_ = False
 
 MyShaders = None
 def register():
@@ -7269,7 +7270,7 @@ def register():
     readOrCreateConfig()
 
     ## only test for Tundra2 once ##
-    if os.path.isdir( CONFIG_TUNDRA ): _USE_TUNDRA_ = True
+    if os.path.isdir( CONFIG_TUNDRA_ROOT ): _USE_TUNDRA_ = True
     else: _USE_TUNDRA_ = False
 
     MyShaders = MyShadersSingleton()
@@ -7278,7 +7279,7 @@ def register():
 
     if os.path.isdir( CONFIG_MYSHADERS_DIR ):
         update_parent_material_path( CONFIG_MYSHADERS_DIR )
-    else: assert 0
+    else: print( 'WARNING: invalid my-shaders path' )
 
     print( '-'*80)
 
