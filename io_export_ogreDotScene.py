@@ -5073,13 +5073,20 @@ class _OgreCommonExport_( _TXML_ ):
                 linkedgroups.append( ob )
             else: objects.append( ob )
 
+        ######## LINKED GROUPS - allows 3 levels of nested blender library linking ########
         temps = []
-
         for e in linkedgroups:
             grp = e.dupli_group
             subs = []
             for o in grp.objects:
                 if o.type=='MESH': subs.append( o )
+                elif o.type == 'EMPTY' and o.dupli_group and o.dupli_type == 'GROUP':
+                    for oo in o.dupli_group.objects:
+                        if oo.type=='MESH': subs.append( oo )
+                        elif oo.type == 'EMPTY' and oo.dupli_group and oo.dupli_type == 'GROUP':
+                            for ooo in oo.dupli_group.objects:
+                                if ooo.type=='MESH': subs.append( ooo )
+
             if subs:
                 m = merge_objects( subs, name=e.name, transform=e.matrix_world )
                 objects.append( m )
