@@ -15,7 +15,63 @@ else:	# from inside blender
 rpy = rpythonic.RPython( 'blender2ogre' )
 
 
-def dump( path, cmesh ):
+class Mesh(object):
+
+    def __init__(self, data):
+        self.numVerts = N = len( data.vertices )
+        self.numFaces = Nfaces = len(data.faces)
+
+        self.vertex_positions = (ctypes.c_float * (N * 3))()
+        data.vertices.foreach_get( 'co', self.vertex_positions )
+        v = self.vertex_positions
+
+        self.vertex_normals = (ctypes.c_float * (N * 3))()
+        data.vertices.foreach_get( 'normal', self.vertex_normals )
+
+        self.faces = (ctypes.c_uint * (Nfaces * 4))()
+        data.faces.foreach_get( 'vertices_raw', self.faces )
+
+        self.faces_normals = (ctypes.c_float * (Nfaces * 3))()
+        data.faces.foreach_get( 'normal', self.faces_normals )
+
+        self.faces_smooth = (ctypes.c_bool * Nfaces)() 
+        data.faces.foreach_get( 'use_smooth', self.faces_smooth )
+
+        self.faces_material_index = (ctypes.c_ushort * Nfaces)() 
+        data.faces.foreach_get( 'material_index', self.faces_material_index )
+
+        self.vertex_colors = []
+        if len( data.vertex_colors ):
+            vc = data.vertex_colors[0]
+            n = len(vc.data)
+            # no colors_raw !!?
+            self.vcolors1 = (ctypes.c_float * (n * 3))()  # face1
+            vc.data.foreach_get( 'color1', self.vcolors1 )
+            self.vertex_colors.append( self.vcolors1 )
+
+            self.vcolors2 = (ctypes.c_float * (n * 3))()  # face2
+            vc.data.foreach_get( 'color2', self.vcolors2 )
+            self.vertex_colors.append( self.vcolors2 )
+
+            self.vcolors3 = (ctypes.c_float * (n * 3))()  # face3
+            vc.data.foreach_get( 'color3', self.vcolors3 )
+            self.vertex_colors.append( self.vcolors3 )
+
+            self.vcolors4 = (ctypes.c_float * (n * 3))()  # face4
+            vc.data.foreach_get( 'color4', self.vcolors4 )
+            self.vertex_colors.append( self.vcolors4 )
+
+        self.uv_textures = []
+        if data.uv_textures.active:
+            for layer in data.uv_textures:
+                n = len(layer.data) * 8
+                a = (ctypes.c_float * n)()
+                layer.data.foreach_get( 'uv_raw', a )   # 4 faces
+                self.uv_textures.append( a )
+
+
+def save( blenderobject, path ):
+	cmesh = Mesh( blenderobject.data )
 	start = time.time()
 	dotmesh(
 		path,

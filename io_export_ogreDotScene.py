@@ -67,6 +67,7 @@ def swap(vec):
 ###### imports #####
 import os, sys, time, hashlib, getpass, tempfile, configparser
 import math, subprocess
+import array, time, ctypes
 from xml.sax.saxutils import XMLGenerator
 
 try:
@@ -122,6 +123,14 @@ bpy.types.Material.use_ogre_advanced_options = BoolProperty( name='Show Advanced
 #    name = 'ogre pass 1',
 #    type = bpy.types.Material,
 #)
+
+
+bpy.types.Material.ogre_parent_material = EnumProperty(
+  name="Script Inheritence", 
+  description='ogre parent material class', default='',
+  items=[ ('', '', 'none') ],
+)
+
 
 bpy.types.Material.ogre_polygon_mode = EnumProperty(
     items=[
@@ -4866,92 +4875,13 @@ def material_name( mat ):
 
 
 
-import array, time, ctypes
-class CtypesMesh(object):
 
-    def get_vertex_position(self, idx ):
-        v = self.vertex_positions; d = idx*3
-        return v[ d ], v[ d+1 ], v[ d+2 ]
-
-    def get_vertex_normal(self, idx ):
-        v = self.vertex_normals; d = idx*3
-        return v[ d ], v[ d+1 ], v[ d+2 ]
-
-    def __init__(self, data):
-        self.numVerts = N = len( data.vertices )
-        self.numFaces = Nfaces = len(data.faces)
-
-        #self.vertex_positions = array.array( 'f', [.0]*3 ) * N
-        self.vertex_positions = (ctypes.c_float * (N * 3))()
-        data.vertices.foreach_get( 'co', self.vertex_positions )
-        v = self.vertex_positions
-
-        #start = time.time()     # 5x slower than doing the same thing with array.array
-        #for i in range(N):
-        #    x,y,z=data.vertices[i].co
-        #print('end slow', time.time()-start )
-
-        self.vertex_normals = (ctypes.c_float * (N * 3))()
-        data.vertices.foreach_get( 'normal', self.vertex_normals )
-        print('vert normals ok')
-
-        self.faces = (ctypes.c_uint * (Nfaces * 4))()
-        data.faces.foreach_get( 'vertices_raw', self.faces )
-        print('faces ok')
-
-        self.faces_normals = (ctypes.c_float * (Nfaces * 3))()
-        data.faces.foreach_get( 'normal', self.faces_normals )
-        print('face normals ok')
-
-
-        self.faces_smooth = (ctypes.c_bool * Nfaces)() 
-        data.faces.foreach_get( 'use_smooth', self.faces_smooth )
-        print('faces smooth ok')
-        #for i in range(self.numFaces): print(' smooth:', self.faces_smooth[i], i )
-
-        self.faces_material_index = (ctypes.c_ushort * Nfaces)() 
-        data.faces.foreach_get( 'material_index', self.faces_material_index )
-        print('faces mat idx ok')
-
-        self.vertex_colors = []
-        if len( data.vertex_colors ):
-            vc = data.vertex_colors[0]
-            n = len(vc.data)
-            # no colors_raw !!?
-            self.vcolors1 = (ctypes.c_float * (n * 3))()  # face1
-            vc.data.foreach_get( 'color1', self.vcolors1 )
-            self.vertex_colors.append( self.vcolors1 )
-
-            self.vcolors2 = (ctypes.c_float * (n * 3))()  # face2
-            vc.data.foreach_get( 'color2', self.vcolors2 )
-            self.vertex_colors.append( self.vcolors2 )
-
-            self.vcolors3 = (ctypes.c_float * (n * 3))()  # face3
-            vc.data.foreach_get( 'color3', self.vcolors3 )
-            self.vertex_colors.append( self.vcolors3 )
-
-            self.vcolors4 = (ctypes.c_float * (n * 3))()  # face4
-            vc.data.foreach_get( 'color4', self.vcolors4 )
-            self.vertex_colors.append( self.vcolors4 )
-
-        self.uv_textures = []
-        if data.uv_textures.active:
-            for layer in data.uv_textures:
-                n = len(layer.data) * 8
-                a = (ctypes.c_float * n)()
-                layer.data.foreach_get( 'uv_raw', a )   # 4 faces
-                self.uv_textures.append( a )
-
-
-
-
-
-try: import io_export_rogremesh.rogremesh as R
+try: import io_export_rogremesh.rogremesh as Rmesh
 except:
-    R = None
+    Rmesh = None
     print( 'WARNING: "io_export_rogremesh" is missing' )
 
-if R and R.rpy.load(): _USE_RPYTHON_ = True
+if Rmesh and Rmesh.rpy.load(): _USE_RPYTHON_ = True
 else:
     _USE_RPYTHON_ = False
     print( 'Rpython module is not cached, you must exit Blender to compile the module:' )
@@ -5012,15 +4942,11 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 
     print('creating document...')
 
-    #replaced by sax parser
-    #doc = RDocument()
-    #root = doc.createElement('mesh'); doc.appendChild( root )
     name = force_name or ob.data.name
     xmlfile = os.path.join(path, '%s.mesh.xml' %name )
 
     if _USE_RPYTHON_ and False:
-        cmesh = CtypesMesh( ob.data )
-        R.dump( xmlfile, cmesh )
+        Rmesh.save( ob, xmlfile )
 
     else:
         f = open( xmlfile, 'w' )
@@ -5820,6 +5746,7 @@ def update_parent_material_path( path ):
         description='ogre parent material class', default='',
         items=items,
     )
+
 
 
 
