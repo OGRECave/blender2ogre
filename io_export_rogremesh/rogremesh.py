@@ -15,9 +15,10 @@ else:	# from inside blender
 rpy = rpythonic.RPython( 'blender2ogre' )
 
 
-def dump( cmesh ):
+def dump( path, cmesh ):
 	start = time.time()
 	dotmesh(
+		path,
 		ctypes.addressof( cmesh.faces ),
 		ctypes.addressof( cmesh.faces_smooth ),
 		ctypes.addressof( cmesh.faces_material_index ),
@@ -30,6 +31,7 @@ def dump( cmesh ):
 
 
 @rpy.bind(
+	path=str,
 	facesAddr=int, 
 	facesSmoothAddr=int,
 	facesMatAddr=int,
@@ -38,15 +40,16 @@ def dump( cmesh ):
 	numFaces=int,
 	numVerts=int,
 )
-def dotmesh( facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts ):
-	faces = rffi.cast( rffi.UINTP, facesAddr )
+def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts ):
+
+	file = streamio.open_file_as_stream( path, 'w')
+
+	faces = rffi.cast( rffi.UINTP, facesAddr )		# face vertex indices
 	facesSmooth = rffi.cast( rffi.CCHARP, facesSmoothAddr )
 	facesMat = rffi.cast( rffi.USHORTP, facesMatAddr )
 
 	vertsPos = rffi.cast( rffi.FLOATP, vertsPosAddr )
 	vertsNor = rffi.cast( rffi.FLOATP, vertsNorAddr )
-
-	file = streamio.open_file_as_stream('/tmp/rpystream', 'w')
 
 	VB = [
 		'<sharedgeometry>',
@@ -66,37 +69,51 @@ def dotmesh( facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAdd
 		triangle = []
 		for J in [ai, bi, ci]:
 			i = J*3
-			x = -rffi.cast( rffi.DOUBLE, vertsPos[ i ] )
-			z = rffi.cast( rffi.DOUBLE, vertsPos[ i+1 ] )
-			y = rffi.cast( rffi.DOUBLE, vertsPos[ i+2 ] )
+			x = rffi.cast( rffi.DOUBLE, vertsPos[ i ] )
+			y = rffi.cast( rffi.DOUBLE, vertsPos[ i+1 ] )
+			z = rffi.cast( rffi.DOUBLE, vertsPos[ i+2 ] )
 			pos = (x,y,z)
 			#if smooth:
-			x = -rffi.cast( rffi.DOUBLE, vertsNor[ i ] )
-			z = rffi.cast( rffi.DOUBLE, vertsNor[ i+1 ] )
-			y = rffi.cast( rffi.DOUBLE, vertsNor[ i+2 ] )
+			x = rffi.cast( rffi.DOUBLE, vertsNor[ i ] )
+			y = rffi.cast( rffi.DOUBLE, vertsNor[ i+1 ] )
+			z = rffi.cast( rffi.DOUBLE, vertsNor[ i+2 ] )
 			nor = (x,y,z)
 
-			ID = (pos,nor)
-			if ID not in fastlookup:
-				xml = [
-					'<vertex>',
-					'<position x="%s" y="%s" z="%s" />' %pos,	# funny that tuple is valid here
-					'<normal x="%s" y="%s" z="%s" />' %nor,
-					'</vertex>'
-				]
-				VB.append( '\n'.join(xml) )
+			SIG = (pos,nor)
+			skip = False
+			if J in fastlookup:
+				for otherSIG in fastlookup[ J ]:
+					if SIG == otherSIG:
+						triangle.append( fastlookup[J][otherSIG] )
+						skip = True
+						break
 
-				fastlookup[ ID ] = ogre_vert_index
-				triangle.append( ogre_vert_index )
-				ogre_vert_index += 1
+				if not skip:
+					triangle.append( ogre_vert_index )
+					fastlookup[ J ][ SIG ] = ogre_vert_index
+
 			else:
-				triangle.append( fastlookup[ID] )
+				triangle.append( ogre_vert_index )
+				fastlookup[ J ] = { SIG : ogre_vert_index }
+
+			if skip: continue
+
+			xml = [
+				'<vertex>',
+				'<position x="%s" y="%s" z="%s" />' %pos,	# funny that tuple is valid here
+				'<normal x="%s" y="%s" z="%s" />' %nor,
+				'</vertex>'
+			]
+			VB.append( '\n'.join(xml) )
+
+			ogre_vert_index += 1
+
 		triangles.append( triangle )
 	VB.append( '</vertexbuffer>' )
 	VB.append( '</sharedgeometry>' )
 
 	file.write( '\n'.join(VB) )
-
+	del VB		# free memory
 
 	SMS = ['<submeshes>']
 	#for matidx, matname in ...:

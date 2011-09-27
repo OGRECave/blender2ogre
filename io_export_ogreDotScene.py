@@ -4987,8 +4987,6 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
     start = time.time()
     print('mesh to Ogre mesh XML format', ob.name)
 
-    if _USE_RPYTHON_ and False: cmesh = CtypesMesh( ob.data ); R.dump( cmesh )
-
     if not os.path.isdir( path ):
         print('creating directory', path )
         os.makedirs( path )
@@ -5019,8 +5017,12 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
     #root = doc.createElement('mesh'); doc.appendChild( root )
     name = force_name or ob.data.name
     xmlfile = os.path.join(path, '%s.mesh.xml' %name )
-    #try:
-    if True:
+
+    if _USE_RPYTHON_ and False:
+        cmesh = CtypesMesh( ob.data )
+        R.dump( xmlfile, cmesh )
+
+    else:
         f = open( xmlfile, 'w' )
         doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
 
