@@ -299,7 +299,7 @@ CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
 
 
 _IMAGE_FORMATS =  [     # for EnumProperty "FORCE_IMAGE_FORMAT"
-    ('','do not convert', 'default'),
+    ('NONE','NONE', 'keeps current image formats'),
     ('jpg', 'jpg', 'jpeg format'),
     ('png', 'png', 'png format'),
     ('dds', 'dds', 'nvidia dds format'),
@@ -309,7 +309,7 @@ _IMAGE_FORMATS =  [     # for EnumProperty "FORCE_IMAGE_FORMAT"
 _CONFIG_DEFAULTS_ALL = {
     'SWAP_AXIS' : 'xz-y',         # ogre standard
     'ONLY_ANIMATED_BONES' : False,
-    'FORCE_IMAGE_FORMAT' : '',
+    'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : False,
     'PATH' : '/tmp',
 
@@ -321,12 +321,25 @@ _CONFIG_DEFAULTS_ALL = {
     'FORCE_LAMPS' : True,
     'MESH' : True,
     'MESH_OVERWRITE' : True,
-    'ANIM' : True,
+    'ARM_ANIM' : True,
     'SHAPE_ANIM' : True,
     'ARRAY' : True,
     'MATERIALS' : True,
     'DDS_MIPS' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
+
+    'lodLevels' : 0,
+    'lodDistance' : 300,
+    'lodPercent' : 40,
+    'nuextremityPoints' : 0,
+    'generateEdgeLists' : False,
+    'generateTangents' : False,
+    'tangentSemantic' : 'uvw',
+    'tangentUseParity' : 4,
+    'tangentSplitMirrored' : False,
+    'tangentSplitRotated' : False,
+    'reorganiseBuffers' : True,
+    'optimiseAnimations' : True,
 
 }
 
@@ -2026,8 +2039,8 @@ class ShaderTree( _MatNodes_ ):
             else:
                 print('MESSAGE: packed image already in temp, not updating', iurl)
 
-        if CONFIG['FORCE_IMAGE_FORMAT']:
-            postname = self._reformat( texname )        #texname.split('.')[0]+'.dds'
+        if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
+            postname = self._reformat( texname )
 
         M += indent(4, 'texture %s' %postname )    
 
@@ -3267,7 +3280,6 @@ class _TXML_(object):
 
 class _OgreCommonExport_( _TXML_ ):
     #EXPORT_TYPE = 'OGRE'   # defined in subclass
-    filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
 
     @classmethod
     def poll(cls, context): return True
@@ -3277,58 +3289,53 @@ class _OgreCommonExport_( _TXML_ ):
         return {'RUNNING_MODAL'}
     def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
-    EX_SEP_MATS = BoolProperty(
-        name="Separate Materials", 
-        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
-        default=CONFIG['SEP_MATS'])
-
-    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
-
-
-    EX_ONLY_ANIMATED_BONES = BoolProperty(
-        name="Only Animated Bones", 
-        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
-        default=CONFIG['ONLY_ANIMATED_BONES'])
-
-    ##############################################################################################################
     EX_SWAP_AXIS = EnumProperty( 
         items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
         default= CONFIG['SWAP_AXIS'] 
     )
+    EX_SEP_MATS = BoolProperty(
+        name="Separate Materials", 
+        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
+        default=CONFIG['SEP_MATS'])
+    EX_ONLY_ANIMATED_BONES = BoolProperty(
+        name="Only Animated Bones", 
+        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
+        default=CONFIG['ONLY_ANIMATED_BONES'])
     EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
     EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
     EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
     EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
     EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
     EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
-    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ANIM'])
+    EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
     EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
-
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
         min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
+    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
 
     ## Mesh Options ##
-    lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
-    lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
-    lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", default=40, min=0, max=99)
-    nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", default=0, min=0, max=65536)
-    generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=False)
-    generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=False)
-    tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default="uvw")
-    tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", default=4, min=0, max=16)
-    tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=False)
-    tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
-    reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
-    optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
+    EX_lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", min=0, max=32, default=CONFIG['lodLevels'])
+    EX_lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", min=0, max=2000, default=CONFIG['lodDistance'])
+    EX_lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", min=0, max=99, default=CONFIG['lodPercent'])
+    EX_nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", min=0, max=65536, default=CONFIG['nuextremityPoints'])
+    EX_generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=CONFIG['generateEdgeLists'])
+    EX_generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=CONFIG['generateTangents'])
+    EX_tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default=CONFIG['tangentSemantic'])
+    EX_tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", min=0, max=16, default=CONFIG['tangentUseParity'])
+    EX_tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=CONFIG['tangentSplitMirrored'])
+    EX_tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=CONFIG['tangentSplitRotated'])
+    EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
+    EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
 
 
+    filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
 
     def dot_material( self, meshes, path='/tmp', mat_file_name='SceneMaterial'):
         material_files = []
@@ -3402,31 +3409,13 @@ class _OgreCommonExport_( _TXML_ ):
 
 
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
-        opts = {
-            #'mesh-sub-dir' : self.EX_MESH_SUBDIR,
-            'shape-anim' : self.EX_SHAPE_ANIM,
-            'trim-bone-weights' : self.EX_TRIM_BONE_WEIGHTS,
-            'armature-anim' : self.EX_ANIM,
-            'lodLevels' : self.lodLevels,
-            'lodDistance' : self.lodDistance,
-            'lodPercent' : self.lodPercent,
-            'nuextremityPoints' : self.nuextremityPoints,
-            'generateEdgeLists' : self.generateEdgeLists,
-            'generateTangents' : self.generateTangents,
-            'tangentSemantic' : self.tangentSemantic, 
-            'tangentUseParity' : self.tangentUseParity,
-            'tangentSplitMirrored' : self.tangentSplitMirrored,
-            'tangentSplitRotated' : self.tangentSplitRotated,
-            'reorganiseBuffers' : self.reorganiseBuffers,
-            'optimiseAnimations' : self.optimiseAnimations,
-        }
-        dot_mesh( ob, path, force_name, ignore_shape_animation=False, opts=opts )
+        dot_mesh( ob, path, force_name, ignore_shape_animation=False )
 
 
     def ogre_export(self, url, context ):
         global CONFIG
         for name in dir(self):
-            if name.startswith('EX'):
+            if name.startswith('EX_'):
                 CONFIG[ name[3:] ] = getattr(self,name)
 
         #CONFIG['FORCE_IMAGE_FORMAT'] = None
@@ -3848,13 +3837,11 @@ class _OgreCommonExport_( _TXML_ ):
 
 
 
-class INFO_OT_createOgreExport(_OgreCommonExport_, bpy.types.Operator):
+class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
     bl_idname = "ogre.export"
     bl_label = "Export Ogre"
     bl_options = {'REGISTER'}
-    filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
-    EXPORT_TYPE = 'OGRE'
 
     EX_SWAP_AXIS = EnumProperty( 
         items=AXIS_MODES, 
@@ -3862,45 +3849,55 @@ class INFO_OT_createOgreExport(_OgreCommonExport_, bpy.types.Operator):
         description='axis swapping mode', 
         default= CONFIG['SWAP_AXIS'] 
     )
+    EX_SEP_MATS = BoolProperty(
+        name="Separate Materials", 
+        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
+        default=CONFIG['SEP_MATS'])
+    EX_ONLY_ANIMATED_BONES = BoolProperty(
+        name="Only Animated Bones", 
+        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
+        default=CONFIG['ONLY_ANIMATED_BONES'])
     EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
     EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
     EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
     EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
     EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
     EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
-    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ANIM'])
+    EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
     EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
-    #EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE'] )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
         min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
+    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
 
     ## Mesh Options ##
-    lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
-    lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
-    lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", default=40, min=0, max=99)
-    nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", default=0, min=0, max=65536)
-    generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=False)
-    generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=False)
-    tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default="uvw")
-    tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", default=4, min=0, max=16)
-    tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=False)
-    tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
-    reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
-    optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
+    EX_lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", min=0, max=32, default=CONFIG['lodLevels'])
+    EX_lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", min=0, max=2000, default=CONFIG['lodDistance'])
+    EX_lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", min=0, max=99, default=CONFIG['lodPercent'])
+    EX_nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", min=0, max=65536, default=CONFIG['nuextremityPoints'])
+    EX_generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=CONFIG['generateEdgeLists'])
+    EX_generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=CONFIG['generateTangents'])
+    EX_tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default=CONFIG['tangentSemantic'])
+    EX_tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", min=0, max=16, default=CONFIG['tangentUseParity'])
+    EX_tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=CONFIG['tangentSplitMirrored'])
+    EX_tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=CONFIG['tangentSplitRotated'])
+    EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
+    EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
+
+    filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
+    EXPORT_TYPE = 'OGRE'
 
 
-class INFO_OT_createRealxtendExport( _OgreCommonExport_, bpy.types.Operator ):
+
+class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
     '''Export RealXtend Scene'''
     bl_idname = "ogre.export_realxtend"
     bl_label = "Export RealXtend"
     bl_options = {'REGISTER', 'UNDO'}
-    filepath= StringProperty(name="File Path", description="Filepath used for exporting .txml file", maxlen=1024, default="", subtype='FILE_PATH')
-    EXPORT_TYPE = 'REX'
 
     EX_SWAP_AXIS = EnumProperty( 
         items=AXIS_MODES, 
@@ -3908,38 +3905,49 @@ class INFO_OT_createRealxtendExport( _OgreCommonExport_, bpy.types.Operator ):
         description='axis swapping mode', 
         default= CONFIG['SWAP_AXIS'] 
     )
+    EX_SEP_MATS = BoolProperty(
+        name="Separate Materials", 
+        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
+        default=CONFIG['SEP_MATS'])
+    EX_ONLY_ANIMATED_BONES = BoolProperty(
+        name="Only Animated Bones", 
+        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
+        default=CONFIG['ONLY_ANIMATED_BONES'])
+
     EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
     EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
     EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
     EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
     EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
     EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
-    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ANIM'])
+    EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
     EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
-    #EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE'] )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
         min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
 
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
+    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
+
     ## Mesh Options ##
-    lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
-    lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
-    lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", default=40, min=0, max=99)
-    nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", default=0, min=0, max=65536)
-    generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=False)
-    generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=False)
-    tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default="uvw")
-    tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", default=4, min=0, max=16)
-    tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=False)
-    tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
-    reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
-    optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
+    EX_lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", min=0, max=32, default=CONFIG['lodLevels'])
+    EX_lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", min=0, max=2000, default=CONFIG['lodDistance'])
+    EX_lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", min=0, max=99, default=CONFIG['lodPercent'])
+    EX_nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", min=0, max=65536, default=CONFIG['nuextremityPoints'])
+    EX_generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=CONFIG['generateEdgeLists'])
+    EX_generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=CONFIG['generateTangents'])
+    EX_tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default=CONFIG['tangentSemantic'])
+    EX_tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", min=0, max=16, default=CONFIG['tangentUseParity'])
+    EX_tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=CONFIG['tangentSplitMirrored'])
+    EX_tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=CONFIG['tangentSplitRotated'])
+    EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
+    EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
 
-
+    filepath= StringProperty(name="File Path", description="Filepath used for exporting .txml file", maxlen=1024, default="", subtype='FILE_PATH')
+    EXPORT_TYPE = 'REX'
 
 
 def get_parent_matrix( ob, objects ):
@@ -4128,39 +4136,37 @@ Available options:
 
 '''
 
-def OgreXMLConverter( infile, opts ):
+def OgreXMLConverter( infile ):
     print('[Ogre Tools Wrapper]', infile )
-
     exe = CONFIG['OGRETOOLS_XML_CONVERTER']
     if not os.path.isfile( exe ):
-        print( 'ERROR: can not find OgreXMLConverter' )
-        print( exe )
+        print( 'WARNING: can not find OgreXMLConverter (can not convert XXX.mesh.xml to XXX.mesh' )
         return
 
     basicArguments = ''
 
-    if opts['lodLevels']:
-        basicArguments += ' -l %s -d %s -p %s' %(opts['lodLevels'], opts['lodDistance'], opts['lodPercent'])
+    if CONFIG['lodLevels']:
+        basicArguments += ' -l %s -d %s -p %s' %(CONFIG['lodLevels'], CONFIG['lodDistance'], CONFIG['lodPercent'])
         
-    if opts['nuextremityPoints'] > 0:
-        basicArguments += ' -x %s' %opts['nuextremityPoints']
+    if CONFIG['nuextremityPoints'] > 0:
+        basicArguments += ' -x %s' %CONFIG['nuextremityPoints']
 
-    if not opts['generateEdgeLists']:
+    if not CONFIG['generateEdgeLists']:
         basicArguments += ' -e'
 
-    if opts['generateTangents']:
+    if CONFIG['generateTangents']:
         basicArguments += ' -t'
-        if opts['tangentSemantic']:
-            basicArguments += ' -td %s' %opts['tangentSemantic']
-        if opts['tangentUseParity']:
-            basicArguments += ' -ts %s' %opts['tangentUseParity']
-        if opts['tangentSplitMirrored']:
+        if CONFIG['tangentSemantic']:
+            basicArguments += ' -td %s' %CONFIG['tangentSemantic']
+        if CONFIG['tangentUseParity']:
+            basicArguments += ' -ts %s' %CONFIG['tangentUseParity']
+        if CONFIG['tangentSplitMirrored']:
             basicArguments += ' -tm'
-        if opts['tangentSplitRotated']:
+        if CONFIG['tangentSplitRotated']:
             basicArguments += ' -tr'
-    if not opts['reorganiseBuffers']:
+    if not CONFIG['reorganiseBuffers']:
         basicArguments += ' -r'
-    if not opts['optimiseAnimations']:
+    if not CONFIG['optimiseAnimations']:
         basicArguments += ' -o'
 
     opts = '-log _ogre_debug.txt %s' %basicArguments
@@ -4897,7 +4903,7 @@ class VertexNoPos(object):
 
 
 #######################################################################################
-def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, opts=OptionsEx, normals=True ):
+def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
     start = time.time()
     print('mesh to Ogre mesh XML format', ob.name)
 
@@ -5135,7 +5141,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
             for vidx, v in enumerate(_remap_verts_):
                 check = 0
                 for vgroup in v.groups:
-                    if vgroup.weight > opts['trim-bone-weights']:        #self.EX_TRIM_BONE_WEIGHTS:        # optimized
+                    if vgroup.weight > CONFIG['TRIM_BONE_WEIGHTS']:
                         bnidx = find_bone_index(copy,arm,vgroup.group)
                         if bnidx is not None:        # allows other vertex groups, not just armature vertex groups
                             doc.leaf_tag('vertexboneassignment', {
@@ -5153,7 +5159,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 
         ############################################
         ## updated June3 2011 - shape animation works ##
-        if opts['shape-anim'] and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
+        if CONFIG['SHAPE_ANIM'] and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
             print('    writing shape keys')
 
             doc.start_tag('poses', {})
@@ -5264,9 +5270,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
     replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
     del(replaceInplace)
         
-    OgreXMLConverter( xmlfile, opts )
+    OgreXMLConverter( xmlfile )
 
-    if arm and opts['armature-anim']:
+    if arm and CONFIG['ARM_ANIM']:
         skel = Skeleton( ob )
         data = skel.to_xml()
         name = force_name or ob.data.name
@@ -5274,7 +5280,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
         f = open( xmlfile, 'wb' )
         f.write( bytes(data,'utf-8') )
         f.close()
-        OgreXMLConverter( xmlfile, opts )
+        OgreXMLConverter( xmlfile )
 
     mats = []
     for mat in materials:
