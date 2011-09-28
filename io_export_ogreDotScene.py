@@ -89,8 +89,8 @@ bpy.types.Material.use_ogre_advanced_options = BoolProperty( name='Show Advanced
 
 bpy.types.Material.ogre_parent_material = EnumProperty(
   name="Script Inheritence", 
-  description='ogre parent material class', default='',
-  items=[ ('', '', 'none') ],
+  description='ogre parent material class', default='NONE',
+  items=[ ('NONE', 'NONE', 'do not use script inheritance') ],
 )
 
 
@@ -3379,7 +3379,7 @@ class _OgreCommonExport_( _TXML_ ):
 
         safename = material_name(mat)     # supports blender library linking
         M = '// blender material: %s\n' %(mat.name)
-        if mat.ogre_parent_material:    ## NEW: script inheritance
+        if mat.ogre_parent_material != 'NONE':    ## NEW: script inheritance
             assert mat.ogre_parent_material in _OGRE_MATERIAL_CLASS_SCRIPT
             dotmaterial = _OGRE_MATERIAL_CLASS_SCRIPT[ mat.ogre_parent_material ]
             M += 'import %s from "%s"\n' %(mat.ogre_parent_material, dotmaterial)
@@ -5711,7 +5711,7 @@ def generate_material( mat, path ):
 def update_parent_material_path( path ):
     global _OGRE_MATERIAL_CLASS_SCRIPT
     print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
-    items = [ ('', '', 'none') ]
+    items = [ ('NONE', 'NONE', 'do not use script inheritance') ]
     classes = []
     for sub in os.listdir( path ):
         a = os.path.join( path, sub )
@@ -5732,7 +5732,7 @@ def update_parent_material_path( path ):
 
     bpy.types.Material.ogre_parent_material = EnumProperty(
         name="Script Inheritence", 
-        description='ogre parent material class', default='',
+        description='ogre parent material class', default='NONE',
         items=items,
     )
 
