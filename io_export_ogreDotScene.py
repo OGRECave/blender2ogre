@@ -312,6 +312,7 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 
 ############ CONFIG ##############
 CONFIG_FILENAME = 'blender2ogre.cfg'
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split()
 
 # Methode to read a config value from a config file, or update it to the default value
 def readOrCreateConfigValue(config, section, option, default):
@@ -380,7 +381,7 @@ def readOrCreateConfig():
         config.add_section('paths')
 
     ################ Read (or create default) config values ##################
-    for tag in 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split():
+    for tag in _CONFIG_TAGS_:
         default = readOrCreateConfigValue( config, 'paths', tag, locals()['DEFAULT_'+tag] )
         globals().update( {'CONFIG_'+tag : default})
         func = eval( 'lambda self,con: globals().update( {"CONFIG_%s" : self.%s} )' %(tag,tag) )
@@ -410,7 +411,7 @@ class Blender2Ogre_ConfigOp(bpy.types.Operator):
         config = configparser.ConfigParser()
         config.add_section('paths')
 
-        for tag in 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split():
+        for tag in _CONFIG_TAGS_:
             value = globals()['CONFIG_'+tag]
             config.set('paths', tag, value)
 
@@ -1211,7 +1212,7 @@ class ConfigurePanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         op = layout.operator( 'ogre.save_config', text='update config file', icon='FILE' )
-        for tag in 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split():
+        for tag in _CONFIG_TAGS_:
             layout.prop( context.window_manager, tag )
 
 
@@ -4195,8 +4196,6 @@ Rest Bone <bpy_struct, Bone("Bone")>
     '''
 
     def __init__(self, rbone, pbone, skeleton):
-        print(rbone, dir(rbone) )
-
         if OPTIONS['SWAP_AXIS'] == 'xyz':
             self.fixUpAxis = False
         else:
@@ -5095,7 +5094,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
         print('    writing submeshes' )
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
-            if not len(_sm_faces_[matidx]): continue	# fixes corrupt unused materials
+            if not len(_sm_faces_[matidx]):
+                Report.warnings.append( 'BAD SUBMESH: %s' %ob.name )
+                continue	# fixes corrupt unused materials
 
             doc.start_tag('submesh', {
                     'usesharedvertices' : 'true',
