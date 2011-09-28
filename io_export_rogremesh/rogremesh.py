@@ -95,8 +95,11 @@ def save( blenderobject, path ):
 	vertsNorAddr=int,
 	numFaces=int,
 	numVerts=int,
+	materials=[str],
 )
-def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts ):
+def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts, materials ):
+	for matname in materials:
+		print( 'Material Name: %s' %matname )
 
 	file = streamio.open_file_as_stream( path, 'w')
 
@@ -135,7 +138,7 @@ def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, verts
 			z = rffi.cast( rffi.DOUBLE, vertsNor[ i+2 ] )
 			nor = (x,y,z)
 
-			SIG = (pos,nor)
+			SIG = (pos,nor, matidx)
 			skip = False
 			if J in fastlookup:
 				for otherSIG in fastlookup[ J ]:

@@ -2354,8 +2354,6 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
     def execute(self, context):
         Report.reset()
         Report.messages.append('running %s' %CONFIG_OGRE_MESHY)
-        Report.messages.append('please wait...')
-        Report.show()
 
         if sys.platform == 'linux2':
             path = '%s/.wine/drive_c/tmp' %os.environ['HOME']
@@ -2437,6 +2435,7 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
             #subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
             subprocess.Popen( [CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'] )
 
+        Report.show()
         return {'FINISHED'}
 
 
@@ -3310,7 +3309,7 @@ class _OgreCommonExport_( _TXML_ ):
 
     EX_FORCE_IMAGE = EnumProperty( items=_image_formats, name='Convert Images',  description='convert all textures to format', default='' )
     EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
-    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.1)
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.5)
     ## Mesh Options ##
     lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
     lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
@@ -4185,14 +4184,21 @@ def mesh_is_smooth( mesh ):
 
 
 class Bone(object):
-    ''' EditBone
+    ''' 
+EditBone
     ['__doc__', '__module__', '__slots__', 'align_orientation', 'align_roll', 'bbone_in', 'bbone_out', 'bbone_segments', 'bl_rna', 'envelope_distance', 'envelope_weight', 'head', 'head_radius', 'hide', 'hide_select', 'layers', 'lock', 'matrix', 'name', 'parent', 'rna_type', 'roll', 'select', 'select_head', 'select_tail', 'show_wire', 'tail', 'tail_radius', 'transform', 'use_connect', 'use_cyclic_offset', 'use_deform', 'use_envelope_multiply', 'use_inherit_rotation', 'use_inherit_scale', 'use_local_location']
+
+Rest Bone <bpy_struct, Bone("Bone")> 
+    ['__doc__', '__module__', '__slots__', 'bbone_in', 'bbone_out', 'bbone_segments', 'bbone_x', 'bbone_z', 'bl_rna', 'children', 'envelope_distance', 'envelope_weight', 'evaluate_envelope', 'head', 'head_local', 'head_radius', 'hide', 'hide_select', 'layers', 'matrix', 'matrix_local', 'name', 'parent', 'rna_type', 'select', 'select_head', 'select_tail', 'show_wire', 'tail', 'tail_local', 'tail_radius', 'use_connect', 'use_cyclic_offset', 'use_deform', 'use_envelope_multiply', 'use_inherit_rotation', 'use_inherit_scale', 'use_local_location']
+
+
     '''
 
-    def __init__(self, matrix, pbone, skeleton):
+    def __init__(self, rbone, pbone, skeleton):
+        print(rbone, dir(rbone) )
+
         if OPTIONS['SWAP_AXIS'] == 'xyz':
             self.fixUpAxis = False
-
         else:
             self.fixUpAxis = True
             if OPTIONS['SWAP_AXIS'] == '-xzy':      # Tundra1
@@ -4205,8 +4211,9 @@ class Bone(object):
 
         self.skeleton = skeleton
         self.name = pbone.name
-        #self.matrix = self.flipMat * matrix
-        self.matrix = matrix
+        self.matrix = rbone.matrix_local.copy() # armature space
+        #self.matrix_local = rbone.matrix.copy()    # space?
+
         self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
         if not pbone.bone.use_deform: print('warning: bone <%s> is non-deformabled, this is inefficient!' %self.name)
         #TODO test#if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
@@ -4215,35 +4222,19 @@ class Bone(object):
 
     def update(self):        # called on frame update
         pose =  self.bone.matrix.copy()
-        #pose = self.bone.matrix * self.skeleton.object_space_transformation
-        #pose =  self.skeleton.object_space_transformation * self.bone.matrix
         self._inverse_total_trans_pose = pose.inverted()
-
         # calculate difference to parent bone
         if self.parent:
             pose = self.parent._inverse_total_trans_pose* pose
         elif self.fixUpAxis:
-            #pose = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1))) * pose   # Requiered for Blender SVN > 2.56
             pose = self.flipMat * pose
         else:
             pass
 
-        # get transformation values
-        # translation relative to parent coordinate system orientation
-        # and as difference to rest pose translation
-        #blender2.49#translation -= self.ogreRestPose.translationPart()
         self.pose_location =  pose.to_translation()  -  self.ogre_rest_matrix.to_translation()
-
-        # rotation (and scale) relative to local coordiante system
-        # calculate difference to rest pose
-        #blender2.49#poseTransformation *= self.inverseOgreRestPose
-        #pose = pose * self.inverse_ogre_rest_matrix        # this was wrong, fixed Dec3rd
         pose = self.inverse_ogre_rest_matrix * pose
         self.pose_rotation = pose.to_quaternion()
         self.pose_scale = pose.to_scale()
-
-        #self.pose_location = self.bone.location.copy()
-        #self.pose_rotation = self.bone.rotation_quaternion.copy()
         for child in self.children: child.update()
 
 
@@ -4260,20 +4251,11 @@ class Bone(object):
         else:
             inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))
 
-        # bone matrix relative to armature object
+        #self.ogre_rest_matrix = self.skeleton.object_space_transformation * self.matrix    # ALLOW ROTATION?
         self.ogre_rest_matrix = self.matrix.copy()
-        # relative to mesh object origin
-        #self.ogre_rest_matrix *= self.skeleton.object_space_transformation        # 2.49 style
-
-        ##not correct - june18##self.ogre_rest_matrix = self.skeleton.object_space_transformation * self.ogre_rest_matrix
-        #self.ogre_rest_matrix -= self.skeleton.object_space_transformation
-
-
         # store total inverse transformation
         self.inverse_total_trans = self.ogre_rest_matrix.inverted()
-
         # relative to OGRE parent bone origin
-        #self.ogre_rest_matrix *= inverseParentMatrix        # 2.49 style
         self.ogre_rest_matrix = inverseParentMatrix * self.ogre_rest_matrix
         self.inverse_ogre_rest_matrix = self.ogre_rest_matrix.inverted()
 
@@ -4287,6 +4269,9 @@ class Skeleton(object):
             if b.name == name: return b
 
     def __init__(self, ob ):
+        if ob.location.x != 0 or ob.location.y != 0 or ob.location.z != 0:
+            Report.warnings.append('Mesh (%s): is offset from Armature - zero transform is required' %ob.name)
+
         self.object = ob
         self.bones = []
         mats = {}
@@ -4294,25 +4279,21 @@ class Skeleton(object):
         arm.hide = False
         self._restore_layers = list(arm.layers)
         #arm.layers = [True]*20      # can not have anything hidden - REQUIRED?
-        prev = bpy.context.scene.objects.active
-        bpy.context.scene.objects.active = arm        # arm needs to be in edit mode to get to .edit_bones
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-        for bone in arm.data.edit_bones: mats[ bone.name ] = bone.matrix.copy()
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-        #bpy.ops.object.mode_set(mode='POSE', toggle=False)
-        bpy.context.scene.objects.active = prev
 
         for pbone in arm.pose.bones:
-            mybone = Bone( mats[pbone.name] ,pbone, self )
+            mybone = Bone( arm.data.bones[pbone.name] ,pbone, self )
             self.bones.append( mybone )
 
         if arm.name not in Report.armatures: Report.armatures.append( arm.name )
 
-        # additional transformation for root bones:
-        # from armature object space into mesh object space, i.e.,
-        # (x,y,z,w)*AO*MO^(-1)
-        self.object_space_transformation = arm.matrix_local * ob.matrix_local.inverted()
+        ## bad idea - allowing rotation of armature, means vertices must also be rotated,
+        ## also a bug with applying the rotation, the Z rotation is lost
+        #x,y,z = arm.matrix_local.copy().inverted().to_euler()
+        #e = mathutils.Euler( (x,z,y) )
+        #self.object_space_transformation = e.to_matrix().to_4x4()
+        x,y,z = arm.matrix_local.to_euler()
+        if x != 0 or y != 0 or z != 0:
+            Report.warnings.append('Armature: %s is rotated - (rotation is ignored)' %arm.name)
 
         ## setup bones for Ogre format ##
         for b in self.bones: b.rebuild_tree()
@@ -4978,7 +4959,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
         for mat in ob.data.materials:
             if mat: materials.append( mat )
             else:
-                print('warning: bad material data', ob)
+                print('WARNING: bad material data', ob)
                 materials.append( '_missing_material_' )        # fixed dec22, keep proper index
         if not materials: materials.append( '_missing_material_' )
         _sm_faces_ = []
@@ -5277,11 +5258,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
     
     replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
     del(replaceInplace)
-    
-    
+        
     OgreXMLConverter( xmlfile, opts )
-
-    
 
     if arm and opts['armature-anim']:
         skel = Skeleton( ob )
