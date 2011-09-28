@@ -32,7 +32,7 @@ VERSION = '0.5.5 preview6'
 ###########################################################
 ###### imports #####
 import os, sys, time, hashlib, getpass, tempfile, configparser
-import math, subprocess
+import math, subprocess, pickle
 import array, time, ctypes
 from xml.sax.saxutils import XMLGenerator
 
@@ -293,19 +293,42 @@ def swap(vec):
 
 
 ############ CONFIG ##############
+CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
+CONFIG_FILENAME = 'blender2ogre.pickle'
+CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
+
+
+_IMAGE_FORMATS =  [     # for EnumProperty "FORCE_IMAGE_FORMAT"
+    ('','do not convert', 'default'),
+    ('jpg', 'jpg', 'jpeg format'),
+    ('png', 'png', 'png format'),
+    ('dds', 'dds', 'nvidia dds format'),
+]
 
 
 _CONFIG_DEFAULTS_ALL = {
     'SWAP_AXIS' : 'xz-y',         # ogre standard
     'ONLY_ANIMATED_BONES' : False,
-    'FORCE_IMAGE_FORMAT' : None,
+    'FORCE_IMAGE_FORMAT' : '',
     'TOUCH_TEXTURES' : False,
-    'PATH' : '/tmp'
-}
+    'PATH' : '/tmp',
 
-CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
-CONFIG_FILENAME = 'blender2ogre.pickle'
-CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
+    'SEP_MATS' : True,
+
+    'SCENE' : True,
+    'SELONLY' : True,
+    'FORCE_CAMERA' : True,
+    'FORCE_LAMPS' : True,
+    'MESH' : True,
+    'MESH_OVERWRITE' : True,
+    'ANIM' : True,
+    'SHAPE_ANIM' : True,
+    'ARRAY' : True,
+    'MATERIALS' : True,
+    'DDS_MIPS' : True,
+    'TRIM_BONE_WEIGHTS' : 0.01,
+
+}
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR'.split()
 
@@ -353,7 +376,8 @@ def load_config():  # PUBLIC API
             print( 'IO ERROR, can not read: %s' %CONFIG_FILEPATH )
 
     for tag in _CONFIG_DEFAULTS_ALL:
-        CONFIG[ tag ] = _CONFIG_DEFAULTS_ALL[ tag ]
+        if tag not in CONFIG:
+            CONFIG[ tag ] = _CONFIG_DEFAULTS_ALL[ tag ]
 
     for tag in _CONFIG_TAGS_:
         if tag not in CONFIG:
@@ -377,10 +401,12 @@ def load_config():  # PUBLIC API
 CONFIG = load_config()
 
 def save_config():  # PUBLIC API
-    if os.path.isfile( CONFIG_PATH ):
+    print('saving config....')
+    for key in CONFIG: print( '%s =   %s' %(key, CONFIG[key]) )
+    if os.path.isdir( CONFIG_PATH ):
         try:
             with open( CONFIG_FILEPATH, 'wb' ) as f:
-                pickle.dump( f, CONFIG )
+                pickle.dump( CONFIG, f, -1 )
                 print('SAVED CONFIG')
         except:
             print( 'IO ERROR, can not write: %s' %CONFIG_FILEPATH )
@@ -2286,14 +2312,13 @@ class ShaderTree( _MatNodes_ ):
         subprocess.call( [exe]+opts )
         print( 'image magick->', outfile )
 
-    EX_DDS_MIPS = 3    # default
     def DDS_converter(self, infile ):
         print('[NVIDIA DDS Wrapper]', infile )
         exe = CONFIG['NVIDIATOOLS_EXE']
         if not os.path.isfile( exe ):
             Report.warnings.append( 'Nvidia DDS tools not installed!' )
             print( 'ERROR: can not find nvdxt.exe', exe ); return
-        opts = '-quality_production -nmips %s -rescale nearest' %self.EX_DDS_MIPS
+        opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
         path,name = os.path.split( infile )
         outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
         opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
@@ -3241,6 +3266,9 @@ class _TXML_(object):
         a.setAttribute('value', '40' )
 
 class _OgreCommonExport_( _TXML_ ):
+    #EXPORT_TYPE = 'OGRE'   # defined in subclass
+    filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
+
     @classmethod
     def poll(cls, context): return True
     def invoke(self, context, event):
@@ -3252,38 +3280,40 @@ class _OgreCommonExport_( _TXML_ ):
     EX_SEP_MATS = BoolProperty(
         name="Separate Materials", 
         description="exports a .material for each material (rather than putting all materials in a single .material file)", 
-        default=True)
+        default=CONFIG['SEP_MATS'])
 
-    _image_formats =  [
-        ('','do not convert', 'default'),
-        ('jpg', 'jpg', 'jpeg format'),
-        ('png', 'png', 'png format'),
-        ('dds', 'dds', 'nvidia dds format'),
-    ]
+    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
 
 
-    filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
-    #EXPORT_TYPE = 'OGRE'   # defined in subclass
     EX_ONLY_ANIMATED_BONES = BoolProperty(
         name="Only Animated Bones", 
         description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
-        default=False)
+        default=CONFIG['ONLY_ANIMATED_BONES'])
 
-    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
-    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=True)
-    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=True)
-    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=True)
-    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=True)
-    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=True)
-    EX_INSTANCES = BoolProperty(name="Optimize Instances", description="optimize instances in OgreDotScene xml", default=True)
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=True)
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=True)
+    ##############################################################################################################
+    EX_SWAP_AXIS = EnumProperty( 
+        items=AXIS_MODES, 
+        name='swap axis',  
+        description='axis swapping mode', 
+        default= CONFIG['SWAP_AXIS'] 
+    )
+    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
+    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
+    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
+    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
+    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
+    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
+    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ANIM'])
+    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
 
-    EX_FORCE_IMAGE = EnumProperty( items=_image_formats, name='Convert Images',  description='convert all textures to format', default='' )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
-    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.5)
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(
+        name="Trim Weights", 
+        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
+        min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+
     ## Mesh Options ##
     lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
     lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
@@ -3394,19 +3424,16 @@ class _OgreCommonExport_( _TXML_ ):
 
 
     def ogre_export(self, url, context ):
-        CONFIG['FORCE_IMAGE_FORMAT'] = None
-        CONFIG['TOUCH_TEXTURES'] = True
-        CONFIG['SWAP_AXIS'] = self.EX_SWAP_MODE
-        CONFIG['ONLY_ANIMATED_BONES'] = self.EX_ONLY_ANIMATED_BONES
+        global CONFIG
+        for name in dir(self):
+            if name.startswith('EX'):
+                CONFIG[ name[3:] ] = getattr(self,name)
+
+        #CONFIG['FORCE_IMAGE_FORMAT'] = None
+        #CONFIG['TOUCH_TEXTURES'] = True
+        #CONFIG['SWAP_AXIS'] = self.EX_SWAP_MODE
+        #CONFIG['ONLY_ANIMATED_BONES'] = self.EX_ONLY_ANIMATED_BONES
         Report.reset()
-
-        ShaderTree.EX_DDS_MIPS = self.EX_DDS_MIPS
-
-        if self.EX_FORCE_IMAGE:
-            fmt = self.EX_FORCE_IMAGE.lower()
-            if not fmt.startswith('.'): fmt = '.'+fmt
-            CONFIG['FORCE_IMAGE_FORMAT'] = fmt
-
 
         print('ogre export->', url)
         prefix = url.split('.')[0]
@@ -3550,6 +3577,8 @@ class _OgreCommonExport_( _TXML_ ):
 
         for ob in temps: context.scene.objects.unlink( ob )
         bpy.ops.wm.call_menu( name='Ogre_User_Report' )
+
+        save_config()   # always save?
 
     def create_ogre_document(self, context, material_files=[] ):
         now = time.time()
@@ -3819,7 +3848,7 @@ class _OgreCommonExport_( _TXML_ ):
 
 
 
-class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
+class INFO_OT_createOgreExport(_OgreCommonExport_, bpy.types.Operator):
     '''Export Ogre Scene'''
     bl_idname = "ogre.export"
     bl_label = "Export Ogre"
@@ -3827,28 +3856,29 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
     EXPORT_TYPE = 'OGRE'
 
-    EX_SWAP_MODE = EnumProperty( 
+    EX_SWAP_AXIS = EnumProperty( 
         items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
-        default='xz-y' 
+        default= CONFIG['SWAP_AXIS'] 
     )
+    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
+    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
+    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
+    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
+    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
+    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
+    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ANIM'])
+    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
+    #EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE'] )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(
+        name="Trim Weights", 
+        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
+        min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
 
-    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
-    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=True)
-    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=True)
-    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=True)
-    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=True)
-    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=True)
-    EX_INSTANCES = BoolProperty(name="Optimize Instances", description="optimize instances in OgreDotScene xml", default=True)
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=True)
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=True)
-
-    EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default='' )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
-    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.1)
     ## Mesh Options ##
     lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
     lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
@@ -3864,7 +3894,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
 
 
-class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_ ):
+class INFO_OT_createRealxtendExport( _OgreCommonExport_, bpy.types.Operator ):
     '''Export RealXtend Scene'''
     bl_idname = "ogre.export_realxtend"
     bl_label = "Export RealXtend"
@@ -3872,28 +3902,29 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_ ):
     filepath= StringProperty(name="File Path", description="Filepath used for exporting .txml file", maxlen=1024, default="", subtype='FILE_PATH')
     EXPORT_TYPE = 'REX'
 
-    EX_SWAP_MODE = EnumProperty( 
+    EX_SWAP_AXIS = EnumProperty( 
         items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
-        default='xz-y' 
+        default= CONFIG['SWAP_AXIS'] 
     )
+    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
+    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
+    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
+    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
+    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
+    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
+    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ANIM'])
+    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
+    #EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE'] )
+    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(
+        name="Trim Weights", 
+        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
+        min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
 
-    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=True)
-    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=True)
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=True)
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=True)
-    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=True)
-    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=True)
-    EX_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=True)
-    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=True)
-    EX_INSTANCES = BoolProperty(name="Optimize Instances", description="optimize instances in OgreDotScene xml", default=True)
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=True)
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=True)
-
-    EX_FORCE_IMAGE = EnumProperty( items=_OgreCommonExport_._image_formats, name='Convert Images',  description='convert all textures to format', default='' )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", default=3, min=0, max=16)
-    EX_TRIM_BONE_WEIGHTS = FloatProperty(name="Trim Weights", description="ignore bone weights below this value\n(Ogre may only support 4 bones per vertex", default=0.01, min=0.0, max=0.1)
     ## Mesh Options ##
     lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", default=0, min=0, max=32)
     lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", default=100, min=0, max=2000)
@@ -3907,6 +3938,8 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_ ):
     tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=False)
     reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=True)
     optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=True)
+
+
 
 
 def get_parent_matrix( ob, objects ):
@@ -5254,7 +5287,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, op
 ## end dot_mesh ##
 
 
-class TundraPreviewOp(bpy.types.Operator,  _OgreCommonExport_):
+class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
     '''helper to open Tundra2 (realXtend)'''
     bl_idname = 'tundra.preview'
     bl_label = "opens Tundra2 in a non-blocking subprocess"
@@ -5263,11 +5296,11 @@ class TundraPreviewOp(bpy.types.Operator,  _OgreCommonExport_):
     filepath= StringProperty(name="File Path", description="Filepath used for exporting Tundra .txml file", maxlen=1024, default="/tmp/preview.txml", subtype='FILE_PATH')
     EXPORT_TYPE = 'REX'
 
-    EX_SWAP_MODE = EnumProperty( 
+    EX_SWAP_AXIS = EnumProperty( 
         items=AXIS_MODES, 
         name='swap axis',  
         description='axis swapping mode', 
-        default='xz-y' 
+        default= CONFIG['SWAP_AXIS']
     )
 
     @classmethod
@@ -5487,7 +5520,7 @@ def register():
     for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
     bpy.utils.register_class( INFO_HT_microheader )
 
-    load_config()   # new pickle based config supports all options
+    #load_config()   # new pickle based config supports all options
 
     ## only test for Tundra2 once ##
     if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
