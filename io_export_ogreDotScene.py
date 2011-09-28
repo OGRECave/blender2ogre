@@ -28,40 +28,6 @@ bl_info = {
 
 VERSION = '0.5.5 preview6'
 
-## Options ##
-AXIS_MODES =  [
-    ('xyz', 'xyz', 'no swapping'),
-    ('xz-y', 'xz-y', 'ogre standard'),
-    ('-xzy', '-xzy', 'non standard'),
-]
-
-# options yet to be added to the config file
-OPTIONS = {
-    'ONLY_ANIMATED_BONES' : False,
-    'FORCE_IMAGE_FORMAT' : None,
-    'PATH' : '/tmp',    			# TODO SRombauts: use the CONFIG_TEMP_DIR variable
-    'TOUCH_TEXTURES' : False,
-    'SWAP_AXIS' : 'xz-y',         # Tundra2 standard
-    #'SWAP_AXIS' : '-xzy',         # Tundra1 standard
-}
-
-
-
-def swap(vec):
-    if OPTIONS['SWAP_AXIS'] == 'xyz': return vec
-    elif OPTIONS['SWAP_AXIS'] == 'xzy':
-        if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, vec.y] )
-        elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, vec.y] )
-    elif OPTIONS['SWAP_AXIS'] == '-xzy':
-        if len(vec) == 3: return mathutils.Vector( [-vec.x, vec.z, vec.y] )
-        elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, -vec.x, vec.z, vec.y] )
-    elif OPTIONS['SWAP_AXIS'] == 'xz-y':
-        if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, -vec.y] )
-        elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
-    else:
-        print( 'unknown swap axis mode', OPTIONS['SWAP_AXIS'] )
-        assert 0
-
 
 ###########################################################
 ###### imports #####
@@ -75,6 +41,10 @@ try:
     from bpy.props import *
 except ImportError:
     sys.exit("This script is an addon for blender, you must install it from blender.")
+
+## make sure we can import from same directory ##
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 
 
 ######################### bpy RNA #########################
@@ -115,14 +85,6 @@ bpy.types.Material.use_in_ogre_material_pass = BoolProperty( name='Layer Toggle'
 
 bpy.types.Material.use_ogre_advanced_options = BoolProperty( name='Show Advanced Options', default=False )
 
-
-
-
-#http://blenderpython.svn.sourceforge.net/viewvc/blenderpython/259/scripts/addons_extern/io_scene_assimp/import_assimp.py?revision=4&view=markup
-#bpy.types.Material.pass1 = PointerProperty(
-#    name = 'ogre pass 1',
-#    type = bpy.types.Material,
-#)
 
 
 bpy.types.Material.ogre_parent_material = EnumProperty(
@@ -305,97 +267,125 @@ Installing:
 
 
 
-## make sure we can import from same directory ##
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
+
+
+## Options ##
+AXIS_MODES =  [
+    ('xyz', 'xyz', 'no swapping'),
+    ('xz-y', 'xz-y', 'ogre standard'),
+    ('-xzy', '-xzy', 'non standard'),
+]
+
+def swap(vec):
+    if CONFIG['SWAP_AXIS'] == 'xyz': return vec
+    elif CONFIG['SWAP_AXIS'] == 'xzy':
+        if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, vec.y] )
+        elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, vec.y] )
+    elif CONFIG['SWAP_AXIS'] == '-xzy':
+        if len(vec) == 3: return mathutils.Vector( [-vec.x, vec.z, vec.y] )
+        elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, -vec.x, vec.z, vec.y] )
+    elif CONFIG['SWAP_AXIS'] == 'xz-y':
+        if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, -vec.y] )
+        elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
+    else:
+        print( 'unknown swap axis mode', CONFIG['SWAP_AXIS'] )
+        assert 0
 
 
 ############ CONFIG ##############
-CONFIG_FILENAME = 'blender2ogre.cfg'
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR TEMP_DIR'.split()
-
-# Methode to read a config value from a config file, or update it to the default value
-def readOrCreateConfigValue(config, section, option, default):
-    try:
-        return config.get(section, option)
-    except configparser.NoOptionError:
-        config.set(section, option, default)
-        return default
-
-# Read the addon config values from the config blender2ogre.cfg file, or create/update it whith platform specific default values
-def readOrCreateConfig():
-    # TODO SRombauts: make a class AddonConfig to store these values
-    global CONFIG_TEMP_DIR, CONFIG_OGRETOOLS_XML_CONVERTER, CONFIG_OGRETOOLS_MESH_MAGICK, CONFIG_OGRE_MESHY, CONFIG_IMAGE_MAGICK_CONVERT, CONFIG_NVIDIATOOLS_EXE, CONFIG_MYSHADERS_DIR, CONFIG_TUNDRA_ROOT
-    
-    # Create default options values (platform specific paths)
-    DEFAULT_TEMP_DIR = tempfile.gettempdir()
-    if sys.platform.startswith('win'):        # win32 and win64
-        DEFAULT_OGRETOOLS_XML_CONVERTER = 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe'
-        DEFAULT_OGRETOOLS_MESH_MAGICK = 'C:\\OgreCommandLineTools\\MeshMagick.exe'
-        DEFAULT_OGRE_MESHY = 'C:\\OgreMeshy\\Ogre Meshy.exe'
-        DEFAULT_IMAGE_MAGICK_CONVERT = ''
-        for name in os.listdir(  'C:\\Program Files' ):
-            if name.startswith( 'ImageMagick' ):
-                image_magick_path = os.path.join('C:\\Program Files', name)
-                DEFAULT_IMAGE_MAGICK_CONVERT = os.path.join(image_magick_path, 'convert.exe');
-                break
-        DEFAULT_NVIDIATOOLS_EXE = 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe'
-
-        DEFAULT_TUNDRA_ROOT = 'C:\\Tundra2'
-        DEFAULT_MYSHADERS_DIR = 'C:\\Tundra2\\media\\materials'
-        
-    elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):        # OSX patch by FreqMod June6th 2011
-        # DEFAULT_TEMP_PATH = '/tmp' 
-        # ogre-tools from andrews repo is broken
-        #DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'	# apt-get ogre-tools
-        DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/local/bin/OgreXMLConverter' # prefer source builds
-
-        DEFAULT_OGRETOOLS_MESH_MAGICK = '/usr/bin/MeshMagick'
-        DEFAULT_TUNDRA_ROOT = '%s/Tundra2' %os.environ['HOME']
-        DEFAULT_MYSHADERS_DIR = '%s/Tundra2/media/materials' %os.environ['HOME']
-
-        if not os.path.isfile( DEFAULT_OGRETOOLS_XML_CONVERTER ):
-            if os.path.isfile( '/usr/bin/OgreXMLConverter'):
-                DEFAULT_OGRETOOLS_XML_CONVERTER = '/usr/bin/OgreXMLConverter'
-            elif os.path.isfile( '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME'] ):
-                DEFAULT_OGRETOOLS_XML_CONVERTER = '%s/.wine/drive_c/OgreCommandLineTools/OgreXmlConverter.exe' %os.environ['HOME']
-                DEFAULT_OGRETOOLS_MESH_MAGICK = '%s/.wine/drive_c/OgreCommandLineTools/MeshMagick.exe' %os.environ['HOME']
 
 
-        DEFAULT_OGRE_MESHY = '%s/OgreMeshy/Ogre Meshy.exe' %os.environ['HOME']
+_CONFIG_DEFAULTS_ALL = {
+    'SWAP_AXIS' : 'xz-y',         # ogre standard
+    'ONLY_ANIMATED_BONES' : False,
+    'FORCE_IMAGE_FORMAT' : None,
+    'TOUCH_TEXTURES' : False,
+    'PATH' : '/tmp'
+}
 
-        DEFAULT_IMAGE_MAGICK_CONVERT = '/usr/bin/convert/convert'
-        if not os.path.isfile( DEFAULT_IMAGE_MAGICK_CONVERT ): DEFAULT_IMAGE_MAGICK_CONVERT = '/usr/local/bin/convert/convert'
+CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
+CONFIG_FILENAME = 'blender2ogre.pickle'
+CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
 
-        DEFAULT_NVIDIATOOLS_EXE = '%s/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities' %os.environ['HOME']
-        
-    # Compose the path to the config file, in the config/scripts subfolder
-    config_path = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
-    config_filepath = os.path.join(config_path, CONFIG_FILENAME)
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR'.split()
 
-    # Read the blender2ogre.cfg config file for addon options (or create a 'paths' section if not present)
-    print('Opening config file %s ...' % config_filepath)
-    config = configparser.ConfigParser()
-    config.read(config_filepath)
-    if not config.has_section('paths'):
-        config.add_section('paths')
 
-    ################ Read (or create default) config values ##################
+_CONFIG_DEFAULTS_WINDOWS = {
+    'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
+    'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
+    'TUNDRA_ROOT' : 'C:\\Tundra2',
+    'OGRE_MESHY' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
+    'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
+    'NVIDIATOOLS_EXE' : 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe',
+    'MYSHADERS_DIR' : 'C:\\Tundra2\\media\\materials',
+#    'TEMP_DIR' : 'C:\\tmp',
+}
+
+_CONFIG_DEFAULTS_UNIX = {
+    'OGRETOOLS_XML_CONVERTER' : '/usr/local/bin/OgreXMLConverter',  # source build is better
+    'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
+    'TUNDRA_ROOT' : '~/Tundra2',
+    'OGRE_MESHY' : '~/OgreMeshy/Ogre Meshy.exe',
+    'IMAGE_MAGICK_CONVERT' : '/usr/bin/convert',
+    'NVIDIATOOLS_EXE' : '~/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities',
+    'MYSHADERS_DIR' : '~/Tundra2/media/materials',
+#    'TEMP_DIR' : '/tmp',
+}
+if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+    for tag in _CONFIG_DEFAULTS_UNIX:
+        path = _CONFIG_DEFAULTS_UNIX[ tag ]
+        if path.startswith('~'): _CONFIG_DEFAULTS_UNIX[ tag ] = os.path.expanduser( path )
+        elif tag.startswith('OGRETOOLS') and not os.path.isfile( path ):
+            _CONFIG_DEFAULTS_UNIX[ tag ] = os.path.join( '/usr/bin', os.path.split( path )[-1] )
+    del tag
+    del path
+
+
+CONFIG = {}
+def load_config():  # PUBLIC API
+    global CONFIG
+    if os.path.isfile( CONFIG_FILEPATH ):
+        try:
+            with open( CONFIG_FILEPATH, 'rb' ) as f:
+                CONFIG = pickle.load( f )
+                print('CONFIG LOADED')
+        except:
+            print( 'IO ERROR, can not read: %s' %CONFIG_FILEPATH )
+
+    for tag in _CONFIG_DEFAULTS_ALL:
+        CONFIG[ tag ] = _CONFIG_DEFAULTS_ALL[ tag ]
+
     for tag in _CONFIG_TAGS_:
-        default = readOrCreateConfigValue( config, 'paths', tag, locals()['DEFAULT_'+tag] )
-        globals().update( {'CONFIG_'+tag : default})
-        func = eval( 'lambda self,con: globals().update( {"CONFIG_%s" : self.%s} )' %(tag,tag) )
+        if tag not in CONFIG:
+            if sys.platform.startswith('win'):
+                CONFIG[ tag ] = _CONFIG_DEFAULTS_WINDOWS[ tag ]
+            elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+                CONFIG[ tag ] = _CONFIG_DEFAULTS_UNIX[ tag ]
+            else:
+                print( 'ERROR: unknown platform' )
+                assert 0
+
+    for tag in _CONFIG_TAGS_: ## setup temp hidden RNA  to expose the file paths ##
+        default = CONFIG[ tag ]
+        func = eval( 'lambda self,con: CONFIG.update( {"%s" : self.%s} )' %(tag,tag) )
         prop = StringProperty(
             name=tag, description='updates path setting', maxlen=128, default=default, 
             options={'SKIP_SAVE'}, update=func
         )
         setattr( bpy.types.WindowManager, tag, prop )
-        print( 'CONFIG: %s = %s' %(tag, default) )
+    return CONFIG
+CONFIG = load_config()
 
-    # Write the blender2ogre.cfg config file 
-    with open(config_filepath, 'w') as configfile:
-        config.write(configfile)
-        print('config file %s written.' % config_filepath)
+def save_config():  # PUBLIC API
+    if os.path.isfile( CONFIG_PATH ):
+        try:
+            with open( CONFIG_FILEPATH, 'wb' ) as f:
+                pickle.dump( f, CONFIG )
+                print('SAVED CONFIG')
+        except:
+            print( 'IO ERROR, can not write: %s' %CONFIG_FILEPATH )
+    else:
+        print( 'ERROR: config path is missing %s' %CONFIG_PATH )
 
 
 class Blender2Ogre_ConfigOp(bpy.types.Operator):
@@ -406,23 +396,10 @@ class Blender2Ogre_ConfigOp(bpy.types.Operator):
     @classmethod
     def poll(cls, context): return True
     def invoke(self, context, event):
-        config_path = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
-        config_filepath = os.path.join(config_path, CONFIG_FILENAME)
-        config = configparser.ConfigParser()
-        config.add_section('paths')
-
-        for tag in _CONFIG_TAGS_:
-            value = globals()['CONFIG_'+tag]
-            config.set('paths', tag, value)
-
-        with open(config_filepath, 'w') as configfile:
-            config.write(configfile)
-            print('config file %s written.' % config_filepath)
-
+        save_config()
         Report.reset()
-        Report.messages.append('SAVED %s' %config_filepath)
+        Report.messages.append('SAVED %s' %CONFIG_FILEPATH)
         Report.show()
-
         return {'FINISHED'}
 
 
@@ -659,7 +636,7 @@ class MyShadersSingleton(object):
         elif name in self.fragment_progs_by_name: return self.fragment_progs_by_name[ name ]
             
     def __init__(self):
-        self.path = CONFIG_MYSHADERS_DIR
+        self.path = CONFIG['MYSHADERS_DIR']
         self.files = []
         self.vertex_progs = []
         self.vertex_progs_by_name = {}
@@ -1992,7 +1969,7 @@ class ShaderTree( _MatNodes_ ):
         #if slot: print(dir(slot))
         if slot and not slot.use: return ''
 
-        path = OPTIONS['PATH']
+        path = CONFIG['PATH']
         M = ''; _alphahack = None
         M += indent(3, 'texture_unit b2ogre_%s' %time.time(), '{' )
 
@@ -2023,13 +2000,9 @@ class ShaderTree( _MatNodes_ ):
             else:
                 print('MESSAGE: packed image already in temp, not updating', iurl)
 
-        if OPTIONS['FORCE_IMAGE_FORMAT']:
+        if CONFIG['FORCE_IMAGE_FORMAT']:
             postname = self._reformat( texname )        #texname.split('.')[0]+'.dds'
-        #if OPTIONS['TEXTURES_SUBDIR']:
-        #    destpath = os.path.join(path,'textures')
-        #    if not os.path.isdir( destpath ): os.mkdir( destpath )
-        #    M += indent(4, 'texture textures/%s' %postname )    
-        #else: 
+
         M += indent(4, 'texture %s' %postname )    
 
         exmode = texture.extension
@@ -2130,7 +2103,7 @@ class ShaderTree( _MatNodes_ ):
 
         M += indent(3, '}' )    # end texture
 
-        if OPTIONS['TOUCH_TEXTURES']:
+        if CONFIG['TOUCH_TEXTURES']:
             ## copy texture only if newer ##
             if not os.path.isfile( iurl ): Report.warnings.append( 'missing texture: %s' %iurl )
             else:
@@ -2139,8 +2112,8 @@ class ShaderTree( _MatNodes_ ):
                     f = open( desturl, 'wb' )
                     f.write( open(iurl,'rb').read() )
                     f.close()
-                if OPTIONS['FORCE_IMAGE_FORMAT']:        # bug fix jan7th 2011
-                    if OPTIONS['FORCE_IMAGE_FORMAT'] == '.dds': self.DDS_converter( desturl )
+                if CONFIG['FORCE_IMAGE_FORMAT']:        # bug fix jan7th 2011
+                    if CONFIG['FORCE_IMAGE_FORMAT'] == '.dds': self.DDS_converter( desturl )
                     else: self.image_magick( desturl )
 
         return M
@@ -2300,10 +2273,10 @@ class ShaderTree( _MatNodes_ ):
 
 
     ############################################
-    def _reformat( self, image ): return image[ : image.rindex('.') ] + OPTIONS['FORCE_IMAGE_FORMAT']
+    def _reformat( self, image ): return image[ : image.rindex('.') ] + CONFIG['FORCE_IMAGE_FORMAT']
     def image_magick( self, infile ):
         print('[Image Magick Wrapper]', infile )
-        exe = CONFIG_IMAGE_MAGICK_CONVERT
+        exe = CONFIG['IMAGE_MAGICK_CONVERT']
         if not os.path.isfile( exe ):
             Report.warnings.append( 'ImageMagick not installed!' )
             print( 'ERROR: can not find Image Magick - convert', exe ); return
@@ -2316,7 +2289,7 @@ class ShaderTree( _MatNodes_ ):
     EX_DDS_MIPS = 3    # default
     def DDS_converter(self, infile ):
         print('[NVIDIA DDS Wrapper]', infile )
-        exe = CONFIG_NVIDIATOOLS_EXE
+        exe = CONFIG['NVIDIATOOLS_EXE']
         if not os.path.isfile( exe ):
             Report.warnings.append( 'Nvidia DDS tools not installed!' )
             print( 'ERROR: can not find nvdxt.exe', exe ); return
@@ -2354,7 +2327,7 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
 
     def execute(self, context):
         Report.reset()
-        Report.messages.append('running %s' %CONFIG_OGRE_MESHY)
+        Report.messages.append('running %s' %CONFIG['OGRE_MESHY'])
 
         if sys.platform == 'linux2':
             path = '%s/.wine/drive_c/tmp' %os.environ['HOME']
@@ -2413,8 +2386,8 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
                 umaterials = dot_mesh( context.active_object, path=path, force_name='preview' )
 
         if mat or umaterials:
-            OPTIONS['TOUCH_TEXTURES'] = True
-            OPTIONS['PATH'] = path
+            CONFIG['TOUCH_TEXTURES'] = True
+            CONFIG['PATH'] = path
             data = ''
             for umat in umaterials:
                 data += INFO_OT_createOgreExport.gen_dot_material( umat, path=path )
@@ -2424,17 +2397,17 @@ class Ogre_ogremeshy_op(bpy.types.Operator):
         if merged: context.scene.objects.unlink( merged )
 
         if sys.platform == 'linux2':
-            if CONFIG_OGRE_MESHY.endswith('.exe'):
-                cmd = [CONFIG_OGRE_MESHY, 'c:\\tmp\\preview.mesh' ]
+            if CONFIG['OGRE_MESHY'].endswith('.exe'):
+                cmd = [CONFIG['OGRE_MESHY'], 'c:\\tmp\\preview.mesh' ]
             else:
-                cmd = [CONFIG_OGRE_MESHY, '/tmp/preview.mesh']
+                cmd = [CONFIG['OGRE_MESHY'], '/tmp/preview.mesh']
             print( cmd )
             #subprocess.call(cmd)
             subprocess.Popen(cmd)
 
         else:
             #subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
-            subprocess.Popen( [CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'] )
+            subprocess.Popen( [CONFIG['OGRE_MESHY'], 'C:\\tmp\\preview.mesh'] )
 
         Report.show()
         return {'FINISHED'}
@@ -2469,7 +2442,7 @@ class ogre_dot_mat_preview(bpy.types.Menu):
         layout = self.layout
         mat = context.active_object.active_material
         if mat:
-            OPTIONS['TOUCH_TEXTURES'] = False
+            CONFIG['TOUCH_TEXTURES'] = False
             preview = INFO_OT_createOgreExport.gen_dot_material( mat )
             for line in preview.splitlines():
                 if line.strip():
@@ -3389,7 +3362,7 @@ class _OgreCommonExport_( _TXML_ ):
     @classmethod
     def gen_dot_material_pass( self, mat, path, convert_textures ):
         print('GEN DOT MATERIAL...', mat)
-        OPTIONS['PATH'] = path
+        CONFIG['PATH'] = path
         M = ''
         print('        STANDARD MATERIAL')
         tree = ShaderTree( material=mat )
@@ -3420,13 +3393,11 @@ class _OgreCommonExport_( _TXML_ ):
         dot_mesh( ob, path, force_name, ignore_shape_animation=False, opts=opts )
 
 
-
     def ogre_export(self, url, context ):
-        global OPTIONS
-        OPTIONS['FORCE_IMAGE_FORMAT'] = None
-        OPTIONS['TOUCH_TEXTURES'] = True
-        OPTIONS['SWAP_AXIS'] = self.EX_SWAP_MODE
-        OPTIONS['ONLY_ANIMATED_BONES'] = self.EX_ONLY_ANIMATED_BONES
+        CONFIG['FORCE_IMAGE_FORMAT'] = None
+        CONFIG['TOUCH_TEXTURES'] = True
+        CONFIG['SWAP_AXIS'] = self.EX_SWAP_MODE
+        CONFIG['ONLY_ANIMATED_BONES'] = self.EX_ONLY_ANIMATED_BONES
         Report.reset()
 
         ShaderTree.EX_DDS_MIPS = self.EX_DDS_MIPS
@@ -3434,7 +3405,7 @@ class _OgreCommonExport_( _TXML_ ):
         if self.EX_FORCE_IMAGE:
             fmt = self.EX_FORCE_IMAGE.lower()
             if not fmt.startswith('.'): fmt = '.'+fmt
-            OPTIONS['FORCE_IMAGE_FORMAT'] = fmt
+            CONFIG['FORCE_IMAGE_FORMAT'] = fmt
 
 
         print('ogre export->', url)
@@ -4063,7 +4034,7 @@ class MeshMagick(object):
     def merge( group, path='/tmp', force_name=None ):
         print('-'*80)
         print(' mesh magick - merge ')
-        exe = CONFIG_OGRETOOLS_MESH_MAGICK
+        exe = CONFIG['OGRETOOLS_MESH_MAGICK']
         if not os.path.isfile( exe ):
             print( 'ERROR: can not find MeshMagick.exe' )
             print( exe )
@@ -4127,7 +4098,7 @@ Available options:
 def OgreXMLConverter( infile, opts ):
     print('[Ogre Tools Wrapper]', infile )
 
-    exe = CONFIG_OGRETOOLS_XML_CONVERTER
+    exe = CONFIG['OGRETOOLS_XML_CONVERTER']
     if not os.path.isfile( exe ):
         print( 'ERROR: can not find OgreXMLConverter' )
         print( exe )
@@ -4196,13 +4167,13 @@ Rest Bone <bpy_struct, Bone("Bone")>
     '''
 
     def __init__(self, rbone, pbone, skeleton):
-        if OPTIONS['SWAP_AXIS'] == 'xyz':
+        if CONFIG['SWAP_AXIS'] == 'xyz':
             self.fixUpAxis = False
         else:
             self.fixUpAxis = True
-            if OPTIONS['SWAP_AXIS'] == '-xzy':      # Tundra1
+            if CONFIG['SWAP_AXIS'] == '-xzy':      # Tundra1
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
-            elif OPTIONS['SWAP_AXIS'] == 'xz-y':    # Tundra2
+            elif CONFIG['SWAP_AXIS'] == 'xz-y':    # Tundra2
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
             else:
                 print( 'ERROR - TODO: axis swap mode not supported with armature animation' )
@@ -4427,7 +4398,7 @@ class Skeleton(object):
                     ## the exporter will not be smart enough to know which bones are active for a given track...
                     ## can hijack blender NLA, user sets a single keyframe for only selected bones, and keys last frame
                     stripbones = []
-                    if OPTIONS['ONLY_ANIMATED_BONES']:
+                    if CONFIG['ONLY_ANIMATED_BONES']:
                         for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
                             if group.name in arm.pose.bones: stripbones.append( group.name )
 
@@ -5356,7 +5327,7 @@ class Tundra_PhysicsDebugOp(bpy.types.Operator):
 class TundraPipe(object):
     def __init__(self):
         self._physics_debug = True
-        exe = os.path.join( CONFIG_TUNDRA_ROOT, 'Tundra.exe' )
+        exe = os.path.join( CONFIG['TUNDRA_ROOT'], 'Tundra.exe' )
         if sys.platform == 'linux2':
             cmd = ['wine', exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
@@ -5516,18 +5487,18 @@ def register():
     for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
     bpy.utils.register_class( INFO_HT_microheader )
 
-    readOrCreateConfig()
+    load_config()   # new pickle based config supports all options
 
     ## only test for Tundra2 once ##
-    if os.path.isdir( CONFIG_TUNDRA_ROOT ): _USE_TUNDRA_ = True
+    if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
     else: _USE_TUNDRA_ = False
 
     MyShaders = MyShadersSingleton()
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
 
-    if os.path.isdir( CONFIG_MYSHADERS_DIR ):
-        update_parent_material_path( CONFIG_MYSHADERS_DIR )
+    if os.path.isdir( CONFIG['MYSHADERS_DIR'] ):
+        update_parent_material_path( CONFIG['MYSHADERS_DIR'] )
     else: print( 'WARNING: invalid my-shaders path' )
 
     print( '-'*80)
