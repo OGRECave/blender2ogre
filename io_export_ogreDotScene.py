@@ -2737,28 +2737,6 @@ IMAGE_FORMATS = {
 #class _type(bpy.types.IDPropertyGroup):
 #    name = StringProperty(name="jpeg format", description="", maxlen=64, default="")
 
-OptionsEx = {
-    'mesh-sub-dir' : False,
-    'shape-anim' : True,
-    'trim-bone-weights' : 0.01,
-    'armature-anim' : True,
-
-    'lodLevels' : 0,
-    'lodDistance' : 100,
-    'lodPercent' : 40,
-    'nuextremityPoints' : 0,
-    'generateEdgeLists' : False,
-
-    'generateTangents' : False,
-    'tangentSemantic' : "uvw", 
-    'tangentUseParity' : 4,
-    'tangentSplitMirrored' : False,
-    'tangentSplitRotated' : False,
-    'reorganiseBuffers' : True,
-    'optimiseAnimations' : True,
-
-}
-
 
 
 class _TXML_(object):
@@ -3314,7 +3292,7 @@ class _OgreCommonExport_( _TXML_ ):
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
-        min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+        min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
     EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
     EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
     EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
@@ -3868,7 +3846,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
-        min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+        min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
     EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
     EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
     EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
@@ -3925,7 +3903,7 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
-        min=0.0, max=0.1, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+        min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
 
     EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
     EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
