@@ -26,7 +26,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 preview6'
+VERSION = '0.5.5 preview7'
 
 
 ###########################################################
@@ -343,10 +343,12 @@ _CONFIG_DEFAULTS_ALL = {
 
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK JMONKEY_ROOT TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR'.split()
+
 
 
 _CONFIG_DEFAULTS_WINDOWS = {
+    'JMONKEY_ROOT' : 'C:\\jmonkeyplatform',
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
@@ -358,6 +360,7 @@ _CONFIG_DEFAULTS_WINDOWS = {
 }
 
 _CONFIG_DEFAULTS_UNIX = {
+    'JMONKEY_ROOT' : '/usr/local/jmonkeyplatform',
     'OGRETOOLS_XML_CONVERTER' : '/usr/local/bin/OgreXMLConverter',  # source build is better
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
@@ -2349,9 +2352,9 @@ class ShaderTree( _MatNodes_ ):
 
 ########################################
 ############### OgreMeshy ##############
-class Ogre_ogremeshy_op(bpy.types.Operator):
+class OgreMeshyPreviewOp(bpy.types.Operator):
     '''helper to open ogremeshy'''
-    bl_idname = 'ogre.preview_ogremeshy'
+    bl_idname = 'ogremeshy.preview'
     bl_label = "opens ogremeshy in a subprocess"
     bl_options = {'REGISTER'}
     preview = BoolProperty(name="preview", description="fast preview", default=True)
@@ -5270,6 +5273,47 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
 ## end dot_mesh ##
 
+############### Jmonkey ################
+class JmonkeyPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
+    '''helper to open jMonkey (JME)'''
+    bl_idname = 'jmonkey.preview'
+    bl_label = "opens JMonkeyEngine in a non-blocking subprocess"
+    bl_options = {'REGISTER'}
+
+    filepath= StringProperty(name="File Path", description="Filepath used for exporting Jmonkey .scene file", maxlen=1024, default="/tmp/preview.txml", subtype='FILE_PATH')
+    EXPORT_TYPE = 'OGRE'
+
+    EX_SWAP_AXIS = EnumProperty( 
+        items=AXIS_MODES, 
+        name='swap axis',  
+        description='axis swapping mode', 
+        default= CONFIG['SWAP_AXIS']
+    )
+
+    @classmethod
+    def poll(cls, context):
+        if context.active_object: return True
+
+    def invoke(self, context, event):
+        global TundraSingleton
+        path = '/tmp/preview.scene'
+        self.ogre_export( path, context )
+        JmonkeyPipe( path )
+        return {'FINISHED'}
+
+def JmonkeyPipe( path ):
+    root = CONFIG[ 'JMONKEY_ROOT']
+    if sys.platform.startswith('win'):
+        cmd = [ os.path.join( os.path.join( root, 'bin' ), 'jmonkeyplatform.exe' ) ]
+    else:
+        cmd = [ os.path.join( os.path.join( root, 'bin' ), 'jmonkeyplatform' ) ]
+    cmd.append( '--nosplash' )
+    cmd.append( '--open' )
+    cmd.append( path )
+    proc = subprocess.Popen(cmd)#, stdin=subprocess.PIPE)
+    return proc
+
+############### Tundra ################
 
 class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
     '''helper to open Tundra2 (realXtend)'''
@@ -5384,6 +5428,11 @@ class INFO_HT_myheader(bpy.types.Header):
         screen = context.screen
 
         layout.separator()
+
+        if _USE_JMONKEY_:
+            row = layout.row(align=True)
+            op = row.operator( 'jmonkey.preview', text='', icon='MONKEY' )
+
         if _USE_TUNDRA_:
             row = layout.row(align=True)
             op = row.operator( 'tundra.preview', text='', icon='WORLD' )
@@ -5392,6 +5441,9 @@ class INFO_HT_myheader(bpy.types.Header):
                 op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
                 op = row.operator( 'tundra.toggle_physics_debug', text='', icon='WIRE' )
 
+        op = layout.operator( 'ogremeshy.preview', text='', icon='PLUGIN' ); op.mesh = True
+
+
         row = layout.row(align=True)
         sub = row.row(align=True)
         sub.menu("INFO_MT_file")
@@ -5399,7 +5451,6 @@ class INFO_HT_myheader(bpy.types.Header):
         if rd.use_game_engine: sub.menu("INFO_MT_game")
         else: sub.menu("INFO_MT_render")
 
-        op = layout.operator( Ogre_ogremeshy_op.bl_idname, text='', icon='PLUGIN' ); op.mesh = True
 
         row = layout.row(align=False); row.scale_x = 1.25
         row.menu("INFO_MT_instances", icon='NODETREE', text='')
@@ -5492,12 +5543,13 @@ class INFO_HT_microheader(bpy.types.Header):
 
 _OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OGRE_toggle_toolbar_op, Ogre_User_Report)
 _USE_TUNDRA_ = False
+_USE_JMONKEY_ = False
 
 MyShaders = None
 def register():
     print( '-'*80)
     print(VERSION)
-    global MyShaders, _header_, _USE_TUNDRA_
+    global MyShaders, _header_, _USE_TUNDRA_, _USE_JMONKEY_
     #bpy.utils.register_module(__name__)
     #_header_ = bpy.types.INFO_HT_header
     #bpy.utils.unregister_class(_header_)
@@ -5506,9 +5558,11 @@ def register():
 
     #load_config()   # new pickle based config supports all options
 
-    ## only test for Tundra2 once ##
+    ## only test for Tundra2 once - do not do this every panel redraw ##
     if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
     else: _USE_TUNDRA_ = False
+    if os.path.isdir( CONFIG['JMONKEY_ROOT'] ): _USE_JMONKEY_ = True
+    else: _USE_JMONKEY_ = False
 
     MyShaders = MyShadersSingleton()
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
