@@ -50,7 +50,7 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 ######################### bpy RNA #########################
 
 # ..Material.ogre_depth_write = AUTO|ON|OFF
-bpy.types.Material.ogre_disable_depth_write = BoolProperty( name='force disable depth write', default=False )
+bpy.types.Material.ogre_depth_write = BoolProperty( name='set depth write', default=False )
 
 #If depth-buffer checking is on, whenever a pixel is about to be written to the frame buffer the depth buffer is checked to see if the pixel is in front of all other pixels written at that point. If not, the pixel is not written. If depth checking is off, pixels are written no matter what has been rendered before.
 bpy.types.Material.ogre_depth_check = BoolProperty( name='depth check', default=True )
@@ -66,7 +66,7 @@ bpy.types.Material.ogre_light_scissor = BoolProperty( name='light scissor', defa
 bpy.types.Material.ogre_light_clip_planes = BoolProperty( name='light clip planes', default=False )
 
 #Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.
-bpy.types.Material.ogre_normalize_normals = BoolProperty( name='normalize normals', default=False )
+bpy.types.Material.ogre_normalise_normals = BoolProperty( name='normalize normals', default=False )
 
 #Sets whether or not dynamic lighting is turned on for this pass or not. If lighting is turned off, all objects rendered using the pass will be fully lit. This attribute has no effect if a vertex program is used.
 bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', default=True )
@@ -343,12 +343,12 @@ _CONFIG_DEFAULTS_ALL = {
 
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK JMONKEY_ROOT TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR'.split()
-
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR'.split()
+#_CONFIG_TAGS_.append( 'JMONKEY_ROOT' )
 
 
 _CONFIG_DEFAULTS_WINDOWS = {
-    'JMONKEY_ROOT' : 'C:\\jmonkeyplatform',
+#    'JMONKEY_ROOT' : 'C:\\jmonkeyplatform',
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
@@ -360,7 +360,7 @@ _CONFIG_DEFAULTS_WINDOWS = {
 }
 
 _CONFIG_DEFAULTS_UNIX = {
-    'JMONKEY_ROOT' : '/usr/local/jmonkeyplatform',
+#    'JMONKEY_ROOT' : '/usr/local/jmonkeyplatform',
     'OGRETOOLS_XML_CONVERTER' : '/usr/local/bin/OgreXMLConverter',  # source build is better
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
@@ -1649,9 +1649,9 @@ def _helper_ogre_material_draw_options( parent, mat ):
     box.prop(mat, 'use_ogre_advanced_options', text='----------------------advanced options----------------------' )
 
     if mat.use_ogre_advanced_options:
-        box.prop(mat, 'ogre_disable_depth_write' )
+        box.prop(mat, 'ogre_depth_write' )
 
-        for tag in 'ogre_colour_write ogre_lighting ogre_normalize_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
+        for tag in 'ogre_colour_write ogre_lighting ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
             box.prop(mat, tag)
 
         for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
@@ -2219,9 +2219,6 @@ class ShaderTree( _MatNodes_ ):
         else:
             M += indent(2, 'pass b2ogre_%s'%time.time(), '{' )
 
-        #M += indent(3, 'cull_hardware none' )        # directx and opengl are reversed? TODO
-        #if mat.ogre_disable_depth_write:
-        #    M += indent(3, 'depth_write off' ) # once per pass (global attributes)
 
         if mat.use_fixed_pipeline:
             f = mat.ambient
@@ -2263,7 +2260,7 @@ class ShaderTree( _MatNodes_ ):
 
         #M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
         for name in dir(mat):   #mat.items():
-            if name.startswith('ogre_') and name != 'ogre_parent_material':
+            if name.startswith('ogre_') and name not in 'ogre_parent_material ogre_depth_write'.split():
                 var = getattr(mat,name)
                 op = name.replace('ogre_', '')
                 val = var
@@ -2272,19 +2269,21 @@ class ShaderTree( _MatNodes_ ):
                     else: val = 'off'
                 M += indent( 3, '%s %s' %(op,val) )
 
-
+        usealpha = mat.ogre_depth_write
         ## textures ##
-        if not self.textures:        ## classic materials
+        if not self.textures:  # force depth write off if textures use alpha
             slots = get_image_textures( mat )        # returns texture_slot object
-            usealpha = False
             for slot in slots:
                 #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
                 if slot.use_map_alpha: usealpha = True; break
-            if usealpha:
-                if mat.use_transparency:
-                    M += indent(3, 'depth_write off' ) # once per pass (global attributes)
+        if usealpha:
+            #if mat.use_transparency:
+            M += indent(3, 'depth_write off' )  # default is on
+
+
+        if not self.textures:   # classic material
             ## write shader programs before textures
-            M += self._write_shader_programs( mat )
+            #M += self._write_shader_programs( mat )
             for slot in slots: M += self.dotmat_texture( slot.texture, slot=slot )
 
         elif self.node:        # TODO redo shader nodes - new rule: unconnect only
@@ -5495,6 +5494,7 @@ class INFO_HT_myheader(bpy.types.Header):
 
             layout.menu( "INFO_MT_ogre_docs" )
             layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
+            layout.operator('ogre.toggle_interface')
 
 
 def export_menu_func_ogre(self, context):
@@ -5509,28 +5509,32 @@ def export_menu_func_realxtend(self, context):
 
 
 
-_header_ = None
-class OGRE_toggle_toolbar_op(bpy.types.Operator):
+_header_ = bpy.types.INFO_HT_header
+class OgreToggleInterfaceOp(bpy.types.Operator):
     '''Toggle Ogre UI'''
     bl_idname = "ogre.toggle_interface"
     bl_label = "Ogre UI"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
+    TOGGLE = False
 
     @classmethod
     def poll(cls, context): return True
     def invoke(self, context, event):
-        global _header_
-        if _header_:
-            bpy.utils.unregister_module(__name__)
-            bpy.utils.register_class(_header_)
-            _header_ = None
-            for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
-            bpy.utils.register_class( INFO_HT_microheader )
-        else:
+        #global _header_
+        if self.TOGGLE: #_header_:
             bpy.utils.register_module(__name__)
-            _header_ = bpy.types.INFO_HT_header
-            bpy.utils.unregister_class(_header_)
+            #_header_ = bpy.types.INFO_HT_header
+            try: bpy.utils.unregister_class(_header_)
+            except: pass
             bpy.utils.unregister_class( INFO_HT_microheader )
+            self.TOGGLE = False
+        else:
+            bpy.utils.unregister_module(__name__); print(1)
+            bpy.utils.register_class(_header_); print(2)
+            #_header_ = None; print(3)
+            for op in _OGRE_MINIMAL_: bpy.utils.register_class( op ); print(op)
+            bpy.utils.register_class( INFO_HT_microheader ); print('end')
+            self.TOGGLE = True
 
         return {'FINISHED'}
 
@@ -5541,7 +5545,7 @@ class INFO_HT_microheader(bpy.types.Header):
         try: op = layout.operator( 'ogre.toggle_interface' )
         except: pass    # reported by Reyn
 
-_OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OGRE_toggle_toolbar_op, Ogre_User_Report)
+_OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OgreToggleInterfaceOp, Ogre_User_Report)
 _USE_TUNDRA_ = False
 _USE_JMONKEY_ = False
 
@@ -5561,8 +5565,8 @@ def register():
     ## only test for Tundra2 once - do not do this every panel redraw ##
     if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
     else: _USE_TUNDRA_ = False
-    if os.path.isdir( CONFIG['JMONKEY_ROOT'] ): _USE_JMONKEY_ = True
-    else: _USE_JMONKEY_ = False
+    #if os.path.isdir( CONFIG['JMONKEY_ROOT'] ): _USE_JMONKEY_ = True
+    #else: _USE_JMONKEY_ = False
 
     MyShaders = MyShadersSingleton()
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
