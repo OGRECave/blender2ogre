@@ -86,11 +86,12 @@ bpy.types.Material.use_in_ogre_material_pass = BoolProperty( name='Layer Toggle'
 bpy.types.Material.use_ogre_advanced_options = BoolProperty( name='Show Advanced Options', default=False )
 
 
+bpy.types.Material.use_ogre_parent_material = BoolProperty( name='Use Script Inheritance', default=False )
 
 bpy.types.Material.ogre_parent_material = EnumProperty(
   name="Script Inheritence", 
-  description='ogre parent material class', default='NONE',
-  items=[ ('NONE', 'NONE', 'do not use script inheritance') ],
+  description='ogre parent material class', #default='NONE',
+  items=[],
 )
 
 
@@ -307,6 +308,8 @@ _IMAGE_FORMATS =  [     # for EnumProperty "FORCE_IMAGE_FORMAT"
 
 
 _CONFIG_DEFAULTS_ALL = {
+    'COPY_PARENT_MATERIAL' : True,
+
     'SWAP_AXIS' : 'xz-y',         # ogre standard
     'ONLY_ANIMATED_BONES' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
@@ -340,6 +343,7 @@ _CONFIG_DEFAULTS_ALL = {
     'tangentSplitRotated' : False,
     'reorganiseBuffers' : True,
     'optimiseAnimations' : True,
+
 
 }
 
@@ -600,8 +604,77 @@ class Ogre_relocate_textures_op(bpy.types.Operator):
         bpy.ops.wm.call_menu( name='Ogre_User_Report' )
         return {'FINISHED'}
 
+###### RPython xml dom ######
+class RElement(object):
+	def appendChild( self, child ): self.childNodes.append( child )
+	def setAttribute( self, name, value ): self.attributes[name]=value
+
+	def __init__(self, tag):
+		self.tagName = tag
+		self.childNodes = []
+		self.attributes = {}
+
+	def toprettyxml(self, lines, indent ):
+		s = '<%s ' %self.tagName
+		for name in self.attributes:
+			value = self.attributes[name]
+			s += '%s="%s" ' %(name,value)
+		if not self.childNodes:
+			s += '/>'; lines.append( ('\t'*indent)+s )
+		else:
+			s += '>'; lines.append( ('\t'*indent)+s )
+			indent += 1
+			for child in self.childNodes:
+				child.toprettyxml( lines, indent )
+			indent -= 1
+			lines.append( ('\t'*indent)+'</%s>' %self.tagName )
 
 
+class RDocument(object):
+	def __init__(self): self.documentElement = None
+	def appendChild(self,root): self.documentElement = root
+	def createElement(self,tag): e = RElement(tag); e.document = self; return e
+	def toprettyxml(self):
+		indent = 0
+		lines = []
+		self.documentElement.toprettyxml( lines, indent )
+		return '\n'.join( lines )
+
+
+class SimpleSaxWriter():
+    def __init__(self, output, encoding, top_level_tag, attrs):
+        xml_writer = XMLGenerator(output, encoding, True)
+        xml_writer.startDocument()
+        xml_writer.startElement(top_level_tag, attrs)
+        self._xml_writer = xml_writer
+        self.top_level_tag = top_level_tag
+        self.ident=4
+        self._xml_writer.characters('\n')
+
+    def start_tag(self, name, attrs):
+        self._xml_writer.characters(" " * self.ident)
+        self._xml_writer.startElement(name, attrs)
+        self.ident += 4
+        self._xml_writer.characters('\n')
+
+    def end_tag(self, name):
+        self.ident -= 4
+        self._xml_writer.characters(" " * self.ident)
+        self._xml_writer.endElement(name)
+        self._xml_writer.characters('\n')
+
+    def leaf_tag(self, name, attrs):
+        self._xml_writer.characters(" " * self.ident)
+        self._xml_writer.startElement(name, attrs)
+        self._xml_writer.endElement(name)
+        self._xml_writer.characters('\n')
+
+    def close(self):
+        self._xml_writer.endElement(self.top_level_tag)
+        self._xml_writer.endDocument()
+
+
+############## Report Hack ############
 class ReportSingleton(object):
     def show(self): bpy.ops.wm.call_menu( name='Ogre_User_Report' )
     def __init__(self): self.reset()
@@ -1621,8 +1694,13 @@ class Deprecated2:
 
 def _helper_ogre_material_draw_options( parent, mat ):
     box = parent.box()
-    box.prop(mat, 'ogre_parent_material')
     box.prop(mat, 'ogre_scene_blend')
+
+    row = box.row()
+    row.prop(mat, 'use_ogre_parent_material')
+    if mat.use_ogre_parent_material:
+        row.prop(mat, 'ogre_parent_material')
+
     box.prop(mat, "use_shadows")
 
     row = box.row()
@@ -3314,6 +3392,10 @@ class _OgreCommonExport_( _TXML_ ):
     EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
     EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
 
+    EX_COPY_PARENT_MATERIAL = BoolProperty(
+        name="copy parent material", 
+        description="when using script inheritance copy the parent material into the generated .material script", 
+        default=CONFIG['COPY_PARENT_MATERIAL'])
 
     filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
 
@@ -5509,34 +5591,7 @@ def export_menu_func_realxtend(self, context):
 
 
 
-_header_ = bpy.types.INFO_HT_header
-class OgreToggleInterfaceOp(bpy.types.Operator):
-    '''Toggle Ogre UI'''
-    bl_idname = "ogre.toggle_interface"
-    bl_label = "Ogre UI"
-    bl_options = {'REGISTER'}
-    TOGGLE = False
 
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        #global _header_
-        if self.TOGGLE: #_header_:
-            bpy.utils.register_module(__name__)
-            #_header_ = bpy.types.INFO_HT_header
-            try: bpy.utils.unregister_class(_header_)
-            except: pass
-            bpy.utils.unregister_class( INFO_HT_microheader )
-            self.TOGGLE = False
-        else:
-            bpy.utils.unregister_module(__name__); print(1)
-            bpy.utils.register_class(_header_); print(2)
-            #_header_ = None; print(3)
-            for op in _OGRE_MINIMAL_: bpy.utils.register_class( op ); print(op)
-            bpy.utils.register_class( INFO_HT_microheader ); print('end')
-            self.TOGGLE = True
-
-        return {'FINISHED'}
 
 class INFO_HT_microheader(bpy.types.Header):
     bl_space_type = 'INFO'
@@ -5545,22 +5600,69 @@ class INFO_HT_microheader(bpy.types.Header):
         try: op = layout.operator( 'ogre.toggle_interface' )
         except: pass    # reported by Reyn
 
-_OGRE_MINIMAL_ = ( INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OgreToggleInterfaceOp, Ogre_User_Report)
+def get_minimal_interface_classes():
+    return INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OgreToggleInterfaceOp, Ogre_User_Report
+
 _USE_TUNDRA_ = False
 _USE_JMONKEY_ = False
+
+def restore_minimal_interface():
+    #if not hasattr( bpy.ops.ogre..   #always true
+    try:
+        for op in get_minimal_interface_classes(): bpy.utils.register_class( op )
+        bpy.utils.register_class( INFO_HT_microheader )
+        return False
+    except:
+        print( 'b2ogre minimal UI already setup' )
+        return True
+
+
+try: _header_ = bpy.types.INFO_HT_header
+except:
+    print('---blender2ogre addon enable---')
+
+class OgreToggleInterfaceOp(bpy.types.Operator):
+    '''Toggle Ogre UI'''
+    bl_idname = "ogre.toggle_interface"
+    bl_label = "Ogre UI"
+    bl_options = {'REGISTER'}
+    TOGGLE = restore_minimal_interface()
+    BLENDER_DEFAULT_HEADER = _header_
+    @classmethod
+    def poll(cls, context): return True
+    def invoke(self, context, event):
+        #global _header_
+        if OgreToggleInterfaceOp.TOGGLE: #_header_:
+            print( 'ogre.toggle_interface ENABLE' )
+            bpy.utils.register_module(__name__)
+            #_header_ = bpy.types.INFO_HT_header
+            try: bpy.utils.unregister_class(_header_)
+            except: pass
+            bpy.utils.unregister_class( INFO_HT_microheader )   # moved to custom header
+            OgreToggleInterfaceOp.TOGGLE = False
+        else:
+            print( 'ogre.toggle_interface DISABLE' )
+            bpy.utils.unregister_module(__name__)
+            bpy.utils.register_class(_header_)
+            restore_minimal_interface()
+            OgreToggleInterfaceOp.TOGGLE = True
+
+        return {'FINISHED'}
+
+
+
+
+
 
 MyShaders = None
 def register():
     print( '-'*80)
     print(VERSION)
     global MyShaders, _header_, _USE_TUNDRA_, _USE_JMONKEY_
-    #bpy.utils.register_module(__name__)
+    #bpy.utils.register_module(__name__)    ## do not load all the ogre panels by default
     #_header_ = bpy.types.INFO_HT_header
     #bpy.utils.unregister_class(_header_)
-    for op in _OGRE_MINIMAL_: bpy.utils.register_class( op )
-    bpy.utils.register_class( INFO_HT_microheader )
-
-    #load_config()   # new pickle based config supports all options
+    restore_minimal_interface()
 
     ## only test for Tundra2 once - do not do this every panel redraw ##
     if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
@@ -5582,7 +5684,7 @@ def unregister():
     global _header_
     print('unreg-> ogre exporter')
     bpy.utils.unregister_module(__name__)
-    if _header_: bpy.utils.register_class(_header_); _header_ = None
+    #############if _header_: bpy.utils.register_class(_header_); _header_ = None
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
 
@@ -5591,76 +5693,9 @@ if __name__ == "__main__":
     register()
 
 
-###### RPython xml dom ######
-class RElement(object):
-	def appendChild( self, child ): self.childNodes.append( child )
-	def setAttribute( self, name, value ): self.attributes[name]=value
-
-	def __init__(self, tag):
-		self.tagName = tag
-		self.childNodes = []
-		self.attributes = {}
-
-	def toprettyxml(self, lines, indent ):
-		s = '<%s ' %self.tagName
-		for name in self.attributes:
-			value = self.attributes[name]
-			s += '%s="%s" ' %(name,value)
-		if not self.childNodes:
-			s += '/>'; lines.append( ('\t'*indent)+s )
-		else:
-			s += '>'; lines.append( ('\t'*indent)+s )
-			indent += 1
-			for child in self.childNodes:
-				child.toprettyxml( lines, indent )
-			indent -= 1
-			lines.append( ('\t'*indent)+'</%s>' %self.tagName )
 
 
-class RDocument(object):
-	def __init__(self): self.documentElement = None
-	def appendChild(self,root): self.documentElement = root
-	def createElement(self,tag): e = RElement(tag); e.document = self; return e
-	def toprettyxml(self):
-		indent = 0
-		lines = []
-		self.documentElement.toprettyxml( lines, indent )
-		return '\n'.join( lines )
-
-
-class SimpleSaxWriter():
-    def __init__(self, output, encoding, top_level_tag, attrs):
-        xml_writer = XMLGenerator(output, encoding, True)
-        xml_writer.startDocument()
-        xml_writer.startElement(top_level_tag, attrs)
-        self._xml_writer = xml_writer
-        self.top_level_tag = top_level_tag
-        self.ident=4
-        self._xml_writer.characters('\n')
-
-    def start_tag(self, name, attrs):
-        self._xml_writer.characters(" " * self.ident)
-        self._xml_writer.startElement(name, attrs)
-        self.ident += 4
-        self._xml_writer.characters('\n')
-
-    def end_tag(self, name):
-        self.ident -= 4
-        self._xml_writer.characters(" " * self.ident)
-        self._xml_writer.endElement(name)
-        self._xml_writer.characters('\n')
-
-    def leaf_tag(self, name, attrs):
-        self._xml_writer.characters(" " * self.ident)
-        self._xml_writer.startElement(name, attrs)
-        self._xml_writer.endElement(name)
-        self._xml_writer.characters('\n')
-
-    def close(self):
-        self._xml_writer.endElement(self.top_level_tag)
-        self._xml_writer.endDocument()
-
-
+########### Tundra SkyX - TODO move to tundra.py #############
 
 bpy.types.World.ogre_skyX = BoolProperty(
     name="enable sky", description="ogre sky",
@@ -5715,11 +5750,66 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_x' )
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
+#_OGRE_MATERIAL_CLASS_SCRIPT = {}
+
+class OgreMaterial(object):
+    def __init__(self, txt, url):
+        self.url = url
+        self.data = txt.strip()
+        self.parent = None
+        line = self.data.splitlines()[0]
+        assert line.startswith('material')
+        if ':' in line:
+            line, self.parent = line.split(':')
+        self.name = line.split()[-1]
+        print( 'new ogre material: %s' %self.name )
+
+        print('parsing----------------------------------------')
+        for line in self.data.splitlines():
+            print( line )
 
 
-_OGRE_MATERIAL_CLASS_SCRIPT = {}
+class MaterialScript(object):
+    ALL_MATERIALS = {}
+    ENUM_ITEMS = []
 
-#####################################################################################
+    def __init__(self, url):
+        self.url = url
+        self.data = open( url, 'rb' ).read().decode('utf-8')
+        self.materials = {}
+
+        mats = []
+        mat = []
+        for line in self.data.splitlines():
+            line = line
+            if line.strip().startswith('material'):
+                mat = []; mats.append( mat )
+                mat.append( line )
+            elif mat:
+                mat.append( line )
+
+        for mat in mats:
+            omat = OgreMaterial( '\n'.join( mat ), url )
+            if omat.name in self.ALL_MATERIALS:
+                print( 'WARNING: material %s redefined' %omat.name )
+                print( '--OLD MATERIAL--')
+                print( self.ALL_MATERIALS[ omat.name ].data )
+                print( '--NEW MATERIAL--')
+                print( omat.data )
+            self.materials[ omat.name ] = omat
+            self.ALL_MATERIALS[ omat.name ] = omat
+            self.ENUM_ITEMS.append( (omat.name, omat.name, url) )
+
+    @classmethod    # only call after parsing all material scripts
+    def reset_rna(self):
+        bpy.types.Material.ogre_parent_material = EnumProperty(
+            name="Script Inheritence", 
+            description='ogre parent material class',
+            items=self.ENUM_ITEMS,
+        )
+
+
+####################################end private ########################################
 
 
 
@@ -5745,33 +5835,19 @@ def generate_material( mat, path ):
 
 ## updates RNA ##
 def update_parent_material_path( path ):
-    global _OGRE_MATERIAL_CLASS_SCRIPT
+    scripts = []
     print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
-    items = [ ('NONE', 'NONE', 'do not use script inheritance') ]
-    classes = []
+
     for sub in os.listdir( path ):
         a = os.path.join( path, sub )
         for name in os.listdir( a ):
             if name.endswith( '.material' ):
                 print( '>>', name )
                 url = os.path.join( a, name )
-                data = open( url, 'rb' ).read()
-                for line in data.splitlines():
-                    line = line.strip()
-                    if line.startswith(b'material'):
-                        cls = line.split()[-1].decode('utf-8')
-                        print('>>>>', cls )
-                        if cls not in classes:
-                            classes.append( cls )
-                            items.append( (cls,cls,url) )
-                            _OGRE_MATERIAL_CLASS_SCRIPT[ cls ] = name   # name.material
+                scripts.append( MaterialScript( url ) )
 
-    bpy.types.Material.ogre_parent_material = EnumProperty(
-        name="Script Inheritence", 
-        description='ogre parent material class', default='NONE',
-        items=items,
-    )
-
+    MaterialScript.reset_rna()
+    return scripts
 
 
 
