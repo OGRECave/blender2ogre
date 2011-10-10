@@ -5765,8 +5765,61 @@ class OgreMaterial(object):
         print( 'new ogre material: %s' %self.name )
 
         print('parsing----------------------------------------')
+        brace = 0
+        self.techniques = techs = []
+        prog = None  # pick up program params
+        tex = None  # pick up texture_unit options, require "texture" ?
+
         for line in self.data.splitlines():
             print( line )
+            line = line.split('//')[0]
+            line = line.strip()
+            if not line: continue
+
+            if line == '{': brace += 1; continue
+            elif line == '}': brace -= 1; prog = None; tex = None; continue
+
+            if line.startswith( 'technique' ):
+                tech = {'passes':[]}; techs.append( tech )
+                if len(line.split()) > 1: tech['technique-name'] = line.split()[-1]
+            elif techs:
+                if line.startswith('pass'):
+                    P = {'texture_units':[], 'vprogram':None, 'fprogram':None}
+                    tech['passes'].append( P )
+                elif tech['passes']:
+                    P = tech['passes'][-1]
+
+                    if line.startswith('vertex_program_ref'):
+                        prog = P['vprogram'] = {'name':line.split()[-1], 'params':{}}
+
+                    elif line.startswith('fragment_program_ref'):
+                        prog = P['fprogram'] = {'name':line.split()[-1], 'params':{}}
+
+                    elif line.startswith('texture_unit'):
+                        tex = {'name':line.split()[-1], 'params':{}}
+                        P['texture_units'].append( tex )
+                        prog = None
+
+                    elif prog:
+                        p = line.split()[0]
+                        if p=='param_named':
+                            if len(line.split()) == 4:
+                                p, o, t, v = line.split()
+                            elif len(line.split()) == 3:
+                                p, o, v = line.split()
+                                t = 'class'
+
+                            opt = { 'name': o, 'type':t, 'raw_value':v }
+                            prog['params'][ o ] = opt
+                            if t=='float': opt['value'] = float(v)
+                            else: print('unknown type:', t)
+
+                    elif tex:   # (not used)
+                        tex['params'][ line.split()[0] ] = line.split()[ 1 : ]
+
+
+        print( self.techniques )
+
 
 
 class MaterialScript(object):
