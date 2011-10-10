@@ -347,7 +347,7 @@ _CONFIG_DEFAULTS_ALL = {
 
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR SHADER_PROGRAMS'.split()
 #_CONFIG_TAGS_.append( 'JMONKEY_ROOT' )
 
 
@@ -360,6 +360,7 @@ _CONFIG_DEFAULTS_WINDOWS = {
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
     'NVIDIATOOLS_EXE' : 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe',
     'MYSHADERS_DIR' : 'C:\\Tundra2\\media\\materials',
+    'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs',
 #    'TEMP_DIR' : 'C:\\tmp',
 }
 
@@ -372,6 +373,8 @@ _CONFIG_DEFAULTS_UNIX = {
     'IMAGE_MAGICK_CONVERT' : '/usr/bin/convert',
     'NVIDIATOOLS_EXE' : '~/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities',
     'MYSHADERS_DIR' : '~/Tundra2/media/materials',
+    'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
+
 #    'TEMP_DIR' : '/tmp',
 }
 if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
@@ -3441,10 +3444,17 @@ class _OgreCommonExport_( _TXML_ ):
 
         safename = material_name(mat)     # supports blender library linking
         M = '// blender material: %s\n' %(mat.name)
-        if mat.ogre_parent_material != 'NONE':    ## NEW: script inheritance
-            assert mat.ogre_parent_material in _OGRE_MATERIAL_CLASS_SCRIPT
-            dotmaterial = _OGRE_MATERIAL_CLASS_SCRIPT[ mat.ogre_parent_material ]
-            M += 'import %s from "%s"\n' %(mat.ogre_parent_material, dotmaterial)
+        if mat.use_ogre_parent_material and mat.ogre_parent_material:
+            omat = get_ogre_material( mat.ogre_parent_material )
+            if not CONFIG['COPY_PARENT_MATERIAL']:
+                M += 'import %s from "%s"\n' %(mat.ogre_parent_material, os.path.split(omat.url)[-1] )
+            else:
+                ## first write vertex/fragment program defs
+                for prog in omat.get_programs():
+                    M += '\n%s\n' %prog.data
+                ## then write parent material def
+                M += '\n%s\n' %omat.data
+
             M += 'material %s : %s \n{\n' %(safename, mat.ogre_parent_material)
         else: M += 'material %s \n{\n'        %safename
 
@@ -5729,8 +5739,6 @@ bpy.types.World.ogre_skyX_cloud_density_y = FloatProperty(
     default=1.0, min=0.0, max=5.0
 )
 
-
-
 class OgreSkyPanel(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -5750,13 +5758,72 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_x' )
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
+
 #_OGRE_MATERIAL_CLASS_SCRIPT = {}
+class OgreProgram(object):
+    def save( self, path ):
+        '''
+            progs = OgreProgram.parse_programs( your_material_scripts_paths )
+            for p in progs:
+                p.save( your_project_path )
+        '''
+        f = open( os.path.join(path,self.name), 'wb' )
+        f.write(self.source_bytes )
+        f.close()
+    ######################################
+    PROGRAMS = {}
+    SOURCES = {}
+
+    def reload(self):   # only one directory is allowed to hold shader programs
+        if self.name not in os.listdir( CONFIG['SHADER_PROGRAMS'] ): return False
+        url = os.path.join(  CONFIG['SHADER_PROGRAMS'], self.name )
+        self.source_bytes = open( url, 'rb' ).read()#.decode('utf-8')
+        return True
+
+    def __init__(self, name='', data=''):
+        self.name=name
+        self.data = data.strip()
+        if self.name in OgreProgram.PROGRAMS:
+            other = OgreProgram.PROGRAMS
+            self.source = other.source
+            self.data = other.data
+            self.entry_point = other.entry_point
+            self.profiles = other.profiles
+
+        if data: self.parse( self.data )
+
+        if self.name:
+            OgreProgram.PROGRAMS[ self.name ] = self
+
+    def parse( self, txt ):
+        self.data = txt
+        print('--parsing ogre shader program--' )
+        for line in self.data.splitlines():
+            print(line)
+            line = line.split('//')[0]
+            line = line.strip()
+            if line.startswith('vertex_program') or line.startswith('fragment_program'):
+                a, self.name, self.type = line.split()
+
+            elif line.startswith('source'): self.source = line.split()[-1]
+            elif line.startswith('entry_point'): self.entry_point = line.split()[-1]
+            elif line.startswith('profiles'): self.profiles = line.split()[1:]
 
 class OgreMaterial(object):
+    def get_programs(self):
+        progs = []
+        for name in self.vertex_programs + self.fragment_programs:
+            p = get_shader_program( name )
+            if p: progs.append( p )
+        return progs
+
     def __init__(self, txt, url):
         self.url = url
         self.data = txt.strip()
         self.parent = None
+        self.vertex_programs = []
+        self.fragment_programs = []
+
         line = self.data.splitlines()[0]
         assert line.startswith('material')
         if ':' in line:
@@ -5791,9 +5858,10 @@ class OgreMaterial(object):
 
                     if line.startswith('vertex_program_ref'):
                         prog = P['vprogram'] = {'name':line.split()[-1], 'params':{}}
-
+                        self.vertex_programs.append( prog['name'] )
                     elif line.startswith('fragment_program_ref'):
                         prog = P['fprogram'] = {'name':line.split()[-1], 'params':{}}
+                        self.fragment_programs.append( prog['name'] )
 
                     elif line.startswith('texture_unit'):
                         tex = {'name':line.split()[-1], 'params':{}}
@@ -5816,7 +5884,6 @@ class OgreMaterial(object):
 
                     elif tex:   # (not used)
                         tex['params'][ line.split()[0] ] = line.split()[ 1 : ]
-
 
         print( self.techniques )
 
@@ -5886,21 +5953,47 @@ def generate_material( mat, path ):
     return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
 
 
+def get_ogre_material( name ):
+    if name in MaterialScript.ALL_MATERIALS:
+        return MaterialScript.ALL_MATERIALS[ name ]
+
+def get_shader_program( name ):
+    if name in OgreProgram.PROGRAMS:
+        return OgreProgram.PROGRAMS[ name ]
+
+def get_shader_programs():
+    return OgreProgram.PROGRAMS.values()
+
 ## updates RNA ##
 def update_parent_material_path( path ):
-    scripts = []
     print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
-
+    scripts = []
+    progs = {}
+    missing = []
     for sub in os.listdir( path ):
         a = os.path.join( path, sub )
         for name in os.listdir( a ):
             if name.endswith( '.material' ):
-                print( '>>', name )
+                print( '<material>', name )
                 url = os.path.join( a, name )
                 scripts.append( MaterialScript( url ) )
 
+            if name.endswith('.program'):
+                print( '<program>', name )
+                url = os.path.join( a, name )
+                data = open( url, 'rb' ).read().decode('utf-8')
+                for d in data.split(  '\n}\n'  ):
+                    if d.strip():
+                        p = OgreProgram( data=d )
+                        if p.source and not p.reload():
+                            missing.append( p )
+                        elif p.source:
+                            progs.append( p )
+    if missing:
+        print('WARNING: missing shader programs - set "SHADER_PROGRAMS" to your path')
+        for p in missing: print(p.name)
     MaterialScript.reset_rna()
-    return scripts
+    return scripts, progs
 
 
 
