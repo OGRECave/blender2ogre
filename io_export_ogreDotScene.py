@@ -65,8 +65,11 @@ bpy.types.Material.ogre_light_scissor = BoolProperty( name='light scissor', defa
 
 bpy.types.Material.ogre_light_clip_planes = BoolProperty( name='light clip planes', default=False )
 
-#Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.
-bpy.types.Material.ogre_normalise_normals = BoolProperty( name='normalize normals', default=False )
+# TODO set description for all pyRNA
+bpy.types.Material.ogre_normalise_normals = BoolProperty( name='normalise normals', default=False,
+    description='''
+Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.
+''')
 
 #Sets whether or not dynamic lighting is turned on for this pass or not. If lighting is turned off, all objects rendered using the pass will be fully lit. This attribute has no effect if a vertex program is used.
 bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', default=True )
@@ -1700,9 +1703,11 @@ def _helper_ogre_material_draw_options( parent, mat ):
     box.prop(mat, 'ogre_scene_blend')
 
     row = box.row()
-    row.prop(mat, 'use_ogre_parent_material')
     if mat.use_ogre_parent_material:
-        row.prop(mat, 'ogre_parent_material')
+        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='Parent Material:')
+        row.prop(mat, 'ogre_parent_material', text='')
+    else:
+        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT')
 
     box.prop(mat, "use_shadows")
 
@@ -1789,7 +1794,7 @@ class _OgreMatPass( object ):
 
         if mat.use_material_passes:
             db = layout.box()
-            nodes = get_or_create_material_passes( mat )
+            nodes = bpyShaders.get_or_create_material_passes( mat )
             node = nodes[ self.INDEX ]
             split = db.row()
             if node.material: split.prop( node.material, 'use_in_ogre_material_pass', text='' )
@@ -1815,9 +1820,9 @@ class _create_new_material_layer_helper(bpy.types.Operator):
 
     def execute(self, context):
         mat = context.active_object.active_material
-        nodes = get_or_create_material_passes( mat )
+        nodes = bpyShaders.get_or_create_material_passes( mat )
         node = nodes[ self.INDEX ]
-        node.material = bpy.data.materials.new( name='OgreLayer' )
+        node.material = bpy.data.materials.new( name='_layer_.%s.%s'%(self.INDEX, node.name) )
         return {'FINISHED'}
 
 class MatPass1( _OgreMatPass, bpy.types.Panel ): INDEX = 0; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
@@ -2252,7 +2257,7 @@ class ShaderTree( _MatNodes_ ):
         passes.append( self._helper_dotmat_pass( self.material ) )
         ########## Material Layers ###########
         if self.material.use_material_passes:
-            nodes = get_or_create_material_passes( self.material )
+            nodes = bpyShaders.get_or_create_material_passes( self.material )
             for i,node in enumerate(nodes):
                 if node.material and node.material.use_in_ogre_material_pass:
                     s = self._helper_dotmat_pass(node.material, pass_name='b2ogre_pass%s'%str(i))
@@ -5582,11 +5587,10 @@ class INFO_HT_myheader(bpy.types.Header):
             row.prop(scene.game_settings, 'material_mode', text='')
             row.prop(scene, 'camera', text='')
 
-
-
             layout.menu( "INFO_MT_ogre_docs" )
             layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
-            layout.operator('ogre.toggle_interface')
+            if OgreToggleInterfaceOp.TOGGLE: layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_DEHLT')
+            else: layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_HLT')
 
 
 def export_menu_func_ogre(self, context):
@@ -5607,8 +5611,12 @@ class INFO_HT_microheader(bpy.types.Header):
     bl_space_type = 'INFO'
     def draw(self, context):
         layout = self.layout
-        try: op = layout.operator( 'ogre.toggle_interface' )
-        except: pass    # reported by Reyn
+        try:
+            if OgreToggleInterfaceOp.TOGGLE:
+                layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_DEHLT')
+            else:
+                layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_HLT')
+        except: pass    # STILL REQUIRED?
 
 def get_minimal_interface_classes():
     return INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OgreToggleInterfaceOp, Ogre_User_Report
@@ -5652,10 +5660,11 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
             OgreToggleInterfaceOp.TOGGLE = False
         else:
             print( 'ogre.toggle_interface DISABLE' )
-            bpy.utils.unregister_module(__name__)
-            bpy.utils.register_class(_header_)
-            restore_minimal_interface()
-            OgreToggleInterfaceOp.TOGGLE = True
+            #bpy.utils.unregister_module(__name__); print(1)
+            hide_user_interface()
+            bpy.utils.register_class(_header_);print(2)
+            restore_minimal_interface();print(3)
+            OgreToggleInterfaceOp.TOGGLE = True;print('oh shit')
 
         return {'FINISHED'}
 
@@ -6022,28 +6031,13 @@ def get_subcollisions(ob):
     return r
 
 
-def _create_material_passes( mat ):
-    mat.use_nodes = True
-    tree = mat.node_tree	# valid pointer
-    #<tree bpy.data.node_groups['Shader Nodetree']>
-    for i in range( 8 ):
-        node = tree.nodes.new( type='MATERIAL' )
-        node.name = 'GEN.%s' %i
-    mat.use_nodes = False
 
-def get_or_create_material_passes( mat ):
-    if not mat.node_tree: _create_material_passes( mat )
-    r = []
-    for node in mat.node_tree.nodes:
-        if node.type == 'MATERIAL' and node.name.startswith('GEN.'):
-            r.append( node )
-    return r
 
-class CreateMaterialPassesOp(bpy.types.Operator):
-    '''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
+class bpyShaders(bpy.types.Operator):
+    '''operator: enables material nodes (workaround for not having IDPointers in pyRNA)'''  
     bl_idname = "ogre.force_setup_material_passes"  
-    bl_label = "relocate textures"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
+    bl_label = "force bpyShaders"
+    bl_options = {'REGISTER'}
 
     @classmethod
     def poll(cls, context):
@@ -6052,7 +6046,82 @@ class CreateMaterialPassesOp(bpy.types.Operator):
     def invoke(self, context, event):
         mat = context.active_object.active_material
         mat.use_material_passes = True
-        _create_material_passes( mat )
+        bpyShaders.create_material_passes( mat )
         return {'FINISHED'}
 
+    @staticmethod
+    def create_material_passes( mat, n=8 ):
+        print('bpyShaders.create_material_passes( %s, %s )' %(mat,n))
+        mat.use_nodes = True
+        tree = mat.node_tree	# valid pointer now
+        #<tree bpy.data.node_groups['Shader Nodetree']>
+        for i in range( n ):
+            node = tree.nodes.new( type='MATERIAL' )
+            node.name = 'GEN.%s' %i
+            node.location.x = 210*i; node.location.y = -100
+            print(node, node.location)
+        mat.use_nodes = False
+
+    @staticmethod
+    def get_or_create_material_passes( mat, n=8 ):
+        if not mat.node_tree:
+            bpyShaders.create_material_passes( mat, n )
+            bpyShaders.create_texture_nodes( mat )
+
+        r = []
+        for node in mat.node_tree.nodes:
+            if node.type == 'MATERIAL' and node.name.startswith('GEN.'):
+                r.append( node )
+        return r
+
+    @staticmethod
+    def get_or_create_texture_nodes( mat, n=2 ):
+        print('bpyShaders.get_or_create_texture_nodes( %s, %s )' %(mat,n))
+        assert mat.node_tree    # must call create_material_passes first
+        m = []
+        for node in mat.node_tree.nodes:
+            print( node )
+            if node.type == 'MATERIAL' and node.name.startswith('GEN.'):
+                m.append( node )
+        if not m:
+            m = bpyShaders.get_or_create_material_passes(mat)
+        print(m)
+        r = []
+        for link in mat.node_tree.links:
+            print(link, link.to_node, link.from_node)
+            if link.to_node and link.to_node.name.startswith('GEN.') and link.from_node.type=='TEXTURE':
+                r.append( link.from_node )
+        if not r:
+            print('--missing texture nodes--')
+            r = bpyShaders.create_texture_nodes( mat, n )
+        return r
+
+    @staticmethod
+    def create_texture_nodes( mat, n=2 ):
+        print('bpyShaders.create_texture_nodes( %s )' %mat)
+        assert mat.node_tree    # must call create_material_passes first
+        mats = bpyShaders.get_or_create_material_passes( mat )
+        r = {}
+        for i,m in enumerate(mats):
+            r['material'] = m; r['textures'] = []
+            inputs = m.inputs.values() #m.inputs['Color'], m.inputs['Spec'] ]   # MAX=4?
+            for j in range(n):
+                tex = mat.node_tree.nodes.new( type='TEXTURE' )
+                tex.name = 'TEX.%s.%s' %(j, m.name)
+                tex.location.x = 100*i*j
+                tex.location.y = -150
+                input = inputs[j]; output = tex.outputs['Color']
+                link = mat.node_tree.links.new( input, output )
+                r['textures'].append( tex )
+                print(tex, tex.location)
+        return r
+
+#mats.sort( key=lambda x: x.node.location.y, reverse=True )
+
+# these classes will be toggled on and off by the user - interface toggle #
+UI_CLASSES = []
+def OgreUI(cls):
+    if cls not in UI_CLASSES:
+        UI_CLASSES.append(cls)
+    return cls
 
