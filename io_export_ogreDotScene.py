@@ -21,14 +21,23 @@ bl_info = {
     "blender": (2,5,9),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
-    #"warning": "Quick Start: '.mesh' output requires OgreCommandLineTools (http://www.ogre3d.org/download/tools) - install to the default path.",
     "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
 VERSION = '0.5.5 preview7'
 
+## Public API ##
+UI_CLASSES = []
+def ogrepanel(cls): # @decorator
+    ''' these classes will be toggled on and off by the user - interface toggle '''
+    if cls not in UI_CLASSES:
+        UI_CLASSES.append(cls)
+    return cls
 
+
+## END Public API ## -- (go to bottom for rest of API)
+###########################################################
 ###########################################################
 ###### imports #####
 import os, sys, time, hashlib, getpass, tempfile, configparser
@@ -1482,28 +1491,6 @@ The most common thing a designer will want to do is have an event trigger an ani
 
 '''
 
-
-
-
-
-class Ogre_game_logic_op(bpy.types.Operator):
-    '''helper to hijack BGE logic'''
-    bl_idname = "ogre.gamelogic"
-    bl_label = "ogre game logic helper"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
-    logictype = StringProperty(name="logic-type", description="...", maxlen=32, default="")
-    subtype = StringProperty(name="logic-subtype", description="...", maxlen=32, default="")
-
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        if self.logictype == 'sensor':
-            bpy.ops.logic.sensor_add( type=self.subtype )
-        elif self.logictype == 'actuator':
-            bpy.ops.logic.actuator_add( type=self.subtype )
-
-        return {'FINISHED'}
-
 class _WrapLogic(object):
     ## custom name hacks ##
     SwapName = {
@@ -1563,61 +1550,6 @@ class WrapSensor( _WrapLogic ):
         'TOUCH'  :  ['material'],
     }
 
-
-#class Ogre_Logic_Sensors(bpy.types.Panel):
-class Deprecated1:
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    #bl_context = "physics"        # selects tab within the properties
-    bl_label = "Ogre Game Logic | Sensors"
-
-    @classmethod
-    def poll(cls, context):
-        if context.active_object: return True
-        else: return False
-
-    def draw(self, context):
-        layout = self.layout
-        ob = context.active_object
-        game = ob.game
-
-        split = layout.split()
-
-        col = split.column()
-        col.label( text='New Sensor:' )
-
-        row = col.row()
-        op = row.operator( 'ogre.gamelogic', text='Near' )
-        op.logictype = 'sensor'
-        op.subtype = 'NEAR'
-        op = row.operator( 'ogre.gamelogic', text='Collision' )
-        op.logictype = 'sensor'
-        op.subtype = 'COLLISION'
-        op = row.operator( 'ogre.gamelogic', text='Radar' )
-        op.logictype = 'sensor'
-        op.subtype = 'RADAR'
-
-        row = col.row()
-        op = row.operator( 'ogre.gamelogic', text='Touching' )
-        op.logictype = 'sensor'
-        op.subtype = 'TOUCH'
-        op = row.operator( 'ogre.gamelogic', text='Raycast' )
-        op.logictype = 'sensor'
-        op.subtype = 'RAY'
-        op = row.operator( 'ogre.gamelogic', text='Message' )
-        op.logictype = 'sensor'
-        op.subtype = 'MESSAGE'
-
-        layout.separator()
-        split = layout.split()
-        left = split.column()
-        right = split.column()
-        mid = len(game.sensors)/2
-        for i,sen in enumerate(game.sensors):
-            w = WrapSensor( sen )
-            if i < mid: w.widget( left )
-            else: w.widget( right )
-
 class WrapActuator( _WrapLogic ):
     LogicType = 'actuator'
     TYPES = {
@@ -1630,144 +1562,6 @@ class WrapActuator( _WrapLogic ):
         'SHAPE_ACTION'  :  'frame_blend_in frame_end frame_property frame_start mode property use_continue_last_frame'.split(),
         'EDIT_OBJECT'  :  'dynamic_operation linear_velocity mass mesh mode object time track_object use_3d_tracking use_local_angular_velocity use_local_linear_velocity use_replace_display_mesh use_replace_physics_mesh'.split(),
     }
-
-
-#class Ogre_Logic_Actuators(bpy.types.Panel):
-class Deprecated2:
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_context = "physics"
-    bl_label = "Ogre Game Logic | Actuators"
-
-    @classmethod
-    def poll(cls, context):
-        if context.active_object: return True
-        else: return False
-
-    def draw(self, context):
-        layout = self.layout
-        ob = context.active_object
-        game = ob.game
-
-        split = layout.split()
-
-        ### actuators
-        col = split.column()
-        col.label( text='New Actuator:' )
-
-        row = col.row()
-        op = row.operator( 'ogre.gamelogic', text='Camera' )
-        op.logictype = 'actuator'
-        op.subtype = 'CAMERA'
-        op = row.operator( 'ogre.gamelogic', text='Constrain' )
-        op.logictype = 'actuator'
-        op.subtype = 'CONSTRAINT'
-        op = row.operator( 'ogre.gamelogic', text='Message' )
-        op.logictype = 'actuator'
-        op.subtype = 'MESSAGE'
-        op = row.operator( 'ogre.gamelogic', text='Animation' )
-        op.logictype = 'actuator'
-        op.subtype = 'SHAPE_ACTION'
-
-        row = col.row()
-        op = row.operator( 'ogre.gamelogic', text='Motion' )
-        op.logictype = 'actuator'
-        op.subtype = 'OBJECT'        # blender bug? 'MOTION'
-        op = row.operator( 'ogre.gamelogic', text='Sound' )
-        op.logictype = 'actuator'
-        op.subtype = 'SOUND'
-        op = row.operator( 'ogre.gamelogic', text='Visibility' )
-        op.logictype = 'actuator'
-        op.subtype = 'VISIBILITY'
-        op = row.operator( 'ogre.gamelogic', text='Change' )
-        op.logictype = 'actuator'
-        op.subtype = 'EDIT_OBJECT'
-
-
-        layout.separator()
-        split = layout.split()
-        left = split.column()
-        right = split.column()
-        mid = len(game.actuators)/2
-        for i,act in enumerate(game.actuators):
-            w = WrapActuator( act )
-            if i < mid: w.widget( left )
-            else: w.widget( right )
-
-
-
-
-
-def _helper_ogre_material_draw_options( parent, mat ):
-    box = parent.box()
-    box.prop(mat, 'ogre_scene_blend')
-
-    row = box.row()
-    if mat.use_ogre_parent_material:
-        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='Parent Material:')
-        row.prop(mat, 'ogre_parent_material', text='')
-    else:
-        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT')
-
-    box.prop(mat, "use_shadows")
-
-    row = box.row()
-    row.prop(mat, "use_transparency", text="Transparent")
-    if mat.use_transparency: row.prop(mat, "alpha")
-
-    box = parent.box()
-    box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline', icon='LAMP_SUN' )
-    if mat.use_fixed_pipeline:
-        row = box.row()
-        row.prop(mat, "diffuse_color")
-        row.prop(mat, "diffuse_intensity")
-        row = box.row()
-        row.prop(mat, "specular_color")
-        row.prop(mat, "specular_intensity")
-        row = box.row()
-        row.prop(mat, "specular_hardness")
-        row = box.row()
-        row.prop(mat, "emit")
-        row.prop(mat, "ambient")
-        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
-
-
-    box.prop(mat, 'use_ogre_advanced_options', text='----------------------advanced options----------------------' )
-
-    if mat.use_ogre_advanced_options:
-        box.prop(mat, 'ogre_depth_write' )
-
-        for tag in 'ogre_colour_write ogre_lighting ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
-            box.prop(mat, tag)
-
-        for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
-            box.prop(mat, tag)
-
-        box = parent.box()
-
-
-
-class Ogre_Material_Panel( bpy.types.Panel ):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "material"
-    bl_label = "Ogre Material (pass0)"
-
-    def draw(self, context):
-        if not hasattr(context, "material"): return
-        if not context.active_object: return
-        if not context.active_object.active_material: return
-
-        mat = context.material
-        ob = context.object
-        slot = context.material_slot
-        layout = self.layout
-
-        _helper_ogre_material_draw_options( layout, mat )
-
-        if not mat.use_material_passes:
-            box = layout.box()
-            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers", icon='SCENE_DATA' )
 
 
 
@@ -1799,12 +1593,13 @@ class _OgreMatPass( object ):
             split = db.row()
             if node.material: split.prop( node.material, 'use_in_ogre_material_pass', text='' )
             split.prop( node, 'material' )
-            op = split.operator( 'ogre.helper_create_attach_material_layer', icon="PLUS", text='' )
-            op.INDEX = self.INDEX
+            if not node.material:
+                op = split.operator( 'ogre.helper_create_attach_material_layer', icon="PLUS", text='' )
+                op.INDEX = self.INDEX
 
             dbb = db.box()
             if node.material and node.material.use_in_ogre_material_pass:
-                _helper_ogre_material_draw_options( dbb, node.material )
+                ogre_material_panel( dbb, node.material )
 
 ## operator ##
 class _create_new_material_layer_helper(bpy.types.Operator):
@@ -3450,7 +3245,7 @@ class _OgreCommonExport_( _TXML_ ):
         safename = material_name(mat)     # supports blender library linking
         M = '// blender material: %s\n' %(mat.name)
         if mat.use_ogre_parent_material and mat.ogre_parent_material:
-            omat = get_ogre_material( mat.ogre_parent_material )
+            omat = get_ogre_user_material( mat.ogre_parent_material )
             if not CONFIG['COPY_PARENT_MATERIAL']:
                 M += 'import %s from "%s"\n' %(mat.ogre_parent_material, os.path.split(omat.url)[-1] )
             else:
@@ -5930,11 +5725,12 @@ class MaterialScript(object):
             self.ENUM_ITEMS.append( (omat.name, omat.name, url) )
 
     @classmethod    # only call after parsing all material scripts
-    def reset_rna(self):
+    def reset_rna(self, callback):
         bpy.types.Material.ogre_parent_material = EnumProperty(
             name="Script Inheritence", 
             description='ogre parent material class',
             items=self.ENUM_ITEMS,
+            update=callback
         )
 
 
@@ -5962,7 +5758,8 @@ def generate_material( mat, path ):
     return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
 
 
-def get_ogre_material( name ):
+def get_ogre_user_material( name ):
+    print('get_ogre_user_material(%s)'%name)
     if name in MaterialScript.ALL_MATERIALS:
         return MaterialScript.ALL_MATERIALS[ name ]
 
@@ -6001,7 +5798,11 @@ def update_parent_material_path( path ):
     if missing:
         print('WARNING: missing shader programs - set "SHADER_PROGRAMS" to your path')
         for p in missing: print(p.name)
-    MaterialScript.reset_rna()
+
+    def callback(mat,context):
+        print(mat,context)
+        print('callback', mat.ogre_parent_material)
+    MaterialScript.reset_rna( callback )
     return scripts, progs
 
 
@@ -6049,28 +5850,16 @@ class bpyShaders(bpy.types.Operator):
         bpyShaders.create_material_passes( mat )
         return {'FINISHED'}
 
-    @staticmethod
-    def create_material_passes( mat, n=8 ):
-        print('bpyShaders.create_material_passes( %s, %s )' %(mat,n))
-        mat.use_nodes = True
-        tree = mat.node_tree	# valid pointer now
-        #<tree bpy.data.node_groups['Shader Nodetree']>
-        for i in range( n ):
-            node = tree.nodes.new( type='MATERIAL' )
-            node.name = 'GEN.%s' %i
-            node.location.x = 210*i; node.location.y = -100
-            print(node, node.location)
-        mat.use_nodes = False
 
     @staticmethod
     def get_or_create_material_passes( mat, n=8 ):
         if not mat.node_tree:
+            print('CREATING MATERIAL PASSES', n)
             bpyShaders.create_material_passes( mat, n )
-            bpyShaders.create_texture_nodes( mat )
 
         r = []
         for node in mat.node_tree.nodes:
-            if node.type == 'MATERIAL' and node.name.startswith('GEN.'):
+            if node.type == 'MATERIAL_EXT' and node.name.startswith('GEN.'):
                 r.append( node )
         return r
 
@@ -6081,7 +5870,7 @@ class bpyShaders(bpy.types.Operator):
         m = []
         for node in mat.node_tree.nodes:
             print( node )
-            if node.type == 'MATERIAL' and node.name.startswith('GEN.'):
+            if node.type == 'MATERIAL_EXT' and node.name.startswith('GEN.'):
                 m.append( node )
         if not m:
             m = bpyShaders.get_or_create_material_passes(mat)
@@ -6096,32 +5885,173 @@ class bpyShaders(bpy.types.Operator):
             r = bpyShaders.create_texture_nodes( mat, n )
         return r
 
+
+    @staticmethod
+    def create_material_passes( mat, n=8, textures=True ):
+        print('bpyShaders.create_material_passes( %s, %s )' %(mat,n))
+        mat.use_nodes = True
+        tree = mat.node_tree	# valid pointer now
+        r = []
+        x = 680
+        for i in range( n ):
+            node = tree.nodes.new( type='MATERIAL_EXT' ) #[‘OUTPUT’, ‘MATERIAL’, ‘RGB’, ‘VALUE’, ‘MIX_RGB’, ‘VALTORGB’, ‘RGBTOBW’, ‘TEXTURE’, ‘NORMAL’, ‘GEOMETRY’, ‘MAPPING’, ‘CURVE_VEC’, ‘CURVE_RGB’, ‘CAMERA’, ‘MATH’, ‘VECT_MATH’, ‘SQUEEZE’, ‘MATERIAL_EXT’, ‘INVERT’, ‘SEPRGB’, ‘COMBRGB’, ‘HUE_SAT’, ‘SCRIPT’, ‘GROUP’]
+            node.name = 'GEN.%s' %i
+            node.location.x = x; node.location.y = 580
+            r.append( node )
+            x += 180
+        #mat.use_nodes = False  # TODO set user material to default output
+        if textures:
+            texnodes = bpyShaders.create_texture_nodes( mat )
+            print( texnodes )
+        return r
+
     @staticmethod
     def create_texture_nodes( mat, n=2 ):
         print('bpyShaders.create_texture_nodes( %s )' %mat)
         assert mat.node_tree    # must call create_material_passes first
         mats = bpyShaders.get_or_create_material_passes( mat )
-        r = {}
+        r = {}; x = 500
         for i,m in enumerate(mats):
             r['material'] = m; r['textures'] = []
             inputs = m.inputs.values() #m.inputs['Color'], m.inputs['Spec'] ]   # MAX=4?
+            inputs.reverse()
             for j in range(n):
                 tex = mat.node_tree.nodes.new( type='TEXTURE' )
                 tex.name = 'TEX.%s.%s' %(j, m.name)
-                tex.location.x = 100*i*j
-                tex.location.y = -150
+                tex.location.x = x - (j*16)
+                if j == 0:
+                    tex.location.y = -(j*230)
+                else: tex.location.y = 800; tex.location.x += 120
                 input = inputs[j]; output = tex.outputs['Color']
                 link = mat.node_tree.links.new( input, output )
                 r['textures'].append( tex )
                 print(tex, tex.location)
+            x += 180
         return r
+
 
 #mats.sort( key=lambda x: x.node.location.y, reverse=True )
 
-# these classes will be toggled on and off by the user - interface toggle #
-UI_CLASSES = []
-def OgreUI(cls):
-    if cls not in UI_CLASSES:
-        UI_CLASSES.append(cls)
-    return cls
+@ogrepanel
+class PANEL_properties_window_ogre_material( bpy.types.Panel ):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "material"
+    bl_label = "Ogre Material (pass0)"
+
+    @classmethod
+    def poll( self, context ):
+        if not hasattr(context, "material"): return False
+        if not context.active_object: return False
+        if not context.active_object.active_material: return False
+        return True
+
+    def draw(self, context):
+        mat = context.material
+        ob = context.object
+        slot = context.material_slot
+        layout = self.layout
+        ogre_material_panel( layout, mat )
+        if not mat.use_material_passes:
+            box = layout.box()
+            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers", icon='SCENE_DATA' )
+
+@ogrepanel
+class PANEL_node_editor_ui( bpy.types.Panel ):
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "Ogre Material"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        topmat = context.space_data.id                        # always returns the toplevel material that contains the node_tree
+        mat = topmat.active_node_material        # the currently selected sub-material
+        if not mat:
+            layout.label(text='enable use_nodes')
+            box = layout.box()
+            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers", icon='SCENE_DATA' )
+        else:
+            #for node in context.space_data.node_tree.nodes:
+            ogre_material_panel( layout, mat )
+
+@ogrepanel
+class PANEL_node_editor_ui_extra( bpy.types.Panel ):
+    bl_space_type = 'NODE_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "Ogre Material Advanced"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        topmat = context.space_data.id                        # always returns the toplevel material that contains the node_tree
+        mat = topmat.active_node_material        # the currently selected sub-material
+        #for node in context.space_data.node_tree.nodes:
+        ogre_material_panel_extra( layout, mat )
+
+
+
+def ogre_material_panel( parent, mat ):
+    box = parent.box()
+    box.prop(mat, 'ogre_scene_blend')
+    if mat.ogre_scene_blend and 'alpha' in mat.ogre_scene_blend:
+        row = box.row()
+        row.prop(mat, "use_transparency", text="Transparent")
+        if mat.use_transparency: row.prop(mat, "alpha")
+
+    row = box.row()
+    if mat.use_ogre_parent_material:
+        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='Parent Material:')
+        row.prop(mat, 'ogre_parent_material', text='')
+
+        #s = get_ogre_user_material( mat.ogre_parent_material )  # gets by name
+        #print(s,dir(s))
+
+    else:
+        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT')
+
+
+
+
+def ogre_material_panel_extra( parent, mat ):
+    #box = parent.box()
+    #box.prop(mat, 'ogre_scene_blend')
+    box = parent.box()
+    box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline', icon='LAMP_SUN' )
+    if mat.use_fixed_pipeline:
+        if mat.use_shadeless:
+            row = box.row()
+            row.prop(mat, "diffuse_color", text='Color')
+        else:
+            if not mat.use_vertex_color_paint:
+                row = box.row()
+                row.prop(mat, "diffuse_color", text='Diffuse')
+                row.prop(mat, "diffuse_intensity", text='intensity')
+            row = box.row()
+            row.prop(mat, "specular_color", text='Spec')
+            row.prop(mat, "specular_intensity", text='intensity')
+            row = box.row()
+            row.prop(mat, "specular_hardness")
+            row = box.row()
+            row.prop(mat, "ambient")
+            row = box.row()
+            row.prop(mat, "emit")
+
+        row = box.row()
+        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
+        row.prop(mat, "use_shadeless")
+
+    box.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
+    if mat.use_ogre_advanced_options:
+        box.prop(mat, "use_shadows")
+
+        box.prop(mat, 'ogre_depth_write' )
+
+        for tag in 'ogre_colour_write ogre_lighting ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
+            box.prop(mat, tag)
+
+        for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
+            box.prop(mat, tag)
+
+        box = parent.box()
 
