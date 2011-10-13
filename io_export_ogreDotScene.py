@@ -760,106 +760,7 @@ Report = ReportSingleton()
 
 
 
-class MyShadersSingleton(object):
-    def get(self, name):
-        if name in self.vertex_progs_by_name: return self.vertex_progs_by_name[ name ]
-        elif name in self.fragment_progs_by_name: return self.fragment_progs_by_name[ name ]
-            
-    def __init__(self):
-        self.path = CONFIG['MYSHADERS_DIR']
-        self.files = []
-        self.vertex_progs = []
-        self.vertex_progs_by_name = {}
-        self.fragment_progs = []
-        self.fragment_progs_by_name = {}
-        if os.path.isdir( self.path ):
-            for name in os.listdir( self.path ):
-                if name.endswith('.program'):
-                    url = os.path.join( self.path, name )
-                    #self.parse(url)
-                    try: self.parse( url )
-                    except: print('WARNING: syntax error in .program!')
 
-    def parse(self, url ):
-        print('parsing .program', url )
-        data = open( url, 'rb' ).read().decode()
-        lines = data.splitlines()
-        lines.reverse()
-        while lines:
-            line = lines.pop().strip()
-            if line:
-                if line.startswith('vertex_program') or line.startswith('fragment_program'):
-                    ptype, name, tech = line.split()
-                    if tech == 'asm':
-                        print('Warning: asm programs not supported')
-                    else:
-                        prog = Program(name, tech, url)
-                        if ptype == 'vertex_program':
-                            self.vertex_progs.append( prog ); prog.type = 'vertex'
-                            self.vertex_progs_by_name[ prog.name ] = prog
-                        else:
-                            self.fragment_progs.append( prog ); prog.type = 'fragment'
-                            self.fragment_progs_by_name[ prog.name ] = prog
-
-                        while lines:        # continue parsing
-                            subA = lines.pop()
-                            if subA.startswith('}'): break
-                            else:
-                                a = subA = subA.strip()
-                                if a.startswith('//') and len(a) > 2: prog.comments.append( a[2:] )
-                                elif subA.startswith('source'): prog.source = subA.split()[-1]
-                                elif subA.startswith('entry_point'): prog.entry_point = subA.split()[-1]
-                                elif subA.startswith('profiles'): prog.profiles = subA.split()[-1]
-                                elif subA.startswith('compile_arguments'): prog.compile_args = ' '.join( subA.split()[-1].split('-D') )
-                                elif subA.startswith('default_params'):
-                                    while lines:
-                                        b = lines.pop().strip()
-                                        if b.startswith('}'): break
-                                        else:
-                                            if b.startswith('param_named_auto'):
-                                                s = b.split('param_named_auto')[-1].strip()
-                                                prog.add_param( s, auto=True )
-                                            elif b.startswith('param_named'):
-                                                s = b.split('param_named')[-1].strip()
-                                                prog.add_param( s )
-
-        # end ugly-simple parser #
-        self.files.append( url )
-        print('----------------vertex programs----------------')
-        for p in self.vertex_progs: p.debug()
-        print('----------------fragment programs----------------')
-        for p in self.fragment_progs: p.debug()
-
-class Program(object):
-    def debug( self ):
-        print('GPU Program')
-        print('  ', self.name)
-        print('  ', self.technique)
-        print('  ', self.file)
-        for p in self.params + self.params_auto: print('    ', p)
-
-    def __init__(self, name, tech, file):
-        if len(name) >= 31:        #KeyError: 'the length of IDProperty names is limited to 31 characters'
-            if '/' in name: name = name.split('/')[-1]
-            if len(name) >= 31: name = name[ : 29 ] + '..'
-        self.name = name; self.technique = tech; self.file = file
-        self.source = self.entry_point = self.profiles = self.compile_args = self.type = None
-        self.params = []; self.params_auto = []
-        self.comments = []
-
-    def add_param( self, line, auto=False ):
-        name = line.split()[0]
-        value_code = line.split()[1]
-        p = {'name': name, 'value-code': value_code }
-        if auto: self.params_auto.append( p )
-        else: self.params.append( p )
-        if len( line.split() ) >= 3:
-            args = line.split( p['value-code'] )[-1]
-            p['args'] = args.strip()
-
-    def get_param( self, name ):
-        for p in self.params + self.params_auto:
-            if p['name'] == name: return p
 
 class Ogre_User_Report(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
@@ -1599,6 +1500,7 @@ class _OgreMatPass( object ):
             dbb = db.box()
             if node.material and node.material.use_in_ogre_material_pass:
                 ogre_material_panel( dbb, node.material, parent=mat )
+                ogre_material_panel_extra( dbb, node.material )
 
 
 ## operator ##
@@ -1626,7 +1528,7 @@ class PANEL_properties_window_ogre_material( bpy.types.Panel ):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "material"
-    bl_label = "Ogre Material (pass0)"
+    bl_label = "Ogre Material (base pass)"
 
     @classmethod
     def poll( self, context ):
@@ -1642,7 +1544,7 @@ class PANEL_properties_window_ogre_material( bpy.types.Panel ):
         layout = self.layout
         if not mat.use_material_passes:
             box = layout.box()
-            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers", icon='SCENE_DATA' )
+            box.operator( 'ogre.force_setup_material_passes', text="Ogre Material Layers", icon='SCENE_DATA' )
 
         ogre_material_panel( layout, mat )
         ogre_material_panel_extra( layout, mat )
@@ -2563,12 +2465,6 @@ Blender Collision Setup:
     2. If 'Collision Bounds' game option is checked, the bounds type [box, sphere, etc] is used. This will override above rule.
 
     3. Instances (and instances generated by optimal array modifier) will share the same collision type of the first instance, you DO NOT need to set the collision type for each instance.
-
-    Tips and Tricks:
-        . instance your mesh, parent it under the source, add a Decimate modifier, set the draw type to wire.  boom! easy optimized collision mesh
-        . sphere collision type is the fastest
-
-    TODO support composite collision objects?
 
 '''
 
@@ -5512,7 +5408,6 @@ def register():
     #if os.path.isdir( CONFIG['JMONKEY_ROOT'] ): _USE_JMONKEY_ = True
     #else: _USE_JMONKEY_ = False
 
-    MyShaders = MyShadersSingleton()
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
 
@@ -5606,9 +5501,13 @@ class OgreProgram(object):
     SOURCES = {}
 
     def reload(self):   # only one directory is allowed to hold shader programs
-        if self.name not in os.listdir( CONFIG['SHADER_PROGRAMS'] ): return False
-        url = os.path.join(  CONFIG['SHADER_PROGRAMS'], self.name )
+        if self.source not in os.listdir( CONFIG['SHADER_PROGRAMS'] ):
+            print( 'ERROR: ogre material %s is missing source: %s' %(self.name,self.source) )
+            print( CONFIG['SHADER_PROGRAMS'] )
+            return False
+        url = os.path.join(  CONFIG['SHADER_PROGRAMS'], self.source )
         self.source_bytes = open( url, 'rb' ).read()#.decode('utf-8')
+        print(self.source_bytes)
         return True
 
     def __init__(self, name='', data=''):
@@ -5628,9 +5527,9 @@ class OgreProgram(object):
 
     def parse( self, txt ):
         self.data = txt
-        print('--parsing ogre shader program--' )
+        #print('--parsing ogre shader program--' )
         for line in self.data.splitlines():
-            print(line)
+            #print(line)
             line = line.split('//')[0]
             line = line.strip()
             if line.startswith('vertex_program') or line.startswith('fragment_program'):
@@ -5643,7 +5542,7 @@ class OgreProgram(object):
 class OgreMaterialScript(object):
     def get_programs(self):
         progs = []
-        for name in self.vertex_programs.keys() + self.fragment_programs.keys():
+        for name in list(self.vertex_programs.keys()) + list(self.fragment_programs.keys()):
             p = get_shader_program( name )  # OgreProgram.PROGRAMS
             if p: progs.append( p )
         return progs
@@ -5663,12 +5562,10 @@ class OgreMaterialScript(object):
         self.name = line.split()[-1]
         print( 'new ogre material: %s' %self.name )
 
-        print('parsing----------------------------------------')
         brace = 0
         self.techniques = techs = []
         prog = None  # pick up program params
         tex = None  # pick up texture_unit options, require "texture" ?
-
         for line in self.data.splitlines():
             print( line )
             line = line.split('//')[0]
@@ -5704,11 +5601,14 @@ class OgreMaterialScript(object):
                     elif prog:
                         p = line.split()[0]
                         if p=='param_named':
-                            if len(line.split()) == 4:
-                                p, o, t, v = line.split()
-                            elif len(line.split()) == 3:
-                                p, o, v = line.split()
+                            items = line.split()
+                            if len(items) == 4: p, o, t, v = items
+                            elif len(items) == 3:
+                                p, o, v = items
                                 t = 'class'
+                            elif len(items) > 4:
+                                o = items[1]; t = items[2]
+                                v = items[2:]
 
                             opt = { 'name': o, 'type':t, 'raw_value':v }
                             prog['params'][ o ] = opt
@@ -5718,7 +5618,7 @@ class OgreMaterialScript(object):
                     elif tex:   # (not used)
                         tex['params'][ line.split()[0] ] = line.split()[ 1 : ]
 
-        print( self.techniques )
+        #print( self.techniques )
         self.hidden_texture_units = rem = []
         for tex in self.texture_units.values():
             if 'texture' not in tex['params']:
@@ -5765,7 +5665,7 @@ class MaterialScripts(object):
             name="Script Inheritence", 
             description='ogre parent material class',
             items=self.ENUM_ITEMS,
-            update=callback
+            #update=callback
         )
 
 
@@ -5794,45 +5694,58 @@ def generate_material( mat, path ):
 
 
 def get_ogre_user_material( name ):
-    print('get_ogre_user_material(%s)'%name)
+    #print('get_ogre_user_material(%s)'%name)
     if name in MaterialScripts.ALL_MATERIALS:
         return MaterialScripts.ALL_MATERIALS[ name ]
 
 def get_shader_program( name ):
     if name in OgreProgram.PROGRAMS:
         return OgreProgram.PROGRAMS[ name ]
+    else:
+        print('WARNING: no shader program named: %s' %name)
+        print( OgreProgram.PROGRAMS )
 
 def get_shader_programs():
     return OgreProgram.PROGRAMS.values()
+
+
+def parse_material_and_program_scripts( path, scripts, progs, missing ):   # recursive
+    for name in os.listdir(path):
+        url = os.path.join(path,name)
+        if os.path.isdir( url ):
+            parse_material_and_program_scripts( url, scripts, progs, missing )
+
+        elif os.path.isfile( url ):
+            if name.endswith( '.material' ):
+                print( '<found material>', name )
+                scripts.append( MaterialScripts( url ) )
+
+            if name.endswith('.program'):
+                print( '<found program>', name )
+                data = open( url, 'rb' ).read().decode('utf-8')
+                for d in data.split(  '\n}\n'  ):
+                    if d.strip():
+                        p = OgreProgram( data=d )
+                        if p.source:
+                            ok = p.reload()
+                            if not ok: missing.append( p )
+                            else: progs.append( p )
+
 
 ## updates RNA ##
 def update_parent_material_path( path ):
     print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
     scripts = []
-    progs = {}
+    progs = []
     missing = []
-    for sub in os.listdir( path ):
-        a = os.path.join( path, sub )
-        for name in os.listdir( a ):
-            if name.endswith( '.material' ):
-                print( '<material>', name )
-                url = os.path.join( a, name )
-                scripts.append( MaterialScripts( url ) )
+    parse_material_and_program_scripts( path, scripts, progs, missing )
 
-            if name.endswith('.program'):
-                print( '<program>', name )
-                url = os.path.join( a, name )
-                data = open( url, 'rb' ).read().decode('utf-8')
-                for d in data.split(  '\n}\n'  ):
-                    if d.strip():
-                        p = OgreProgram( data=d )
-                        if p.source and not p.reload():
-                            missing.append( p )
-                        elif p.source:
-                            progs.append( p )
     if missing:
-        print('WARNING: missing shader programs - set "SHADER_PROGRAMS" to your path')
+        print('WARNING: missing shader programs:')
         for p in missing: print(p.name)
+    if missing and not progs:
+        print('WARNING: shader programs not found - set "SHADER_PROGRAMS" to your path')
+        assert 0
 
     MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
     return scripts, progs
@@ -5923,8 +5836,8 @@ class bpyShaders(bpy.types.Operator):
         return r
 
     @staticmethod
-    def get_or_create_texture_nodes( mat, n=4 ):
-        print('bpyShaders.get_or_create_texture_nodes( %s, %s )' %(mat,n))
+    def get_or_create_texture_nodes( mat, n=6 ):
+        #print('bpyShaders.get_or_create_texture_nodes( %s, %s )' %(mat,n))
         assert mat.node_tree    # must call create_material_passes first
         m = []
         for node in mat.node_tree.nodes:
@@ -5947,7 +5860,7 @@ class bpyShaders(bpy.types.Operator):
 
     @staticmethod
     def create_material_passes( mat, n=8, textures=True ):
-        print('bpyShaders.create_material_passes( %s, %s )' %(mat,n))
+        #print('bpyShaders.create_material_passes( %s, %s )' %(mat,n))
         mat.use_nodes = True
         tree = mat.node_tree	# valid pointer now
         r = []
@@ -5965,15 +5878,16 @@ class bpyShaders(bpy.types.Operator):
         return r
 
     @staticmethod
-    def create_texture_nodes( mat, n=4 ):
-        print('bpyShaders.create_texture_nodes( %s )' %mat)
+    def create_texture_nodes( mat, n=6 ):
+        #print('bpyShaders.create_texture_nodes( %s )' %mat)
         assert mat.node_tree    # must call create_material_passes first
         mats = bpyShaders.get_or_create_material_passes( mat )
         r = {}; x = 500
         for i,m in enumerate(mats):
             r['material'] = m; r['textures'] = []
-            inputs = m.inputs.values() #m.inputs['Color'], m.inputs['Spec'] ]   # MAX=4?
-            inputs.reverse()
+            inputs = []     # other inputs mess up material preview #
+            for tag in ['Mirror', 'Ambient', 'Emit', 'SpecTra', 'Ray Mirror', 'Translucency']:
+                inputs.append( m.inputs[ tag ] )
             for j in range(n):
                 tex = mat.node_tree.nodes.new( type='TEXTURE' )
                 tex.name = 'TEX.%s.%s' %(j, m.name)
@@ -6005,13 +5919,22 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
         mat = topmat.active_node_material        # the currently selected sub-material
-        if not mat:
-            layout.label(text='enable use_nodes')
-            box = layout.box()
-            box.operator( 'ogre.force_setup_material_passes', text="Use Extra Material Layers", icon='SCENE_DATA' )
-        else:
-            #for node in context.space_data.node_tree.nodes:
+        if mat:
             ogre_material_panel( layout, mat, topmat, show_programs=False )
+
+        else:
+            if not topmat.use_material_passes:
+                layout.operator(
+                    'ogre.force_setup_material_passes', 
+                    text="Ogre Material Layers", 
+                    icon='SCENE_DATA' 
+                )
+
+            if not topmat.use_nodes:
+                layout.label(text='enable use_nodes')
+            elif topmat.use_material_passes:
+                ogre_material_panel( layout, topmat, show_programs=False )
+
 
 @ogrepanel
 class PANEL_node_editor_ui_extra( bpy.types.Panel ):
@@ -6024,8 +5947,11 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
         mat = topmat.active_node_material        # the currently selected sub-material
-        #for node in context.space_data.node_tree.nodes:
-        ogre_material_panel_extra( layout, mat )
+        if mat:
+            ogre_material_panel_extra( layout, mat )
+        else:
+            ogre_material_panel_extra( layout, topmat )
+
 
 
 def ogre_material_panel_extra( parent, mat ):
@@ -6073,6 +5999,8 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
         row.prop(mat, "use_transparency", text="Transparent")
         if mat.use_transparency: row.prop(mat, "alpha")
 
+    if not parent: return   # only allow on pass1 and higher
+
     row = box.row()
     if not mat.use_ogre_parent_material:
         row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT')
@@ -6090,6 +6018,8 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                     bx.label( text=name )
                 for name in s.fragment_programs:
                     bx.label( text=name )
+                progs = s.get_programs()
+                print(progs)
 
             texnodes = None
             if parent:
@@ -6106,6 +6036,6 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                         tex = texnodes[i]
                         row.prop( tex, 'texture', text='' )
                     else:
-                        print('WARNING: user shader with more than 4 texture units')
+                        print('WARNING: no slot for texture unit:', name)
 
 
