@@ -5412,7 +5412,10 @@ def register():
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
 
     if os.path.isdir( CONFIG['MYSHADERS_DIR'] ):
-        update_parent_material_path( CONFIG['MYSHADERS_DIR'] )
+        scripts,progs = update_parent_material_path( CONFIG['MYSHADERS_DIR'] )
+        for prog in progs:
+            print('ogre shader program', prog.name)
+
     else: print( 'WARNING: invalid my-shaders path' )
 
     print( '-'*80)
@@ -5506,14 +5509,17 @@ class OgreProgram(object):
             print( CONFIG['SHADER_PROGRAMS'] )
             return False
         url = os.path.join(  CONFIG['SHADER_PROGRAMS'], self.source )
+        print('shader source:', url)
         self.source_bytes = open( url, 'rb' ).read()#.decode('utf-8')
-        print(self.source_bytes)
+        print('shader source code num bytes:', len(self.source_bytes))
         return True
 
     def __init__(self, name='', data=''):
         self.name=name
         self.data = data.strip()
+        self.source = None
         if self.name in OgreProgram.PROGRAMS:
+            print('---copy ogreprogram---', self.name)
             other = OgreProgram.PROGRAMS
             self.source = other.source
             self.data = other.data
@@ -5521,15 +5527,13 @@ class OgreProgram(object):
             self.profiles = other.profiles
 
         if data: self.parse( self.data )
-
-        if self.name:
-            OgreProgram.PROGRAMS[ self.name ] = self
+        if self.name: OgreProgram.PROGRAMS[ self.name ] = self
 
     def parse( self, txt ):
         self.data = txt
-        #print('--parsing ogre shader program--' )
+        print('--parsing ogre shader program--' )
         for line in self.data.splitlines():
-            #print(line)
+            print(line)
             line = line.split('//')[0]
             line = line.strip()
             if line.startswith('vertex_program') or line.startswith('fragment_program'):
@@ -5567,7 +5571,7 @@ class OgreMaterialScript(object):
         prog = None  # pick up program params
         tex = None  # pick up texture_unit options, require "texture" ?
         for line in self.data.splitlines():
-            print( line )
+            #print( line )
             line = line.split('//')[0]
             line = line.strip()
             if not line: continue
@@ -5608,11 +5612,12 @@ class OgreMaterialScript(object):
                                 t = 'class'
                             elif len(items) > 4:
                                 o = items[1]; t = items[2]
-                                v = items[2:]
+                                v = items[3:]
 
                             opt = { 'name': o, 'type':t, 'raw_value':v }
                             prog['params'][ o ] = opt
                             if t=='float': opt['value'] = float(v)
+                            elif t in 'float2 float3 float4'.split(): opt['value'] = [ float(a) for a in v ]
                             else: print('unknown type:', t)
 
                     elif tex:   # (not used)
@@ -5651,13 +5656,14 @@ class MaterialScripts(object):
             omat = OgreMaterialScript( '\n'.join( mat ), url )
             if omat.name in self.ALL_MATERIALS:
                 print( 'WARNING: material %s redefined' %omat.name )
-                print( '--OLD MATERIAL--')
-                print( self.ALL_MATERIALS[ omat.name ].data )
-                print( '--NEW MATERIAL--')
-                print( omat.data )
+                #print( '--OLD MATERIAL--')
+                #print( self.ALL_MATERIALS[ omat.name ].data )
+                #print( '--NEW MATERIAL--')
+                #print( omat.data )
             self.materials[ omat.name ] = omat
             self.ALL_MATERIALS[ omat.name ] = omat
-            self.ENUM_ITEMS.append( (omat.name, omat.name, url) )
+            if omat.vertex_programs or omat.fragment_programs:  # ignore materials without programs
+                self.ENUM_ITEMS.append( (omat.name, omat.name, url) )
 
     @classmethod    # only call after parsing all material scripts
     def reset_rna(self, callback=None):
@@ -5717,19 +5723,28 @@ def parse_material_and_program_scripts( path, scripts, progs, missing ):   # rec
 
         elif os.path.isfile( url ):
             if name.endswith( '.material' ):
-                print( '<found material>', name )
+                print( '<found material>', url )
                 scripts.append( MaterialScripts( url ) )
 
             if name.endswith('.program'):
-                print( '<found program>', name )
+                print( '<found program>', url )
                 data = open( url, 'rb' ).read().decode('utf-8')
-                for d in data.split(  '\n}\n'  ):
-                    if d.strip():
-                        p = OgreProgram( data=d )
-                        if p.source:
-                            ok = p.reload()
-                            if not ok: missing.append( p )
-                            else: progs.append( p )
+
+                chk = []; chunks = [ chk ]
+                for line in data.splitlines():
+                    line = line.split('//')[0]
+                    if line.startswith('}'):
+                        chk = []; chunks.append( chk )
+                    elif line.strip():
+                        chk.append( line )
+
+                for chk in chunks:
+                    if not chk: continue
+                    p = OgreProgram( data='\n'.join(chk) )
+                    if p.source:
+                        ok = p.reload()
+                        if not ok: missing.append( p )
+                        else: progs.append( p )
 
 
 ## updates RNA ##
@@ -5744,8 +5759,7 @@ def update_parent_material_path( path ):
         print('WARNING: missing shader programs:')
         for p in missing: print(p.name)
     if missing and not progs:
-        print('WARNING: shader programs not found - set "SHADER_PROGRAMS" to your path')
-        assert 0
+        print('WARNING: no shader programs were found - set "SHADER_PROGRAMS" to your path')
 
     MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
     return scripts, progs
@@ -6012,7 +6026,7 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
         s = get_ogre_user_material( mat.ogre_parent_material )  # gets by name
         if s.vertex_programs or s.fragment_programs:
             split = box.row()
-            if show_programs:
+            if show_programs and (s.vertex_programs or s.fragment_programs):
                 bx = split.box()
                 for name in s.vertex_programs:
                     bx.label( text=name )
