@@ -5565,12 +5565,11 @@ class OgreSkyPanel(bpy.types.Panel):
 
 #_OGRE_MATERIAL_CLASS_SCRIPT = {}
 class OgreProgram(object):
+    '''
+    parses .program scripts
+    saves bytes to copy later
+    '''
     def save( self, path ):
-        '''
-            progs = OgreProgram.parse_programs( your_material_scripts_paths )
-            for p in progs:
-                p.save( your_project_path )
-        '''
         f = open( os.path.join(path,self.name), 'wb' )
         f.write(self.source_bytes )
         f.close()
@@ -5613,11 +5612,11 @@ class OgreProgram(object):
             elif line.startswith('entry_point'): self.entry_point = line.split()[-1]
             elif line.startswith('profiles'): self.profiles = line.split()[1:]
 
-class OgreMaterial(object):
+class OgreMaterialScript(object):
     def get_programs(self):
         progs = []
-        for name in self.vertex_programs + self.fragment_programs:
-            p = get_shader_program( name )
+        for name in self.vertex_programs.keys() + self.fragment_programs.keys():
+            p = get_shader_program( name )  # OgreProgram.PROGRAMS
             if p: progs.append( p )
         return progs
 
@@ -5625,8 +5624,9 @@ class OgreMaterial(object):
         self.url = url
         self.data = txt.strip()
         self.parent = None
-        self.vertex_programs = []
-        self.fragment_programs = []
+        self.vertex_programs = {}
+        self.fragment_programs = {}
+        self.texture_units = {}
 
         line = self.data.splitlines()[0]
         assert line.startswith('material')
@@ -5662,14 +5662,15 @@ class OgreMaterial(object):
 
                     if line.startswith('vertex_program_ref'):
                         prog = P['vprogram'] = {'name':line.split()[-1], 'params':{}}
-                        self.vertex_programs.append( prog['name'] )
+                        self.vertex_programs[ prog['name'] ] = prog
                     elif line.startswith('fragment_program_ref'):
                         prog = P['fprogram'] = {'name':line.split()[-1], 'params':{}}
-                        self.fragment_programs.append( prog['name'] )
+                        self.fragment_programs[ prog['name'] ] = prog
 
                     elif line.startswith('texture_unit'):
                         tex = {'name':line.split()[-1], 'params':{}}
                         P['texture_units'].append( tex )
+                        self.texture_units[ tex['name'] ] = tex
                         prog = None
 
                     elif prog:
@@ -5693,7 +5694,7 @@ class OgreMaterial(object):
 
 
 
-class MaterialScript(object):
+class MaterialScripts(object):
     ALL_MATERIALS = {}
     ENUM_ITEMS = []
 
@@ -5701,7 +5702,7 @@ class MaterialScript(object):
         self.url = url
         self.data = open( url, 'rb' ).read().decode('utf-8')
         self.materials = {}
-
+        ## chop up .material file, find all material defs ####
         mats = []
         mat = []
         for line in self.data.splitlines():
@@ -5711,9 +5712,9 @@ class MaterialScript(object):
                 mat.append( line )
             elif mat:
                 mat.append( line )
-
+        ##########################
         for mat in mats:
-            omat = OgreMaterial( '\n'.join( mat ), url )
+            omat = OgreMaterialScript( '\n'.join( mat ), url )
             if omat.name in self.ALL_MATERIALS:
                 print( 'WARNING: material %s redefined' %omat.name )
                 print( '--OLD MATERIAL--')
@@ -5725,7 +5726,7 @@ class MaterialScript(object):
             self.ENUM_ITEMS.append( (omat.name, omat.name, url) )
 
     @classmethod    # only call after parsing all material scripts
-    def reset_rna(self, callback):
+    def reset_rna(self, callback=None):
         bpy.types.Material.ogre_parent_material = EnumProperty(
             name="Script Inheritence", 
             description='ogre parent material class',
@@ -5760,8 +5761,8 @@ def generate_material( mat, path ):
 
 def get_ogre_user_material( name ):
     print('get_ogre_user_material(%s)'%name)
-    if name in MaterialScript.ALL_MATERIALS:
-        return MaterialScript.ALL_MATERIALS[ name ]
+    if name in MaterialScripts.ALL_MATERIALS:
+        return MaterialScripts.ALL_MATERIALS[ name ]
 
 def get_shader_program( name ):
     if name in OgreProgram.PROGRAMS:
@@ -5782,7 +5783,7 @@ def update_parent_material_path( path ):
             if name.endswith( '.material' ):
                 print( '<material>', name )
                 url = os.path.join( a, name )
-                scripts.append( MaterialScript( url ) )
+                scripts.append( MaterialScripts( url ) )
 
             if name.endswith('.program'):
                 print( '<program>', name )
@@ -5799,10 +5800,7 @@ def update_parent_material_path( path ):
         print('WARNING: missing shader programs - set "SHADER_PROGRAMS" to your path')
         for p in missing: print(p.name)
 
-    def callback(mat,context):
-        print(mat,context)
-        print('callback', mat.ogre_parent_material)
-    MaterialScript.reset_rna( callback )
+    MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
     return scripts, progs
 
 
@@ -5839,6 +5837,13 @@ class bpyShaders(bpy.types.Operator):
     bl_idname = "ogre.force_setup_material_passes"  
     bl_label = "force bpyShaders"
     bl_options = {'REGISTER'}
+
+    ## setup from MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
+    @staticmethod
+    def on_change_parent_material(mat,context):
+        print(mat,context)
+        print('callback', mat.ogre_parent_material)
+
 
     @classmethod
     def poll(cls, context):
@@ -5990,39 +5995,20 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
         ogre_material_panel_extra( layout, mat )
 
 
-
-def ogre_material_panel( parent, mat ):
-    box = parent.box()
-    box.prop(mat, 'ogre_scene_blend')
-    if mat.ogre_scene_blend and 'alpha' in mat.ogre_scene_blend:
-        row = box.row()
-        row.prop(mat, "use_transparency", text="Transparent")
-        if mat.use_transparency: row.prop(mat, "alpha")
-
-    row = box.row()
-    if mat.use_ogre_parent_material:
-        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='Parent Material:')
-        row.prop(mat, 'ogre_parent_material', text='')
-
-        #s = get_ogre_user_material( mat.ogre_parent_material )  # gets by name
-        #print(s,dir(s))
-
-    else:
-        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT')
-
-
-
-
 def ogre_material_panel_extra( parent, mat ):
     #box = parent.box()
     #box.prop(mat, 'ogre_scene_blend')
     box = parent.box()
     box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline', icon='LAMP_SUN' )
     if mat.use_fixed_pipeline:
-        if mat.use_shadeless:
+        row = box.row()
+        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
+        row.prop(mat, "use_shadeless")
+
+        if mat.use_shadeless and not mat.use_vertex_color_paint:
             row = box.row()
             row.prop(mat, "diffuse_color", text='Color')
-        else:
+        elif not mat.use_shadeless:
             if not mat.use_vertex_color_paint:
                 row = box.row()
                 row.prop(mat, "diffuse_color", text='Diffuse')
@@ -6037,9 +6023,6 @@ def ogre_material_panel_extra( parent, mat ):
             row = box.row()
             row.prop(mat, "emit")
 
-        row = box.row()
-        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
-        row.prop(mat, "use_shadeless")
 
     box.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
     if mat.use_ogre_advanced_options:
@@ -6054,4 +6037,35 @@ def ogre_material_panel_extra( parent, mat ):
             box.prop(mat, tag)
 
         box = parent.box()
+
+
+def ogre_material_panel( parent, mat ):
+    box = parent.box()
+    box.prop(mat, 'ogre_scene_blend')
+    if mat.ogre_scene_blend and 'alpha' in mat.ogre_scene_blend:
+        row = box.row()
+        row.prop(mat, "use_transparency", text="Transparent")
+        if mat.use_transparency: row.prop(mat, "alpha")
+
+    row = box.row()
+    if mat.use_ogre_parent_material:
+        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='Parent Material:')
+        row.prop(mat, 'ogre_parent_material', text='')
+
+        s = get_ogre_user_material( mat.ogre_parent_material )  # gets by name
+        if s.vertex_programs or s.fragment_programs:
+            bx = box.box()
+            for name in s.vertex_programs:
+                bx.label( text=name )
+            for name in s.fragment_programs:
+                bx.label( text=name )
+
+            if s.texture_units:
+                bx = box.box()
+                for name in s.texture_units:
+                    bx.label( text=name )
+
+
+    else:
+        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT')
 
