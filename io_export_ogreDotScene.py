@@ -157,14 +157,14 @@ bpy.types.Material.ogre_transparent_sorting = EnumProperty(
 
 bpy.types.Material.ogre_illumination_stage = EnumProperty(
     items=[
-            ('none', 'none', 'autodetect'),
+            ('', '', 'autodetect'),
             ('ambient', 'ambient', 'ambient'),
             ('per_light', 'per_light', 'lights'),
             ('decal', 'decal', 'decal')
     ],
     name='illumination stage', 
     description='When using an additive lighting mode (SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE), the scene is rendered in 3 discrete stages, ambient (or pre-lighting), per-light (once per light, with shadowing) and decal (or post-lighting). Usually OGRE figures out how to categorise your passes automatically, but there are some effects you cannot achieve without manually controlling the illumination.', 
-    default='none'
+    default=''
 )
 
 
@@ -320,7 +320,7 @@ _IMAGE_FORMATS =  [     # for EnumProperty "FORCE_IMAGE_FORMAT"
 
 
 _CONFIG_DEFAULTS_ALL = {
-    'COPY_PARENT_MATERIAL' : True,
+    'COPY_SHADER_PROGRAMS' : True,
 
     'SWAP_AXIS' : 'xz-y',         # ogre standard
     'ONLY_ANIMATED_BONES' : False,
@@ -1742,7 +1742,7 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
             CONFIG['PATH'] = path
             data = ''
             for umat in umaterials:
-                data += generate_material( umat, path=path )
+                data += generate_material( umat, path ) # copies shader programs to path
             f=open( os.path.join( path, 'preview.material' ), 'wb' )
             f.write( bytes(data,'utf-8') ); f.close()
 
@@ -2609,10 +2609,10 @@ class _OgreCommonExport_( _TXML_ ):
     EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
     EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
 
-    EX_COPY_PARENT_MATERIAL = BoolProperty(
-        name="copy parent material", 
-        description="when using script inheritance copy the parent material into the generated .material script", 
-        default=CONFIG['COPY_PARENT_MATERIAL'])
+    EX_COPY_SHADER_PROGRAMS = BoolProperty(
+        name="copy shader programs", 
+        description="when using script inheritance copy the source shader programs to the output path", 
+        default=CONFIG['COPY_SHADER_PROGRAMS'])
 
     filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
 
@@ -2631,7 +2631,11 @@ class _OgreCommonExport_( _TXML_ ):
         for mat in mats:
             if mat is None: continue
             Report.materials.append( material_name(mat) )
-            data = self.gen_dot_material( mat, path, convert_textures=True )
+            if CONFIG['COPY_SHADER_PROGRAMS']:
+                data = generate_material( mat, path )
+            else:
+                data = generate_material( mat )
+
             M += data
             if self.EX_SEP_MATS:
                 url = self.dot_material_write_separate( mat, data, path )
@@ -2650,28 +2654,6 @@ class _OgreCommonExport_( _TXML_ ):
         f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
         print('saved', url)
         return url
-
-
-
-    @classmethod
-    def gen_dot_material( self, mat, path='/tmp', convert_textures=False ):
-        safename = material_name(mat)     # supports blender library linking
-        M = '// blender material: %s\n' %(mat.name)
-        M += 'material %s \n{\n'        %safename
-
-        if mat.use_shadows: M += indent(1, 'receive_shadows on')
-        else: M += indent(1, 'receive_shadows off')
-
-        M += indent(1, 'technique b2ogre_%s'%time.time(), '{' )    # technique GLSL
-
-        w = MaterialWrapper( mat )
-        header = w.get_header()
-        passes = w.get_passes()
-        M += '\n'.join( passes )
-        #M += self.gen_dot_material_pass( mat, path, convert_textures )
-        M += indent(1, '}' )    # end technique
-        M += '}\n'    # end material
-        return header + '\n' + M
 
 
 
@@ -4123,10 +4105,6 @@ Examples
 '''
 
 
-def material_name( mat ):
-    if type(mat) is str: return mat
-    elif not mat.library: return mat.name
-    else: return mat.name + mat.library.filepath.replace('/','_')
 
 
 
@@ -4965,9 +4943,14 @@ class OgreProgram(object):
     '''
     parses .program scripts
     saves bytes to copy later
+
+    self.name = name of program reference
+    self.source = name of shader program (.cg, .glsl)
+
     '''
     def save( self, path ):
-        f = open( os.path.join(path,self.name), 'wb' )
+        print('saving program to', path)
+        f = open( os.path.join(path,self.source), 'wb' )
         f.write(self.source_bytes )
         f.close()
     ######################################
@@ -5176,7 +5159,40 @@ class MaterialScripts(object):
 
 ############################################################################
 
-class OgreMaterialGenerator(object):
+class _image_processing_( object ):
+    def _reformat( self, image ): return image[ : image.rindex('.') ] + CONFIG['FORCE_IMAGE_FORMAT']
+    def image_magick( self, infile ):
+        print('[Image Magick Wrapper]', infile )
+        exe = CONFIG['IMAGE_MAGICK_CONVERT']
+        if not os.path.isfile( exe ):
+            Report.warnings.append( 'ImageMagick not installed!' )
+            print( 'ERROR: can not find Image Magick - convert', exe ); return
+        path,name = os.path.split( infile )
+        outfile = os.path.join( path, self._reformat( name ) )
+        opts = [ infile, outfile ]
+        subprocess.call( [exe]+opts )
+        print( 'image magick->', outfile )
+
+    def DDS_converter(self, infile ):
+        print('[NVIDIA DDS Wrapper]', infile )
+        exe = CONFIG['NVIDIATOOLS_EXE']
+        if not os.path.isfile( exe ):
+            Report.warnings.append( 'Nvidia DDS tools not installed!' )
+            print( 'ERROR: can not find nvdxt.exe', exe ); return
+        opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
+        path,name = os.path.split( infile )
+        outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
+        opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'): subprocess.call( ['/usr/bin/wine', exe]+opts )
+        else: subprocess.call( [exe]+opts )         ## TODO support OSX
+        data = open( '_tmp_.dds', 'rb' ).read()
+        f = open( outfile, 'wb' )
+        f.write(data)
+        f.close()
+
+
+
+class OgreMaterialGenerator( _image_processing_ ):
     def __init__(self, material ):
         self.material = material    # top level material
         self.passes = []
@@ -5186,12 +5202,23 @@ class OgreMaterialGenerator(object):
                 if node.material:
                     self.passes.append( node.material )
 
+    def get_active_programs(self):
+        r = []
+        for mat in self.passes:
+            if mat.use_ogre_parent_material and mat.ogre_parent_material:
+                usermat = get_ogre_user_material( mat.ogre_parent_material )
+                for prog in usermat.get_programs(): r.append( prog )
+        return r
+
     def get_header(self):
         r = []
         for mat in self.passes:
             if mat.use_ogre_parent_material and mat.ogre_parent_material:
                 usermat = get_ogre_user_material( mat.ogre_parent_material )
                 r.append( '//user material: %s' %usermat.name )
+                for prog in usermat.get_programs():
+                    r.append( prog.data )
+                r.append( '// abstract passes //' )
                 r += usermat.as_abstract_passes()
         return '\n'.join( r )
 
@@ -5206,7 +5233,7 @@ class OgreMaterialGenerator(object):
 
 
     def generate_pass( self, mat, pass_name=None ):
-        usermat = textnodes = None
+        usermat = texnodes = None
         if mat.use_ogre_parent_material and mat.ogre_parent_material:
             usermat = get_ogre_user_material( mat.ogre_parent_material )
             texnodes = bpyShaders.get_texture_subnodes( self.material, mat )
@@ -5272,13 +5299,21 @@ class OgreMaterialGenerator(object):
                 M += indent( 3, '%s %s' %(op,val) )
 
         if mat.use_fixed_pipeline:
-            for slot in slots: M += self.generate_texture_unit( slot.texture, slot=slot )
+            for slot in slots:
+                M += self.generate_texture_unit( slot.texture, slot=slot )
+
+        if texnodes and usermat.texture_units:
+            for i,name in enumerate(usermat.texture_units):
+                if i<len(texnodes):
+                    node = texnodes[i]
+                    if node.texture:
+                        M += self.generate_texture_unit( node.texture, name=name )
 
         M += indent(2, '}' )    # end pass
 
         return M
 
-    def generate_texture_unit(self, texture, texwrapper=None, slot=None):
+    def generate_texture_unit(self, texture, slot=None, name=None):
         if not hasattr(texture, 'image'):
             print('WARNING: texture must be of type IMAGE->', texture)
             return ''
@@ -5289,8 +5324,10 @@ class OgreMaterialGenerator(object):
         if slot and not slot.use: return ''
 
         path = CONFIG['PATH']
+
         M = ''; _alphahack = None
-        M += indent(3, 'texture_unit b2ogre_%s' %time.time(), '{' )
+        if not name: name = 'b2ogre_%s' %time.time()
+        M += indent(3, 'texture_unit %s' %name, '{' )
 
         if texture.library: # support library linked textures
             libpath = os.path.split( bpy.path.abspath(texture.library.filepath) )[0]
@@ -5304,13 +5341,7 @@ class OgreMaterialGenerator(object):
         ## packed images - dec10th 2010 ##
         if texture.image.packed_file:
             orig = texture.image.filepath
-            if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-                iurl = '/tmp/%s' %texname
-            else:
-                iurl = 'C:\\tmp\\%s' %texname
-                if not os.path.isdir( 'C:\\tmp' ):
-                    print('creating tmp directory' )
-                    os.makedirs( 'C:\\tmp' )
+            iurl = os.path.join(path, texname)
             if not os.path.isfile( iurl ):
                 print('MESSAGE: unpacking image: ', iurl)
                 texture.image.filepath = iurl
@@ -5334,10 +5365,8 @@ class OgreMaterialGenerator(object):
         elif exmode == 'CHECKER':
             M += indent(4, 'tex_address_mode mirror' )
 
-        if texwrapper:    # shader node options
-            M += texwrapper.get_texture_attributes()
 
-        elif slot:        # class blender material slot options
+        if slot:        # classic blender material slot options
             if exmode == 'CLIP': M += indent(4, 'tex_border_colour %s %s %s' %(slot.color.r, slot.color.g, slot.color.b) )    
             M += indent(4, 'scale %s %s' %(1.0/slot.scale.x, 1.0/slot.scale.y) )    # thanks Reyn
             if slot.texture_coords != 'UV':
@@ -5359,7 +5388,6 @@ class OgreMaterialGenerator(object):
             if slot.use_map_scatter:    # hijacked from volume shaders
                 M += indent(4, 'scroll_anim %s %s ' %(slot.density_factor, slot.emission_factor) )
 
-
             ## set uv layer
             if slot.uv_layer:
                 idx = find_uv_layer_index( self.material, slot.uv_layer )
@@ -5371,10 +5399,10 @@ class OgreMaterialGenerator(object):
 
             btype = slot.blend_type
 
-            if rgba and slot.use_stencil:
-                texop =     'blend_current_alpha'        # 'blend_texture_alpha' shadeless
+            if rgba and slot.use_stencil:              # TODO - fix this hack when slots support pyRNA
+                texop = 'blend_current_alpha'        # 'blend_texture_alpha' shadeless
             elif btype == 'MIX':
-                texop = 'add_signed'    #'blend_manual'  # problem with blend manual it kills shading at 1.0
+                texop = 'blend_manual'
             elif btype == 'MULTIPLY':
                 texop = 'modulate'
             elif btype == 'SCREEN':
@@ -5386,29 +5414,19 @@ class OgreMaterialGenerator(object):
             elif btype == 'SUBTRACT':
                 texop = 'subtract'
             elif btype == 'OVERLAY':
-                texop = 'blend_manual'  #'add_signed'        
+                texop = 'add_signed'
             elif btype == 'DIFFERENCE':
                 texop = 'dotproduct'        # nothing closely matches blender
             else:
                 texop = 'blend_diffuse_colour'
 
-            # add_smooth not very useful?
-            #factor = .0
-            #if slot.use_map_color_diffuse:
             factor = 1.0 - slot.diffuse_color_factor
-
-            #M += indent(4, 'alpha_op_ex source1 src_manual src_current %s' %factor )
-            #M += indent(4, 'alpha_op_ex modulate src_texture src_manual %s' %factor )
-            #M += indent(4, 'alpha_op_ex subtract src_manual src_current %s' %factor )
 
             if texop == 'blend_manual':
                 M += indent(4, 'colour_op_ex %s src_current src_texture %s' %(texop, factor) )
             else:
-                #M += indent(4, 'colour_op_ex %s src_manual src_current %s' %(texop, factor) )
                 M += indent(4, 'colour_op_ex %s src_texture src_current' %texop )
                 #M += indent(4, 'colour_op_ex blend_current_alpha src_texture src_current' )
-
-
                 #M += indent(4, 'colour_op_ex %s src_manual src_diffuse %s' %(texop, 1.0-factor) )
                 #M += indent(4, 'alpha_op_ex blend_manual src_current src_current %s' %factor )
             if slot.use_map_alpha:
@@ -5416,9 +5434,6 @@ class OgreMaterialGenerator(object):
                 #M += indent(4, 'colour_op_ex blend_manual src_current src_texture %s' %factor )
                 M += indent(4, 'alpha_op_ex modulate src_current src_texture' )
 
-
-        #else:        # fallback to default options
-        #    M += indent(4, 'filtering trilinear' )
 
         M += indent(3, '}' )    # end texture
 
@@ -5438,37 +5453,6 @@ class OgreMaterialGenerator(object):
         return M
 
 
-class MaterialWrapper( OgreMaterialGenerator ):
-    ############################################
-    def _reformat( self, image ): return image[ : image.rindex('.') ] + CONFIG['FORCE_IMAGE_FORMAT']
-    def image_magick( self, infile ):
-        print('[Image Magick Wrapper]', infile )
-        exe = CONFIG['IMAGE_MAGICK_CONVERT']
-        if not os.path.isfile( exe ):
-            Report.warnings.append( 'ImageMagick not installed!' )
-            print( 'ERROR: can not find Image Magick - convert', exe ); return
-        path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat( name ) )
-        opts = [ infile, outfile ]
-        subprocess.call( [exe]+opts )
-        print( 'image magick->', outfile )
-
-    def DDS_converter(self, infile ):
-        print('[NVIDIA DDS Wrapper]', infile )
-        exe = CONFIG['NVIDIATOOLS_EXE']
-        if not os.path.isfile( exe ):
-            Report.warnings.append( 'Nvidia DDS tools not installed!' )
-            print( 'ERROR: can not find nvdxt.exe', exe ); return
-        opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
-        path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
-        opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'): subprocess.call( ['/usr/bin/wine', exe]+opts )
-        else: subprocess.call( [exe]+opts )         ## TODO support OSX
-        data = open( '_tmp_.dds', 'rb' ).read()
-        f = open( outfile, 'wb' )
-        f.write(data)
-        f.close()
 
 
 
@@ -5479,16 +5463,36 @@ class MaterialWrapper( OgreMaterialGenerator ):
 
 #####################################################################################
 ###################################### Public API #####################################
+def material_name( mat ):
+    if type(mat) is str: return mat
+    elif not mat.library: return mat.name
+    else: return mat.name + mat.library.filepath.replace('/','_')
+
 
 def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
     ''' returns materials used by the mesh '''
     return dot_mesh( ob, path, force_name, ignore_shape_animation, opts, normals )
 
 
-def generate_material( mat, path='/tmp' ):
+def generate_material( mat, copy_programs_to_path=None ):
     ''' returns generated material string '''
-    return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
+    safename = material_name(mat)     # supports blender library linking
+    M = '// blender material: %s\n' %(mat.name)
+    M += 'material %s \n{\n'        %safename
+    if mat.use_shadows: M += indent(1, 'receive_shadows on')
+    else: M += indent(1, 'receive_shadows off')
+    M += indent(1, 'technique b2ogre_%s'%time.time(), '{' )    # technique GLSL, CG
+    w = OgreMaterialGenerator( mat )
+    if copy_programs_to_path:
+        progs = w.get_active_programs()
+        for prog in progs: prog.save( copy_programs_to_path )
 
+    header = w.get_header()
+    passes = w.get_passes()
+    M += '\n'.join( passes )
+    M += indent(1, '}' )    # end technique
+    M += '}\n'    # end material
+    return header + '\n' + M
 
 def get_ogre_user_material( name ):
     #print('get_ogre_user_material(%s)'%name)
@@ -5524,6 +5528,7 @@ def parse_material_and_program_scripts( path, scripts, progs, missing ):   # rec
                 for line in data.splitlines():
                     line = line.split('//')[0]
                     if line.startswith('}'):
+                        chk.append( line )
                         chk = []; chunks.append( chk )
                     elif line.strip():
                         chk.append( line )
