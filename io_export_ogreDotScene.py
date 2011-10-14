@@ -5029,6 +5029,7 @@ class OgreMaterialScript(object):
         self.vertex_programs = {}
         self.fragment_programs = {}
         self.texture_units = {}
+        self.passes = []
 
         line = self.data.splitlines()[0]
         assert line.startswith('material')
@@ -5043,22 +5044,28 @@ class OgreMaterialScript(object):
         tex = None  # pick up texture_unit options, require "texture" ?
         for line in self.data.splitlines():
             #print( line )
+            rawline = line
             line = line.split('//')[0]
             line = line.strip()
             if not line: continue
 
-            if line == '{': brace += 1; continue
-            elif line == '}': brace -= 1; prog = None; tex = None; continue
+            if line == '{': brace += 1
+            elif line == '}': brace -= 1; prog = None; tex = None
 
             if line.startswith( 'technique' ):
                 tech = {'passes':[]}; techs.append( tech )
                 if len(line.split()) > 1: tech['technique-name'] = line.split()[-1]
             elif techs:
                 if line.startswith('pass'):
-                    P = {'texture_units':[], 'vprogram':None, 'fprogram':None}
+                    P = {'texture_units':[], 'vprogram':None, 'fprogram':None, 'body':[]}
                     tech['passes'].append( P )
+                    self.passes.append( P )
+
                 elif tech['passes']:
                     P = tech['passes'][-1]
+                    P['body'].append( rawline )
+
+                    if line == '{' or line == '}': continue
 
                     if line.startswith('vertex_program_ref'):
                         prog = P['vprogram'] = {'name':line.split()[-1], 'params':{}}
@@ -5097,6 +5104,8 @@ class OgreMaterialScript(object):
                     elif tex:   # (not used)
                         tex['params'][ line.split()[0] ] = line.split()[ 1 : ]
 
+        for P in self.passes: P['body'] = '\n'.join( P['body'] )
+
         #print( self.techniques )
         self.hidden_texture_units = rem = []
         for tex in self.texture_units.values():
@@ -5105,6 +5114,16 @@ class OgreMaterialScript(object):
         for tex in rem:
             self.texture_units.pop( tex['name'] )
 
+        if len(self.techniques)>1:
+            print('WARNING: user material %s has more than one technique' %self.url)
+
+
+    def as_abstract_passes( self ):
+        r = []
+        for i,P in enumerate(self.passes):
+            head = 'abstract pass %s/PASS%s' %(self.name,i)
+            r.append( head + '\n' + P['body'] )
+        return r
 
 
 class MaterialScripts(object):
@@ -5155,7 +5174,8 @@ class MaterialScripts(object):
         )
 
 
-####################################end private ########################################
+############################################################################
+
 class OgreMaterialGenerator(object):
     def __init__(self, material ):
         self.material = material    # top level material
@@ -5166,7 +5186,16 @@ class OgreMaterialGenerator(object):
                 if node.material:
                     self.passes.append( node.material )
 
-    def get_header(self): return '//TODO'
+    def get_header(self):
+        r = []
+        for mat in self.passes:
+            if mat.use_ogre_parent_material and mat.ogre_parent_material:
+                usermat = get_ogre_user_material( mat.ogre_parent_material )
+                r.append( '//user material: %s' %usermat.name )
+                r += usermat.as_abstract_passes()
+        return '\n'.join( r )
+
+
     def get_passes(self):
         r = []
         r.append( self.generate_pass(self.material) )
@@ -5185,7 +5214,7 @@ class OgreMaterialGenerator(object):
         M = ''
         if not pass_name: pass_name = 'b2ogre_%s'%time.time()
         if usermat:
-            M += indent(2, 'pass %s : %s' %(pass_name,usermat.name), '{' )
+            M += indent(2, 'pass %s : %s/PASS0' %(pass_name,usermat.name), '{' )
         else:
             M += indent(2, 'pass %s'%pass_name, '{' )
 
