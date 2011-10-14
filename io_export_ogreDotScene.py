@@ -486,6 +486,16 @@ material _missing_material_
 
 
 ############# helper functions ##############
+def find_uv_layer_index( material, uvname ):
+    idx = 0
+    for mesh in bpy.data.meshes:
+        if material.name in mesh.materials:
+            if mesh.uv_textures:
+                names = [ uv.name for uv in mesh.uv_textures ]
+                if uvname in names:
+                    idx = names.index( uvname )
+                    break   # should we check all objects using material and enforce the same index?
+    return idx
 
 def has_property( a, name ):
     for prop in a.items():
@@ -1642,515 +1652,9 @@ class Ogre_Texture_Panel(bpy.types.Panel):
         row.prop(slot, "emission_color_factor", text="")
         row.prop(slot, "use_from_dupli", text="")
 
-
-
-def find_uv_layer_index( material, uvname ):
-    idx = 0
-    for mesh in bpy.data.meshes:
-        if material.name in mesh.materials:
-            if mesh.uv_textures:
-                names = [ uv.name for uv in mesh.uv_textures ]
-                if uvname in names:
-                    idx = names.index( uvname )
-                    break   # should we check all objects using material and enforce the same index?
-    return idx
-
-
-def guess_uv_layer( layer ):    # DEPRECATED - this fails because the users will often change the UV name
-    ## small issue: in blender layer is a string, multiple objects may have the same material assigned, 
-    ## but having different named UVTex slots, most often the user will never rename these so they get
-    ## named UVTex.000 etc...   assume this to always be true.
-    idx = 0
-    if '.' in layer:
-        a = layer.split('.')[-1]
-        if a.isdigit(): idx = int(a)+1
-        else: print('WARNING: it is not allowed to give custom names to UVTexture channels ->', layer)
-    return idx
-
-
 ###################
 
 
-class _MatNodes_(object):       # Material Node methods
-    def ancestors(self):
-        if not self.parents: return []
-        else: c = []; self._ancestors(c); return c
-    def _ancestors(self, c):
-        for p in self.parents: c.append( p ); p._ancestors( c )
-
-    def decendents(self):
-        if not self.children: return []
-        else: c = []; self._decendents(c); return c
-    def _decendents(self, c):
-        for p in self.children: c.append( p ); p._decendents( c )
-
-    def is_ogre_branch( self ):
-        ancestors = []
-        self._ancestors( ancestors )
-        for parent in ancestors:
-            if parent.node.name == ShaderTree.Output.name: return True
-        print('node not in ogre branch', self.node)
-
-
-    ## returns height sorted materials, 'passes' in Ogre speak ##
-    # called after tree=ShaderTree.parse( nodedmat ); mats=tree.get_passes()
-    def get_passes( self ):
-        mats = []
-        for mat in ShaderTree.Materials:
-            print('            checking material ancestors:', mat)
-            # only consider materials that are connected to the ogre Output
-            #if self.Output in ancestors:
-            if mat.is_ogre_branch():
-                print('            material is in ogre branch->', mat)
-                mats.append( mat )
-        mats.sort( key=lambda x: x.node.location.y, reverse=True )
-        if not mats: print('WARNING: no materials connected to Output node')
-        ## collect and sort textures of a material ##
-        for mat in mats:
-            mat.textures = []
-            d = mat.decendents()
-            for child in d:
-                if child.node.type == 'TEXTURE': mat.textures.append( child )
-            mat.textures.sort( key=lambda x: x.node.location.y, reverse=True )
-        return mats
-
-    def get_texture_attributes(self):
-        M = ''
-        ops = {}
-        for prop in self.node.texture.items():
-            name,value = prop
-            ops[name]=value
-            M += indent(4, '%s %s' %prop )
-
-        d = self.decendents()
-        for child in d:
-            if child.type == 'GEOMETRY' and child.node.uv_layer:
-                idx = guess_uv_layer( child.node.uv_layer )
-                M += indent(4, 'tex_coord_set %s' %idx)
-
-            elif child.type == 'MAPPING':
-                snode = child.node
-                x,y,z = snode.location            # bpy bug, mapping node has two .location attrs
-                if x or y:
-                    M += indent(4, 'scroll %s %s' %(x,y))
-                angle = math.degrees(snode.rotation.x)
-                if angle:
-                    M += indent(4, 'rotate %s' %angle)
-                x,y,z = snode.scale
-                if x != 1.0 or y != 1.0:
-                    M += indent(4, 'scale %s %s' %(1.0/x,1.0/y))    # reported by Sanni and Reyn
-
-        return M
-
-
-
-class ShaderTree( _MatNodes_ ):
-    Materials = []
-    Output = None
-
-    @staticmethod
-    def is_valid_node_material( mat ):  # just incase the user enabled nodes but didn't do anything, then disabled nodes
-        if mat.node_tree and len(mat.node_tree.nodes):
-            for node in mat.node_tree.nodes:
-                if node.type == 'MATERIAL':
-                    if node.material: return True
-
-    @staticmethod
-    def parse( mat ):        # only called for noded materials
-        print('        parsing node_tree')
-        ShaderTree.Materials = []
-        ShaderTree.Output = None
-        outputs = []
-        for link in mat.node_tree.links:
-            if link.to_node and link.to_node.type == 'OUTPUT': outputs.append( link )
-
-        root = None
-        for link in outputs:
-            if root is None or link.to_node.name.lower().startswith('ogre'): root = link
-        if root:
-            ShaderTree.Output = root.to_node
-            print('setting Output node', root.to_node)
-            #tree = ShaderTree( root.from_node, mat )
-            #tree.parents.append( root.to_node )
-            tree = ShaderTree( node=root.to_node, parent_material=mat )
-            return tree
-        else:
-            print('warning: no Output shader node found')
-
-    def __init__(self, node=None, material=None, parent_material=None ):
-        if node: print('        shader node ->', node)
-        if node and node.type.startswith('MATERIAL'):
-            assert 0    # DEPRECATED - TODO clean up
-            ShaderTree.Materials.append( self )
-            self.material = node.material
-        elif material:        # standard material
-            self.material = material
-            self.textures = []
-
-        self.node = node
-        if node:
-            self.type = node.type
-            self.name = node.name
-        self.children = []
-        self.parents = []
-        self.inputs = {}        # socket name : child
-        self.outputs = {}    # parent : socket name
-        #if parent_material:
-        if False:   # DEPRECATED - TODO cleanup
-            for link in parent_material.node_tree.links:
-                if link.to_node and link.to_node.name == self.name:
-                    branch = ShaderTree(
-                        node=link.from_node, 
-                        parent_material=parent_material
-                    )
-                    self.children.append( branch )
-                    self.inputs[ link.to_socket.name ] = branch
-                    branch.outputs[ self ] = link.from_socket.name
-                    branch.parents.append( self )
-
-
-    def dotmat_texture(self, texture, texwrapper=None, slot=None):
-        if not hasattr(texture, 'image'):
-            print('WARNING: texture must be of type IMAGE->', texture)
-            return ''
-        if not texture.image:
-            print('WARNING: texture has no image assigned->', texture)
-            return ''
-        #if slot: print(dir(slot))
-        if slot and not slot.use: return ''
-
-        path = CONFIG['PATH']
-        M = ''; _alphahack = None
-        M += indent(3, 'texture_unit b2ogre_%s' %time.time(), '{' )
-
-        if texture.library: # support library linked textures
-            libpath = os.path.split( bpy.path.abspath(texture.library.filepath) )[0]
-            iurl = bpy.path.abspath( texture.image.filepath, libpath )
-        else:
-            iurl = bpy.path.abspath( texture.image.filepath )
-
-        postname = texname = os.path.split(iurl)[-1]
-        destpath = path
-
-        ## packed images - dec10th 2010 ##
-        if texture.image.packed_file:
-            orig = texture.image.filepath
-            if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
-                iurl = '/tmp/%s' %texname
-            else:
-                iurl = 'C:\\tmp\\%s' %texname
-                if not os.path.isdir( 'C:\\tmp' ):
-                    print('creating tmp directory' )
-                    os.makedirs( 'C:\\tmp' )
-            if not os.path.isfile( iurl ):
-                print('MESSAGE: unpacking image: ', iurl)
-                texture.image.filepath = iurl
-                texture.image.save()
-                texture.image.filepath = orig
-            else:
-                print('MESSAGE: packed image already in temp, not updating', iurl)
-
-        if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
-            postname = self._reformat( texname )
-
-        M += indent(4, 'texture %s' %postname )    
-
-        exmode = texture.extension
-        if exmode == 'REPEAT':
-            M += indent(4, 'tex_address_mode wrap' )
-        elif exmode == 'EXTEND':
-            M += indent(4, 'tex_address_mode clamp' )
-        elif exmode == 'CLIP':
-            M += indent(4, 'tex_address_mode border' )
-        elif exmode == 'CHECKER':
-            M += indent(4, 'tex_address_mode mirror' )
-
-        if texwrapper:    # shader node options
-            M += texwrapper.get_texture_attributes()
-
-        elif slot:        # class blender material slot options
-            if exmode == 'CLIP': M += indent(4, 'tex_border_colour %s %s %s' %(slot.color.r, slot.color.g, slot.color.b) )    
-            M += indent(4, 'scale %s %s' %(1.0/slot.scale.x, 1.0/slot.scale.y) )    # thanks Reyn
-            if slot.texture_coords != 'UV':
-                if slot.mapping == 'SPHERE':
-                    M += indent(4, 'env_map spherical' )
-                elif slot.mapping == 'FLAT':
-                    M += indent(4, 'env_map planar' )
-                else: print('WARNING: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' %(texture.name, slot.mapping))
-
-            ox,oy,oz = slot.offset
-            if ox or oy:
-                M += indent(4, 'scroll %s %s' %(ox,oy) )
-            if oz:
-                M += indent(4, 'rotate %s' %oz )
-
-            #if slot.use_map_emission:    # problem, user will want to use emission sometimes
-            if slot.use_from_dupli:    # hijacked again - june7th
-                M += indent(4, 'rotate_anim %s' %slot.emission_color_factor )
-            if slot.use_map_scatter:    # hijacked from volume shaders
-                M += indent(4, 'scroll_anim %s %s ' %(slot.density_factor, slot.emission_factor) )
-
-
-            ## set uv layer
-            if slot.uv_layer:
-                idx = find_uv_layer_index( self.material, slot.uv_layer )
-                #idx = guess_uv_layer( slot.uv_layer )
-                M += indent(4, 'tex_coord_set %s' %idx)
-
-            rgba = False
-            if texture.image.depth == 32: rgba = True
-
-            btype = slot.blend_type
-
-            if rgba and slot.use_stencil:
-                texop =     'blend_current_alpha'        # 'blend_texture_alpha' shadeless
-            elif btype == 'MIX':
-                texop = 'add_signed'    #'blend_manual'  # problem with blend manual it kills shading at 1.0
-            elif btype == 'MULTIPLY':
-                texop = 'modulate'
-            elif btype == 'SCREEN':
-                texop = 'modulate_x2'
-            elif btype == 'LIGHTEN':
-                texop = 'modulate_x4'
-            elif btype == 'ADD':
-                texop = 'add'
-            elif btype == 'SUBTRACT':
-                texop = 'subtract'
-            elif btype == 'OVERLAY':
-                texop = 'blend_manual'  #'add_signed'        
-            elif btype == 'DIFFERENCE':
-                texop = 'dotproduct'        # nothing closely matches blender
-            else:
-                texop = 'blend_diffuse_colour'
-
-            # add_smooth not very useful?
-            #factor = .0
-            #if slot.use_map_color_diffuse:
-            factor = 1.0 - slot.diffuse_color_factor
-
-            #M += indent(4, 'alpha_op_ex source1 src_manual src_current %s' %factor )
-            #M += indent(4, 'alpha_op_ex modulate src_texture src_manual %s' %factor )
-            #M += indent(4, 'alpha_op_ex subtract src_manual src_current %s' %factor )
-
-            if texop == 'blend_manual':
-                M += indent(4, 'colour_op_ex %s src_current src_texture %s' %(texop, factor) )
-            else:
-                #M += indent(4, 'colour_op_ex %s src_manual src_current %s' %(texop, factor) )
-                M += indent(4, 'colour_op_ex %s src_texture src_current' %texop )
-                #M += indent(4, 'colour_op_ex blend_current_alpha src_texture src_current' )
-
-
-                #M += indent(4, 'colour_op_ex %s src_manual src_diffuse %s' %(texop, 1.0-factor) )
-                #M += indent(4, 'alpha_op_ex blend_manual src_current src_current %s' %factor )
-            if slot.use_map_alpha:
-                #alphafactor = 1.0 - slot.alpha_factor
-                #M += indent(4, 'colour_op_ex blend_manual src_current src_texture %s' %factor )
-                M += indent(4, 'alpha_op_ex modulate src_current src_texture' )
-
-
-        #else:        # fallback to default options
-        #    M += indent(4, 'filtering trilinear' )
-
-        M += indent(3, '}' )    # end texture
-
-        if CONFIG['TOUCH_TEXTURES']:
-            ## copy texture only if newer ##
-            if not os.path.isfile( iurl ): Report.warnings.append( 'missing texture: %s' %iurl )
-            else:
-                desturl = os.path.join( destpath, texname )
-                if not os.path.isfile( desturl ) or os.stat( desturl ).st_mtime < os.stat( iurl ).st_mtime:
-                    f = open( desturl, 'wb' )
-                    f.write( open(iurl,'rb').read() )
-                    f.close()
-                if CONFIG['FORCE_IMAGE_FORMAT']:        # bug fix jan7th 2011
-                    if CONFIG['FORCE_IMAGE_FORMAT'] == '.dds': self.DDS_converter( desturl )
-                    else: self.image_magick( desturl )
-
-        return M
-
-
-    ## this writes multiple passes ##
-    def dotmat_pass(self):    # must be a standard-material
-        if not self.material:
-            print('ERROR: material node with no submaterial block chosen')
-            return ''
-
-        passes = []
-        passes.append( self._helper_dotmat_pass( self.material ) )
-        ########## Material Layers ###########
-        if self.material.use_material_passes:
-            nodes = bpyShaders.get_or_create_material_passes( self.material )
-            for i,node in enumerate(nodes):
-                if node.material and node.material.use_in_ogre_material_pass:
-                    s = self._helper_dotmat_pass(node.material, pass_name='b2ogre_pass%s'%str(i))
-                    print( s )
-                    passes.append( s )
-
-        return '\n'.join( passes )
-
-    def _helper_dotmat_pass( self, mat, pass_name=None ):
-        color = mat.diffuse_color
-        alpha = 1.0
-        if mat.use_transparency: alpha = mat.alpha
-
-        ## textures ##
-        if not self.textures:        ## class style materials
-            slots = get_image_textures( mat )        # returns texture_slot object
-            print('*'*80)
-            print('TEXTURE SLOTS', slots)
-            print('*'*80)
-            usealpha = False
-            for slot in slots:
-                if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
-            if usealpha: alpha = 1.0    # reported by f00bar june 18th
-
-        def _helper( child, opname, f ):        # python note, define inline function shares variables - copies?
-            if child.type == 'RGB':
-                print('warning: RGB shader node bpy rna is incomplete, missing color attributes' )
-                return indent(3, '%s %s %s %s %s' %(opname, color.r*f, color.g*f, color.b*f, alpha) )
-            elif child.type == 'GEOMETRY':
-                if child.outputs[self] != 'Vertex Color': print('warning: you are supposed to connect the vertex color output of geometry')
-                return indent(3, '%s vertexcolour' %opname)
-            elif child.type == 'TEXTURE':
-                print( 'TODO: connecting a texture to this slot will be supported for program-shaders in the future' )
-                #return indent(3, '%s 1.0 0.0 0.0 1.0' %opname)
-                return indent(3, '%s %s %s %s %s' %(opname, color.r*f, color.g*f, color.b*f, alpha) )
-
-        M = ''
-        if pass_name:
-            M += indent(2, 'pass %s'%pass_name, '{' )
-
-        elif self.node:        # ogre combines passes with the same name, be careful!   # TODO DEPRECATED
-            passname = '%s__%s' %(self.node.name,material_name(mat))
-            passname = passname.replace(' ','_')
-            M += indent(2, 'pass %s' %passname, '{' )        # be careful with pass names
-        else:
-            M += indent(2, 'pass b2ogre_%s'%time.time(), '{' )
-
-
-        if mat.use_fixed_pipeline:
-            f = mat.ambient
-            if 'Ambient' in self.inputs:
-                child = self.inputs['Ambient']
-                M += _helper( child, 'ambient', f )
-            elif mat.use_vertex_color_paint:
-                M += indent(3, 'ambient vertexcolour' )
-            else:        # fall back to basic material
-                M += indent(3, 'ambient %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
-
-            f = mat.diffuse_intensity
-            if 'Color' in self.inputs:
-                child = self.inputs['Color']
-                M += _helper( child, 'diffuse', f )
-            elif mat.use_vertex_color_paint:
-                M += indent(3, 'diffuse vertexcolour' )
-            else:        # fall back to basic material 
-                M += indent(3, 'diffuse %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
-
-            f = mat.specular_intensity
-            if 'Spec' in self.inputs:
-                child = self.inputs['Spec']
-                M += _helper( child, 'specular', f ) + ' %s'%(mat.specular_hardness/4.0)
-            else:
-                s = mat.specular_color
-                M += indent(3, 'specular %s %s %s %s %s' %(s.r*f, s.g*f, s.b*f, alpha, mat.specular_hardness/4.0) )
-
-            f = mat.emit        # remains valid even if material_ex inputs a color node
-            if 'Emit' in self.inputs:
-                child = self.inputs['Emit']
-                M += _helper( child, 'emissive', f )
-            elif mat.use_vertex_color_light:
-                M += indent(3, 'emissive vertexcolour' )
-            elif mat.use_shadeless:     # requested by Borris
-                M += indent(3, 'emissive %s %s %s 1.0' %(color.r, color.g, color.b) )
-            else:
-                M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
-
-        #M += indent( 3, 'scene_blend %s' %mat.ogre_scene_blend )
-        for name in dir(mat):   #mat.items():
-            if name.startswith('ogre_') and name not in 'ogre_parent_material ogre_depth_write'.split():
-                var = getattr(mat,name)
-                op = name.replace('ogre_', '')
-                val = var
-                if type(var) == bool:
-                    if var: val = 'on'
-                    else: val = 'off'
-                M += indent( 3, '%s %s' %(op,val) )
-
-        usealpha = mat.ogre_depth_write
-        ## textures ##
-        if not self.textures:  # force depth write off if textures use alpha
-            slots = get_image_textures( mat )        # returns texture_slot object
-            for slot in slots:
-                #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
-                if slot.use_map_alpha: usealpha = True; break
-        if usealpha:
-            #if mat.use_transparency:
-            M += indent(3, 'depth_write off' )  # default is on
-
-
-        if not self.textures:   # classic material
-            ## write shader programs before textures
-            #M += self._write_shader_programs( mat )
-            for slot in slots: M += self.dotmat_texture( slot.texture, slot=slot )
-
-        elif self.node:        # TODO redo shader nodes - new rule: unconnect only
-            M += self._write_shader_programs( mat )
-            for wrap in self.textures:
-                M += self.dotmat_texture( wrap.node.texture, texwrapper=wrap )
-
-        M += indent(2, '}' )    # end pass
-
-        return M
-
-
-
-
-    def _write_shader_programs( self, mat ):    # DEPRECATED TODO
-        M = ''
-        for prop in mat.items():
-            name,val = prop
-            if name in '_vprograms_ _fprograms_'.split():
-                for progname in val:
-                    if name=='_vprograms_':        # TODO over-ridden default params
-                        M += indent( 3, 'vertex_program_ref %s' %progname, '{', '}' )
-                    else:
-                        M += indent( 3, 'fragment_program_ref %s' %progname, '{', '}' )
-        return M
-
-
-
-
-    ############################################
-    def _reformat( self, image ): return image[ : image.rindex('.') ] + CONFIG['FORCE_IMAGE_FORMAT']
-    def image_magick( self, infile ):
-        print('[Image Magick Wrapper]', infile )
-        exe = CONFIG['IMAGE_MAGICK_CONVERT']
-        if not os.path.isfile( exe ):
-            Report.warnings.append( 'ImageMagick not installed!' )
-            print( 'ERROR: can not find Image Magick - convert', exe ); return
-        path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat( name ) )
-        opts = [ infile, outfile ]
-        subprocess.call( [exe]+opts )
-        print( 'image magick->', outfile )
-
-    def DDS_converter(self, infile ):
-        print('[NVIDIA DDS Wrapper]', infile )
-        exe = CONFIG['NVIDIATOOLS_EXE']
-        if not os.path.isfile( exe ):
-            Report.warnings.append( 'Nvidia DDS tools not installed!' )
-            print( 'ERROR: can not find nvdxt.exe', exe ); return
-        opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
-        path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
-        opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'): subprocess.call( ['/usr/bin/wine', exe]+opts )
-        else: subprocess.call( [exe]+opts )         ## TODO support OSX
-        data = open( '_tmp_.dds', 'rb' ).read()
-        f = open( outfile, 'wb' )
-        f.write(data)
-        f.close()
 
 
 
@@ -3151,44 +2655,23 @@ class _OgreCommonExport_( _TXML_ ):
 
     @classmethod
     def gen_dot_material( self, mat, path='/tmp', convert_textures=False ):
-
         safename = material_name(mat)     # supports blender library linking
         M = '// blender material: %s\n' %(mat.name)
-        if mat.use_ogre_parent_material and mat.ogre_parent_material:
-            omat = get_ogre_user_material( mat.ogre_parent_material )
-            if not CONFIG['COPY_PARENT_MATERIAL']:
-                M += 'import %s from "%s"\n' %(mat.ogre_parent_material, os.path.split(omat.url)[-1] )
-            else:
-                print('INSERTING USER MATERIAL PARENTS')
-                ## first write vertex/fragment program defs
-                for prog in omat.get_programs():
-                    print( prog )
-                    M += '\n%s\n' %prog.data
-                ## then write parent material def
-                M += '\n%s\n' %omat.data
-
-            M += 'material %s : %s \n{\n' %(safename, mat.ogre_parent_material)
-        else: M += 'material %s \n{\n'        %safename
+        M += 'material %s \n{\n'        %safename
 
         if mat.use_shadows: M += indent(1, 'receive_shadows on')
         else: M += indent(1, 'receive_shadows off')
 
         M += indent(1, 'technique b2ogre_%s'%time.time(), '{' )    # technique GLSL
-        M += self.gen_dot_material_pass( mat, path, convert_textures )
+
+        w = MaterialWrapper( mat )
+        header = w.get_header()
+        passes = w.get_passes()
+        M += '\n'.join( passes )
+        #M += self.gen_dot_material_pass( mat, path, convert_textures )
         M += indent(1, '}' )    # end technique
-
         M += '}\n'    # end material
-        return M
-
-    @classmethod
-    def gen_dot_material_pass( self, mat, path, convert_textures ):
-        print('GEN DOT MATERIAL...', mat)
-        CONFIG['PATH'] = path
-        M = ''
-        print('        STANDARD MATERIAL')
-        tree = ShaderTree( material=mat )
-        M += tree.dotmat_pass()
-        return M
+        return header + '\n' + M
 
 
 
@@ -5673,8 +5156,290 @@ class MaterialScripts(object):
 
 
 ####################################end private ########################################
+class OgreMaterialGenerator(object):
+    def __init__(self, material ):
+        self.material = material    # top level material
+        self.passes = []
+        if material.node_tree:
+            nodes = bpyShaders.get_subnodes( self.material.node_tree, type='MATERIAL_EXT' )
+            for node in nodes:
+                if node.material:
+                    self.passes.append( node.material )
+
+    def get_header(self): return '//TODO'
+    def get_passes(self):
+        r = []
+        r.append( self.generate_pass(self.material) )
+        for mat in self.passes:
+            if mat.use_in_ogre_material_pass:             # submaterials
+                r.append( self.generate_pass(mat) )
+        return r
 
 
+    def generate_pass( self, mat, pass_name=None ):
+        usermat = textnodes = None
+        if mat.use_ogre_parent_material and mat.ogre_parent_material:
+            usermat = get_ogre_user_material( mat.ogre_parent_material )
+            texnodes = bpyShaders.get_texture_subnodes( self.material, mat )
+
+        M = ''
+        if not pass_name: pass_name = 'b2ogre_%s'%time.time()
+        if usermat:
+            M += indent(2, 'pass %s : %s' %(pass_name,usermat.name), '{' )
+        else:
+            M += indent(2, 'pass %s'%pass_name, '{' )
+
+        color = mat.diffuse_color
+        alpha = 1.0
+        usealpha = mat.ogre_depth_write
+
+        if mat.use_transparency: alpha = mat.alpha
+
+        slots = get_image_textures( mat )        # returns texture_slot objects (CLASSIC MATERIAL)
+        for slot in slots:
+            #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
+            if slot.texture.use_alpha: usealpha = True; break
+
+        ## force material alpha to 1.0 if textures use_alpha?
+        #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
+
+        if mat.use_fixed_pipeline:
+            f = mat.ambient
+            if mat.use_vertex_color_paint:
+                M += indent(3, 'ambient vertexcolour' )
+            else:        # fall back to basic material
+                M += indent(3, 'ambient %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
+
+            f = mat.diffuse_intensity
+            if mat.use_vertex_color_paint:
+                M += indent(3, 'diffuse vertexcolour' )
+            else:        # fall back to basic material 
+                M += indent(3, 'diffuse %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
+
+            f = mat.specular_intensity
+            s = mat.specular_color
+            M += indent(3, 'specular %s %s %s %s %s' %(s.r*f, s.g*f, s.b*f, alpha, mat.specular_hardness/4.0) )
+
+            f = mat.emit
+            if mat.use_shadeless:     # requested by Borris
+                M += indent(3, 'emissive %s %s %s 1.0' %(color.r, color.g, color.b) )
+            elif mat.use_vertex_color_light:
+                M += indent(3, 'emissive vertexcolour' )
+            else:
+                M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
+
+        if usealpha:
+            #if mat.use_transparency:
+            M += indent(3, 'depth_write off' )  # default is on
+
+        for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
+            if name.startswith('ogre_') and name not in 'ogre_parent_material ogre_depth_write'.split():
+                var = getattr(mat,name)
+                op = name.replace('ogre_', '')
+                val = var
+                if type(var) == bool:
+                    if var: val = 'on'
+                    else: val = 'off'
+                M += indent( 3, '%s %s' %(op,val) )
+
+        if mat.use_fixed_pipeline:
+            for slot in slots: M += self.generate_texture_unit( slot.texture, slot=slot )
+
+        M += indent(2, '}' )    # end pass
+
+        return M
+
+    def generate_texture_unit(self, texture, texwrapper=None, slot=None):
+        if not hasattr(texture, 'image'):
+            print('WARNING: texture must be of type IMAGE->', texture)
+            return ''
+        if not texture.image:
+            print('WARNING: texture has no image assigned->', texture)
+            return ''
+        #if slot: print(dir(slot))
+        if slot and not slot.use: return ''
+
+        path = CONFIG['PATH']
+        M = ''; _alphahack = None
+        M += indent(3, 'texture_unit b2ogre_%s' %time.time(), '{' )
+
+        if texture.library: # support library linked textures
+            libpath = os.path.split( bpy.path.abspath(texture.library.filepath) )[0]
+            iurl = bpy.path.abspath( texture.image.filepath, libpath )
+        else:
+            iurl = bpy.path.abspath( texture.image.filepath )
+
+        postname = texname = os.path.split(iurl)[-1]
+        destpath = path
+
+        ## packed images - dec10th 2010 ##
+        if texture.image.packed_file:
+            orig = texture.image.filepath
+            if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+                iurl = '/tmp/%s' %texname
+            else:
+                iurl = 'C:\\tmp\\%s' %texname
+                if not os.path.isdir( 'C:\\tmp' ):
+                    print('creating tmp directory' )
+                    os.makedirs( 'C:\\tmp' )
+            if not os.path.isfile( iurl ):
+                print('MESSAGE: unpacking image: ', iurl)
+                texture.image.filepath = iurl
+                texture.image.save()
+                texture.image.filepath = orig
+            else:
+                print('MESSAGE: packed image already in temp, not updating', iurl)
+
+        if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
+            postname = self._reformat( texname )
+
+        M += indent(4, 'texture %s' %postname )    
+
+        exmode = texture.extension
+        if exmode == 'REPEAT':
+            M += indent(4, 'tex_address_mode wrap' )
+        elif exmode == 'EXTEND':
+            M += indent(4, 'tex_address_mode clamp' )
+        elif exmode == 'CLIP':
+            M += indent(4, 'tex_address_mode border' )
+        elif exmode == 'CHECKER':
+            M += indent(4, 'tex_address_mode mirror' )
+
+        if texwrapper:    # shader node options
+            M += texwrapper.get_texture_attributes()
+
+        elif slot:        # class blender material slot options
+            if exmode == 'CLIP': M += indent(4, 'tex_border_colour %s %s %s' %(slot.color.r, slot.color.g, slot.color.b) )    
+            M += indent(4, 'scale %s %s' %(1.0/slot.scale.x, 1.0/slot.scale.y) )    # thanks Reyn
+            if slot.texture_coords != 'UV':
+                if slot.mapping == 'SPHERE':
+                    M += indent(4, 'env_map spherical' )
+                elif slot.mapping == 'FLAT':
+                    M += indent(4, 'env_map planar' )
+                else: print('WARNING: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' %(texture.name, slot.mapping))
+
+            ox,oy,oz = slot.offset
+            if ox or oy:
+                M += indent(4, 'scroll %s %s' %(ox,oy) )
+            if oz:
+                M += indent(4, 'rotate %s' %oz )
+
+            #if slot.use_map_emission:    # problem, user will want to use emission sometimes
+            if slot.use_from_dupli:    # hijacked again - june7th
+                M += indent(4, 'rotate_anim %s' %slot.emission_color_factor )
+            if slot.use_map_scatter:    # hijacked from volume shaders
+                M += indent(4, 'scroll_anim %s %s ' %(slot.density_factor, slot.emission_factor) )
+
+
+            ## set uv layer
+            if slot.uv_layer:
+                idx = find_uv_layer_index( self.material, slot.uv_layer )
+                #idx = guess_uv_layer( slot.uv_layer )
+                M += indent(4, 'tex_coord_set %s' %idx)
+
+            rgba = False
+            if texture.image.depth == 32: rgba = True
+
+            btype = slot.blend_type
+
+            if rgba and slot.use_stencil:
+                texop =     'blend_current_alpha'        # 'blend_texture_alpha' shadeless
+            elif btype == 'MIX':
+                texop = 'add_signed'    #'blend_manual'  # problem with blend manual it kills shading at 1.0
+            elif btype == 'MULTIPLY':
+                texop = 'modulate'
+            elif btype == 'SCREEN':
+                texop = 'modulate_x2'
+            elif btype == 'LIGHTEN':
+                texop = 'modulate_x4'
+            elif btype == 'ADD':
+                texop = 'add'
+            elif btype == 'SUBTRACT':
+                texop = 'subtract'
+            elif btype == 'OVERLAY':
+                texop = 'blend_manual'  #'add_signed'        
+            elif btype == 'DIFFERENCE':
+                texop = 'dotproduct'        # nothing closely matches blender
+            else:
+                texop = 'blend_diffuse_colour'
+
+            # add_smooth not very useful?
+            #factor = .0
+            #if slot.use_map_color_diffuse:
+            factor = 1.0 - slot.diffuse_color_factor
+
+            #M += indent(4, 'alpha_op_ex source1 src_manual src_current %s' %factor )
+            #M += indent(4, 'alpha_op_ex modulate src_texture src_manual %s' %factor )
+            #M += indent(4, 'alpha_op_ex subtract src_manual src_current %s' %factor )
+
+            if texop == 'blend_manual':
+                M += indent(4, 'colour_op_ex %s src_current src_texture %s' %(texop, factor) )
+            else:
+                #M += indent(4, 'colour_op_ex %s src_manual src_current %s' %(texop, factor) )
+                M += indent(4, 'colour_op_ex %s src_texture src_current' %texop )
+                #M += indent(4, 'colour_op_ex blend_current_alpha src_texture src_current' )
+
+
+                #M += indent(4, 'colour_op_ex %s src_manual src_diffuse %s' %(texop, 1.0-factor) )
+                #M += indent(4, 'alpha_op_ex blend_manual src_current src_current %s' %factor )
+            if slot.use_map_alpha:
+                #alphafactor = 1.0 - slot.alpha_factor
+                #M += indent(4, 'colour_op_ex blend_manual src_current src_texture %s' %factor )
+                M += indent(4, 'alpha_op_ex modulate src_current src_texture' )
+
+
+        #else:        # fallback to default options
+        #    M += indent(4, 'filtering trilinear' )
+
+        M += indent(3, '}' )    # end texture
+
+        if CONFIG['TOUCH_TEXTURES']:
+            ## copy texture only if newer ##
+            if not os.path.isfile( iurl ): Report.warnings.append( 'missing texture: %s' %iurl )
+            else:
+                desturl = os.path.join( destpath, texname )
+                if not os.path.isfile( desturl ) or os.stat( desturl ).st_mtime < os.stat( iurl ).st_mtime:
+                    f = open( desturl, 'wb' )
+                    f.write( open(iurl,'rb').read() )
+                    f.close()
+                if CONFIG['FORCE_IMAGE_FORMAT']:        # bug fix jan7th 2011
+                    if CONFIG['FORCE_IMAGE_FORMAT'] == '.dds': self.DDS_converter( desturl )
+                    else: self.image_magick( desturl )
+
+        return M
+
+
+class MaterialWrapper( OgreMaterialGenerator ):
+    ############################################
+    def _reformat( self, image ): return image[ : image.rindex('.') ] + CONFIG['FORCE_IMAGE_FORMAT']
+    def image_magick( self, infile ):
+        print('[Image Magick Wrapper]', infile )
+        exe = CONFIG['IMAGE_MAGICK_CONVERT']
+        if not os.path.isfile( exe ):
+            Report.warnings.append( 'ImageMagick not installed!' )
+            print( 'ERROR: can not find Image Magick - convert', exe ); return
+        path,name = os.path.split( infile )
+        outfile = os.path.join( path, self._reformat( name ) )
+        opts = [ infile, outfile ]
+        subprocess.call( [exe]+opts )
+        print( 'image magick->', outfile )
+
+    def DDS_converter(self, infile ):
+        print('[NVIDIA DDS Wrapper]', infile )
+        exe = CONFIG['NVIDIATOOLS_EXE']
+        if not os.path.isfile( exe ):
+            Report.warnings.append( 'Nvidia DDS tools not installed!' )
+            print( 'ERROR: can not find nvdxt.exe', exe ); return
+        opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
+        path,name = os.path.split( infile )
+        outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
+        opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'): subprocess.call( ['/usr/bin/wine', exe]+opts )
+        else: subprocess.call( [exe]+opts )         ## TODO support OSX
+        data = open( '_tmp_.dds', 'rb' ).read()
+        f = open( outfile, 'wb' )
+        f.write(data)
+        f.close()
 
 
 
@@ -5785,7 +5550,6 @@ def get_subcollisions(ob):
         if child.subcollision and child.name.startswith( prefix ):
             r.append( child )
     return r
-
 
 
 
