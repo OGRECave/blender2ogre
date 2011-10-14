@@ -359,7 +359,7 @@ _CONFIG_DEFAULTS_ALL = {
 
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE MYSHADERS_DIR SHADER_PROGRAMS'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS'.split()
 #_CONFIG_TAGS_.append( 'JMONKEY_ROOT' )
 
 
@@ -371,9 +371,8 @@ _CONFIG_DEFAULTS_WINDOWS = {
     'OGRE_MESHY' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
     'NVIDIATOOLS_EXE' : 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe',
-    'MYSHADERS_DIR' : 'C:\\Tundra2\\media\\materials',
+    'USER_MATERIALS' : 'C:\\Tundra2\\media\\materials',
     'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs',
-#    'TEMP_DIR' : 'C:\\tmp',
 }
 
 _CONFIG_DEFAULTS_UNIX = {
@@ -384,11 +383,12 @@ _CONFIG_DEFAULTS_UNIX = {
     'OGRE_MESHY' : '~/OgreMeshy/Ogre Meshy.exe',
     'IMAGE_MAGICK_CONVERT' : '/usr/bin/convert',
     'NVIDIATOOLS_EXE' : '~/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities',
-    'MYSHADERS_DIR' : '~/Tundra2/media/materials',
+    'USER_MATERIALS' : '~/Tundra2/media/materials',
     'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
-
-#    'TEMP_DIR' : '/tmp',
+#    'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
+#    'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
 }
+
 if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
     for tag in _CONFIG_DEFAULTS_UNIX:
         path = _CONFIG_DEFAULTS_UNIX[ tag ]
@@ -1745,10 +1745,8 @@ class _MatNodes_(object):       # Material Node methods
 
 
 class ShaderTree( _MatNodes_ ):
-
     Materials = []
     Output = None
-
 
     @staticmethod
     def is_valid_node_material( mat ):  # just incase the user enabled nodes but didn't do anything, then disabled nodes
@@ -1756,7 +1754,6 @@ class ShaderTree( _MatNodes_ ):
             for node in mat.node_tree.nodes:
                 if node.type == 'MATERIAL':
                     if node.material: return True
-
 
     @staticmethod
     def parse( mat ):        # only called for noded materials
@@ -2241,7 +2238,7 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
             CONFIG['PATH'] = path
             data = ''
             for umat in umaterials:
-                data += INFO_OT_createOgreExport.gen_dot_material( umat, path=path )
+                data += generate_material( umat, path=path )
             f=open( os.path.join( path, 'preview.material' ), 'wb' )
             f.write( bytes(data,'utf-8') ); f.close()
 
@@ -2249,7 +2246,7 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
 
         if sys.platform == 'linux2':
             if CONFIG['OGRE_MESHY'].endswith('.exe'):
-                cmd = [CONFIG['OGRE_MESHY'], 'c:\\tmp\\preview.mesh' ]
+                cmd = ['wine', CONFIG['OGRE_MESHY'], 'c:\\tmp\\preview.mesh' ]
             else:
                 cmd = [CONFIG['OGRE_MESHY'], '/tmp/preview.mesh']
             print( cmd )
@@ -2287,17 +2284,6 @@ def ogredoc( cls ):
 
 
 
-class ogre_dot_mat_preview(bpy.types.Menu):
-    bl_label = 'preview'
-    def draw(self, context):
-        layout = self.layout
-        mat = context.active_object.active_material
-        if mat:
-            CONFIG['TOUCH_TEXTURES'] = False
-            preview = INFO_OT_createOgreExport.gen_dot_material( mat )
-            for line in preview.splitlines():
-                if line.strip():
-                    for ww in wordwrap( line ): layout.label(text=ww)
 
 
 ############ USED BY DOCS ##########
@@ -3173,8 +3159,10 @@ class _OgreCommonExport_( _TXML_ ):
             if not CONFIG['COPY_PARENT_MATERIAL']:
                 M += 'import %s from "%s"\n' %(mat.ogre_parent_material, os.path.split(omat.url)[-1] )
             else:
+                print('INSERTING USER MATERIAL PARENTS')
                 ## first write vertex/fragment program defs
                 for prog in omat.get_programs():
+                    print( prog )
                     M += '\n%s\n' %prog.data
                 ## then write parent material def
                 M += '\n%s\n' %omat.data
@@ -5411,8 +5399,8 @@ def register():
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
 
-    if os.path.isdir( CONFIG['MYSHADERS_DIR'] ):
-        scripts,progs = update_parent_material_path( CONFIG['MYSHADERS_DIR'] )
+    if os.path.isdir( CONFIG['USER_MATERIALS'] ):
+        scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
         for prog in progs:
             print('ogre shader program', prog.name)
 
@@ -5597,10 +5585,13 @@ class OgreMaterialScript(object):
                         self.fragment_programs[ prog['name'] ] = prog
 
                     elif line.startswith('texture_unit'):
-                        tex = {'name':line.split()[-1], 'params':{}}
-                        P['texture_units'].append( tex )
-                        self.texture_units[ tex['name'] ] = tex
                         prog = None
+                        tex = {'name':line.split()[-1], 'params':{}}
+                        if tex['name'] == 'texture_unit': # ignore unnamed texture units
+                            print('WARNING: material %s contains unnamed texture_units' %self.name)
+                        else:
+                            P['texture_units'].append( tex )
+                            self.texture_units[ tex['name'] ] = tex
 
                     elif prog:
                         p = line.split()[0]
@@ -5639,7 +5630,13 @@ class MaterialScripts(object):
 
     def __init__(self, url):
         self.url = url
-        self.data = open( url, 'rb' ).read().decode('utf-8')
+        self.data = ''
+        data = open( url, 'rb' ).read()
+        try:
+            self.data = data.decode('utf-8')
+        except:
+            self.data = data.decode('latin-1')
+
         self.materials = {}
         ## chop up .material file, find all material defs ####
         mats = []
@@ -5694,7 +5691,7 @@ def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False,
     return dot_mesh( ob, path, force_name, ignore_shape_animation, opts, normals )
 
 
-def generate_material( mat, path ):
+def generate_material( mat, path='/tmp' ):
     ''' returns generated material string '''
     return INFO_OT_createOgreExport.gen_dot_material( mat, path=path )
 
@@ -5709,7 +5706,6 @@ def get_shader_program( name ):
         return OgreProgram.PROGRAMS[ name ]
     else:
         print('WARNING: no shader program named: %s' %name)
-        print( OgreProgram.PROGRAMS )
 
 def get_shader_programs():
     return OgreProgram.PROGRAMS.values()
@@ -5933,10 +5929,13 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
         mat = topmat.active_node_material        # the currently selected sub-material
+
+        layout.menu( 'MENU_preview_material_text', icon='TEXT' )
+
         if mat:
             ogre_material_panel( layout, mat, topmat, show_programs=False )
-
         else:
+
             if not topmat.use_material_passes:
                 layout.operator(
                     'ogre.force_setup_material_passes', 
@@ -5956,7 +5955,6 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
     bl_region_type = 'UI'
     bl_label = "Ogre Material Advanced"
     bl_options = {'DEFAULT_CLOSED'}
-
     def draw(self, context):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
@@ -5966,6 +5964,21 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
         else:
             ogre_material_panel_extra( layout, topmat )
 
+
+class MENU_preview_material_text(bpy.types.Menu):
+    bl_label = 'preview'
+    @classmethod
+    def poll(self,context):
+        if context.active_object and context.active_object.active_material: return True
+    def draw(self, context):
+        layout = self.layout
+        mat = context.active_object.active_material
+        if mat:
+            CONFIG['TOUCH_TEXTURES'] = False
+            preview = generate_material( mat )
+            for line in preview.splitlines():
+                if line.strip():
+                    for ww in wordwrap( line ): layout.label(text=ww)
 
 
 def ogre_material_panel_extra( parent, mat ):
