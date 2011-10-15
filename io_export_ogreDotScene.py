@@ -348,7 +348,7 @@ _CONFIG_DEFAULTS_ALL = {
     'lodPercent' : 40,
     'nuextremityPoints' : 0,
     'generateEdgeLists' : False,
-    'generateTangents' : False,
+    'generateTangents' : True,     # this is now safe - ignored if mesh is missing UVs
     'tangentSemantic' : 'uvw',
     'tangentUseParity' : 4,
     'tangentSplitMirrored' : False,
@@ -3400,7 +3400,7 @@ Available options:
 
 '''
 
-def OgreXMLConverter( infile ):
+def OgreXMLConverter( infile, has_uvs=False ):
     print('[Ogre Tools Wrapper]', infile )
     exe = CONFIG['OGRETOOLS_XML_CONVERTER']
     if not os.path.isfile( exe ):
@@ -3418,7 +3418,7 @@ def OgreXMLConverter( infile ):
     if not CONFIG['generateEdgeLists']:
         basicArguments += ' -e'
 
-    if CONFIG['generateTangents']:
+    if CONFIG['generateTangents'] and has_uvs:  # OgreXmlConverter fails to convert meshes without UVs
         basicArguments += ' -t'
         if CONFIG['tangentSemantic']:
             basicArguments += ' -td %s' %CONFIG['tangentSemantic']
@@ -4497,13 +4497,6 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         doc.close()     # reported by Reyn
         f.close()
 
-    #finally:
-    #    if doc:
-    #        doc.close()
-    #    if f:
-    #        f.close()
-
-
     #very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
             import fileinput
@@ -4516,7 +4509,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
     del(replaceInplace)
         
-    OgreXMLConverter( xmlfile )
+    OgreXMLConverter( xmlfile, has_uvs=dotextures )
 
     if arm and CONFIG['ARM_ANIM']:
         skel = Skeleton( ob )
