@@ -4953,6 +4953,11 @@ class OgreProgram(object):
         f = open( os.path.join(path,self.source), 'wb' )
         f.write(self.source_bytes )
         f.close()
+        for name in self.includes:
+            f = open( os.path.join(path,name), 'wb' )
+            f.write( self.includes[name] )
+            f.close()
+
     ######################################
     PROGRAMS = {}
     SOURCES = {}
@@ -4965,13 +4970,23 @@ class OgreProgram(object):
         url = os.path.join(  CONFIG['SHADER_PROGRAMS'], self.source )
         print('shader source:', url)
         self.source_bytes = open( url, 'rb' ).read()#.decode('utf-8')
-        print('shader source code num bytes:', len(self.source_bytes))
+        print('shader source num bytes:', len(self.source_bytes))
+        data = self.source_bytes.decode('utf-8')
+
+        for line in data.splitlines():  # only cg shaders use the include macro?
+            if line.startswith('#include') and line.count('"')==2:
+                name = line.split()[-1].replace('"','').strip()
+                print('shader includes:', name)
+                url = os.path.join(  CONFIG['SHADER_PROGRAMS'], name )
+                self.includes[ name ] = open( url, 'rb' ).read()
         return True
 
     def __init__(self, name='', data=''):
         self.name=name
         self.data = data.strip()
         self.source = None
+        self.includes = {} # cg files may use #include something.cg
+
         if self.name in OgreProgram.PROGRAMS:
             print('---copy ogreprogram---', self.name)
             other = OgreProgram.PROGRAMS
