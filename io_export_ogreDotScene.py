@@ -29,12 +29,11 @@ VERSION = '0.5.5 preview7'
 
 ## Public API ##
 UI_CLASSES = []
-def ogrepanel(cls): # @decorator
+def UI(cls): # @decorator
     ''' these classes will be toggled on and off by the user - interface toggle '''
     if cls not in UI_CLASSES:
         UI_CLASSES.append(cls)
     return cls
-
 
 ## END Public API ## -- (go to bottom for rest of API)
 ###########################################################
@@ -1544,11 +1543,11 @@ class _create_new_material_layer_helper(bpy.types.Operator):
         mat = context.active_object.active_material
         nodes = bpyShaders.get_or_create_material_passes( mat )
         node = nodes[ self.INDEX ]
-        node.material = bpy.data.materials.new( name='_layer_.%s.%s'%(self.INDEX, node.name) )
+        node.material = bpy.data.materials.new( name='%s.LAYER%s'%(mat.name,self.INDEX) )
         return {'FINISHED'}
 
 
-@ogrepanel
+@UI
 class PANEL_properties_window_ogre_material( bpy.types.Panel ):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -5620,6 +5619,16 @@ class bpyShaders(bpy.types.Operator):
     bl_label = "force bpyShaders"
     bl_options = {'REGISTER'}
 
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.active_material: return True
+    def invoke(self, context, event):
+        mat = context.active_object.active_material
+        mat.use_material_passes = True
+        bpyShaders.create_material_passes( mat )
+        return {'FINISHED'}
+
+
     ## setup from MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
     @staticmethod
     def on_change_parent_material(mat,context):
@@ -5647,15 +5656,6 @@ class bpyShaders(bpy.types.Operator):
                             r.append( link.from_node )
         return r
 
-    @classmethod
-    def poll(cls, context):
-        if context.active_object and context.active_object.active_material: return True
-
-    def invoke(self, context, event):
-        mat = context.active_object.active_material
-        mat.use_material_passes = True
-        bpyShaders.create_material_passes( mat )
-        return {'FINISHED'}
 
 
     @staticmethod
@@ -5698,6 +5698,11 @@ class bpyShaders(bpy.types.Operator):
         #print('bpyShaders.create_material_passes( %s, %s )' %(mat,n))
         mat.use_nodes = True
         tree = mat.node_tree	# valid pointer now
+
+        nodes = bpyShaders.get_subnodes( tree, 'MATERIAL' )  # assign base material
+        if nodes and not nodes[0].material:
+            nodes[0].material = mat
+
         r = []
         x = 680
         for i in range( n ):
@@ -5743,7 +5748,7 @@ class bpyShaders(bpy.types.Operator):
 
 
 
-@ogrepanel
+@UI
 class PANEL_node_editor_ui( bpy.types.Panel ):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
@@ -5754,24 +5759,21 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
         mat = topmat.active_node_material        # the currently selected sub-material
-
-        if mat:
-            ogre_material_panel( layout, mat, topmat, show_programs=False )
-        else:
-
+        if not mat or topmat.name == mat.name:
+            self.bl_label = topmat.name
             if not topmat.use_material_passes:
                 layout.operator(
                     'ogre.force_setup_material_passes', 
                     text="Ogre Material Layers", 
                     icon='SCENE_DATA' 
                 )
+            ogre_material_panel( layout, topmat, show_programs=False )
+        elif mat:
+            self.bl_label = mat.name
+            ogre_material_panel( layout, mat, topmat, show_programs=False )
 
-            if topmat.use_material_passes:
-                if not topmat.use_nodes: layout.label(text='enable use_nodes')
-                else: ogre_material_panel( layout, topmat, show_programs=False )
 
-
-@ogrepanel
+@UI
 class PANEL_node_editor_ui_extra( bpy.types.Panel ):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
@@ -5782,8 +5784,10 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
         topmat = context.space_data.id             # the top level node_tree
         mat = topmat.active_node_material        # the currently selected sub-material
         if mat:
+            self.bl_label = mat.name + ' (advanced)'
             ogre_material_panel_extra( layout, mat )
         else:
+            self.bl_label = topmat.name + ' (advanced)'
             ogre_material_panel_extra( layout, topmat )
 
 
