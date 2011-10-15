@@ -87,7 +87,7 @@ bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', defaul
 bpy.types.Material.ogre_colour_write = BoolProperty( name='color-write', default=True )
 
 
-bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=True )
+bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=False )    # fixed pipeline is oldschool
 
 # hidden option - gets turned on by operator
 bpy.types.Material.use_material_passes = BoolProperty( name='use ogre extra material passes (layers)', default=False )
@@ -486,6 +486,21 @@ material _missing_material_
 
 
 ############# helper functions ##############
+
+def find_bone_index( ob, arm, groupidx):    # sometimes the groups are out of order, this finds the right index.
+    if groupidx < len(ob.vertex_groups):        # reported by Slacker
+        vg = ob.vertex_groups[ groupidx ]
+        for i,bone in enumerate(arm.pose.bones):
+            if bone.name == vg.name: return i
+    else:
+        print('WARNING: object vertex groups not in sync with armature', ob, arm, groupidx)
+
+
+def mesh_is_smooth( mesh ):
+    for face in mesh.faces:
+        if face.use_smooth: return True
+
+
 def find_uv_layer_index( material, uvname ):
     idx = 0
     for mesh in bpy.data.meshes:
@@ -497,7 +512,7 @@ def find_uv_layer_index( material, uvname ):
                     break   # should we check all objects using material and enforce the same index?
     return idx
 
-def has_property( a, name ):
+def has_custom_property( a, name ):
     for prop in a.items():
         n,val = prop
         if n == name: return True
@@ -3429,20 +3444,6 @@ def OgreXMLConverter( infile ):
     subprocess.call( cmd )
 
 
-
-
-def find_bone_index( ob, arm, groupidx):    # sometimes the groups are out of order, this finds the right index.
-    vg = ob.vertex_groups[ groupidx ]
-    for i,bone in enumerate(arm.pose.bones):
-        if bone.name == vg.name: return i
-
-def mesh_is_smooth( mesh ):
-    for face in mesh.faces:
-        if face.use_smooth: return True
-
-
-
-
 class Bone(object):
     ''' 
 EditBone
@@ -4679,6 +4680,21 @@ class TundraPipe(object):
         self.proc.stdin.write( b'physicsdebug\n' )
         self.proc.stdin.flush()
 
+class MENU_preview_material_text(bpy.types.Menu):
+    bl_label = 'preview'
+    @classmethod
+    def poll(self,context):
+        if context.active_object and context.active_object.active_material: return True
+    def draw(self, context):
+        layout = self.layout
+        mat = context.active_object.active_material
+        if mat:
+            CONFIG['TOUCH_TEXTURES'] = False
+            preview = generate_material( mat )
+            for line in preview.splitlines():
+                if line.strip():
+                    for ww in wordwrap( line ): layout.label(text=ww)
+
 
 class INFO_HT_myheader(bpy.types.Header):
     bl_space_type = 'INFO'
@@ -4754,6 +4770,8 @@ class INFO_HT_myheader(bpy.types.Header):
             row = layout.row(align=True); row.scale_x = 1.1
             row.prop(scene.game_settings, 'material_mode', text='')
             row.prop(scene, 'camera', text='')
+
+            layout.menu( 'MENU_preview_material_text', icon='TEXT', text='' )
 
             layout.menu( "INFO_MT_ogre_docs" )
             layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
@@ -5691,7 +5709,7 @@ class bpyShaders(bpy.types.Operator):
         for i in range( n ):
             node = tree.nodes.new( type='MATERIAL_EXT' ) #[‘OUTPUT’, ‘MATERIAL’, ‘RGB’, ‘VALUE’, ‘MIX_RGB’, ‘VALTORGB’, ‘RGBTOBW’, ‘TEXTURE’, ‘NORMAL’, ‘GEOMETRY’, ‘MAPPING’, ‘CURVE_VEC’, ‘CURVE_RGB’, ‘CAMERA’, ‘MATH’, ‘VECT_MATH’, ‘SQUEEZE’, ‘MATERIAL_EXT’, ‘INVERT’, ‘SEPRGB’, ‘COMBRGB’, ‘HUE_SAT’, ‘SCRIPT’, ‘GROUP’]
             node.name = 'GEN.%s' %i
-            node.location.x = x; node.location.y = 600
+            node.location.x = x; node.location.y = 640
             r.append( node )
             x += 180
         #mat.use_nodes = False  # TODO set user material to default output
@@ -5715,9 +5733,9 @@ class bpyShaders(bpy.types.Operator):
                 tex = mat.node_tree.nodes.new( type='TEXTURE' )
                 tex.name = 'TEX.%s.%s' %(j, m.name)
                 tex.location.x = x - (j*16)
-                if j == 0: tex.location.y = 840; tex.location.x += 120
-                else: 
-                    tex.location.y = -(j*230)
+                #if j == 0: tex.location.y = 840; tex.location.x += 120
+                #else: 
+                tex.location.y = -(j*230)
 
                 input = inputs[j]; output = tex.outputs['Color']
                 link = mat.node_tree.links.new( input, output )
@@ -5736,14 +5754,12 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
     bl_label = "Ogre Material"
-    bl_options = {'DEFAULT_CLOSED'}
+    #bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
         mat = topmat.active_node_material        # the currently selected sub-material
-
-        layout.menu( 'MENU_preview_material_text', icon='TEXT' )
 
         if mat:
             ogre_material_panel( layout, mat, topmat, show_programs=False )
@@ -5756,10 +5772,9 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
                     icon='SCENE_DATA' 
                 )
 
-            if not topmat.use_nodes:
-                layout.label(text='enable use_nodes')
-            elif topmat.use_material_passes:
-                ogre_material_panel( layout, topmat, show_programs=False )
+            if topmat.use_material_passes:
+                if not topmat.use_nodes: layout.label(text='enable use_nodes')
+                else: ogre_material_panel( layout, topmat, show_programs=False )
 
 
 @ogrepanel
@@ -5778,48 +5793,41 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
             ogre_material_panel_extra( layout, topmat )
 
 
-class MENU_preview_material_text(bpy.types.Menu):
-    bl_label = 'preview'
-    @classmethod
-    def poll(self,context):
-        if context.active_object and context.active_object.active_material: return True
-    def draw(self, context):
-        layout = self.layout
-        mat = context.active_object.active_material
-        if mat:
-            CONFIG['TOUCH_TEXTURES'] = False
-            preview = generate_material( mat )
-            for line in preview.splitlines():
-                if line.strip():
-                    for ww in wordwrap( line ): layout.label(text=ww)
 
 
 def ogre_material_panel_extra( parent, mat ):
     box = parent.box()
-    box.prop( mat, 'use_fixed_pipeline', text='Generate Fixed Pipeline', icon='LAMP_SUN' )
+    header = box.row()
+
     if mat.use_fixed_pipeline:
+        header.prop( mat, 'use_fixed_pipeline', text='Fixed Pipeline', icon='LAMP_SUN' )
+
         row = box.row()
         row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
         row.prop(mat, "use_shadeless")
         if mat.use_shadeless and not mat.use_vertex_color_paint:
             row = box.row()
-            row.prop(mat, "diffuse_color", text='Color')
+            row.prop(mat, "diffuse_color", text='')
         elif not mat.use_shadeless:
             if not mat.use_vertex_color_paint:
                 row = box.row()
-                row.prop(mat, "diffuse_color", text='Diffuse')
+                row.prop(mat, "diffuse_color", text='')
                 row.prop(mat, "diffuse_intensity", text='intensity')
             row = box.row()
-            row.prop(mat, "specular_color", text='Spec')
+            row.prop(mat, "specular_color", text='')
             row.prop(mat, "specular_intensity", text='intensity')
             row = box.row()
             row.prop(mat, "specular_hardness")
             row = box.row()
             row.prop(mat, "ambient")
-            row = box.row()
+            #row = box.row()
             row.prop(mat, "emit")
+        box.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
 
-    box.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
+    else:
+        header.prop( mat, 'use_fixed_pipeline', text='', icon='LAMP_SUN' )
+        header.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
+
     if mat.use_ogre_advanced_options:
         box.prop(mat, "use_shadows")
         box.prop(mat, 'ogre_depth_write' )
@@ -5833,24 +5841,28 @@ def ogre_material_panel_extra( parent, mat ):
 
 def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
     box = layout.box()
-    box.prop(mat, 'ogre_scene_blend')
+    header = box.row()
+    header.prop(mat, 'ogre_scene_blend', text='')
     if mat.ogre_scene_blend and 'alpha' in mat.ogre_scene_blend:
         row = box.row()
-        row.prop(mat, "use_transparency", text="Transparent")
-        if mat.use_transparency: row.prop(mat, "alpha")
+        if mat.use_transparency:
+            row.prop(mat, "use_transparency", text='')
+            row.prop(mat, "alpha")
+        else:
+            row.prop(mat, "use_transparency", text='Transparent')
 
     if not parent: return   # only allow on pass1 and higher
 
-    row = box.row()
-    if not mat.use_ogre_parent_material:
-        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT')
+    header.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='')
 
-    else:
-        row.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='Parent Material:')
+    if mat.use_ogre_parent_material:
+        row = box.row()
         row.prop(mat, 'ogre_parent_material', text='')
 
         s = get_ogre_user_material( mat.ogre_parent_material )  # gets by name
         if s.vertex_programs or s.fragment_programs:
+            progs = s.get_programs()
+
             split = box.row()
             if show_programs and (s.vertex_programs or s.fragment_programs):
                 bx = split.box()
@@ -5858,8 +5870,6 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                     bx.label( text=name )
                 for name in s.fragment_programs:
                     bx.label( text=name )
-                progs = s.get_programs()
-                print(progs)
 
             texnodes = None
             if parent:
@@ -5867,7 +5877,10 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
             elif mat.node_tree:
                 texnodes = bpyShaders.get_texture_subnodes( mat )   # assume toplevel
 
-            if s.texture_units and texnodes:
+            if not progs:
+                bx = split.box()
+                bx.label( text='(missing shader programs)', icon='ERROR' )
+            elif s.texture_units and texnodes:
                 bx = split.box()
                 for i,name in enumerate(s.texture_units):
                     if i<len(texnodes):
