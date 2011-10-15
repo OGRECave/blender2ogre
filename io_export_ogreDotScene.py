@@ -59,7 +59,7 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 ######################### bpy RNA #########################
 
 # ..Material.ogre_depth_write = AUTO|ON|OFF
-bpy.types.Material.ogre_depth_write = BoolProperty( name='set depth write', default=False )
+bpy.types.Material.ogre_depth_write = BoolProperty( name='depth write', default=True )
 
 #If depth-buffer checking is on, whenever a pixel is about to be written to the frame buffer the depth buffer is checked to see if the pixel is in front of all other pixels written at that point. If not, the pixel is not written. If depth checking is off, pixels are written no matter what has been rendered before.
 bpy.types.Material.ogre_depth_check = BoolProperty( name='depth check', default=True )
@@ -5280,11 +5280,10 @@ class OgreMaterialGenerator( _image_processing_ ):
 
         color = mat.diffuse_color
         alpha = 1.0
-        usealpha = mat.ogre_depth_write
-
         if mat.use_transparency: alpha = mat.alpha
 
         slots = get_image_textures( mat )        # returns texture_slot objects (CLASSIC MATERIAL)
+        usealpha = False #mat.ogre_depth_write
         for slot in slots:
             #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
             if slot.texture.use_alpha: usealpha = True; break
@@ -5317,12 +5316,12 @@ class OgreMaterialGenerator( _image_processing_ ):
             else:
                 M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
-        if usealpha:
-            #if mat.use_transparency:
-            M += indent(3, 'depth_write off' )  # default is on
+        #if usealpha:
+        #    #if mat.use_transparency:
+        #    M += indent(3, 'depth_write off' )  # default is on
 
         for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
-            if name.startswith('ogre_') and name not in 'ogre_parent_material ogre_depth_write'.split():
+            if name.startswith('ogre_') and name != 'ogre_parent_material':
                 var = getattr(mat,name)
                 op = name.replace('ogre_', '')
                 val = var
@@ -5331,9 +5330,6 @@ class OgreMaterialGenerator( _image_processing_ ):
                     else: val = 'off'
                 M += indent( 3, '%s %s' %(op,val) )
 
-        if mat.use_fixed_pipeline:
-            for slot in slots:
-                M += self.generate_texture_unit( slot.texture, slot=slot )
 
         if texnodes and usermat.texture_units:
             for i,name in enumerate(usermat.texture_units):
@@ -5341,6 +5337,11 @@ class OgreMaterialGenerator( _image_processing_ ):
                     node = texnodes[i]
                     if node.texture:
                         M += self.generate_texture_unit( node.texture, name=name )
+
+        #if mat.use_fixed_pipeline:
+        elif slots:
+            for slot in slots:
+                M += self.generate_texture_unit( slot.texture, slot=slot )
 
         M += indent(2, '}' )    # end pass
 
