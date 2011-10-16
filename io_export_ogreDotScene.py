@@ -392,7 +392,7 @@ _CONFIG_DEFAULTS_UNIX = {
 #    'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
 }
 
-if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
     for tag in _CONFIG_DEFAULTS_UNIX:
         path = _CONFIG_DEFAULTS_UNIX[ tag ]
         if path.startswith('~'): _CONFIG_DEFAULTS_UNIX[ tag ] = os.path.expanduser( path )
@@ -421,7 +421,7 @@ def load_config():  # PUBLIC API
         if tag not in CONFIG:
             if sys.platform.startswith('win'):
                 CONFIG[ tag ] = _CONFIG_DEFAULTS_WINDOWS[ tag ]
-            elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+            elif sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
                 CONFIG[ tag ] = _CONFIG_DEFAULTS_UNIX[ tag ]
             else:
                 print( 'ERROR: unknown platform' )
@@ -1592,8 +1592,10 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
         Report.reset()
         Report.messages.append('running %s' %CONFIG['OGRE_MESHY'])
 
-        if sys.platform == 'linux2':
+        if sys.platform.startswith('linux'):    # TODO use native OgreMeshy on linux
             path = '%s/.wine/drive_c/tmp' %os.environ['HOME']
+        elif sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
+            path = '/tmp'
         else:
             path = 'C:\\tmp'
 
@@ -1659,7 +1661,7 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
 
         if merged: context.scene.objects.unlink( merged )
 
-        if sys.platform == 'linux2':
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
             if CONFIG['OGRE_MESHY'].endswith('.exe'):
                 cmd = ['wine', CONFIG['OGRE_MESHY'], 'c:\\tmp\\preview.mesh' ]
             else:
@@ -2466,9 +2468,12 @@ class _TXML_(object):
 
 class _OgreCommonExport_( _TXML_ ):
     #EXPORT_TYPE = 'OGRE'   # defined in subclass
-
+    #@classmethod
+    #def poll(cls, context): return True
     @classmethod
-    def poll(cls, context): return True
+    def poll(cls, context):
+        if context.active_object and context.mode != 'EDIT_MESH': return True
+
     def invoke(self, context, event):
         wm = context.window_manager
         fs = wm.fileselect_add(self)        # writes to filepath
@@ -4422,7 +4427,7 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
 
     @classmethod
     def poll(cls, context):
-        if context.active_object: return True
+        if context.active_object and context.mode != 'EDIT_MESH': return True
 
     def invoke(self, context, event):
         global TundraSingleton
@@ -5036,7 +5041,8 @@ class _image_processing_( object ):
         path,name = os.path.split( infile )
         outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
         opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'): subprocess.call( ['/usr/bin/wine', exe]+opts )
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
+            subprocess.call( ['/usr/bin/wine', exe]+opts )
         else: subprocess.call( [exe]+opts )         ## TODO support OSX
         data = open( '_tmp_.dds', 'rb' ).read()
         f = open( outfile, 'wb' )
