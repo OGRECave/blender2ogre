@@ -35,6 +35,10 @@ def UI(cls): # @decorator
         UI_CLASSES.append(cls)
     return cls
 
+def hide_user_interface():
+    for cls in UI_CLASSES:
+        bpy.utils.unregister_class( cls )
+
 ## END Public API ## -- (go to bottom for rest of API)
 ###########################################################
 ###########################################################
@@ -590,58 +594,73 @@ def get_materials_using_image( img ):
     return mats
 
 
+def get_parent_matrix( ob, objects ):
+    if not ob.parent:
+        return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
+    else:
+        if ob.parent in objects:
+            return ob.parent.matrix_world.copy()
+        else:
+            return get_parent_matrix(ob.parent, objects)
 
-###############################################
-class Ogre_relocate_textures_op(bpy.types.Operator):
-    '''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
-    bl_idname = "ogre.relocate_textures"  
-    bl_label = "relocate textures"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
 
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        Report.reset()
-        badmats = []
-        for img in bpy.data.images:
-            url = bpy.path.abspath( img.filepath )
-            path,name = os.path.split(url)
-            if not name: continue        # user cleared the value
+def merge_group( group ):
+    print('--------------- merge group ->', group )
+    copies = []
+    for ob in group.objects:
+        if ob.type == 'MESH':
+            print( '\t group member', ob.name )
+            o2 = ob.copy(); copies.append( o2 )
+            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
+            while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
+            bpy.context.scene.objects.link( o2 )#; o2.select = True
+    merged = merge( copies )
+    merged.name = group.name
+    merged.data.name = group.name
+    return merged
 
-            if os.path.isfile( url ):
-                if path not in Report.paths: Report.paths.append( path )
-                #Report.messages.append( 'OK: %s' %name )
-            else:
-                Report.messages.append( 'MISSING: %s' %name )
-                found = None
-                for p in Report.paths:
-                    if os.path.isfile( os.path.join(p,name) ):
-                        Report.messages.append( '  found texture in: %s' %p )
-                        found = os.path.join( p,name )
-                        break
-                if not found:        # try lower case
-                    for p in Report.paths:
-                        name = name.lower()
-                        if os.path.isfile( os.path.join(p,name) ):
-                            Report.messages.append( '  found texture in (lower-case): %s' %p )
-                            found = os.path.join( p,name )
-                            break
-                if found:
-                    img.filepath = bpy.path.relpath( found )
-                    Report.messages.append( '  reassigned to -> %s ' %img.filepath )
-                else:
-                    for mat in get_materials_using_image( img ):
-                        if mat not in badmats:
-                            badmats.append( mat )
+def merge_objects( objects, name='_temp_', transform=None ):
+    assert objects
+    copies = []
+    for ob in objects:
+        ob.select = False
+        if ob.type == 'MESH':
+            o2 = ob.copy(); copies.append( o2 )
+            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
+            while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
+            if transform: o2.matrix_world =  transform * o2.matrix_local
+            bpy.context.scene.objects.link( o2 )#; o2.select = True
+    merged = merge( copies )
+    merged.name = name
+    merged.data.name = name
+    return merged
 
-        for ob in get_objects_using_materials(badmats): ob.select=True
-        for mat in badmats:
-            Report.warnings.append( 'BAD-MATERIAL:  %s' %material_name(mat) )
 
-        if not Report.messages and not badmats: Report.messages.append( 'Everything is OK' )
+def merge( objects ):
+    print('MERGE', objects)
+    for ob in bpy.context.selected_objects: ob.select = False
+    for ob in objects:
+        print('\t'+ob.name)
+        ob.select = True
+        assert not ob.library
+    bpy.context.scene.objects.active = ob
+    bpy.ops.object.join()
+    return bpy.context.active_object
 
-        bpy.ops.wm.call_menu( name='Ogre_User_Report' )
-        return {'FINISHED'}
+def get_merge_group( ob, prefix='merge' ):
+    m = []
+    for grp in ob.users_group:
+        if grp.name.lower().startswith(prefix): m.append( grp )
+    if len(m)==1:
+        #if ob.data.users != 1:
+        #    print( 'WARNING: an instance can not be in a merge group' )
+        #    return
+        return m[0]
+    elif m:
+        print('WARNING: an object can not be in two merge groups at the same time', ob)
+        return
+
+
 
 ###### RPython xml dom ######
 class RElement(object):
@@ -715,7 +734,7 @@ class SimpleSaxWriter():
 
 ############## Report Hack ############
 class ReportSingleton(object):
-    def show(self): bpy.ops.wm.call_menu( name='Ogre_User_Report' )
+    def show(self): bpy.ops.wm.call_menu( name='MiniReport' )
     def __init__(self): self.reset()
     def reset(self):
         self.materials = []
@@ -786,7 +805,7 @@ Report = ReportSingleton()
 
 
 
-class Ogre_User_Report(bpy.types.Menu):
+class MiniReport(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
     def draw(self, context):
         layout = self.layout
@@ -1076,7 +1095,8 @@ class OgreCollisionOp(bpy.types.Operator):
         return {'FINISHED'}
 
 ################################
-class PhysicsPanel(bpy.types.Panel):
+@UI
+class PANEL_Physics(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_label = "Physics"
@@ -1117,7 +1137,8 @@ class PhysicsPanel(bpy.types.Panel):
 
 
 ################################
-class CollisionPanel(bpy.types.Panel):
+@UI
+class PANEL_Collision(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_label = "Collision"
@@ -1235,8 +1256,8 @@ class CollisionPanel(bpy.types.Panel):
                 op = box.operator( 'ogre.set_collision', text='Compound Collision', icon='ROTATECOLLECTION' )
             op.MODE = 'COMPOUND'
 
-
-class ConfigurePanel(bpy.types.Panel):
+@UI
+class PANEL_Configure(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "scene"
@@ -1246,137 +1267,6 @@ class ConfigurePanel(bpy.types.Panel):
         op = layout.operator( 'ogre.save_config', text='update config file', icon='FILE' )
         for tag in _CONFIG_TAGS_:
             layout.prop( context.window_manager, tag )
-
-
-
-############### extra tools #############
-'''
-Getting a UV texture's pixel value per vertex, the stupid way.
-(this should be rewritten as a C function exposed to Python)
-This script does the following hack to get the pixel value:
-  1. copy the object
-  2. apply a displace modifier
-  3. for each RGB set the ImageTexture.<color>_factor to 1.0 and other to 0.0
-  4. for each RGB bake a mesh (apply the displace modifier)
-  5. for each RGB find the difference of vertex locations
-  6. apply the differences as vertex colors
-
-'''
-class Harts_Tools(bpy.types.Panel):
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "data"
-    bl_label = "Ogre Extra Tools"
-    @classmethod
-    def poll(cls, context):
-        if context.active_object: return True
-        else: return False
-    def draw(self, context):
-        layout = self.layout
-        layout.operator(Ogre_relocate_textures_op.bl_idname)
-
-        ob = context.active_object
-        if ob.type != 'MESH': return
-        slot = context.texture_slot
-        node = context.texture_node
-        space = context.space_data
-        tex = context.texture
-        #idblock = context_tex_datablock(context)
-        idblock = ob.active_material
-        tex_collection = space.pin_id is None and type(idblock) != bpy.types.Brush and not node
-        if not tex_collection: return
-
-        box = layout.box()
-        box.label(text='bake selected texture to vertex colors')
-        if not ob.data.vertex_colors.active:
-            box.label(text='please select a vertex color channel to bake to')
-        else:
-            row = box.row()
-            row.operator( "harts.bake_texture_to_vertexcolors", text='bake' )
-            row.template_list(idblock, "texture_slots", idblock, "active_texture_index", rows=2)
-
-
-
-class Harts_bake_texture_vc_op(bpy.types.Operator):
-    '''operator: bakes texture to vertex colors'''
-    bl_idname = "harts.bake_texture_to_vertexcolors"  
-    bl_label = "harts extra tools"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
-
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        ob = context.active_object
-        #tex = context.texture
-        tex = ob.active_material.active_texture        # slot
-
-        o2 = ob.copy()
-        #bpy.context.scene.objects.link( o2 )#; o2.select = True
-        while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
-        mod = o2.modifiers.new('_hack_', type='DISPLACE')
-        mod.texture = tex
-        mod.texture_coords = 'UV'
-        mod.mid_level = 1.0
-        #print(dir(tex))
-        image = None
-        mult = 1.0
-        baked = []
-        if hasattr(tex, 'image'):
-            image = tex.image
-            ua = tex.use_alpha
-            tex.use_alpha = False
-
-            tex.factor_red = 1.0
-            tex.factor_green = .0
-            tex.factor_blue = .0
-            _data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")
-            baked.append( [] )
-            for v1 in ob.data.vertices:
-                v2 = _data.vertices[ v1.index ]
-                baked[-1].append( (v1.co-v2.co).magnitude*mult )
-            print('red', baked[-1])
-
-            tex.factor_red = .0
-            tex.factor_green = 1.0
-            tex.factor_blue = .0
-            _data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")
-            baked.append( [] )
-            for v1 in ob.data.vertices:
-                v2 = _data.vertices[ v1.index ]
-                baked[-1].append( (v1.co-v2.co).magnitude*mult )
-            print('green', baked[-1])
-
-            tex.factor_red = .0
-            tex.factor_green = .0
-            tex.factor_blue = 1.0
-            _data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")
-            baked.append( [] )
-            for v1 in ob.data.vertices:
-                v2 = _data.vertices[ v1.index ]
-                baked[-1].append( (v1.co-v2.co).magnitude*mult )
-            print('blue', baked[-1])
-
-
-            tex.factor_red = 1.0
-            tex.factor_green = 1.0
-            tex.factor_blue = 1.0
-            tex.use_alpha = ua
-
-            #while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
-
-            vchan = ob.data.vertex_colors.active
-            for f in ob.data.faces:
-                for i,vidx in enumerate(f.vertices):
-                    r = baked[0][ vidx ]
-                    g = baked[1][ vidx ]
-                    b = baked[2][ vidx ]
-                    #color = vchan.data[ f.index ].color1
-                    color = getattr( vchan.data[ f.index ], 'color%s' %(i+1) )
-                    color.r = 1.0-r
-                    color.g = 1.0-g
-                    color.b = 1.0-b
-
-        return {'FINISHED'}
 
 
 
@@ -1573,20 +1463,27 @@ class PANEL_properties_window_ogre_material( bpy.types.Panel ):
         ogre_material_panel( layout, mat )
         ogre_material_panel_extra( layout, mat )
 
-
+@UI
 class MatPass1( _OgreMatPass, bpy.types.Panel ): INDEX = 0; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
 class MatPass2( _OgreMatPass, bpy.types.Panel ): INDEX = 1; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
 class MatPass3( _OgreMatPass, bpy.types.Panel ): INDEX = 2; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
 class MatPass4( _OgreMatPass, bpy.types.Panel ): INDEX = 3; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
 class MatPass5( _OgreMatPass, bpy.types.Panel ): INDEX = 4; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
 class MatPass6( _OgreMatPass, bpy.types.Panel ): INDEX = 5; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
 class MatPass7( _OgreMatPass, bpy.types.Panel ): INDEX = 6; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
 class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
 
 
 
-
-class Ogre_Texture_Panel(bpy.types.Panel):
+@UI
+class PANEL_Textures(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "texture"
@@ -2828,7 +2725,7 @@ class _OgreCommonExport_( _TXML_ ):
                 print('ogre scene dumped', url)
 
         for ob in temps: context.scene.objects.unlink( ob )
-        bpy.ops.wm.call_menu( name='Ogre_User_Report' )
+        bpy.ops.wm.call_menu( name='MiniReport' )
 
         save_config()   # always save?
 
@@ -3098,8 +2995,6 @@ class _OgreCommonExport_( _TXML_ ):
 
 ################################################################
 
-
-
 class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
     bl_idname = "ogre.export"
@@ -3213,14 +3108,6 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
     EXPORT_TYPE = 'REX'
 
 
-def get_parent_matrix( ob, objects ):
-    if not ob.parent:
-        return mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))   # Requiered for Blender SVN > 2.56
-    else:
-        if ob.parent in objects:
-            return ob.parent.matrix_world.copy()
-        else:
-            return get_parent_matrix(ob.parent, objects)
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
     mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world   # shouldn't this be matrix_local?
@@ -3262,61 +3149,6 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
 
     return o
 
-def merge_group( group ):
-    print('--------------- merge group ->', group )
-    copies = []
-    for ob in group.objects:
-        if ob.type == 'MESH':
-            print( '\t group member', ob.name )
-            o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
-            while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
-            bpy.context.scene.objects.link( o2 )#; o2.select = True
-    merged = merge( copies )
-    merged.name = group.name
-    merged.data.name = group.name
-    return merged
-
-def merge_objects( objects, name='_temp_', transform=None ):
-    assert objects
-    copies = []
-    for ob in objects:
-        ob.select = False
-        if ob.type == 'MESH':
-            o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
-            while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
-            if transform: o2.matrix_world =  transform * o2.matrix_local
-            bpy.context.scene.objects.link( o2 )#; o2.select = True
-    merged = merge( copies )
-    merged.name = name
-    merged.data.name = name
-    return merged
-
-
-def merge( objects ):
-    print('MERGE', objects)
-    for ob in bpy.context.selected_objects: ob.select = False
-    for ob in objects:
-        print('\t'+ob.name)
-        ob.select = True
-        assert not ob.library
-    bpy.context.scene.objects.active = ob
-    bpy.ops.object.join()
-    return bpy.context.active_object
-
-def get_merge_group( ob, prefix='merge' ):
-    m = []
-    for grp in ob.users_group:
-        if grp.name.lower().startswith(prefix): m.append( grp )
-    if len(m)==1:
-        #if ob.data.users != 1:
-        #    print( 'WARNING: an instance can not be in a merge group' )
-        #    return
-        return m[0]
-    elif m:
-        print('WARNING: an object can not be in two merge groups at the same time', ob)
-        return
 
 
 ############ Ogre Command Line Tools ###########
@@ -4687,7 +4519,7 @@ class MENU_preview_material_text(bpy.types.Menu):
                 if line.strip():
                     for ww in wordwrap( line ): layout.label(text=ww)
 
-
+@UI
 class INFO_HT_myheader(bpy.types.Header):
     bl_space_type = 'INFO'
     def draw(self, context):
@@ -4782,37 +4614,6 @@ def export_menu_func_realxtend(self, context):
     op.filepath = os.path.join( path, name.split('.')[0]+'.txml' )
 
 
-
-
-
-class INFO_HT_microheader(bpy.types.Header):
-    bl_space_type = 'INFO'
-    def draw(self, context):
-        layout = self.layout
-        try:
-            if OgreToggleInterfaceOp.TOGGLE:
-                layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_DEHLT')
-            else:
-                layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_HLT')
-        except: pass    # STILL REQUIRED?
-
-def get_minimal_interface_classes():
-    return INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OgreToggleInterfaceOp, Ogre_User_Report
-
-_USE_TUNDRA_ = False
-_USE_JMONKEY_ = False
-
-def restore_minimal_interface():
-    #if not hasattr( bpy.ops.ogre..   #always true
-    try:
-        for op in get_minimal_interface_classes(): bpy.utils.register_class( op )
-        bpy.utils.register_class( INFO_HT_microheader )
-        return False
-    except:
-        print( 'b2ogre minimal UI already setup' )
-        return True
-
-
 try: _header_ = bpy.types.INFO_HT_header
 except:
     print('---blender2ogre addon enable---')
@@ -4822,7 +4623,7 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
     bl_idname = "ogre.toggle_interface"
     bl_label = "Ogre UI"
     bl_options = {'REGISTER'}
-    TOGGLE = restore_minimal_interface()
+    TOGGLE = True  #restore_minimal_interface()
     BLENDER_DEFAULT_HEADER = _header_
     @classmethod
     def poll(cls, context): return True
@@ -4838,15 +4639,47 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
             OgreToggleInterfaceOp.TOGGLE = False
         else:
             print( 'ogre.toggle_interface DISABLE' )
-            #bpy.utils.unregister_module(__name__); print(1)
+            #bpy.utils.unregister_module(__name__); # this is not safe, can segfault blender, why?
             hide_user_interface()
-            bpy.utils.register_class(_header_);print(2)
-            restore_minimal_interface();print(3)
-            OgreToggleInterfaceOp.TOGGLE = True;print('oh shit')
+            bpy.utils.register_class(_header_)
+            restore_minimal_interface()
+            OgreToggleInterfaceOp.TOGGLE = True
 
         return {'FINISHED'}
 
 
+
+class INFO_HT_microheader(bpy.types.Header):
+    bl_space_type = 'INFO'
+    def draw(self, context):
+        layout = self.layout
+        try:
+            if OgreToggleInterfaceOp.TOGGLE:
+                layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_DEHLT')
+            else:
+                layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_HLT')
+        except: pass    # STILL REQUIRED?
+
+def get_minimal_interface_classes():
+    return INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OgreToggleInterfaceOp, MiniReport, INFO_HT_microheader
+
+_USE_TUNDRA_ = False
+_USE_JMONKEY_ = False
+
+def restore_minimal_interface():
+    #if not hasattr( bpy.ops.ogre..   #always true
+    for cls in get_minimal_interface_classes():
+        try: bpy.utils.register_class( cls )
+        except: pass
+    return False
+
+    try:
+        bpy.utils.register_class( INFO_HT_microheader )
+        for op in get_minimal_interface_classes(): bpy.utils.register_class( op )
+        return False
+    except:
+        print( 'b2ogre minimal UI already setup' )
+        return True
 
 
 
@@ -4880,18 +4713,12 @@ def register():
     print( '-'*80)
 
 def unregister():
-    global _header_
+    header = _header_
     print('unreg-> ogre exporter')
     bpy.utils.unregister_module(__name__)
-    #############if _header_: bpy.utils.register_class(_header_); _header_ = None
+    if header: bpy.utils.register_class(header)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
-
-
-if __name__ == "__main__":
-    register()
-
-
 
 
 ########### Tundra SkyX - TODO move to tundra.py #############
@@ -4928,6 +4755,7 @@ bpy.types.World.ogre_skyX_cloud_density_y = FloatProperty(
     default=1.0, min=0.0, max=5.0
 )
 
+@UI
 class OgreSkyPanel(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -5889,4 +5717,10 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                     else:
                         print('WARNING: no slot for texture unit:', name)
 
+
+
+
+###########################################################################
+if __name__ == "__main__":  # allows directly running by "blender --python blender2ogre.py"
+    register()
 
