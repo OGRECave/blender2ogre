@@ -18,7 +18,7 @@ bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
     "version": (0,5,5),
-    "blender": (2,5,9),
+    "blender": (2,6,0),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
@@ -270,13 +270,13 @@ A: no.
 _doc_installing_ = '''
 Installing:
     Installing the Addon:
-        You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.57/scripts/addons/
+        You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.60/scripts/addons/
         and enable it in the user-prefs interface (CTRL+ALT+U)
         Or you can use blenders interface, under user-prefs, click addons, and click 'install-addon'
         (its a good idea to delete the old version first)
 
     Required:
-        1. blender2.59
+        1. blender2.60
 
         2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
             http://www.ogre3d.org/download/tools
@@ -294,10 +294,11 @@ Installing:
             If your using 64bit Windows, you may need to download a 64bit OgreMeshy
             (Linux copy to your home folder)
 
+        6. RealXtend Tundra2
+            http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
+            Windows: extract to C:\Tundra2
+            Linux: extract to ~/Tundra2
 '''
-
-
-
 
 
 
@@ -522,11 +523,11 @@ def mesh_is_smooth( mesh ):
     for face in mesh.faces:
         if face.use_smooth: return True
 
-
-def find_uv_layer_index( material, uvname ):
+## this breaks if users have uv layers with same name with different indices over different objects ##
+def find_uv_layer_index( uvname, material=None ):
     idx = 0
     for mesh in bpy.data.meshes:
-        if material.name in mesh.materials:
+        if material is None or material.name in mesh.materials:
             if mesh.uv_textures:
                 names = [ uv.name for uv in mesh.uv_textures ]
                 if uvname in names:
@@ -1418,7 +1419,7 @@ class _OgreMatPass( object ):
         ob = context.object
         slot = context.material_slot
         layout = self.layout
-
+        #layout.label(text=str(self.INDEX))
         if mat.use_material_passes:
             db = layout.box()
             nodes = bpyShaders.get_or_create_material_passes( mat )
@@ -1430,8 +1431,8 @@ class _OgreMatPass( object ):
                 op = split.operator( 'ogre.helper_create_attach_material_layer', icon="PLUS", text='' )
                 op.INDEX = self.INDEX
 
-            dbb = db.box()
             if node.material and node.material.use_in_ogre_material_pass:
+                dbb = db.box()
                 ogre_material_panel( dbb, node.material, parent=mat )
                 ogre_material_panel_extra( dbb, node.material )
 
@@ -1441,7 +1442,7 @@ class _create_new_material_layer_helper(bpy.types.Operator):
     '''helper to create new material layer'''
     bl_idname = "ogre.helper_create_attach_material_layer"
     bl_label = "creates and assigns new material to layer"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
     INDEX = IntProperty(name="material layer index", description="index", default=0, min=0, max=8)
     @classmethod
     def poll(cls, context):
@@ -1453,6 +1454,7 @@ class _create_new_material_layer_helper(bpy.types.Operator):
         nodes = bpyShaders.get_or_create_material_passes( mat )
         node = nodes[ self.INDEX ]
         node.material = bpy.data.materials.new( name='%s.LAYER%s'%(mat.name,self.INDEX) )
+        node.material.use_fixed_pipeline = False
         return {'FINISHED'}
 
 
@@ -5263,7 +5265,8 @@ class OgreMaterialGenerator( _image_processing_ ):
                 if i<len(texnodes):
                     node = texnodes[i]
                     if node.texture:
-                        M += self.generate_texture_unit( node.texture, name=name )
+                        geo = bpyShaders.get_connected_input_nodes( self.material, node )[0]
+                        M += self.generate_texture_unit( node.texture, name=name, uv_layer=geo.uv_layer )
 
         #if mat.use_fixed_pipeline:
         elif slots:
@@ -5274,7 +5277,7 @@ class OgreMaterialGenerator( _image_processing_ ):
 
         return M
 
-    def generate_texture_unit(self, texture, slot=None, name=None):
+    def generate_texture_unit(self, texture, slot=None, name=None, uv_layer=None):
         if not hasattr(texture, 'image'):
             print('WARNING: texture must be of type IMAGE->', texture)
             return ''
@@ -5299,8 +5302,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         postname = texname = os.path.split(iurl)[-1]
         destpath = path
 
-        ## packed images - dec10th 2010 ##
-        if texture.image.packed_file:
+        if texture.image.packed_file and self.touch_textures:
             orig = texture.image.filepath
             iurl = os.path.join(path, texname)
             if not os.path.isfile( iurl ):
@@ -5319,6 +5321,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         exmode = texture.extension
         if exmode in TextureUnit.tex_address_mode:
             M += indent(4, 'tex_address_mode %s' %TextureUnit.tex_address_mode[exmode] )
+
 
         # TODO - hijack nodes for better control?
         if slot:        # classic blender material slot options
@@ -5343,10 +5346,8 @@ class OgreMaterialGenerator( _image_processing_ ):
             if slot.use_map_scatter:    # hijacked from volume shaders
                 M += indent(4, 'scroll_anim %s %s ' %(slot.density_factor, slot.emission_factor) )
 
-            ## set uv layer
             if slot.uv_layer:
-                idx = find_uv_layer_index( self.material, slot.uv_layer )
-                #idx = guess_uv_layer( slot.uv_layer )
+                idx = find_uv_layer_index( slot.uv_layer, self.material )
                 M += indent(4, 'tex_coord_set %s' %idx)
 
             rgba = False
@@ -5378,7 +5379,14 @@ class OgreMaterialGenerator( _image_processing_ ):
             elif texop:
                     M += indent(4, 'colour_op %s' %texop )
 
-        M += indent(3, '}' )    # end texture
+        else:
+            if uv_layer:
+                idx = find_uv_layer_index( uv_layer )
+                M += indent(4, 'tex_coord_set %s' %idx)
+
+
+        M += indent(3, '}' )
+        ###############
 
         if self.touch_textures:
             ## copy texture only if newer ##
@@ -5577,26 +5585,40 @@ class bpyShaders(bpy.types.Operator):
 
     @staticmethod
     def get_subnodes(mat, type='TEXTURE'):
-        r = []
+        d = {}
         for node in mat.nodes:
-            if node.type==type:
-                r.append( node )
+            if node.type==type: d[node.name] = node
+        keys = list(d.keys())
+        keys.sort()
+        r = []
+        for key in keys: r.append( d[key] )
         return r
+
+
     @staticmethod
     def get_texture_subnodes( parent, submaterial=None ):
         if not submaterial: submaterial = parent.active_node_material
-        r = []
+        d = {}
         for link in parent.node_tree.links:
             if link.from_node and link.from_node.type=='TEXTURE':
                 if link.to_node and link.to_node.type == 'MATERIAL_EXT':
-                    #print( link, link.to_node )
                     if link.to_node.material:
-                        #print(link.to_node.material.name, submaterial.name)
                         if link.to_node.material.name == submaterial.name:
-                            r.append( link.from_node )
+                            node = link.from_node
+                            d[node.name] = node
+        keys = list(d.keys())
+        keys.sort()
+        r = []
+        for key in keys: r.append( d[key] )
         return r
 
-
+    @staticmethod
+    def get_connected_input_nodes( material, node ):
+        r = []
+        for link in material.node_tree.links:
+            if link.to_node and link.to_node.name == node.name:
+                r.append( link.from_node )
+        return r
 
     @staticmethod
     def get_or_create_material_passes( mat, n=8 ):
@@ -5604,19 +5626,22 @@ class bpyShaders(bpy.types.Operator):
             print('CREATING MATERIAL PASSES', n)
             bpyShaders.create_material_passes( mat, n )
 
-        r = []
+        d = {}      # funky, blender259 had this in order, now blender260 has random order
         for node in mat.node_tree.nodes:
             if node.type == 'MATERIAL_EXT' and node.name.startswith('GEN.'):
-                r.append( node )
+                d[node.name] = node
+        keys = list(d.keys())
+        keys.sort()
+        r = []
+        for key in keys: r.append( d[key] )
         return r
 
     @staticmethod
-    def get_or_create_texture_nodes( mat, n=6 ):
+    def get_or_create_texture_nodes( mat, n=6 ):    # currently not used
         #print('bpyShaders.get_or_create_texture_nodes( %s, %s )' %(mat,n))
         assert mat.node_tree    # must call create_material_passes first
         m = []
         for node in mat.node_tree.nodes:
-            print( node )
             if node.type == 'MATERIAL_EXT' and node.name.startswith('GEN.'):
                 m.append( node )
         if not m:
@@ -5650,7 +5675,7 @@ class bpyShaders(bpy.types.Operator):
             node.name = 'GEN.%s' %i
             node.location.x = x; node.location.y = 640
             r.append( node )
-            x += 180
+            x += 220
         #mat.use_nodes = False  # TODO set user material to default output
         if textures:
             texnodes = bpyShaders.create_texture_nodes( mat )
@@ -5658,13 +5683,13 @@ class bpyShaders(bpy.types.Operator):
         return r
 
     @staticmethod
-    def create_texture_nodes( mat, n=6 ):
+    def create_texture_nodes( mat, n=6, geoms=True ):
         #print('bpyShaders.create_texture_nodes( %s )' %mat)
         assert mat.node_tree    # must call create_material_passes first
         mats = bpyShaders.get_or_create_material_passes( mat )
-        r = {}; x = 500
+        r = {}; x = 400
         for i,m in enumerate(mats):
-            r['material'] = m; r['textures'] = []
+            r['material'] = m; r['textures'] = []; r['geoms'] = []
             inputs = []     # other inputs mess up material preview #
             for tag in ['Mirror', 'Ambient', 'Emit', 'SpecTra', 'Ray Mirror', 'Translucency']:
                 inputs.append( m.inputs[ tag ] )
@@ -5676,7 +5701,14 @@ class bpyShaders(bpy.types.Operator):
                 input = inputs[j]; output = tex.outputs['Color']
                 link = mat.node_tree.links.new( input, output )
                 r['textures'].append( tex )
-            x += 180
+
+                if geoms:
+                    geo = mat.node_tree.nodes.new( type='GEOMETRY' )
+                    link = mat.node_tree.links.new( tex.inputs['Vector'], geo.outputs['UV'] )
+                    geo.location.x = x - (j*16) - 250
+                    geo.location.y = -(j*250) - 1500
+                    r['geoms'].append( geo )
+            x += 220
         return r
 
 
@@ -5793,12 +5825,6 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
             progs = s.get_programs()
 
             split = box.row()
-            if show_programs and (s.vertex_programs or s.fragment_programs):
-                bx = split.box()
-                for name in s.vertex_programs:
-                    bx.label( text=name )
-                for name in s.fragment_programs:
-                    bx.label( text=name )
 
             texnodes = None
             if parent:
@@ -5814,13 +5840,24 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                 for i,name in enumerate(s.texture_units):
                     if i<len(texnodes):
                         row = bx.row()
-                        row.label( text=name )
+                        #row.label( text=name )
                         tex = texnodes[i]
-                        row.prop( tex, 'texture', text='' )
+                        row.prop( tex, 'texture', text=name )
+                        if parent:
+                            inputs = bpyShaders.get_connected_input_nodes( parent, tex )
+                            if inputs:
+                                geo = inputs[0]
+                                assert geo.type == 'GEOMETRY'
+                                row.prop( geo, 'uv_layer', text='UV' )
                     else:
                         print('WARNING: no slot for texture unit:', name)
 
-
+            if show_programs and (s.vertex_programs or s.fragment_programs):
+                bx = box.box()
+                for name in s.vertex_programs:
+                    bx.label( text=name )
+                for name in s.fragment_programs:
+                    bx.label( text=name )
 
 
 ###########################################################################

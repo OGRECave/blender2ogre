@@ -5,7 +5,7 @@ License: GNU LGPL
 Version: 0.5.5 2011
 
 Supports:
-	Blender 2.59
+	Blender 2.6
 	Linux, Windows, OSX
 
 Upgrading?
@@ -35,7 +35,7 @@ Installing:
 
 Dependencies:
 	Required:
-		1. blender2.59
+		1. blender2.6
 		2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
 			http://www.ogre3d.org/download/tools
 
@@ -51,9 +51,10 @@ Dependencies:
 			If your using 64bit Windows, you will need to download a 64bit OgreMeshy
 			(Linux copy to your home folder)
 
-		6. Tundra2
-			Windows: copy Tundra2 to C:\Tundra2
-			Linux: copy Tundra2 to your home directory
+		6. RealXtend Tundra2
+			http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
+			Windows: extract to C:\Tundra2
+			Linux: extract to Tundra2 in your home directory (~/Tundra2)
 
 
 ################################### OSX ########################################
