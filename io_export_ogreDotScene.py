@@ -67,6 +67,15 @@ bpy.types.Image.color_quantize = IntProperty(
     name="color quantize", description="reduce to N colors (requires ImageMagick)", 
     default=32, min=2, max=256)
 
+bpy.types.Image.use_resize_half = BoolProperty( name='force image resize by half', default=False )
+bpy.types.Image.use_resize_absolute = BoolProperty( name='force image resize', default=False )
+bpy.types.Image.resize_x = IntProperty(
+    name="resize X", description="only if image is larger than defined, use ImageMagick to resize it", 
+    default=256, min=2, max=4096)
+bpy.types.Image.resize_y = IntProperty(
+    name="resize Y", description="only if image is larger than defined, use ImageMagick to resize it", 
+    default=256, min=2, max=4096)
+
 
 # ..Material.ogre_depth_write = AUTO|ON|OFF
 bpy.types.Material.ogre_depth_write = BoolProperty( name='depth write', default=True )
@@ -97,7 +106,7 @@ bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', defaul
 bpy.types.Material.ogre_colour_write = BoolProperty( name='color-write', default=True )
 
 
-bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=False )    # fixed pipeline is oldschool
+bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=True )    # fixed pipeline is oldschool
 
 # hidden option - gets turned on by operator
 bpy.types.Material.use_material_passes = BoolProperty( name='use ogre extra material passes (layers)', default=False )
@@ -4776,7 +4785,7 @@ def unregister():
 
 bpy.types.World.ogre_skyX = BoolProperty(
     name="enable sky", description="ogre sky",
-    default=True
+    default=False
 )
 
 bpy.types.World.ogre_skyX_time = FloatProperty(
@@ -4827,7 +4836,6 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
 
-#_OGRE_MATERIAL_CLASS_SCRIPT = {}
 class OgreProgram(object):
     '''
     parses .program scripts
