@@ -67,13 +67,13 @@ bpy.types.Image.color_quantize = IntProperty(
     name="color quantize", description="reduce to N colors (requires ImageMagick)", 
     default=32, min=2, max=256)
 
-bpy.types.Image.use_resize_half = BoolProperty( name='force image resize by half', default=False )
+bpy.types.Image.use_resize_half = BoolProperty( name='resize by 1/2', default=False )
 bpy.types.Image.use_resize_absolute = BoolProperty( name='force image resize', default=False )
 bpy.types.Image.resize_x = IntProperty(
-    name="resize X", description="only if image is larger than defined, use ImageMagick to resize it", 
+    name="resize X", description="only if image is larger than defined, use ImageMagick to resize it down", 
     default=256, min=2, max=4096)
 bpy.types.Image.resize_y = IntProperty(
-    name="resize Y", description="only if image is larger than defined, use ImageMagick to resize it", 
+    name="resize Y", description="only if image is larger than defined, use ImageMagick to resize it down", 
     default=256, min=2, max=4096)
 
 
@@ -1609,7 +1609,16 @@ class PANEL_Textures(bpy.types.Panel):
             row.prop( img, 'use_color_quantize', text='Reduce Colors' )
             if img.use_color_quantize:
                 row.prop( img, 'use_color_quantize_dither', text='dither' )
-                row.prop( img, 'color_quantize' )
+                row.prop( img, 'color_quantize', text='colors' )
+
+            row = box.row()
+            row.prop( img, 'use_resize_half' )
+            if not img.use_resize_half:
+                row.prop( img, 'use_resize_absolute' )
+                if img.use_resize_absolute:
+                    row = box.row()
+                    row.prop( img, 'resize_x' )
+                    row.prop( img, 'resize_y' )
 
 ###################
 
@@ -5070,10 +5079,21 @@ class MaterialScripts(object):
 
 
 ############################################################################
+def is_image_postprocessed( image ):
+    if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE' or image.use_resize_half or image.use_resize_absolute or image.use_color_quantize:
+        return True
+    else:
+        return False
 
 class _image_processing_( object ):
-    def _reformat( self, image ):
-        return '%s.%s' %(image[ : image.rindex('.') ], CONFIG['FORCE_IMAGE_FORMAT'])
+    def _reformat( self, name, image ):
+        if image.use_resize_half or image.use_resize_absolute:
+            name = 'R.%s' %name
+        if image.use_color_quantize:
+            name = 'Q.%s' %name
+        if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
+            name = '%s.%s' %(name[:name.rindex('.')], CONFIG['FORCE_IMAGE_FORMAT'])
+        return name
 
     def image_magick( self, texture, infile ):
         print('IMAGE MAGICK', infile )
@@ -5084,9 +5104,20 @@ class _image_processing_( object ):
         cmd = [ exe, infile ]
         ## enforce max size ##
         x,y = texture.image.size
-        if x > CONFIG['MAX_TEXTURE_SIZE'] or y > CONFIG['MAX_TEXTURE_SIZE']:
+        ax = texture.image.resize_x
+        ay = texture.image.resize_y
+
+        if texture.image.use_resize_half:
+            cmd.append( '-resize' )
+            cmd.append( '%sx%s' %(x/2, y/2) )
+        elif texture.image.use_resize_absolute and (x>ax or y>ay):
+            cmd.append( '-resize' )
+            cmd.append( '%sx%s' %(ax,ay) )
+
+        elif x > CONFIG['MAX_TEXTURE_SIZE'] or y > CONFIG['MAX_TEXTURE_SIZE']:
             cmd.append( '-resize' )
             cmd.append( str(CONFIG['MAX_TEXTURE_SIZE']) )
+
         if texture.image.use_color_quantize:
             if texture.image.use_color_quantize_dither:
                 cmd.append( '+dither' )
@@ -5094,7 +5125,7 @@ class _image_processing_( object ):
             cmd.append( str(texture.image.color_quantize) )
 
         path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat( name ) )
+        outfile = os.path.join( path, self._reformat(name,texture.image) )
         cmd.append( outfile )
         print( 'IMAGE MAGICK', cmd )
         subprocess.call( cmd )
@@ -5107,7 +5138,7 @@ class _image_processing_( object ):
             print( 'ERROR: can not find nvdxt.exe', exe ); return
         opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
         path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat( name ) )
+        outfile = os.path.join( path, self._reformat(name,texture.image) )
         opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
         if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
             subprocess.call( ['/usr/bin/wine', exe]+opts )
@@ -5280,8 +5311,8 @@ class OgreMaterialGenerator( _image_processing_ ):
             else:
                 print('MESSAGE: packed image already in temp, not updating', iurl)
 
-        if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
-            postname = self._reformat( texname )
+        if is_image_postprocessed( texture.image ):
+            postname = self._reformat( texname, texture.image )
 
         M += indent(4, 'texture %s' %postname )    
 
@@ -5358,7 +5389,7 @@ class OgreMaterialGenerator( _image_processing_ ):
                     f = open( desturl, 'wb' )
                     f.write( open(iurl,'rb').read() )
                     f.close()
-                if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
+                if is_image_postprocessed( texture.image ):
                     if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds': self.DDS_converter( texture, desturl )
                     else: self.image_magick( texture, desturl )
 
