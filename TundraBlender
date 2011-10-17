@@ -21,4 +21,4 @@ rm ~/.blender/2.59/config/scripts/blender2ogre.pickle
 rm /tmp/*.mesh
 rm /tmp/*.material
 rm ~/.wine/drive_c/tmp/*.*
-~/Blender25/blender --python integrateTundra.py --window-geometry 20 15 1390 720
+~/Blender2.6/blender --python integrateTundra.py --window-geometry 20 15 1390 720

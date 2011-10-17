@@ -61,6 +61,13 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 
 ######################### bpy RNA #########################
 
+bpy.types.Image.use_color_quantize = BoolProperty( name='use color quantize', default=True )
+bpy.types.Image.use_color_quantize_dither = BoolProperty( name='use color quantize dither', default=True )
+bpy.types.Image.color_quantize = IntProperty(
+    name="color quantize", description="reduce to N colors (requires ImageMagick)", 
+    default=32, min=2, max=256)
+
+
 # ..Material.ogre_depth_write = AUTO|ON|OFF
 bpy.types.Material.ogre_depth_write = BoolProperty( name='depth write', default=True )
 
@@ -315,21 +322,24 @@ CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
 
 
 _IMAGE_FORMATS =  [     # for EnumProperty "FORCE_IMAGE_FORMAT"
-    ('NONE','NONE', 'keeps current image formats'),
+    ('NONE','NONE', 'do not convert image'),
+    ('bmp', 'bmp', 'bitmap format'),
     ('jpg', 'jpg', 'jpeg format'),
+    ('gif', 'gif', 'gif format'),
     ('png', 'png', 'png format'),
+    ('tga', 'tga', 'targa format'),
     ('dds', 'dds', 'nvidia dds format'),
 ]
 
 
 _CONFIG_DEFAULTS_ALL = {
     'COPY_SHADER_PROGRAMS' : True,
-
+    'MAX_TEXTURE_SIZE' : 4096,
     'SWAP_AXIS' : 'xz-y',         # ogre standard
     'ONLY_ANIMATED_BONES' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
-    'TOUCH_TEXTURES' : False,
-    'PATH' : '/tmp',
+    'TOUCH_TEXTURES' : True,
+#    'PATH' : '/tmp',
 
     'SEP_MATS' : True,
 
@@ -440,7 +450,7 @@ CONFIG = load_config()
 
 def save_config():  # PUBLIC API
     print('saving config....')
-    for key in CONFIG: print( '%s =   %s' %(key, CONFIG[key]) )
+    #for key in CONFIG: print( '%s =   %s' %(key, CONFIG[key]) )
     if os.path.isdir( CONFIG_PATH ):
         try:
             with open( CONFIG_FILEPATH, 'wb' ) as f:
@@ -453,7 +463,7 @@ def save_config():  # PUBLIC API
 
 
 class Blender2Ogre_ConfigOp(bpy.types.Operator):
-    '''operator: finds missing textures - checks directories with textures to see if missing are there.'''  
+    '''operator: saves current b2ogre configuration'''  
     bl_idname = "ogre.save_config"  
     bl_label = "save config file"
     bl_options = {'REGISTER'}
@@ -943,7 +953,7 @@ class OgreCollisionOp(bpy.types.Operator):
     bl_label = "modify collision"
     bl_options = {'REGISTER'}
 
-    MODE = StringProperty(name="toggle mode", description="...", maxlen=32, default="disable")
+    MODE = StringProperty(name="toggle mode", maxlen=32, default="disable")
 
     @classmethod
     def poll(cls, context):
@@ -1502,51 +1512,70 @@ class PANEL_Textures(bpy.types.Panel):
         slot = context.texture_slot
         if not slot or not slot.texture: return
 
+
+        btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
+        ex = False; texop = None
+        if btype in TextureUnit.colour_op:
+            if btype=='MIX' and slot.use_map_alpha and not slot.use_stencil:
+                if slot.diffuse_color_factor >= 1.0: texop = 'alpha_blend'
+                else:
+                    texop = TextureUnit.colour_op_ex[ btype ]
+                    ex = True
+            elif btype=='MIX' and slot.use_map_alpha and slot.use_stencil:
+                texop = 'blend_current_alpha'; ex=True
+            elif btype=='MIX' and not slot.use_map_alpha and slot.use_stencil:
+                texop = 'blend_texture_alpha'; ex=True
+            else:
+                texop = TextureUnit.colour_op[ btype ]
+        elif btype in TextureUnit.colour_op_ex:
+                texop = TextureUnit.colour_op_ex[ btype ]
+                ex = True
+
         box = layout.box()
         row = box.row()
-        row.label(text="Mapping:")
-        row.prop(slot, "texture_coords", text="")
-        if slot.texture_coords == 'UV':
-            row.label(text="UV Layer:")
-            row.prop(slot, "uv_layer", text="")
-        else:
-            row.label(text="Projection:")
-            row.prop(slot, "mapping", text="")
+        if texop:
+            if ex: row.prop(slot, "blend_type", text=texop, icon='NEW')
+            else: row.prop(slot, "blend_type", text=texop)
 
+        else: row.prop(slot, "blend_type", text='(invalid option)')
+
+        if btype == 'MIX':
+            row.prop(slot, "use_stencil", text="")
+            row.prop(slot, "use_map_alpha", text="")
+
+            if texop == 'blend_manual':
+                row = box.row()
+                row.label(text="Alpha:")
+                row.prop(slot, "diffuse_color_factor", text="")
+
+        ###########################
         if hasattr(slot.texture, 'image') and slot.texture.image:
             row = box.row()
-            row.label(text="Repeat Mode:")
-            row.prop(slot.texture, "extension", text="")
+            n = '(invalid option)'
+            if slot.texture.extension in TextureUnit.tex_address_mode:
+                n = TextureUnit.tex_address_mode[ slot.texture.extension ]
+            row.prop(slot.texture, "extension", text=n)
             if slot.texture.extension == 'CLIP':
-                row.label(text="Border Color:")
-                row.prop(slot, "color", text="")
-
-        box = layout.box()
-        row = box.row()
-        row.label(text="Blending:")
-        row.prop(slot, "blend_type", text="")
-        row.label(text="Alpha Stencil:")
-        row.prop(slot, "use_stencil", text="")
-        row = box.row()
-        if slot.blend_type == 'MIX':
-            row.label(text="Mixing:")
-            row.prop(slot, "diffuse_color_factor", text="")
-            #row.label(text="Enable:")
-            #row.prop(slot, "use_map_color_diffuse", text="")
+                row.prop(slot, "color", text="Border Color")
 
         row = box.row()
-        row.label(text="Enable Alpha:")
-        row.prop(slot, "use_map_alpha", text="")
-        if context.active_object and context.active_object.active_material:
-            row.label(text="Transparent:")
-            row.prop(context.active_object.active_material, "use_transparency", text="")
-            
+        if slot.texture_coords == 'UV':
+            row.prop(slot, "texture_coords", text="", icon='GROUP_UVS')
+            row.prop(slot, "uv_layer", text='Layer')
+        elif slot.texture_coords == 'REFLECTION':
+            row.prop(slot, "texture_coords", text="", icon='MOD_UVPROJECT')
+            n = '(invalid option)'
+            if slot.mapping in 'FLAT SPHERE'.split(): n = ''
+            row.prop(slot, "mapping", text=n)
+        else:
+            row.prop(slot, "texture_coords", text="(invalid mapping option)")
 
-        box = layout.box()
-        box.prop(slot, "offset", text="X,Y = offset.  Z=rotation")
-
-        box = layout.box()
-        box.prop(slot, "scale", text="Scale in X,Y.   (Z ignored)")
+        ########### animation and offset options ############
+        split = layout.row()
+        box = split.box()
+        box.prop(slot, "offset", text="XY=offset,  Z=rotation")
+        box = split.box()
+        box.prop(slot, "scale", text="XY=scale (Z ignored)")
 
         box = layout.box()
         row = box.row()
@@ -1641,7 +1670,7 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
 
             if mgroup:
                 for ob in mgroup.objects:
-                    nmats = dot_mesh( ob, path=path, normals=not self.preview )
+                    nmats = dot_mesh( ob, path=path )
                     for m in nmats:
                         if m not in umaterials: umaterials.append( m )
                 MeshMagick.merge( mgroup, path=path, force_name='preview' )
@@ -1651,11 +1680,11 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
                 umaterials = dot_mesh( context.active_object, path=path, force_name='preview' )
 
         if mat or umaterials:
-            CONFIG['TOUCH_TEXTURES'] = True
-            CONFIG['PATH'] = path
+            #CONFIG['TOUCH_TEXTURES'] = True
+            #CONFIG['PATH'] = path   # TODO deprecate
             data = ''
             for umat in umaterials:
-                data += generate_material( umat, path ) # copies shader programs to path
+                data += generate_material( umat, path=path, copy_programs=True, touch_textures=True ) # copies shader programs to path
             f=open( os.path.join( path, 'preview.material' ), 'wb' )
             f.write( bytes(data,'utf-8') ); f.close()
 
@@ -2548,9 +2577,9 @@ class _OgreCommonExport_( _TXML_ ):
             if mat is None: continue
             Report.materials.append( material_name(mat) )
             if CONFIG['COPY_SHADER_PROGRAMS']:
-                data = generate_material( mat, path )
+                data = generate_material( mat, path=path, copy_programs=True, touch_textures=CONFIG['TOUCH_TEXTURES'] )
             else:
-                data = generate_material( mat )
+                data = generate_material( mat, path=path, touch_textures=CONFIG['TOUCH_TEXTURES'] )
 
             M += data
             if self.EX_SEP_MATS:
@@ -2572,10 +2601,8 @@ class _OgreCommonExport_( _TXML_ ):
         return url
 
 
-
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
         dot_mesh( ob, path, force_name, ignore_shape_animation=False )
-
 
     def ogre_export(self, url, context ):
         global CONFIG
@@ -2583,10 +2610,6 @@ class _OgreCommonExport_( _TXML_ ):
             if name.startswith('EX_'):
                 CONFIG[ name[3:] ] = getattr(self,name)
 
-        #CONFIG['FORCE_IMAGE_FORMAT'] = None
-        #CONFIG['TOUCH_TEXTURES'] = True
-        #CONFIG['SWAP_AXIS'] = self.EX_SWAP_MODE
-        #CONFIG['ONLY_ANIMATED_BONES'] = self.EX_ONLY_ANIMATED_BONES
         Report.reset()
 
         print('ogre export->', url)
@@ -3603,7 +3626,7 @@ class INFO_MT_instance(bpy.types.Operator):
     bl_idname = "ogre.select_instances"
     bl_label = "Select Instance Group"
     bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
-    mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
+    mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
     @classmethod
     def poll(cls, context):
         return True
@@ -3643,7 +3666,7 @@ class INFO_MT_group(bpy.types.Operator):
     bl_idname = "ogre.select_group"
     bl_label = "Select Group"
     bl_options = {'REGISTER'}                              # Options for this panel type
-    mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
+    mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
     @classmethod
     def poll(cls, context):
         return True
@@ -3667,7 +3690,7 @@ class INFO_MT_actor(bpy.types.Operator):
     bl_idname = "ogre.select_actor"
     bl_label = "Select Actor"
     bl_options = {'REGISTER'}                              # Options for this panel type
-    mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
+    mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
     @classmethod
     def poll(cls, context): return True
     def invoke(self, context, event):
@@ -3689,7 +3712,7 @@ class INFO_MT_dynamic(bpy.types.Operator):
     bl_idname = "ogre.select_dynamic"
     bl_label = "Select Dynamic"
     bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
-    mystring= StringProperty(name="MyString", description="...", maxlen=1024, default="my string")
+    mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
     @classmethod
     def poll(cls, context): return True
     def invoke(self, context, event):
@@ -4518,7 +4541,7 @@ class MENU_preview_material_text(bpy.types.Menu):
         layout = self.layout
         mat = context.active_object.active_material
         if mat:
-            CONFIG['TOUCH_TEXTURES'] = False
+            #CONFIG['TOUCH_TEXTURES'] = False
             preview = generate_material( mat )
             for line in preview.splitlines():
                 if line.strip():
@@ -5018,20 +5041,34 @@ class MaterialScripts(object):
 ############################################################################
 
 class _image_processing_( object ):
-    def _reformat( self, image ): return image[ : image.rindex('.') ] + CONFIG['FORCE_IMAGE_FORMAT']
-    def image_magick( self, infile ):
-        print('[Image Magick Wrapper]', infile )
+    def _reformat( self, image ):
+        return '%s.%s' %(image[ : image.rindex('.') ], CONFIG['FORCE_IMAGE_FORMAT'])
+
+    def image_magick( self, texture, infile ):
+        print('IMAGE MAGICK', infile )
         exe = CONFIG['IMAGE_MAGICK_CONVERT']
         if not os.path.isfile( exe ):
             Report.warnings.append( 'ImageMagick not installed!' )
             print( 'ERROR: can not find Image Magick - convert', exe ); return
+        cmd = [ exe, infile ]
+        ## enforce max size ##
+        x,y = texture.image.size
+        if x > CONFIG['MAX_TEXTURE_SIZE'] or y > CONFIG['MAX_TEXTURE_SIZE']:
+            cmd.append( '-resize' )
+            cmd.append( str(CONFIG['MAX_TEXTURE_SIZE']) )
+        if texture.image.use_color_quantize:
+            if texture.image.use_color_quantize_dither:
+                cmd.append( '+dither' )
+            cmd.append( '-colors' )
+            cmd.append( str(texture.image.color_quantize) )
+
         path,name = os.path.split( infile )
         outfile = os.path.join( path, self._reformat( name ) )
-        opts = [ infile, outfile ]
-        subprocess.call( [exe]+opts )
-        print( 'image magick->', outfile )
+        cmd.append( outfile )
+        print( 'IMAGE MAGICK', cmd )
+        subprocess.call( cmd )
 
-    def DDS_converter(self, infile ):
+    def DDS_converter(self, texture, infile ):
         print('[NVIDIA DDS Wrapper]', infile )
         exe = CONFIG['NVIDIATOOLS_EXE']
         if not os.path.isfile( exe ):
@@ -5039,7 +5076,7 @@ class _image_processing_( object ):
             print( 'ERROR: can not find nvdxt.exe', exe ); return
         opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
         path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat( name ) )        #name.split('.')[0]+'.dds' )
+        outfile = os.path.join( path, self._reformat( name ) )
         opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
         if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
             subprocess.call( ['/usr/bin/wine', exe]+opts )
@@ -5052,9 +5089,11 @@ class _image_processing_( object ):
 
 
 class OgreMaterialGenerator( _image_processing_ ):
-    def __init__(self, material ):
+    def __init__(self, material, path='/tmp', touch_textures=False ):
         self.material = material    # top level material
+        self.path = path                # copy textures to path
         self.passes = []
+        self.touch_textures = touch_textures
         if material.node_tree:
             nodes = bpyShaders.get_subnodes( self.material.node_tree, type='MATERIAL_EXT' )
             for node in nodes:
@@ -5183,7 +5222,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         #if slot: print(dir(slot))
         if slot and not slot.use: return ''
 
-        path = CONFIG['PATH']
+        path = self.path    #CONFIG['PATH']
 
         M = ''; _alphahack = None
         if not name: name = 'b2ogre_%s' %time.time()
@@ -5216,20 +5255,14 @@ class OgreMaterialGenerator( _image_processing_ ):
         M += indent(4, 'texture %s' %postname )    
 
         exmode = texture.extension
-        if exmode == 'REPEAT':
-            M += indent(4, 'tex_address_mode wrap' )
-        elif exmode == 'EXTEND':
-            M += indent(4, 'tex_address_mode clamp' )
-        elif exmode == 'CLIP':
-            M += indent(4, 'tex_address_mode border' )
-        elif exmode == 'CHECKER':
-            M += indent(4, 'tex_address_mode mirror' )
+        if exmode in TextureUnit.tex_address_mode:
+            M += indent(4, 'tex_address_mode %s' %TextureUnit.tex_address_mode[exmode] )
 
-
+        # TODO - hijack nodes for better control?
         if slot:        # classic blender material slot options
             if exmode == 'CLIP': M += indent(4, 'tex_border_colour %s %s %s' %(slot.color.r, slot.color.g, slot.color.b) )    
-            M += indent(4, 'scale %s %s' %(1.0/slot.scale.x, 1.0/slot.scale.y) )    # thanks Reyn
-            if slot.texture_coords != 'UV':
+            M += indent(4, 'scale %s %s' %(1.0/slot.scale.x, 1.0/slot.scale.y) )
+            if slot.texture_coords == 'REFLECTION':
                 if slot.mapping == 'SPHERE':
                     M += indent(4, 'env_map spherical' )
                 elif slot.mapping == 'FLAT':
@@ -5256,48 +5289,36 @@ class OgreMaterialGenerator( _image_processing_ ):
 
             rgba = False
             if texture.image.depth == 32: rgba = True
+            btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
+            ex = False; texop = None
+            if btype in TextureUnit.colour_op:
+                if btype=='MIX' and slot.use_map_alpha and not slot.use_stencil:
+                    if slot.diffuse_color_factor >= 1.0: texop = 'alpha_blend'
+                    else:
+                        texop = TextureUnit.colour_op[ btype ]
+                        ex = True
+                elif btype=='MIX' and slot.use_map_alpha and slot.use_stencil:
+                    texop = 'blend_current_alpha'; ex=True
+                elif btype=='MIX' and not slot.use_map_alpha and slot.use_stencil:
+                    texop = 'blend_texture_alpha'; ex=True
+                else:
+                    texop = TextureUnit.colour_op[ btype ]
+            elif btype in TextureUnit.colour_op_ex:
+                    texop = TextureUnit.colour_op_ex[ btype ]
+                    ex = True
 
-            btype = slot.blend_type
-
-            if rgba and slot.use_stencil:              # TODO - fix this hack when slots support pyRNA
-                texop = 'blend_current_alpha'        # 'blend_texture_alpha' shadeless
-            elif btype == 'MIX':
-                texop = 'blend_manual'
-            elif btype == 'MULTIPLY':
-                texop = 'modulate'
-            elif btype == 'SCREEN':
-                texop = 'modulate_x2'
-            elif btype == 'LIGHTEN':
-                texop = 'modulate_x4'
-            elif btype == 'ADD':
-                texop = 'add'
-            elif btype == 'SUBTRACT':
-                texop = 'subtract'
-            elif btype == 'OVERLAY':
-                texop = 'add_signed'
-            elif btype == 'DIFFERENCE':
-                texop = 'dotproduct'        # nothing closely matches blender
-            else:
-                texop = 'blend_diffuse_colour'
-
-            factor = 1.0 - slot.diffuse_color_factor
-
-            if texop == 'blend_manual':
-                M += indent(4, 'colour_op_ex %s src_current src_texture %s' %(texop, factor) )
-            else:
-                M += indent(4, 'colour_op_ex %s src_texture src_current' %texop )
-                #M += indent(4, 'colour_op_ex blend_current_alpha src_texture src_current' )
-                #M += indent(4, 'colour_op_ex %s src_manual src_diffuse %s' %(texop, 1.0-factor) )
-                #M += indent(4, 'alpha_op_ex blend_manual src_current src_current %s' %factor )
-            if slot.use_map_alpha:
-                #alphafactor = 1.0 - slot.alpha_factor
-                #M += indent(4, 'colour_op_ex blend_manual src_current src_texture %s' %factor )
-                M += indent(4, 'alpha_op_ex modulate src_current src_texture' )
-
+            if texop and ex:
+                if texop == 'blend_manual':
+                    factor = 1.0 - slot.diffuse_color_factor
+                    M += indent(4, 'colour_op_ex %s src_texture src_current %s' %(texop, factor) )
+                else:
+                    M += indent(4, 'colour_op_ex %s src_texture src_current' %texop )
+            elif texop:
+                    M += indent(4, 'colour_op %s' %texop )
 
         M += indent(3, '}' )    # end texture
 
-        if CONFIG['TOUCH_TEXTURES']:
+        if self.touch_textures:
             ## copy texture only if newer ##
             if not os.path.isfile( iurl ): Report.warnings.append( 'missing texture: %s' %iurl )
             else:
@@ -5306,14 +5327,37 @@ class OgreMaterialGenerator( _image_processing_ ):
                     f = open( desturl, 'wb' )
                     f.write( open(iurl,'rb').read() )
                     f.close()
-                if CONFIG['FORCE_IMAGE_FORMAT']:        # bug fix jan7th 2011
-                    if CONFIG['FORCE_IMAGE_FORMAT'] == '.dds': self.DDS_converter( desturl )
-                    else: self.image_magick( desturl )
+                if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
+                    if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds': self.DDS_converter( texture, desturl )
+                    else: self.image_magick( texture, desturl )
 
         return M
 
 
 
+class TextureUnit(object):
+    colour_op = {
+        'MIX'       :   'replace',
+        'ADD'     :   'add',
+        'MULTIPLY' : 'modulate',
+        #'alpha_blend' : '',
+    }
+    colour_op_ex = {
+        'MIX'       :    'blend_manual',
+        'SCREEN': 'modulate_x2',
+        'LIGHTEN': 'modulate_x4',
+        'SUBTRACT': 'subtract',
+        'OVERLAY':    'add_signed',
+        'DIFFERENCE': 'dotproduct',        # best match?
+        'VALUE': 'blend_diffuse_colour',
+    }
+
+    tex_address_mode = {
+        'REPEAT': 'wrap',
+        'EXTEND': 'clamp',
+        'CLIP'       : 'border',
+        'CHECKER' : 'mirror'
+    }
 
 
 
@@ -5334,7 +5378,7 @@ def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False,
     return dot_mesh( ob, path, force_name, ignore_shape_animation, opts, normals )
 
 
-def generate_material( mat, copy_programs_to_path=None ):
+def generate_material( mat, path='/tmp', copy_programs=False, touch_textures=False ):
     ''' returns generated material string '''
     safename = material_name(mat)     # supports blender library linking
     M = '// blender material: %s\n' %(mat.name)
@@ -5342,10 +5386,10 @@ def generate_material( mat, copy_programs_to_path=None ):
     if mat.use_shadows: M += indent(1, 'receive_shadows on')
     else: M += indent(1, 'receive_shadows off')
     M += indent(1, 'technique b2ogre_%s'%time.time(), '{' )    # technique GLSL, CG
-    w = OgreMaterialGenerator( mat )
-    if copy_programs_to_path:
+    w = OgreMaterialGenerator( mat, path=path, touch_textures=touch_textures )
+    if copy_programs:
         progs = w.get_active_programs()
-        for prog in progs: prog.save( copy_programs_to_path )
+        for prog in progs: prog.save( path )
 
     header = w.get_header()
     passes = w.get_passes()
@@ -5566,20 +5610,12 @@ class bpyShaders(bpy.types.Operator):
                 tex = mat.node_tree.nodes.new( type='TEXTURE' )
                 tex.name = 'TEX.%s.%s' %(j, m.name)
                 tex.location.x = x - (j*16)
-                #if j == 0: tex.location.y = 840; tex.location.x += 120
-                #else: 
                 tex.location.y = -(j*230)
-
                 input = inputs[j]; output = tex.outputs['Color']
                 link = mat.node_tree.links.new( input, output )
                 r['textures'].append( tex )
-                print(tex, tex.location)
             x += 180
         return r
-
-
-#mats.sort( key=lambda x: x.node.location.y, reverse=True )
-
 
 
 @UI
@@ -5587,7 +5623,6 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
     bl_label = "Ogre Material"
-    #bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         layout = self.layout
@@ -5692,7 +5727,7 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
         row.prop(mat, 'ogre_parent_material', text='')
 
         s = get_ogre_user_material( mat.ogre_parent_material )  # gets by name
-        if s.vertex_programs or s.fragment_programs:
+        if s and (s.vertex_programs or s.fragment_programs):
             progs = s.get_programs()
 
             split = box.row()
