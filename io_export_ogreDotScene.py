@@ -61,7 +61,7 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 
 ######################### bpy RNA #########################
 
-bpy.types.Image.use_color_quantize = BoolProperty( name='use color quantize', default=True )
+bpy.types.Image.use_color_quantize = BoolProperty( name='use color quantize', default=False )
 bpy.types.Image.use_color_quantize_dither = BoolProperty( name='use color quantize dither', default=True )
 bpy.types.Image.color_quantize = IntProperty(
     name="color quantize", description="reduce to N colors (requires ImageMagick)", 
@@ -1592,6 +1592,16 @@ class PANEL_Textures(bpy.types.Panel):
         row.prop(slot, "emission_color_factor", text="")
         row.prop(slot, "use_from_dupli", text="")
 
+        ############# image magick #############
+        if hasattr(slot.texture, 'image') and slot.texture.image:
+            img = slot.texture.image
+            box = layout.box()
+            row = box.row()
+            row.prop( img, 'use_color_quantize', text='Reduce Colors' )
+            if img.use_color_quantize:
+                row.prop( img, 'use_color_quantize_dither', text='dither' )
+                row.prop( img, 'color_quantize' )
+
 ###################
 
 
@@ -2635,13 +2645,26 @@ class _OgreCommonExport_( _TXML_ ):
             grp = e.dupli_group
             subs = []
             for o in grp.objects:
-                if o.type=='MESH': subs.append( o )
+                if o.type=='MESH': subs.append( o )     # TOP-LEVEL
+
                 elif o.type == 'EMPTY' and o.dupli_group and o.dupli_type == 'GROUP':
+                    ss = []     # LEVEL2
                     for oo in o.dupli_group.objects:
-                        if oo.type=='MESH': subs.append( oo )
+                        if oo.type=='MESH': ss.append( oo )
+
                         elif oo.type == 'EMPTY' and oo.dupli_group and oo.dupli_type == 'GROUP':
+                            sss = []    # LEVEL3
                             for ooo in oo.dupli_group.objects:
-                                if ooo.type=='MESH': subs.append( ooo )
+                                if ooo.type=='MESH': sss.append( ooo )
+                            if sss:
+                                m = merge_objects( sss, name=oo.name, transform=oo.matrix_world )
+                                subs.append( m )
+                                temps.append( m )
+                    if ss:
+                        m = merge_objects( ss, name=o.name, transform=o.matrix_world )
+                        subs.append( m )
+                        temps.append( m )
+
 
             if subs:
                 m = merge_objects( subs, name=e.name, transform=e.matrix_world )
