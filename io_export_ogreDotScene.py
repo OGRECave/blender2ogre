@@ -25,7 +25,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 preview7'
+VERSION = '0.5.5 preview8'
 
 ## Public API ##
 UI_CLASSES = []
@@ -562,7 +562,7 @@ def indent( level, *args ):
     else:
         a = ''
         for line in args:
-            a += '\t' * level
+            a += '    ' * level
             a += line
             a += '\n'
         return a
@@ -2634,7 +2634,7 @@ class _OgreCommonExport_( _TXML_ ):
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
         dot_mesh( ob, path, force_name, ignore_shape_animation=False )
 
-    def ogre_export(self, url, context ):
+    def ogre_export(self, url, context, force_material_update=[] ):
         global CONFIG
         for name in dir(self):
             if name.startswith('EX_'):
@@ -2733,7 +2733,11 @@ class _OgreCommonExport_( _TXML_ ):
 
         if self.EX_MATERIALS:
             material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
-            material_files = self.dot_material( meshes, path, material_file_name_base)
+            material_files = self.dot_material( 
+                meshes + force_material_update, 
+                path, 
+                material_file_name_base
+            )
         else:
             material_files = []
 
@@ -4480,16 +4484,10 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
     bl_idname = 'tundra.preview'
     bl_label = "opens Tundra2 in a non-blocking subprocess"
     bl_options = {'REGISTER'}
-
     filepath= StringProperty(name="File Path", description="Filepath used for exporting Tundra .txml file", maxlen=1024, default="/tmp/preview.txml", subtype='FILE_PATH')
     EXPORT_TYPE = 'REX'
-
-    EX_SWAP_AXIS = EnumProperty( 
-        items=AXIS_MODES, 
-        name='swap axis',  
-        description='axis swapping mode', 
-        default= CONFIG['SWAP_AXIS']
-    )
+    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=False)
+    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=False)
 
     @classmethod
     def poll(cls, context):
@@ -4497,12 +4495,18 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
 
     def invoke(self, context, event):
         global TundraSingleton
+        syncmats = []
+        if TundraSingleton:
+            obs = TundraSingleton.deselect_previously_updated(context)
+            for ob in obs:
+                if ob.type=='MESH': syncmats.append( ob )
+
         path = '/tmp/preview.txml'
-        self.ogre_export( path, context )
+        self.ogre_export( path, context, force_material_update=syncmats )
         if not TundraSingleton:
-            TundraSingleton = TundraPipe()
-        else:   # TODO
-            pass    #TundraSingleton.load( path )
+            TundraSingleton = TundraPipe( context )
+        else:
+            TundraSingleton.load( context, path )
         return {'FINISHED'}
 
 TundraSingleton = None
@@ -4546,11 +4550,13 @@ class Tundra_PhysicsDebugOp(bpy.types.Operator):
 
 
 class TundraPipe(object):
-    def __init__(self):
+    def __init__(self, context):
         self._physics_debug = True
+        self._objects = [ob.name for ob in context.selected_objects]
+
         exe = os.path.join( CONFIG['TUNDRA_ROOT'], 'Tundra.exe' )
         if sys.platform == 'linux2':
-            cmd = ['wine', exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
+            cmd = ['wine', exe, '--loglevel', 'debug', '--file', '/tmp/preview.txml']
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         else:
             cmd = [exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
@@ -4558,7 +4564,14 @@ class TundraPipe(object):
         time.sleep(0.1)
         self.stop()
 
-    def load( self, url ):
+    def deselect_previously_updated(self, context):
+        r = []
+        for ob in context.selected_objects:
+            if ob.name in self._objects: ob.select = False; r.append( ob )
+        return r
+
+    def load( self, context, url ):
+        self._objects += [ob.name for ob in context.selected_objects]
         self.proc.stdin.write( b'loadscene(/tmp/preview.txml, true, true)\n')
         self.proc.stdin.flush()
 
