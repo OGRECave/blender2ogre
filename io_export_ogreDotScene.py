@@ -4497,15 +4497,19 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
         global TundraSingleton
         syncmats = []
         if TundraSingleton:
+            actob = context.active_object
             obs = TundraSingleton.deselect_previously_updated(context)
             for ob in obs:
-                if ob.type=='MESH': syncmats.append( ob )
+                if ob.type=='MESH':
+                    syncmats.append( ob )
+                    if ob.name == actob.name:
+                        export_mesh( ob )
 
         path = '/tmp/preview.txml'
         self.ogre_export( path, context, force_material_update=syncmats )
         if not TundraSingleton:
             TundraSingleton = TundraPipe( context )
-        else:
+        elif self.EX_SCENE:
             TundraSingleton.load( context, path )
         return {'FINISHED'}
 
@@ -4553,16 +4557,27 @@ class TundraPipe(object):
     def __init__(self, context):
         self._physics_debug = True
         self._objects = [ob.name for ob in context.selected_objects]
+        self.proc = None
+        exe = None
+        if 'Tundra.exe' in os.listdir( CONFIG['TUNDRA_ROOT'] ):
+            exe = os.path.join( CONFIG['TUNDRA_ROOT'], 'Tundra.exe' )
+        elif 'Tundra' in os.listdir( CONFIG['TUNDRA_ROOT'] ):
+            exe = os.path.join( CONFIG['TUNDRA_ROOT'], 'Tundra' )
 
-        exe = os.path.join( CONFIG['TUNDRA_ROOT'], 'Tundra.exe' )
-        if sys.platform == 'linux2':
-            cmd = ['wine', exe, '--loglevel', 'debug', '--file', '/tmp/preview.txml']
-            self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        else:
+        if not exe:
+            print('ERROR: failed to find Tundra executable')
+        elif sys.platform.startswith('win'):
             cmd = [exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        time.sleep(0.1)
-        self.stop()
+        else:
+            if exe.endswith('.exe'): cmd = ['wine']     # assume user has Wine
+            else: cmd = []                                          # native build
+            cmd += [exe, '--loglevel', 'debug', '--file', '/tmp/preview.txml']
+            self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+
+        if self.proc:
+            time.sleep(0.1)
+            self.stop()
 
     def deselect_previously_updated(self, context):
         r = []
@@ -4615,7 +4630,7 @@ class INFO_HT_myheader(bpy.types.Header):
         ob = context.active_object
         screen = context.screen
 
-        layout.separator()
+        #layout.separator()
 
         if _USE_JMONKEY_:
             row = layout.row(align=True)
@@ -4625,6 +4640,8 @@ class INFO_HT_myheader(bpy.types.Header):
             row = layout.row(align=True)
             op = row.operator( 'tundra.preview', text='', icon='WORLD' )
             if TundraSingleton:
+                op = row.operator( 'tundra.preview', text='', icon='META_CUBE' )
+                op.EX_SCENE = False
                 op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
                 op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
                 op = row.operator( 'tundra.toggle_physics_debug', text='', icon='WIRE' )
@@ -4671,7 +4688,7 @@ class INFO_HT_myheader(bpy.types.Header):
                 row.prop( ob, 'draw_type', text='' )
                 row.prop( ob, 'show_x_ray', text='' )
                 row = layout.row()
-                row.scale_y = 0.75
+                row.scale_y = 0.75; row.scale_x = 0.9
                 row.prop( ob, 'layers', text='' )
 
             layout.separator()
@@ -5458,7 +5475,7 @@ def material_name( mat ):
 
 def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
     ''' returns materials used by the mesh '''
-    return dot_mesh( ob, path, force_name, ignore_shape_animation, opts, normals )
+    return dot_mesh( ob, path, force_name, ignore_shape_animation, normals )
 
 
 def generate_material( mat, path='/tmp', copy_programs=False, touch_textures=False ):
