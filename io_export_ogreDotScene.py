@@ -4496,6 +4496,7 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
     def invoke(self, context, event):
         global TundraSingleton
         syncmats = []
+        obs = []
         if TundraSingleton:
             actob = context.active_object
             obs = TundraSingleton.deselect_previously_updated(context)
@@ -4511,6 +4512,8 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
             TundraSingleton = TundraPipe( context )
         elif self.EX_SCENE:
             TundraSingleton.load( context, path )
+
+        for ob in obs: ob.select = True     # restore selection
         return {'FINISHED'}
 
 TundraSingleton = None
@@ -4551,6 +4554,17 @@ class Tundra_PhysicsDebugOp(bpy.types.Operator):
         TundraSingleton.toggle_physics_debug()
         return {'FINISHED'}
 
+class Tundra_ExitOp(bpy.types.Operator):
+    '''TundraSingleton helper'''
+    bl_idname = 'tundra.exit'
+    bl_label = "quit tundra"
+    bl_options = {'REGISTER'}
+    @classmethod
+    def poll(cls, context):
+        if TundraSingleton: return True
+    def invoke(self, context, event):
+        TundraSingleton.exit()
+        return {'FINISHED'}
 
 
 class TundraPipe(object):
@@ -4575,6 +4589,7 @@ class TundraPipe(object):
             cmd += [exe, '--loglevel', 'debug', '--file', '/tmp/preview.txml']
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
+        self.physics = True
         if self.proc:
             time.sleep(0.1)
             self.stop()
@@ -4585,23 +4600,34 @@ class TundraPipe(object):
             if ob.name in self._objects: ob.select = False; r.append( ob )
         return r
 
-    def load( self, context, url ):
+    def load( self, context, url, clear=False ):
         self._objects += [ob.name for ob in context.selected_objects]
-        self.proc.stdin.write( b'loadscene(/tmp/preview.txml, true, true)\n')
+        if clear:
+            self.proc.stdin.write( b'loadscene(/tmp/preview.txml,true,true)\n')
+        else:
+            self.proc.stdin.write( b'loadscene(/tmp/preview.txml,false,true)\n')
         self.proc.stdin.flush()
 
     def start( self ):
         self.proc.stdin.write( b'startphysics\n' )
         self.proc.stdin.flush()
+        self.physics = True
 
     def stop( self ):
         self.proc.stdin.write( b'stopphysics\n' )
         self.proc.stdin.flush()
+        self.physics = False
 
     def toggle_physics_debug( self ):
         self._physics_debug = not self._physics_debug
         self.proc.stdin.write( b'physicsdebug\n' )
         self.proc.stdin.flush()
+
+    def exit(self):
+        self.proc.stdin.write( b'exit\n' )
+        self.proc.stdin.flush()
+        global TundraSingleton
+        TundraSingleton = None
 
 class MENU_preview_material_text(bpy.types.Menu):
     bl_label = 'preview'
@@ -4642,9 +4668,12 @@ class INFO_HT_myheader(bpy.types.Header):
             if TundraSingleton:
                 op = row.operator( 'tundra.preview', text='', icon='META_CUBE' )
                 op.EX_SCENE = False
-                op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
-                op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
-                op = row.operator( 'tundra.toggle_physics_debug', text='', icon='WIRE' )
+                if not TundraSingleton.physics:
+                    op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
+                else:
+                    op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
+                op = row.operator( 'tundra.toggle_physics_debug', text='', icon='MOD_PHYSICS' )
+                op = row.operator( 'tundra.exit', text='', icon='CANCEL' )
 
         op = layout.operator( 'ogremeshy.preview', text='', icon='PLUGIN' ); op.mesh = True
 
@@ -5747,7 +5776,9 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
     bl_label = "Ogre Material"
-
+    @classmethod
+    def poll(self,context):
+        if context.space_data.id: return True
     def draw(self, context):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
@@ -5772,6 +5803,9 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
     bl_region_type = 'UI'
     bl_label = "Ogre Material Advanced"
     bl_options = {'DEFAULT_CLOSED'}
+    @classmethod
+    def poll(self,context):
+        if context.space_data.id: return True
     def draw(self, context):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
