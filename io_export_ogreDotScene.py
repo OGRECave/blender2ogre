@@ -2128,7 +2128,7 @@ class _TXML_(object):
         a = doc.createElement('attribute'); c.appendChild( a )
         a.setAttribute('name', 'Ambient light color')
         if hemi:
-            R,G,B = hemi.data.color * (hemi.data.energy+0.5)
+            R,G,B = hemi.data.color * hemi.data.energy * 3.0
             if R>1.0: R=1.0
             if G>1.0: G=1.0
             if B>1.0: B=1.0
