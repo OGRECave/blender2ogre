@@ -77,6 +77,10 @@ bpy.types.Image.resize_y = IntProperty(
     default=256, min=2, max=4096)
 
 
+## use Material.offset_z ##
+#bpy.types.Material.ogre_depth_bias = IntProperty( name="depth bias", description="The final depth bias value is constant_bias * minObservableDepth + maxSlope * slopescale_bias. Slope scale biasing is relative to the angle of the polygon to the camera, which makes for a more appropriate bias value, but this is ignored on some older hardware. Constant biasing is expressed as a factor of the minimum depth value, so a value of 1 will nudge the depth by one 'notch' if you will", default=0, min=0, max=100)
+
+
 # ..Material.ogre_depth_write = AUTO|ON|OFF
 bpy.types.Material.ogre_depth_write = BoolProperty( name='depth write', default=True )
 
@@ -1455,6 +1459,7 @@ class _create_new_material_layer_helper(bpy.types.Operator):
         node = nodes[ self.INDEX ]
         node.material = bpy.data.materials.new( name='%s.LAYER%s'%(mat.name,self.INDEX) )
         node.material.use_fixed_pipeline = False
+        node.material.offset_z = (self.INDEX*2) + 2     # nudge each pass by 2
         return {'FINISHED'}
 
 
@@ -5318,9 +5323,8 @@ class OgreMaterialGenerator( _image_processing_ ):
             else:
                 M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
-        #if usealpha:
-        #    #if mat.use_transparency:
-        #    M += indent(3, 'depth_write off' )  # default is on
+        if mat.offset_z:
+            M += indent(3, 'depth_bias %s'%mat.offset_z )
 
         for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
             if name.startswith('ogre_') and name != 'ogre_parent_material':
@@ -5868,6 +5872,7 @@ def ogre_material_panel_extra( parent, mat ):
         header.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
 
     if mat.use_ogre_advanced_options:
+        box.prop(mat, 'offset_z')
         box.prop(mat, "use_shadows")
         box.prop(mat, 'ogre_depth_write' )
 
@@ -5889,7 +5894,6 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
             row.prop(mat, "alpha")
         else:
             row.prop(mat, "use_transparency", text='Transparent')
-
     if not parent: return   # only allow on pass1 and higher
 
     header.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='')
