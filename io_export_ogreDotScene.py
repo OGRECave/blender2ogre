@@ -5069,7 +5069,14 @@ class OgreMaterialScript(object):
                     elif tex:   # (not used)
                         tex['params'][ line.split()[0] ] = line.split()[ 1 : ]
 
-        for P in self.passes: P['body'] = '\n'.join( P['body'] )
+        for P in self.passes:
+            lines = P['body']
+            while lines and ''.join(lines).count('{')!=''.join(lines).count('}'):
+                if lines[-1].strip() == '}': lines.pop()
+                else: break
+            P['body'] = '\n'.join( lines )
+            print( P['body'] ); print(self.url)
+            assert P['body'].count('{') == P['body'].count('}')
 
         #print( self.techniques )
         self.hidden_texture_units = rem = []
@@ -5108,13 +5115,20 @@ class MaterialScripts(object):
         ## chop up .material file, find all material defs ####
         mats = []
         mat = []
+        skip = False    # for now - programs must be defined in .program files, not in the .material
         for line in self.data.splitlines():
-            line = line
-            if line.strip().startswith('material'):
+            if not line.strip(): continue
+            a = line.split()[0]             #NOTE ".split()" strips white space
+            if a == 'material':
                 mat = []; mats.append( mat )
                 mat.append( line )
-            elif mat:
+            elif a in ('vertex_program', 'fragment_program', 'abstract'):
+                skip = True
+            elif mat and not skip:
                 mat.append( line )
+            elif skip and line=='}':
+                skip = False
+
         ##########################
         for mat in mats:
             omat = OgreMaterialScript( '\n'.join( mat ), url )
