@@ -2011,7 +2011,12 @@ IMAGE_FORMATS = {
 #class _type(bpy.types.IDPropertyGroup):
 #    name = StringProperty(name="jpeg format", description="", maxlen=64, default="")
 
-
+def get_lights_by_type( T ):
+    r = []
+    for ob in bpy.context.scene.objects:
+        if ob.type=='LAMP':
+            if ob.data.type==T: r.append( ob )
+    return r
 
 class _TXML_(object):
 
@@ -2060,49 +2065,53 @@ class _TXML_(object):
             a.setAttribute('value', 'blender2ogre' )
 
 
+        ############### environment light ################
+        e = doc.createElement( 'entity' )
+        doc.documentElement.appendChild( e )
+        e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
+
+        c = doc.createElement( 'component' ); e.appendChild( c )
+        c.setAttribute( 'type', 'EC_EnvironmentLight' )
+        c.setAttribute( 'sync', '1' )
+        c.setAttribute( 'name', 'blender-environment-light' )
+
+        sun = hemi = None
+        if get_lights_by_type('SUN'): sun = get_lights_by_type('SUN')[0]
+        if get_lights_by_type('HEMI'): hemi = get_lights_by_type('HEMI')[0]
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Sunlight color')
+        if sun:
+            R,G,B = sun.data.color
+            a.setAttribute('value', '%s %s %s 1' %(R,G,B))
+        else:
+            a.setAttribute('value', '0 0 0 1')
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Brightness')
+        if sun:
+            a.setAttribute('value', '%s' %sun.data.energy)
+        else:
+            a.setAttribute('value', '0')
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Ambient light color')
+        if hemi:
+            R,G,B = hemi.data.color * hemi.data.energy
+            a.setAttribute('value', '%s %s %s 1' %(R,G,B))
+        else:
+            a.setAttribute('value', '0 0 0 1')
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Sunlight direction vector')
+        a.setAttribute('value', '-0.25 -1.0 -0.25')   # TODO, get the sun rotation from blender
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Sunlight cast shadows')
+        a.setAttribute('value', 'true')
+
+
         if context.scene.world.ogre_skyX:
-
-            ############### environment light ################
-            e = doc.createElement( 'entity' )
-            doc.documentElement.appendChild( e )
-            e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
-
-            c = doc.createElement( 'component' ); e.appendChild( c )
-            c.setAttribute( 'type', 'EC_EnvironmentLight' )
-            c.setAttribute( 'sync', '1' )
-            c.setAttribute( 'name', 'blender-environment-light' )
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Sun color')
-            a.setAttribute('value', '0.638999999 0.638999999 0.638999999 1')
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Ambient color')
-            a.setAttribute('value', '0.363999993 0.363999993 0.363999993 1')
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Sun diffuse color')
-            a.setAttribute('value', '0.930000007 0.930000007 0.930000007 1')
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Sun direction vector')
-            a.setAttribute('value', '-1.0 -1.0 -1.0')
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Use fixed time')
-            a.setAttribute('value', 'false')
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Current time')
-            a.setAttribute('value', '0.67')
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Sun cast shadows')
-            a.setAttribute('value', 'true')
-
-            a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Use Caelum')
-            a.setAttribute('value', 'true')
 
             ################# SKYX ################
             c = doc.createElement( 'component' ); e.appendChild( c )
@@ -2161,6 +2170,8 @@ class _TXML_(object):
         loc = '%6f,%6f,%6f' %(x,y,z)
         x,y,z = swap(ob.matrix_world.to_euler())
         x = math.degrees( x ); y = math.degrees( y ); z = math.degrees( z )
+        if ob.type == 'CAMERA': x -= 90
+        elif ob.type == 'LAMP': x += 90
         rot = '%6f,%6f,%6f' %(x,y,z)
         x,y,z = swap(ob.matrix_world.to_scale())
         scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z))		# Tundra2 clamps any negative to zero
@@ -2187,6 +2198,14 @@ class _TXML_(object):
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_TransformGizmo')
             c.setAttribute('sync', '1')
+
+            c = doc.createElement('component'); e.appendChild( c )
+            c.setAttribute('type', 'EC_Name')
+            c.setAttribute('sync', '1')
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "name" )
+            a.setAttribute('value', ob.name)
+
 
         if ob.type == 'CAMERA':
             c = doc.createElement('component'); e.appendChild( c )
@@ -2404,10 +2423,8 @@ class _TXML_(object):
             exists = os.path.isfile( murl )
             if not exists or (exists and self.EX_MESH_OVERWRITE):
                 if ob.data.name not in exported_meshes:
-                    if '_update_mesh_' in ob.data.keys() and not ob.data['_update_mesh_']: print('    skipping', ob.data)
-                    else:
-                        exported_meshes.append( ob.data.name )
-                        self.dot_mesh( ob, os.path.split(url)[0] )
+                    exported_meshes.append( ob.data.name )
+                    self.dot_mesh( ob, os.path.split(url)[0] )
 
 
 
@@ -2460,20 +2477,23 @@ class _TXML_(object):
 
     def tundra_light( self, e, ob ):
         '''
-          <component type="EC_Light" sync="1" name="mylight">
-           <attribute value="0.000000 0.000000 1.000000" name="direction"/>
-           <attribute value="0" name="light type"/>
-           <attribute value="1 1 1 1" name="diffuse color"/>
-           <attribute value="0 0 0 1" name="specular color"/>
-           <attribute value="false" name="cast shadows"/>
-           <attribute value="100" name="light range"/>
-           <attribute value="0" name="constant atten"/>
-           <attribute value="0.00999999978" name="linear atten"/>
-           <attribute value="0.00999999978" name="quadratic atten"/>
-           <attribute value="30" name="light inner angle"/>
-           <attribute value="40" name="light outer angle"/>
-          </component>
+            <component type="EC_Light" sync="1">
+            <attribute value="1" name="light type"/>
+            <attribute value="1 1 1 1" name="diffuse color"/>
+            <attribute value="1 1 1 1" name="specular color"/>
+            <attribute value="true" name="cast shadows"/>
+            <attribute value="29.9999828" name="light range"/>
+            <attribute value="1" name="brightness"/>
+            <attribute value="0" name="constant atten"/>
+            <attribute value="1" name="linear atten"/>
+            <attribute value="0" name="quadratic atten"/>
+            <attribute value="30" name="light inner angle"/>
+            <attribute value="40" name="light outer angle"/>
+            </component>
         '''
+
+        if ob.data.type not in 'POINT SPOT'.split(): return
+
         doc = e.document
 
         c = doc.createElement('component'); e.appendChild( c )
@@ -2481,12 +2501,10 @@ class _TXML_(object):
         c.setAttribute('sync', '1')
 
         a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', 'direction' )
-        a.setAttribute('value', '0.0 0.0 1.0' )
-
-        a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'light type' )
-        a.setAttribute('value', '0' )
+        if ob.data.type=='POINT': a.setAttribute('value', '0' )
+        elif ob.data.type=='SPOT': a.setAttribute('value', '1' )
+        #2 = directional light.  blender has no directional light?
 
         R,G,B = ob.data.color
         a = doc.createElement('attribute'); c.appendChild(a)
@@ -2501,13 +2519,17 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'cast shadows' )
-        if ob.data.type=='HEMI': a.setAttribute('value', 'false' ) # HEMI reported by Reyn
+        if ob.data.type=='HEMI': a.setAttribute('value', 'false' ) # HEMI no .shadow_method
         elif ob.data.shadow_method != 'NOSHADOW': a.setAttribute('value', 'true' )
         else: a.setAttribute('value', 'false' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'light range' )
-        a.setAttribute('value', ob.data.distance*2 )
+        a.setAttribute('value', ob.data.distance )
+
+        a = doc.createElement('attribute'); c.appendChild(a)
+        a.setAttribute('name', 'brightness' )
+        a.setAttribute('value', ob.data.energy )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'constant atten' )
@@ -2515,20 +2537,25 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'linear atten' )
-        #a.setAttribute('value', (1.0/ob.data.distance)*ob.data.energy )
-        a.setAttribute('value', 0.05*ob.data.energy )   # sane default
+        energy = ob.data.energy
+        if energy <= 0.0: energy = 0.001
+        a.setAttribute('value', 1.0/energy )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'quadratic atten' )
         a.setAttribute('value', '0.0' )
 
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', 'light inner angle' )
-        a.setAttribute('value', '30' )
+        if ob.data.type=='SPOT':
+            outer = math.degrees(ob.data.spot_size) / 2.0
+            inner = outer * (1.0-ob.data.spot_blend)
 
-        a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', 'light outer angle' )
-        a.setAttribute('value', '40' )
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'light inner angle' )
+            a.setAttribute('value', '%s'%inner )
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'light outer angle' )
+            a.setAttribute('value', '%s' %outer )
 
 class _OgreCommonExport_( _TXML_ ):
     #EXPORT_TYPE = 'OGRE'   # defined in subclass
@@ -2932,10 +2959,8 @@ class _OgreCommonExport_( _TXML_ ):
                 exists = os.path.isfile( murl )
                 if not exists or (exists and self.EX_MESH_OVERWRITE):
                     if ob.data.name not in exported_meshes:
-                        if '_update_mesh_' in ob.data.keys() and not ob.data['_update_mesh_']: print('    skipping', ob.data)
-                        else:
-                            exported_meshes.append( ob.data.name )
-                            self.dot_mesh( ob, os.path.split(url)[0] )
+                        exported_meshes.append( ob.data.name )
+                        self.dot_mesh( ob, os.path.split(url)[0] )
 
             ## deal with Array mod ##
             vecs = [ ob.matrix_world.to_translation() ]
