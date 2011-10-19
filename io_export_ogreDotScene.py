@@ -2065,11 +2065,42 @@ class _TXML_(object):
             a.setAttribute('value', 'blender2ogre' )
 
 
-        ############### environment light ################
+        ############### environment ################
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
         e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
 
+
+        c = doc.createElement( 'component' ); e.appendChild( c )
+        c.setAttribute( 'type', 'EC_Fog' )
+        c.setAttribute( 'sync', '1' )
+        c.setAttribute( 'name', 'blender-environment-fog' )
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Color')
+        if bpy.context.scene.world.mist_settings.use_mist:
+            A = bpy.context.scene.world.mist_settings.intensity
+            R,G,B = bpy.context.scene.world.horizon_color
+            a.setAttribute('value', '%s %s %s %s'%(R,G,B,A))
+        else:
+            a.setAttribute('value', '0.4 0.4 0.4 1.0')
+
+        if bpy.context.scene.world.mist_settings.use_mist:
+            mist = bpy.context.scene.world.mist_settings
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'Start distance')
+            a.setAttribute('value', mist.start)
+
+            a = doc.createElement('attribute'); c.appendChild( a )
+            a.setAttribute('name', 'End distance')
+            a.setAttribute('value', mist.start+mist.depth)
+
+        a = doc.createElement('attribute'); c.appendChild( a )
+        a.setAttribute('name', 'Exponential density')
+        a.setAttribute('value', 0.001)
+
+        ##############################################
         c = doc.createElement( 'component' ); e.appendChild( c )
         c.setAttribute( 'type', 'EC_EnvironmentLight' )
         c.setAttribute( 'sync', '1' )
@@ -2088,16 +2119,19 @@ class _TXML_(object):
             a.setAttribute('value', '0 0 0 1')
 
         a = doc.createElement('attribute'); c.appendChild( a )
-        a.setAttribute('name', 'Brightness')
+        a.setAttribute('name', 'Brightness')    # brightness of sunlight
         if sun:
-            a.setAttribute('value', '%s' %sun.data.energy)
+            a.setAttribute('value', sun.data.energy*10)     # 10=magic
         else:
             a.setAttribute('value', '0')
 
         a = doc.createElement('attribute'); c.appendChild( a )
         a.setAttribute('name', 'Ambient light color')
         if hemi:
-            R,G,B = hemi.data.color * hemi.data.energy
+            R,G,B = hemi.data.color * (hemi.data.energy+0.5)
+            if R>1.0: R=1.0
+            if G>1.0: G=1.0
+            if B>1.0: B=1.0
             a.setAttribute('value', '%s %s %s 1' %(R,G,B))
         else:
             a.setAttribute('value', '0 0 0 1')
