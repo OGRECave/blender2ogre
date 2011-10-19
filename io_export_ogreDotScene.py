@@ -4611,22 +4611,35 @@ class TundraPipe(object):
             self.proc.stdin.write( b'loadscene(/tmp/preview.txml,true,true)\n')
         else:
             self.proc.stdin.write( b'loadscene(/tmp/preview.txml,false,true)\n')
-        self.proc.stdin.flush()
+        try:
+            self.proc.stdin.flush()
+        except:
+            global TundraSingleton
+            TundraSingleton = None
 
     def start( self ):
-        self.proc.stdin.write( b'startphysics\n' )
-        self.proc.stdin.flush()
         self.physics = True
+        self.proc.stdin.write( b'startphysics\n' )
+        try: self.proc.stdin.flush()
+        except:
+            global TundraSingleton
+            TundraSingleton = None
 
     def stop( self ):
-        self.proc.stdin.write( b'stopphysics\n' )
-        self.proc.stdin.flush()
         self.physics = False
+        self.proc.stdin.write( b'stopphysics\n' )
+        try: self.proc.stdin.flush()
+        except:
+            global TundraSingleton
+            TundraSingleton = None
 
     def toggle_physics_debug( self ):
         self._physics_debug = not self._physics_debug
         self.proc.stdin.write( b'physicsdebug\n' )
-        self.proc.stdin.flush()
+        try: self.proc.stdin.flush()
+        except:
+            global TundraSingleton
+            TundraSingleton = None
 
     def exit(self):
         self.proc.stdin.write( b'exit\n' )
@@ -4999,6 +5012,7 @@ class OgreMaterialScript(object):
         self.vertex_programs = {}
         self.fragment_programs = {}
         self.texture_units = {}
+        self.texture_units_order = []
         self.passes = []
 
         line = self.data.splitlines()[0]
@@ -5049,9 +5063,11 @@ class OgreMaterialScript(object):
                         tex = {'name':line.split()[-1], 'params':{}}
                         if tex['name'] == 'texture_unit': # ignore unnamed texture units
                             print('WARNING: material %s contains unnamed texture_units' %self.name)
+                            print('---unnamed texture units will be ignored---')
                         else:
                             P['texture_units'].append( tex )
                             self.texture_units[ tex['name'] ] = tex
+                            self.texture_units_order.append( tex['name'] )
 
                     elif prog:
                         p = line.split()[0]
@@ -5080,8 +5096,7 @@ class OgreMaterialScript(object):
                 if lines[-1].strip() == '}': lines.pop()
                 else: break
             P['body'] = '\n'.join( lines )
-            print( P['body'] ); print(self.url)
-            assert P['body'].count('{') == P['body'].count('}')
+            assert P['body'].count('{') == P['body'].count('}')     # if this fails, the parser choked
 
         #print( self.techniques )
         self.hidden_texture_units = rem = []
@@ -5089,6 +5104,7 @@ class OgreMaterialScript(object):
             if 'texture' not in tex['params']:
                 rem.append( tex )
         for tex in rem:
+            print('WARNING: not using texture_unit because it lacks a "texture" parameter', tex['name'])
             self.texture_units.pop( tex['name'] )
 
         if len(self.techniques)>1:
@@ -5338,7 +5354,7 @@ class OgreMaterialGenerator( _image_processing_ ):
 
 
         if texnodes and usermat.texture_units:
-            for i,name in enumerate(usermat.texture_units):
+            for i,name in enumerate(usermat.texture_units_order):
                 if i<len(texnodes):
                     node = texnodes[i]
                     if node.texture:
@@ -5683,7 +5699,7 @@ class bpyShaders(bpy.types.Operator):
                         if link.to_node.material.name == submaterial.name:
                             node = link.from_node
                             d[node.name] = node
-        keys = list(d.keys())
+        keys = list(d.keys())           # this breaks if the user renames the node - TODO improve me
         keys.sort()
         r = []
         for key in keys: r.append( d[key] )
@@ -5919,7 +5935,7 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                 bx.label( text='(missing shader programs)', icon='ERROR' )
             elif s.texture_units and texnodes:
                 bx = split.box()
-                for i,name in enumerate(s.texture_units):
+                for i,name in enumerate(s.texture_units_order):
                     if i<len(texnodes):
                         row = bx.row()
                         #row.label( text=name )
