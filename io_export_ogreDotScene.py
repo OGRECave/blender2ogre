@@ -2181,7 +2181,10 @@ class _TXML_(object):
         # txml has flat hierarchy
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
-        e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
+        #e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
+        uid = 0
+        for char in ob.name: uid += ord(char)
+        e.setAttribute('id', uid )
 
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Name")
@@ -2559,7 +2562,7 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'light range' )
-        a.setAttribute('value', ob.data.distance )
+        a.setAttribute('value', ob.data.distance*2 )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'brightness' )
@@ -2573,7 +2576,7 @@ class _TXML_(object):
         a.setAttribute('name', 'linear atten' )
         energy = ob.data.energy
         if energy <= 0.0: energy = 0.001
-        a.setAttribute('value', 1.0/energy )
+        a.setAttribute('value', (1.0/energy)*0.25 )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'quadratic atten' )
@@ -4570,7 +4573,8 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
                     if ob.name == actob.name:
                         export_mesh( ob )
 
-        path = '/tmp/preview.txml'
+        if not os.path.isdir( '/tmp/rex' ): os.makedirs( '/tmp/rex' )
+        path = '/tmp/rex/preview.txml'
         self.ogre_export( path, context, force_material_update=syncmats )
         if not TundraSingleton:
             TundraSingleton = TundraPipe( context )
@@ -4645,12 +4649,12 @@ class TundraPipe(object):
         if not exe:
             print('ERROR: failed to find Tundra executable')
         elif sys.platform.startswith('win'):
-            cmd = [exe, '--file', '/tmp/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
+            cmd = [exe, '--file', '/tmp/rex/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
         else:
             if exe.endswith('.exe'): cmd = ['wine']     # assume user has Wine
             else: cmd = []                                          # native build
-            cmd += [exe, '--loglevel', 'debug', '--file', '/tmp/preview.txml']
+            cmd += [exe, '--loglevel', 'debug', '--file', '/tmp/rex/preview.txml']
             self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
         self.physics = True
@@ -4667,9 +4671,9 @@ class TundraPipe(object):
     def load( self, context, url, clear=False ):
         self._objects += [ob.name for ob in context.selected_objects]
         if clear:
-            self.proc.stdin.write( b'loadscene(/tmp/preview.txml,true,true)\n')
+            self.proc.stdin.write( b'loadscene(/tmp/rex/preview.txml,true,true)\n')
         else:
-            self.proc.stdin.write( b'loadscene(/tmp/preview.txml,false,true)\n')
+            self.proc.stdin.write( b'loadscene(/tmp/rex/preview.txml,false,true)\n')
         try:
             self.proc.stdin.flush()
         except:
