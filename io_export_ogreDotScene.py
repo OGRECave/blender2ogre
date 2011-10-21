@@ -25,7 +25,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 preview8'
+VERSION = '0.5.5 preview10'
 
 ## Public API ##
 UI_CLASSES = []
@@ -76,10 +76,7 @@ bpy.types.Image.resize_y = IntProperty(
     name="resize Y", description="only if image is larger than defined, use ImageMagick to resize it down", 
     default=256, min=2, max=4096)
 
-
-## use Material.offset_z ##
-#bpy.types.Material.ogre_depth_bias = IntProperty( name="depth bias", description="The final depth bias value is constant_bias * minObservableDepth + maxSlope * slopescale_bias. Slope scale biasing is relative to the angle of the polygon to the camera, which makes for a more appropriate bias value, but this is ignored on some older hardware. Constant biasing is expressed as a factor of the minimum depth value, so a value of 1 will nudge the depth by one 'notch' if you will", default=0, min=0, max=100)
-
+## use Material.offset_z ## bpy.types.Material.ogre_depth_bias = IntProperty
 
 # ..Material.ogre_depth_write = AUTO|ON|OFF
 bpy.types.Material.ogre_depth_write = BoolProperty( name='depth write', default=True )
@@ -93,7 +90,6 @@ bpy.types.Material.ogre_alpha_to_coverage = BoolProperty( name='multisample alph
 #This option is usually only useful if this pass is an additive lighting pass, and is at least the second one in the technique. Ie areas which are not affected by the current light(s) will never need to be rendered. If there is more than one light being passed to the pass, then the scissor is defined to be the rectangle which covers all lights in screen-space. Directional lights are ignored since they are infinite.
 #This option does not need to be specified if you are using a standard additive shadow mode, i.e. SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE, since it is the default behaviour to use a scissor for each additive shadow pass. However, if you're not using shadows, or you're using Integrated Texture Shadows where passes are specified in a custom manner, then this could be of use to you.
 bpy.types.Material.ogre_light_scissor = BoolProperty( name='light scissor', default=False )
-
 
 bpy.types.Material.ogre_light_clip_planes = BoolProperty( name='light clip planes', default=False )
 
@@ -109,17 +105,14 @@ bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', defaul
 #If colour writing is off no visible pixels are written to the screen during this pass. You might think this is useless, but if you render with colour writing off, and with very minimal other settings, you can use this pass to initialise the depth buffer before subsequently rendering other passes which fill in the colour data. This can give you significant performance boosts on some newer cards, especially when using complex fragment programs, because if the depth check fails then the fragment program is never run. 
 bpy.types.Material.ogre_colour_write = BoolProperty( name='color-write', default=True )
 
-
 bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=True )    # fixed pipeline is oldschool
 
 # hidden option - gets turned on by operator
 bpy.types.Material.use_material_passes = BoolProperty( name='use ogre extra material passes (layers)', default=False )
 
-
 bpy.types.Material.use_in_ogre_material_pass = BoolProperty( name='Layer Toggle', default=True )
 
 bpy.types.Material.use_ogre_advanced_options = BoolProperty( name='Show Advanced Options', default=False )
-
 
 bpy.types.Material.use_ogre_parent_material = BoolProperty( name='Use Script Inheritance', default=False )
 
@@ -176,8 +169,6 @@ bpy.types.Material.ogre_transparent_sorting = EnumProperty(
     default='on'
 )
 
-
-
 bpy.types.Material.ogre_illumination_stage = EnumProperty(
     items=[
             ('', '', 'autodetect'),
@@ -189,9 +180,6 @@ bpy.types.Material.ogre_illumination_stage = EnumProperty(
     description='When using an additive lighting mode (SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE), the scene is rendered in 3 discrete stages, ambient (or pre-lighting), per-light (once per light, with shadowing) and decal (or post-lighting). Usually OGRE figures out how to categorise your passes automatically, but there are some effects you cannot achieve without manually controlling the illumination.', 
     default=''
 )
-
-
-
 
 _ogre_depth_func =  [
     ('less_equal', 'less_equal', '<='),
@@ -251,7 +239,7 @@ bpy.types.Material.ogre_scene_blend = EnumProperty(
 _faq_ = '''
 
 Q: i have hundres of objects, is there a way i can merge them on export only?
-A: yes, just add them to a group named starting with "merge"
+A: yes, just add them to a group named starting with "merge", or link the group.
 
 Q: can i use subsurf or multi-res on a mesh with an armature?
 A: yes.
@@ -334,8 +322,9 @@ CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'blender2ogre.pickle'
 CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
 
-
-_IMAGE_FORMATS =  [     # for EnumProperty "FORCE_IMAGE_FORMAT"
+# Ogre supports .dds in both directx and opengl
+# http://www.ogre3d.org/forums/viewtopic.php?f=5&t=46847
+_IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IMAGE_FORMAT"
     ('NONE','NONE', 'do not convert image'),
     ('bmp', 'bmp', 'bitmap format'),
     ('jpg', 'jpg', 'jpeg format'),
@@ -684,6 +673,14 @@ def get_merge_group( ob, prefix='merge' ):
         print('WARNING: an object can not be in two merge groups at the same time', ob)
         return
 
+
+def wordwrap( txt ):
+    r = ['']
+    for word in txt.split(' '):    # do not split on tabs
+        word = word.replace('\t', ' '*3)
+        r[-1] += word + ' '
+        if len(r[-1]) > 90: r.append( '' )
+    return r
 
 
 ###### RPython xml dom ######
@@ -1745,27 +1742,12 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
 
 #############################
 
-def wordwrap( txt ):
-    r = ['']
-    for word in txt.split(' '):    # do not split on tabs
-        word = word.replace('\t', ' '*3)
-        r[-1] += word + ' '
-        if len(r[-1]) > 90: r.append( '' )
-    return r
-
-
-
 _OGRE_DOCS_ = []
-
 def ogredoc( cls ):
     tag = cls.__name__.split('_ogredoc_')[-1]
     cls.bl_label = tag.replace('_', ' ')
     _OGRE_DOCS_.append( cls )
     return cls
-
-
-
-
 
 ############ USED BY DOCS ##########
 class INFO_MT_ogre_helper(bpy.types.Menu):
@@ -1816,74 +1798,6 @@ class _ogredoc_Installing( INFO_MT_ogre_helper ):
 @ogredoc
 class _ogredoc_FAQ( INFO_MT_ogre_helper ):
     mydoc = _faq_
-
-@ogredoc
-class _ogredoc_Exporter_Features( INFO_MT_ogre_helper ):
-    mydoc = '''
-Ogre Exporter Features:
-    Export .scene:
-        pos, rot, scl
-        environment colors
-        fog settings
-        lights, colors
-        array modifier (constant offset only)
-        optimize instances
-        selected only
-        force cameras
-        force lamps
-        BGE physics
-        collisions prims and external meshes
-
-    Export .mesh
-
-        verts, normals, uv
-        LOD (Ogre Command Line Tools)
-        export `meshes` subdirectory
-        bone weights
-        shape animation (using NLA-hijacking)
-
-    Export .material
-        diffuse color
-        ambient intensity
-        emission
-        specular
-        receive shadows on/off
-        multiple materials per mesh
-        exports `textures` subdirectory
-
-    Export .skeleton
-        bones
-        animation
-        multi-tracks using NLA-hijacking
-'''
-
-
-
-_ogre_doc_classic_textures_ = '''
-==Supported Blending Modes:==
-    * Mix                - blend_manual -
-    * Multiply        - modulate -
-    * Screen            - modulate_x2 -
-    * Lighten        - modulate_x4 -
-    * Add                - add -
-    * Subtract        - subtract -
-    * Overlay        - add_signed -
-    * Difference    - dotproduct -
-
-==Mapping Types:==
-    * UV
-    * Sphere environment mapping
-    * Flat environment mapping
-
-==Animation:==
-    * scroll animation
-    * rotation animation
-'''
-
-@ogredoc
-class _ogredoc_Texture_Options( INFO_MT_ogre_helper ):
-    mydoc = _ogre_doc_classic_textures_
-
 
 
 @ogredoc
@@ -1952,7 +1866,8 @@ class _ogredoc_Bugs( INFO_MT_ogre_helper ):
     mydoc = '''
 Known Issues:
     . shape animation breaks when using modifiers that change the vertex count
-
+    . never rename the nodes created by enabling Ogre-Material-Layers
+    . never rename collision proxy meshes created by the Collision Panel
 '''
 
 
@@ -1999,14 +1914,6 @@ def _mesh_entity_helper( doc, ob, o ):
             user.setAttribute( 'value', str(propvalue) )
             user.setAttribute( 'type', type(propvalue).__name__ )
 
-
-# Ogre supports .dds in both directx and opengl
-# http://www.ogre3d.org/forums/viewtopic.php?f=5&t=46847
-IMAGE_FORMATS = {
-    'dds',
-    'png',
-    'jpg',
-}
 
 #class _type(bpy.types.IDPropertyGroup):
 #    name = StringProperty(name="jpeg format", description="", maxlen=64, default="")
@@ -3335,8 +3242,6 @@ class MeshMagick(object):
         print('-'*80)
 
 _ogre_command_line_tools_doc = '''
-Bug reported by CLB: converter expects .mesh.xml or .skeleton.xml to determine the type - fixed nov24
-
 Usage: OgreXMLConverter [options] sourcefile [destfile]
 
 Available options:
@@ -3345,32 +3250,22 @@ Available options:
     -l lodlevels   = number of LOD levels
     -d loddist     = distance increment to reduce LOD
     -p lodpercent  = Percentage triangle reduction amount per LOD
-
     -f lodnumtris  = Fixed vertex reduction per LOD
-
     -e             = DON'T generate edge lists (for stencil shadows)
-
     -r             = DON'T reorganise vertex buffers to OGRE recommended format.
     -t             = Generate tangents (for normal mapping)
-
     -o             = DON'T optimise out redundant tracks & keyframes
     -d3d           = Prefer D3D packed colour formats (default on Windows)
-
-
     -gl            = Prefer GL packed colour formats (default on non-Windows)
     -E endian      = Set endian mode 'big' 'little' or 'native' (default)
     -q             = Quiet mode, less output
-
     -log filename  = name of the log file (default: 'OgreXMLConverter.log')
     sourcefile     = name of file to convert
-
     destfile       = optional name of file to write to. If you don't
                        specify this OGRE works it out through the extension
                        and the XML contents if the source is XML. For example
-
                        test.mesh becomes test.xml, test.xml becomes test.mesh
                        if the XML document root is <mesh> etc.
-
 '''
 
 def OgreXMLConverter( infile, has_uvs=False ):
@@ -3418,15 +3313,6 @@ def OgreXMLConverter( infile, has_uvs=False ):
 
 
 class Bone(object):
-    ''' 
-EditBone
-    ['__doc__', '__module__', '__slots__', 'align_orientation', 'align_roll', 'bbone_in', 'bbone_out', 'bbone_segments', 'bl_rna', 'envelope_distance', 'envelope_weight', 'head', 'head_radius', 'hide', 'hide_select', 'layers', 'lock', 'matrix', 'name', 'parent', 'rna_type', 'roll', 'select', 'select_head', 'select_tail', 'show_wire', 'tail', 'tail_radius', 'transform', 'use_connect', 'use_cyclic_offset', 'use_deform', 'use_envelope_multiply', 'use_inherit_rotation', 'use_inherit_scale', 'use_local_location']
-
-Rest Bone <bpy_struct, Bone("Bone")> 
-    ['__doc__', '__module__', '__slots__', 'bbone_in', 'bbone_out', 'bbone_segments', 'bbone_x', 'bbone_z', 'bl_rna', 'children', 'envelope_distance', 'envelope_weight', 'evaluate_envelope', 'head', 'head_local', 'head_radius', 'hide', 'hide_select', 'layers', 'matrix', 'matrix_local', 'name', 'parent', 'rna_type', 'select', 'select_head', 'select_tail', 'show_wire', 'tail', 'tail_local', 'tail_radius', 'use_connect', 'use_cyclic_offset', 'use_deform', 'use_envelope_multiply', 'use_inherit_rotation', 'use_inherit_scale', 'use_local_location']
-
-
-    '''
 
     def __init__(self, rbone, pbone, skeleton):
         if CONFIG['SWAP_AXIS'] == 'xyz':
@@ -3720,12 +3606,9 @@ class Skeleton(object):
         return doc.toprettyxml()
 
 
-
-
-
+############ selector extras ############
 class INFO_MT_instances(bpy.types.Menu):
     bl_label = "Instances"
-
     def draw(self, context):
         layout = self.layout
         inst = gather_instances()
@@ -3749,31 +3632,14 @@ class INFO_MT_instance(bpy.types.Operator):
         select_instances( context, self.mystring )
         return {'FINISHED'}
 
-
 class INFO_MT_groups(bpy.types.Menu):
     bl_label = "Groups"
     def draw(self, context):
         layout = self.layout
         for group in bpy.data.groups:
-            #op = layout.operator(INFO_MT_group_mark.bl_idname)
-            #op.groupname = group.name
             op = layout.operator(INFO_MT_group.bl_idname, text=group.name)    # operator no variable for button name?
             op.mystring = group.name
         layout.separator()
-
-#TODO - is this being used?
-class INFO_MT_group_mark(bpy.types.Operator):
-    '''mark group auto combine on export'''
-    bl_idname = "ogre.mark_group_export_combine"
-    bl_label = "Group Auto Combine"
-    bl_options = {'REGISTER'}                              # Options for this panel type
-    mybool= BoolProperty(name="groupautocombine", description="set group auto-combine", default=False)
-    mygroups = {}
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        self.mygroups[ op.groupname ] = self.mybool
-        return {'FINISHED'}
 
 class INFO_MT_group(bpy.types.Operator):
     '''select group'''
@@ -3789,50 +3655,6 @@ class INFO_MT_group(bpy.types.Operator):
         return {'FINISHED'}
 
 #############
-class INFO_MT_actors(bpy.types.Menu):
-    bl_label = "Actors"
-    def draw(self, context):
-        layout = self.layout
-        for ob in bpy.context.scene.objects:
-            if ob.game.use_actor:
-                op = layout.operator(INFO_MT_actor.bl_idname, text=ob.name)
-                op.mystring = ob.name
-        layout.separator()
-
-class INFO_MT_actor(bpy.types.Operator):
-    '''select actor'''
-    bl_idname = "ogre.select_actor"
-    bl_label = "Select Actor"
-    bl_options = {'REGISTER'}                              # Options for this panel type
-    mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        bpy.data.objects[self.mystring].select = True
-        return {'FINISHED'}
-
-class INFO_MT_dynamics(bpy.types.Menu):
-    bl_label = "Dynamics"
-    def draw(self, context):
-        layout = self.layout
-        for ob in bpy.data.objects:
-            if ob.game.physics_type in 'DYNAMIC SOFT_BODY RIGID_BODY'.split():
-                op = layout.operator(INFO_MT_dynamic.bl_idname, text=ob.name)
-                op.mystring = ob.name
-        layout.separator()
-
-class INFO_MT_dynamic(bpy.types.Operator):
-    '''select dynamic'''
-    bl_idname = "ogre.select_dynamic"
-    bl_label = "Select Dynamic"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
-    mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
-    @classmethod
-    def poll(cls, context): return True
-    def invoke(self, context, event):
-        bpy.context.scene.objects[self.mystring].select = True
-        return {'FINISHED'}
-
 
 
 
@@ -4077,9 +3899,6 @@ Examples
   nvdxt -file *.tga -depth -max -scale 0.5
 
 '''
-
-
-
 
 
 
@@ -4504,7 +4323,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
 ## end dot_mesh ##
 
-############### Jmonkey ################
+############### Jmonkey ################ TODO remove jmonkey
 class JmonkeyPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
     '''helper to open jMonkey (JME)'''
     bl_idname = 'jmonkey.preview'
@@ -4513,13 +4332,6 @@ class JmonkeyPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
 
     filepath= StringProperty(name="File Path", description="Filepath used for exporting Jmonkey .scene file", maxlen=1024, default="/tmp/preview.txml", subtype='FILE_PATH')
     EXPORT_TYPE = 'OGRE'
-
-    EX_SWAP_AXIS = EnumProperty( 
-        items=AXIS_MODES, 
-        name='swap axis',  
-        description='axis swapping mode', 
-        default= CONFIG['SWAP_AXIS']
-    )
 
     @classmethod
     def poll(cls, context):
@@ -4571,7 +4383,7 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
                 if ob.type=='MESH':
                     syncmats.append( ob )
                     if ob.name == actob.name:
-                        export_mesh( ob )
+                        export_mesh( ob, path='/tmp/rex' )
 
         if not os.path.isdir( '/tmp/rex' ): os.makedirs( '/tmp/rex' )
         path = '/tmp/rex/preview.txml'
@@ -4766,13 +4578,10 @@ class INFO_HT_myheader(bpy.types.Header):
         if rd.use_game_engine: sub.menu("INFO_MT_game")
         else: sub.menu("INFO_MT_render")
 
-
         row = layout.row(align=False); row.scale_x = 1.25
         row.menu("INFO_MT_instances", icon='NODETREE', text='')
         row.menu("INFO_MT_groups", icon='GROUP', text='')
-        #row.menu("INFO_MT_actors", icon='GAME')        # not useful?
-        #row.menu("INFO_MT_dynamics", icon='PHYSICS')   # not useful?
-        #layout.separator()
+
 
         layout.template_header()
         if not context.area.show_menus:
