@@ -2370,10 +2370,13 @@ class _TXML_(object):
                     exported_meshes.append( ob.data.name )
                     self.dot_mesh( ob, os.path.split(url)[0] )
 
-
-
         doc = e.document
         proto = 'local://'      # antont says file:// is also valid
+
+        if ob.find_armature():
+            c = doc.createElement('component'); e.appendChild( c )
+            c.setAttribute('type', "EC_AnimationController")
+            c.setAttribute('sync', '1')
 
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Mesh")
@@ -2385,7 +2388,6 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Mesh materials" )
-        #a.setAttribute('value', "%s%s.material"%(proto,bpy.context.scene.name) )       # pre-pforces-patch
         # Query object its materials and make a proper material ref string of it.
         # note: We assume blindly here that the 'submesh' indexes are correct in the material list.
         #       the most common usecase is to have one material per object for rex artists.
@@ -3532,30 +3534,26 @@ class Skeleton(object):
 
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
                 if not len(nla.strips): print( 'skipping empty NLA track: %s' %nla.name ); continue
+                print('NLA track:',  nla.name)
+
                 for strip in nla.strips:
+                    print('   strip name:', strip.name)
                     anim = doc.createElement('animation'); anims.appendChild( anim )
                     tracks = doc.createElement('tracks'); anim.appendChild( tracks )
                     Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]' %(arm.name, nla.name, strip.frame_start, strip.frame_end) )
 
-                    #anim.setAttribute('animation_group', nla.name)        # this is extended xml format not useful?
-                    anim.setAttribute('name', strip.name)                       # USE the action's name
+                    anim.setAttribute('name', strip.name)                       # USE the strip name
                     anim.setAttribute('length', str( (strip.frame_end-strip.frame_start)/_fps ) )
-                    ## using the fcurves directly is useless, because:
-                    ## we need to support constraints and the interpolation between keys
-                    ## is Ogre smart enough that if a track only has a set of bones, then blend animation with current animation?
-                    ## the exporter will not be smart enough to know which bones are active for a given track...
-                    ## can hijack blender NLA, user sets a single keyframe for only selected bones, and keys last frame
+
                     stripbones = []
                     if CONFIG['ONLY_ANIMATED_BONES']:
                         for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
                             if group.name in arm.pose.bones: stripbones.append( group.name )
-
                         if not stripbones:                                    # otherwise we use all bones
                             stripbones = [ bone.name for bone in arm.pose.bones ]
                     else:
                         stripbones = [ bone.name for bone in arm.pose.bones ]
 
-                    print('NLA-strip:',  nla.name)
                     _keyframes = {}
                     for bonename in stripbones:
                         track = doc.createElement('track')
@@ -3564,12 +3562,10 @@ class Skeleton(object):
                         keyframes = doc.createElement('keyframes')
                         track.appendChild( keyframes )
                         _keyframes[ bonename ] = keyframes
-                        print('\t Bone:', bonename)
 
                     for frame in range( int(strip.frame_start), int(strip.frame_end), bpy.context.scene.frame_step):
                         bpy.context.scene.frame_set(frame)
                         for bone in self.roots: bone.update()
-                        print('\t\t Frame:', frame)
                         for bonename in stripbones:
                             bone = self.get_bone( bonename )
                             _loc = bone.pose_location
@@ -4511,6 +4507,7 @@ class TundraPipe(object):
     def toggle_physics_debug( self ):
         self._physics_debug = not self._physics_debug
         self.proc.stdin.write( b'physicsdebug\n' )
+        #self.proc.stdin.write( b'JsExec(scene.GetEntity(1).animationcontroller.PlayAnim("my_animation"))\n' )
         try: self.proc.stdin.flush()
         except:
             global TundraSingleton
