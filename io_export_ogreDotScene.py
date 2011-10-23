@@ -25,7 +25,9 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 preview10'
+VERSION = '0.5.5 preview11'
+
+## final TODO: fix terrain collision offset bug, add realtime transform (rotation is missing), animation playback
 
 ## Public API ##
 UI_CLASSES = []
@@ -38,6 +40,12 @@ def UI(cls): # @decorator
 def hide_user_interface():
     for cls in UI_CLASSES:
         bpy.utils.unregister_class( cls )
+
+def uid(ob):
+    id = 0
+    for char in ob.name: id += ord(char)
+    return id
+
 
 ## END Public API ## -- (go to bottom for rest of API)
 ###########################################################
@@ -336,6 +344,7 @@ _IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IM
 
 
 _CONFIG_DEFAULTS_ALL = {
+    'TUNDRA_STREAMING' : True,
     'COPY_SHADER_PROGRAMS' : True,
     'MAX_TEXTURE_SIZE' : 4096,
     'SWAP_AXIS' : 'xz-y',         # ogre standard
@@ -358,7 +367,6 @@ _CONFIG_DEFAULTS_ALL = {
     'MATERIALS' : True,
     'DDS_MIPS' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
-
     'lodLevels' : 0,
     'lodDistance' : 300,
     'lodPercent' : 40,
@@ -371,11 +379,9 @@ _CONFIG_DEFAULTS_ALL = {
     'tangentSplitRotated' : False,
     'reorganiseBuffers' : True,
     'optimiseAnimations' : True,
-
-
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
 #_CONFIG_TAGS_.append( 'JMONKEY_ROOT' )
 
 
@@ -443,10 +449,16 @@ def load_config():  # PUBLIC API
     for tag in _CONFIG_TAGS_: ## setup temp hidden RNA  to expose the file paths ##
         default = CONFIG[ tag ]
         func = eval( 'lambda self,con: CONFIG.update( {"%s" : self.%s} )' %(tag,tag) )
-        prop = StringProperty(
-            name=tag, description='updates path setting', maxlen=128, default=default, 
-            options={'SKIP_SAVE'}, update=func
-        )
+        if type(default) is bool:
+            prop = BoolProperty(
+                name=tag, description='updates bool setting', default=default, 
+                options={'SKIP_SAVE'}, update=func
+            )
+        else:
+            prop = StringProperty(
+                name=tag, description='updates path setting', maxlen=128, default=default, 
+                options={'SKIP_SAVE'}, update=func
+            )
         setattr( bpy.types.WindowManager, tag, prop )
     return CONFIG
 CONFIG = load_config()
@@ -1850,24 +1862,19 @@ Blender Collision Setup:
 '''
 
 @ogredoc
-class _ogredoc_Warnings( INFO_MT_ogre_helper ):
-    mydoc = '''
-Warnings:
-    . extra vertex groups, can mess up an armature weights (new vgroups must come after armature assignment, not before)
-    . quadratic lights falloff not supported (needs pre calc)
-    . do not enable subsurf modifier on meshes that have shape or armature animation.  
-        (Any modifier that changes the vertex count is bad with shape anim or armature anim)
-
-'''
-
-
-@ogredoc
 class _ogredoc_Bugs( INFO_MT_ogre_helper ):
     mydoc = '''
 Known Issues:
     . shape animation breaks when using modifiers that change the vertex count
+        (Any modifier that changes the vertex count is bad with shape anim or armature anim)
     . never rename the nodes created by enabling Ogre-Material-Layers
     . never rename collision proxy meshes created by the Collision Panel
+    . lighting in Tundra is not excatly the same as in Blender
+Tundra Streaming:
+    . only supports streaming transform of up to 10 objects selected objects
+    . the 3D view must be shown at the time you open Tundra
+    . the same 3D view must be visible to stream data to Tundra
+    . only position and scale are updated, a bug on the Tundra side prevents rotation update
 '''
 
 
@@ -2088,10 +2095,7 @@ class _TXML_(object):
         # txml has flat hierarchy
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
-        #e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
-        uid = 0
-        for char in ob.name: uid += ord(char)
-        e.setAttribute('id', uid )
+        e.setAttribute('id', uid(ob) )
 
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Name")
@@ -4442,11 +4446,208 @@ class Tundra_ExitOp(bpy.types.Operator):
         TundraSingleton.exit()
         return {'FINISHED'}
 
+#######################
+class Server(object):
+    def stream( self, o ):
+        b = pickle.dumps( o, protocol=2 ) #protocol2 is python2 compatible
+        #print( 'streaming bytes', len(b) )
+        n = len( b ); d = STREAM_BUFFER_SIZE - n -4
+        if n > STREAM_BUFFER_SIZE:
+            print( 'ERROR: STREAM OVERFLOW:', n )
+            return
+        padding = b'#' * d
+        if n < 10: header = '000%s' %n
+        elif n < 100: header = '00%s' %n
+        elif n < 1000: header = '0%s' %n
+        else: header = '%s' %n
+        header = bytes( header, 'utf-8' )
+        assert len(header) == 4
+        w = header + b + padding
+        assert len(w) == STREAM_BUFFER_SIZE
+        self.buffer.insert(0, w )
+        return w
+
+    def sync( self ):   # 153 bytes per object
+        p = STREAM_PROTO
+        i = 0; msg = []
+        for ob in bpy.context.selected_objects:
+            if ob.type not in ('MESH','LAMP'): continue
+            loc, rot, scale = ob.matrix_world.decompose()
+            loc = swap(loc).to_tuple()
+            x,y,z = swap( rot.to_euler() )
+            rot = (x,y,z)
+            x,y,z = swap( scale )
+            scale = ( abs(x), abs(y), abs(z) )
+            d = { p['ID']:uid(ob), p['POSITION']:loc, p['ROTATION']:rot, p['SCALE']:scale, p['TYPE']:p[ob.type] }
+            msg.append( d )
+            if i > 10: break    # max is 13 objects to stay under 2048 bytes
+        return msg
+
+    def __init__(self):
+        import socket
+        self.buffer = []    # cmd buffer
+        self.socket = sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)   # UDP
+        host='localhost'; port = 9420
+        sock.connect((host, port))
+        print('SERVER: socket connected', sock)
+        self._handle = None
+        self.setup_callback( bpy.context )
+        import threading
+        self.ready = threading._allocate_lock()
+        self.ID = threading._start_new_thread( 
+            self.loop, (None,) 
+        )
+        print( 'SERVER: thread started')
+
+    def loop(self, none):
+        self.active = True
+        prev = time.time()
+        while self.active:
+            if not self.ready.locked(): time.sleep(0.001)    # not threadsafe
+            else:    # threadsafe start
+                if not bpy.context.active_object: continue
+                now = time.time()
+                if now - prev > 0.033:            # don't flood Tundra
+                    prev = now
+                    sel = bpy.context.active_object
+                    msg = self.sync()
+                    self.ready.release()          # thread release
+                    self.stream( msg )            # releases GIL?
+                    if self.buffer:
+                        bin = self.buffer.pop()
+                        try:
+                            self.socket.sendall( bin )
+                        except:
+                            print('SERVER: send data error')
+                            time.sleep(0.5)
+                            pass
+                    else: print( 'SERVER: empty buffer' )
+                else:
+                    self.ready.release()
+        print('SERVER: thread exit')
+
+    def threadsafe( self, reg ):
+        if not self.ready.locked():
+            self.ready.acquire()
+            time.sleep(0.0001)
+            while self.ready.locked():    # must block to be safe
+                time.sleep(0.0001)            # wait for unlock
+        else: pass #time.sleep(0.033) dont block
+
+    _handle = None
+    def setup_callback( self, context ):        # TODO replace with a proper frame update callback
+        print('SERVER: setup frame update callback')
+        if self._handle: return self._handle
+        for area in bpy.context.window.screen.areas:
+            if area.type == 'VIEW_3D':
+                for reg in area.regions:
+                    if reg.type == 'WINDOW':
+                        # PRE_VIEW, POST_VIEW, POST_PIXEL
+                        self._handle = reg.callback_add(
+                            self.threadsafe, (reg,), 'PRE_VIEW' )
+                        self._area = area
+                        self._region = reg
+                        break
+        if not self._handle:
+            print('SERVER: FAILED to setup frame update callback')
+
+
+def _create_stream_proto():
+    proto = {}
+    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA ANIMATION'.split()
+    for i,tag in enumerate( tags ): proto[ tag ] = chr(i)		# up to 256
+    return proto
+STREAM_PROTO = _create_stream_proto()
+STREAM_BUFFER_SIZE = 2048
+TUNDRA_SCRIPT = '''
+# this file was generated by blender2ogre #
+import tundra, socket, select, pickle
+STREAM_BUFFER_SIZE = 2048
+globals().update( %s )
+E = None    # this is just for debugging from the pyconsole
+class Client(object):
+    def __init__(self):
+        self.socket = sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        host='localhost'; port = 9420
+        sock.bind((host, port))
+
+    def update(self, delay):
+        sock = self.socket
+        poll = select.select( [ sock ], [], [], 0.01 )
+        if not poll[0]: return True
+        data = sock.recv( STREAM_BUFFER_SIZE )
+        assert len(data) == STREAM_BUFFER_SIZE
+        if not data:
+            print( 'blender crashed?' )
+            return
+        header = data[ : 4]
+        s = data[ 4 : int(header)+4 ]
+        objects = pickle.loads( s )
+        scn = tundra.Scene().MainCameraScene()	# replaces GetDefaultScene()
+
+        for ob in objects:
+            e = scn.GetEntityRaw( ob[ID] )
+            if not e: continue
+            x,y,z = ob[POSITION]
+            e.placeable.SetPosition( x,y,z )
+            x,y,z = ob[SCALE]
+            e.placeable.SetScale( x,y,z )
+            #e.placeable.SetOrientation( ob[ROTATION] )
+            #if ob[TYPE] == LAMP:
+            if ANIMATION in ob:
+                if not e.animationcontroller.HasAnimationFinished( ob[ANIMATION] ):
+                    e.animationcontroller.PlayAnim( ob[ANIMATION], '1.0', 'true' )
+            if not E:
+                global E
+                E = e
+client = Client()
+tundra.Frame().connect( 'Updated(float)', client.update )
+print('blender2ogre plugin ok')
+''' %STREAM_PROTO
 
 class TundraPipe(object):
-    def __init__(self, context):
+    CONFIG_PATH = '/tmp/rex/plugins.xml'
+    TUNDRA_SCRIPT_PATH = '/tmp/rex/b2ogre_plugin.py'
+    CONFIG_XML = '''<?xml version="1.0"?>
+<Tundra>
+  <!-- plugins.xml is hardcoded to be the default configuration file to load if another file is not specified on the command line with the "config filename.xml" parameter. -->
+  <plugin path="OgreRenderingModule" />
+  <plugin path="EnvironmentModule" />           <!-- EnvironmentModule depends on OgreRenderingModule -->
+  <plugin path="PhysicsModule" />               <!-- PhysicsModule depends on OgreRenderingModule and EnvironmentModule -->
+  <plugin path="TundraProtocolModule" />        <!-- TundraProtocolModule depends on OgreRenderingModule -->
+  <plugin path="JavascriptModule" />            <!-- JavascriptModule depends on TundraProtocolModule --> 
+  <plugin path="AssetModule" />                 <!-- AssetModule depends on TundraProtocolModule -->
+  <plugin path="AvatarModule" />                <!-- AvatarModule depends on AssetModule and OgreRenderingModule -->
+  <plugin path="ECEditorModule" />              <!-- ECEditorModule depends on OgreRenderingModule, TundraProtocolModule, OgreRenderingModule and AssetModule -->
+  <plugin path="SkyXHydrax" />                  <!-- SkyXHydrax depends on OgreRenderingModule -->
+  <plugin path="OgreAssetEditorModule" />       <!-- OgreAssetEditorModule depends on OgreRenderingModule -->
+  <plugin path="DebugStatsModule" />            <!-- DebugStatsModule depends on OgreRenderingModule, EnvironmentModule and AssetModule -->
+  <plugin path="SceneWidgetComponents" />       <!-- SceneWidgetComponents depends on OgreRenderingModule and TundraProtocolModule -->
+  <plugin path="PythonScriptModule" />
+
+  <!-- TODO: Currently the above <plugin> items are loaded in the order they are specified, but below, the jsplugin items are loaded in an undefined order. Use the order specified here as the load order. -->
+  <!-- NOTE: The startup .js scripts are specified only by base name of the file. Don's specify a path here. Place the startup .js scripts to /bin/jsmodules/startup/. -->
+  <!-- Important: The file names specified here are case sensitive even on Windows! -->
+  <jsplugin path="cameraapplication.js" />
+  <jsplugin path="FirstPersonMouseLook.js" />
+  <jsplugin path="MenuBar.js" />
+  
+  <!-- Python plugins -->
+  <!-- <pyplugin path="lib/apitests.py" /> -->          <!-- Runs framework api tests -->
+  <pyplugin path="%s" />         <!-- shows qt py console. could enable by default when add to menu etc. for controls, now just shows directly when is enabled here -->
+  
+  <option name="--accept_unknown_http_sources" />
+  <option name="--accept_unknown_local_sources" />
+  <option name="--fpslimit" value="30" />
+  <!--  AssetAPI's file system watcher currently disabled because LocalAssetProvider implements
+        the same functionality for LocalAssetStorages and HTTPAssetProviders do not yet support live-update. -->
+  <option name="--nofilewatcher" />
+
+</Tundra>''' %TUNDRA_SCRIPT_PATH
+
+    def __init__(self, context, debug=False):
         self._physics_debug = True
-        self._objects = [ob.name for ob in context.selected_objects]
+        self._objects = []
         self.proc = None
         exe = None
         if 'Tundra.exe' in os.listdir( CONFIG['TUNDRA_ROOT'] ):
@@ -4454,20 +4655,35 @@ class TundraPipe(object):
         elif 'Tundra' in os.listdir( CONFIG['TUNDRA_ROOT'] ):
             exe = os.path.join( CONFIG['TUNDRA_ROOT'], 'Tundra' )
 
+        cmd = []
         if not exe:
             print('ERROR: failed to find Tundra executable')
+            assert 0
         elif sys.platform.startswith('win'):
-            cmd = [exe, '--file', '/tmp/rex/preview.txml']#, '--config', TUNDRA_CONFIG_XML_PATH]
-            self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            cmd.append(exe)
         else:
-            if exe.endswith('.exe'): cmd = ['wine']     # assume user has Wine
-            else: cmd = []                                          # native build
-            cmd += [exe, '--loglevel', 'debug', '--file', '/tmp/rex/preview.txml']
-            self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            if exe.endswith('.exe'): cmd.append('wine')     # assume user has Wine
+            cmd.append( exe )
+        if debug:
+            cmd.append('--loglevel')
+            cmd.append('debug')
+
+        if CONFIG['TUNDRA_STREAMING']:
+            cmd.append( '--config' )
+            cmd.append( self.CONFIG_PATH )
+            with open( self.CONFIG_PATH, 'wb' ) as fp: fp.write( bytes(self.CONFIG_XML,'utf-8') )
+            with open( self.TUNDRA_SCRIPT_PATH, 'wb' ) as fp: fp.write( bytes(TUNDRA_SCRIPT,'utf-8') )
+            self.server = Server()
+
+        #cmd += ['--file', '/tmp/rex/preview.txml']     # tundra2.1.2 bug loading from --file ignores entity ID's
+        cmd.append( '--storage' )
+        cmd.append( '/tmp/rex' )
+        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
         self.physics = True
         if self.proc:
             time.sleep(0.1)
+            self.load( context, '/tmp/rex/preview.txml' )
             self.stop()
 
     def deselect_previously_updated(self, context):
@@ -4507,7 +4723,6 @@ class TundraPipe(object):
     def toggle_physics_debug( self ):
         self._physics_debug = not self._physics_debug
         self.proc.stdin.write( b'physicsdebug\n' )
-        #self.proc.stdin.write( b'JsExec(scene.GetEntity(1).animationcontroller.PlayAnim("my_animation"))\n' )
         try: self.proc.stdin.flush()
         except:
             global TundraSingleton
@@ -4519,6 +4734,12 @@ class TundraPipe(object):
         global TundraSingleton
         TundraSingleton = None
 
+
+
+
+
+
+###########################################
 class MENU_preview_material_text(bpy.types.Menu):
     bl_label = 'preview'
     @classmethod
