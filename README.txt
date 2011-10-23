@@ -9,12 +9,16 @@ Supports:
 	Linux, Windows, OSX
 
 Upgrading?
-	. if you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .cfg file:
-		example linux: rm ~/.blender/2.59/config/scripts/blender2ogre.cfg
+	. if you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle file:
+		example linux: rm ~/.blender/2.59/config/scripts/blender2ogre.pickle
 
 Getting Started:
 	. After installing the addon (see below), enable it from "User Preferences->Add-Ons->Import-Export"
 	. Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal 'Help' menu, read them!
+
+Setting Your Paths:
+    If for some reason you can not install the dependencies below to the recommended paths, you can change the paths in
+blender by going to "Properties>Scene>Ogre Configuration File", and then click "update config file"
 
 Installing:
 	Installing the Addon:
@@ -24,6 +28,7 @@ Installing:
 	Installing Dependencies:
 		Linux:
 			1. Get the Ogre source code, compile and "make install" that should give you: /usr/local/bin/OgreXMLConverter
+				( "apt-get install ogre-tools" also works )
 			2. Get Ogre Meshy for Windows, install wine, extract OgreMeshy to /home/yourname/OgreMeshy
 
 		Windows:

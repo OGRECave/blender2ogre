@@ -25,9 +25,9 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 preview11'
+VERSION = '0.5.5 preview12'
 
-## final TODO: fix terrain collision offset bug, add realtime transform (rotation is missing), animation playback
+## final TODO: fix terrain collision offset bug, add realtime transform (rotation is missing), animation playback needs stop looping
 
 ## Public API ##
 UI_CLASSES = []
@@ -42,10 +42,14 @@ def hide_user_interface():
         bpy.utils.unregister_class( cls )
 
 def uid(ob):
-    id = 0
-    for char in ob.name: id += ord(char)
-    return id
-
+    if ob.uid == 0:
+        high = 0
+        for o in bpy.data.objects:
+            if o.uid > high: high = o.uid
+        high += 1
+        if high < 100: high = 100   # start at 100
+        ob.uid = high
+    return ob.uid
 
 ## END Public API ## -- (go to bottom for rest of API)
 ###########################################################
@@ -68,6 +72,27 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 
 
 ######################### bpy RNA #########################
+bpy.types.Object.uid = IntProperty(
+    name="unique ID", description="unique ID for Tundra", 
+    default=0, min=0, max=2**14)
+
+# Ogre supports .dds in both directx and opengl
+# http://www.ogre3d.org/forums/viewtopic.php?f=5&t=46847
+_IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IMAGE_FORMAT"
+    ('NONE','NONE', 'do not convert image'),
+    ('bmp', 'bmp', 'bitmap format'),
+    ('jpg', 'jpg', 'jpeg format'),
+    ('gif', 'gif', 'gif format'),
+    ('png', 'png', 'png format'),
+    ('tga', 'tga', 'targa format'),
+    ('dds', 'dds', 'nvidia dds format'),
+]
+
+bpy.types.Image.use_convert_format = BoolProperty( name='use convert format', default=False )
+bpy.types.Image.convert_format = EnumProperty( items=_IMAGE_FORMATS, name='convert to format',  description='converts to image format using imagemagick', default='NONE' )
+bpy.types.Image.jpeg_quality = IntProperty(
+    name="jpeg quality", description="quality of jpeg", 
+    default=80, min=0, max=100)
 
 bpy.types.Image.use_color_quantize = BoolProperty( name='use color quantize', default=False )
 bpy.types.Image.use_color_quantize_dither = BoolProperty( name='use color quantize dither', default=True )
@@ -330,17 +355,6 @@ CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'blender2ogre.pickle'
 CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
 
-# Ogre supports .dds in both directx and opengl
-# http://www.ogre3d.org/forums/viewtopic.php?f=5&t=46847
-_IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IMAGE_FORMAT"
-    ('NONE','NONE', 'do not convert image'),
-    ('bmp', 'bmp', 'bitmap format'),
-    ('jpg', 'jpg', 'jpeg format'),
-    ('gif', 'gif', 'gif format'),
-    ('png', 'png', 'png format'),
-    ('tga', 'tga', 'targa format'),
-    ('dds', 'dds', 'nvidia dds format'),
-]
 
 
 _CONFIG_DEFAULTS_ALL = {
@@ -1621,6 +1635,14 @@ class PANEL_Textures(bpy.types.Panel):
         if hasattr(slot.texture, 'image') and slot.texture.image:
             img = slot.texture.image
             box = layout.box()
+
+            row = box.row()
+            row.prop( img, 'use_convert_format' )
+            if img.use_convert_format:
+                row.prop( img, 'convert_format' )
+                if img.convert_format == 'jpg':
+                    box.prop( img, 'jpeg_quality' )
+
             row = box.row()
             row.prop( img, 'use_color_quantize', text='Reduce Colors' )
             if img.use_color_quantize:
@@ -1875,6 +1897,7 @@ Tundra Streaming:
     . the 3D view must be shown at the time you open Tundra
     . the same 3D view must be visible to stream data to Tundra
     . only position and scale are updated, a bug on the Tundra side prevents rotation update
+    . animation playback is broken if you rename your NLA strips after opening Tundra
 '''
 
 
@@ -4467,7 +4490,7 @@ class Server(object):
         self.buffer.insert(0, w )
         return w
 
-    def sync( self ):   # 153 bytes per object
+    def sync( self ):   # 153 bytes per object + n bytes of animation strip name
         p = STREAM_PROTO
         i = 0; msg = []
         for ob in bpy.context.selected_objects:
@@ -4480,7 +4503,22 @@ class Server(object):
             scale = ( abs(x), abs(y), abs(z) )
             d = { p['ID']:uid(ob), p['POSITION']:loc, p['ROTATION']:rot, p['SCALE']:scale, p['TYPE']:p[ob.type] }
             msg.append( d )
-            if i > 10: break    # max is 13 objects to stay under 2048 bytes
+            arm = ob.find_armature()
+            if arm and arm.animation_data and arm.animation_data.nla_tracks:
+                anim = None
+                for nla in arm.animation_data.nla_tracks:
+                    for strip in nla.strips:
+                        if strip.active: anim = strip.name; break
+                    if anim:
+                        d[ p['ANIMATION'] ] = anim      # allow multiple anims to play at once?
+                        break
+            else: pass      # armature without proper NLA setup
+
+            if ob.type == 'LAMP':
+                d[ p['ENERGY'] ] = ob.data.energy
+                d[ p['DISTANCE'] ] = ob.data.distance
+
+            if i >= 10: break    # max is 13 objects to stay under 2048 bytes
         return msg
 
     def __init__(self):
@@ -4543,8 +4581,7 @@ class Server(object):
                 for reg in area.regions:
                     if reg.type == 'WINDOW':
                         # PRE_VIEW, POST_VIEW, POST_PIXEL
-                        self._handle = reg.callback_add(
-                            self.threadsafe, (reg,), 'PRE_VIEW' )
+                        self._handle = reg.callback_add(self.threadsafe, (reg,), 'PRE_VIEW' )
                         self._area = area
                         self._region = reg
                         break
@@ -4554,7 +4591,7 @@ class Server(object):
 
 def _create_stream_proto():
     proto = {}
-    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA ANIMATION'.split()
+    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA ANIMATION DISTANCE ENERGY'.split()
     for i,tag in enumerate( tags ): proto[ tag ] = chr(i)		# up to 256
     return proto
 STREAM_PROTO = _create_stream_proto()
@@ -4572,6 +4609,7 @@ class Client(object):
         sock.bind((host, port))
 
     def update(self, delay):
+        global E
         sock = self.socket
         poll = select.select( [ sock ], [], [], 0.01 )
         if not poll[0]: return True
@@ -4584,7 +4622,6 @@ class Client(object):
         s = data[ 4 : int(header)+4 ]
         objects = pickle.loads( s )
         scn = tundra.Scene().MainCameraScene()	# replaces GetDefaultScene()
-
         for ob in objects:
             e = scn.GetEntityRaw( ob[ID] )
             if not e: continue
@@ -4593,13 +4630,16 @@ class Client(object):
             x,y,z = ob[SCALE]
             e.placeable.SetScale( x,y,z )
             #e.placeable.SetOrientation( ob[ROTATION] )
-            #if ob[TYPE] == LAMP:
+            if ob[TYPE] == LAMP:
+                e.light.range = ob[ DISTANCE ]
+                e.light.brightness = ob[ ENERGY ]
+                #e.light.diffColor = !! not wrapped !!
+                #e.light.specColor = !! not wrapped !!
             if ANIMATION in ob:
-                if not e.animationcontroller.HasAnimationFinished( ob[ANIMATION] ):
-                    e.animationcontroller.PlayAnim( ob[ANIMATION], '1.0', 'true' )
-            if not E:
-                global E
-                E = e
+                if e.animationcontroller.HasAnimationFinished( ob[ANIMATION] ):
+                    #e.animationcontroller.PlayAnim( ob[ANIMATION], '1.0', 'true' )
+                    e.animationcontroller.PlayLoopedAnim( ob[ANIMATION], '1.0', 'true' )
+            if not E: E = e
 client = Client()
 tundra.Frame().connect( 'Updated(float)', client.update )
 print('blender2ogre plugin ok')
@@ -5266,7 +5306,7 @@ class MaterialScripts(object):
 
 ############################################################################
 def is_image_postprocessed( image ):
-    if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE' or image.use_resize_half or image.use_resize_absolute or image.use_color_quantize:
+    if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE' or image.use_resize_half or image.use_resize_absolute or image.use_color_quantize or image.use_convert_format:
         return True
     else:
         return False
@@ -5277,7 +5317,11 @@ class _image_processing_( object ):
             name = 'R.%s' %name
         if image.use_color_quantize:
             name = 'Q.%s' %name
-        if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
+        if image.use_convert_format:
+            name = 'F.%s' %name
+            if image.convert_format != 'NONE':
+                name = '%s.%s' %(name[:name.rindex('.')], image.convert_format)
+        elif CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
             name = '%s.%s' %(name[:name.rindex('.')], CONFIG['FORCE_IMAGE_FORMAT'])
         return name
 
@@ -5292,6 +5336,10 @@ class _image_processing_( object ):
         x,y = texture.image.size
         ax = texture.image.resize_x
         ay = texture.image.resize_y
+
+        if texture.image.use_convert_format and texture.image.convert_format == 'jpg':
+            cmd.append( '-quality' )
+            cmd.append( '%s' %texture.image.jpeg_quality )
 
         if texture.image.use_resize_half:
             cmd.append( '-resize' )
@@ -5580,7 +5628,7 @@ class OgreMaterialGenerator( _image_processing_ ):
                     f = open( desturl, 'wb' )
                     f.write( open(iurl,'rb').read() )
                     f.close()
-                if is_image_postprocessed( texture.image ):
+                if is_image_postprocessed( texture.image ):     # TODO allow imagemagick to operate first, then DDS-convert
                     if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds': self.DDS_converter( texture, desturl )
                     else: self.image_magick( texture, desturl )
 
