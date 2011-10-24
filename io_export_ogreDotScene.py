@@ -17,7 +17,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "HartsAntler, Sebastien Rombauts, and F00bar",
-    "version": (0,5,5),
+    "version": (0,5,6),
     "blender": (2,6,0),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -79,6 +79,10 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 bpy.types.Object.uid = IntProperty(
     name="unique ID", description="unique ID for Tundra", 
     default=0, min=0, max=2**14)
+
+bpy.types.Speaker.play_on_load = BoolProperty( name='play on load', default=False )
+bpy.types.Speaker.loop = BoolProperty( name='loop sound', default=False )
+bpy.types.Speaker.use_spatial = BoolProperty( name='3D spatial sound', default=True )
 
 # Ogre supports .dds in both directx and opengl
 # http://www.ogre3d.org/forums/viewtopic.php?f=5&t=46847
@@ -2206,15 +2210,18 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Play on load' )
-            a.setAttribute('value', 'true')
+            if ob.data.play_on_load: a.setAttribute('value', 'true')
+            else: a.setAttribute('value', 'false')
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Loop sound' )
-            a.setAttribute('value', 'true')
+            if ob.data.loop: a.setAttribute('value', 'true')
+            else: a.setAttribute('value', 'false')
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Spatial' )
-            a.setAttribute('value', 'true')
+            if ob.data.use_spatial: a.setAttribute('value', 'true')
+            else: a.setAttribute('value', 'false')
 
 
         if ob.type == 'CAMERA':
@@ -5752,6 +5759,21 @@ class TextureUnit(object):
 
 
 
+@UI
+class PANEL_Speaker(bpy.types.Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "data"
+    bl_label = "Sound+"
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.type=='SPEAKER': return True
+    def draw(self, context):
+        layout = self.layout
+        box = layout.box()
+        box.prop( context.active_object.data, 'play_on_load' )
+        box.prop( context.active_object.data, 'loop' )
+        box.prop( context.active_object.data, 'use_spatial' )
 
 
 
