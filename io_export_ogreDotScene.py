@@ -25,13 +25,13 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5'
+VERSION = '0.5.6 preview1'
 
 ## final TODO: 
 ## fix terrain collision offset bug
 ## add realtime transform (rotation is missing)
 ## fix camera rotated -90 ogre-dot-scene
-
+## 'Cast shadows' needs pyRNA
 
 ## Public API ##
 UI_CLASSES = []
@@ -2181,6 +2181,40 @@ class _TXML_(object):
             a.setAttribute('name', "name" )
             a.setAttribute('value', ob.name)
 
+        if ob.type == 'SPEAKER' and ob.data.sound:
+            soundpath, soundfile = os.path.split( ob.data.sound.filepath )
+            c = doc.createElement('component'); e.appendChild( c )
+            c.setAttribute('type', 'EC_Sound')
+            c.setAttribute('sync', '1')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'Sound ref' )
+            a.setAttribute('value', 'local://%s'%soundfile)
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'Sound radius inner' )
+            a.setAttribute('value', ob.data.cone_angle_inner)
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'Sound radius outer' )
+            a.setAttribute('value', ob.data.cone_angle_outer)
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'Sound gain' )
+            a.setAttribute('value', ob.data.volume)
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'Play on load' )
+            a.setAttribute('value', 'true')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'Loop sound' )
+            a.setAttribute('value', 'true')
+
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', 'Spatial' )
+            a.setAttribute('value', 'true')
+
 
         if ob.type == 'CAMERA':
             c = doc.createElement('component'); e.appendChild( c )
@@ -2449,8 +2483,8 @@ class _TXML_(object):
         a.setAttribute('value', "0" )
 
         a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', "Cast shadows" )	# cast shadows is per object? not per material?
-        a.setAttribute('value', "false" )
+        a.setAttribute('name', 'Cast shadows' )	# cast shadows is per object. TODO pyRNA for this
+        a.setAttribute('value', 'false' )
 
     def tundra_light( self, e, ob ):
         '''
@@ -4506,7 +4540,7 @@ class Server(object):
         p = STREAM_PROTO
         i = 0; msg = []
         for ob in bpy.context.selected_objects:
-            if ob.type not in ('MESH','LAMP'): continue
+            if ob.type not in ('MESH','LAMP','SPEAKER'): continue
             loc, rot, scale = ob.matrix_world.decompose()
             loc = swap(loc).to_tuple()
             x,y,z = swap( rot.to_euler() )
@@ -4515,18 +4549,21 @@ class Server(object):
             scale = ( abs(x), abs(y), abs(z) )
             d = { p['ID']:uid(ob), p['POSITION']:loc, p['ROTATION']:rot, p['SCALE']:scale, p['TYPE']:p[ob.type] }
             msg.append( d )
-            arm = ob.find_armature()
-            if arm and arm.animation_data and arm.animation_data.nla_tracks:
-                anim = None
-                d[ p['ANIMATIONS'] ] = state = {}    # animation-name : weight
-                for nla in arm.animation_data.nla_tracks:
-                    for strip in nla.strips:
-                        if strip.active: state[ strip.name ] = strip.influence
-            else: pass      # armature without proper NLA setup
 
-            if ob.type == 'LAMP':
+            if ob.type == 'MESH':
+                arm = ob.find_armature()
+                if arm and arm.animation_data and arm.animation_data.nla_tracks:
+                    anim = None
+                    d[ p['ANIMATIONS'] ] = state = {}    # animation-name : weight
+                    for nla in arm.animation_data.nla_tracks:
+                        for strip in nla.strips:
+                            if strip.active: state[ strip.name ] = strip.influence
+                else: pass      # armature without proper NLA setup
+            elif ob.type == 'LAMP':
                 d[ p['ENERGY'] ] = ob.data.energy
                 d[ p['DISTANCE'] ] = ob.data.distance
+            elif ob.type == 'SPEAKER':
+                d[ p['VOLUME'] ] = ob.data.volume
 
             if i >= 10: break    # max is 13 objects to stay under 2048 bytes
         return msg
@@ -4602,7 +4639,7 @@ class Server(object):
 
 def _create_stream_proto():
     proto = {}
-    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA ANIMATIONS DISTANCE ENERGY'.split()
+    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA SPEAKER ANIMATIONS DISTANCE ENERGY VOLUME'.split()
     for i,tag in enumerate( tags ): proto[ tag ] = chr(i)		# up to 256
     return proto
 STREAM_PROTO = _create_stream_proto()
