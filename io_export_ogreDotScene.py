@@ -25,9 +25,13 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.5 preview12'
+VERSION = '0.5.5'
 
-## final TODO: fix terrain collision offset bug, add realtime transform (rotation is missing), animation playback needs stop looping
+## final TODO: 
+## fix terrain collision offset bug
+## add realtime transform (rotation is missing)
+## fix camera rotated -90 ogre-dot-scene
+
 
 ## Public API ##
 UI_CLASSES = []
@@ -4490,7 +4494,7 @@ class Server(object):
         self.buffer.insert(0, w )
         return w
 
-    def sync( self ):   # 153 bytes per object + n bytes of animation strip name
+    def sync( self ):   # 153 bytes per object + n bytes for animation names and weights
         p = STREAM_PROTO
         i = 0; msg = []
         for ob in bpy.context.selected_objects:
@@ -4506,12 +4510,10 @@ class Server(object):
             arm = ob.find_armature()
             if arm and arm.animation_data and arm.animation_data.nla_tracks:
                 anim = None
+                d[ p['ANIMATIONS'] ] = state = {}    # animation-name : weight
                 for nla in arm.animation_data.nla_tracks:
                     for strip in nla.strips:
-                        if strip.active: anim = strip.name; break
-                    if anim:
-                        d[ p['ANIMATION'] ] = anim      # allow multiple anims to play at once?
-                        break
+                        if strip.active: state[ strip.name ] = strip.influence
             else: pass      # armature without proper NLA setup
 
             if ob.type == 'LAMP':
@@ -4591,7 +4593,7 @@ class Server(object):
 
 def _create_stream_proto():
     proto = {}
-    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA ANIMATION DISTANCE ENERGY'.split()
+    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA ANIMATIONS DISTANCE ENERGY'.split()
     for i,tag in enumerate( tags ): proto[ tag ] = chr(i)		# up to 256
     return proto
 STREAM_PROTO = _create_stream_proto()
@@ -4607,6 +4609,7 @@ class Client(object):
         self.socket = sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         host='localhost'; port = 9420
         sock.bind((host, port))
+        self._animated = {}    # entity ID : { anim-name : weight }
 
     def update(self, delay):
         global E
@@ -4635,11 +4638,32 @@ class Client(object):
                 e.light.brightness = ob[ ENERGY ]
                 #e.light.diffColor = !! not wrapped !!
                 #e.light.specColor = !! not wrapped !!
-            if ANIMATION in ob:
-                if e.animationcontroller.HasAnimationFinished( ob[ANIMATION] ):
-                    #e.animationcontroller.PlayAnim( ob[ANIMATION], '1.0', 'true' )
-                    e.animationcontroller.PlayLoopedAnim( ob[ANIMATION], '1.0', 'true' )
+            if ANIMATIONS in ob:
+                self.update_animation( e, ob )
             if not E: E = e
+
+    def update_animation( self, e, ob ):
+        if ob[ID] not in self._animated:
+            self._animated[ ob[ID] ] = {}
+        state = self._animated[ ob[ID] ]
+        ac = e.animationcontroller
+        for aname in ob[ ANIMATIONS ]:
+            if aname not in state:      # save weight of new animation
+                state[ aname ] = ob[ANIMATIONS][aname]  # weight
+        for aname in state:
+            if aname not in ob[ANIMATIONS] and ac.IsAnimationActive( aname ):
+                ac.StopAnim( aname, '0.0' )
+            elif aname in ob[ANIMATIONS]:
+                weight = ob[ANIMATIONS][aname]
+                if ac.HasAnimationFinished( aname ):
+                    ac.PlayLoopedAnim( aname, '1.0', 'false' )      # PlayAnim(...) TODO single playback
+                    ok = ac.SetAnimationWeight( aname, weight )
+                    state[ aname ] = weight
+
+                if weight != state[ aname ]:
+                    ok = ac.SetAnimationWeight( aname, weight )
+                    state[ aname ] = weight
+
 client = Client()
 tundra.Frame().connect( 'Updated(float)', client.update )
 print('blender2ogre plugin ok')
