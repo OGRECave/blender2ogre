@@ -2181,15 +2181,16 @@ class _TXML_(object):
             a.setAttribute('name', "name" )
             a.setAttribute('value', ob.name)
 
-        if ob.type == 'SPEAKER' and ob.data.sound:
-            soundpath, soundfile = os.path.split( ob.data.sound.filepath )
+        if ob.type == 'SPEAKER':
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_Sound')
             c.setAttribute('sync', '1')
 
-            a = doc.createElement('attribute'); c.appendChild(a)
-            a.setAttribute('name', 'Sound ref' )
-            a.setAttribute('value', 'local://%s'%soundfile)
+            if ob.data.sound:   # requires absolute path for now
+                soundpath, soundfile = os.path.split( ob.data.sound.filepath )
+                a = doc.createElement('attribute'); c.appendChild(a)
+                a.setAttribute('name', 'Sound ref' )
+                a.setAttribute('value', 'local://%s'%soundfile)
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Sound radius inner' )
@@ -4541,6 +4542,7 @@ class Server(object):
         i = 0; msg = []
         for ob in bpy.context.selected_objects:
             if ob.type not in ('MESH','LAMP','SPEAKER'): continue
+            print('sending ob', ob)
             loc, rot, scale = ob.matrix_world.decompose()
             loc = swap(loc).to_tuple()
             x,y,z = swap( rot.to_euler() )
@@ -4564,6 +4566,7 @@ class Server(object):
                 d[ p['DISTANCE'] ] = ob.data.distance
             elif ob.type == 'SPEAKER':
                 d[ p['VOLUME'] ] = ob.data.volume
+                d[ p['MUTE'] ] = ob.data.muted
 
             if i >= 10: break    # max is 13 objects to stay under 2048 bytes
         return msg
@@ -4639,7 +4642,7 @@ class Server(object):
 
 def _create_stream_proto():
     proto = {}
-    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA SPEAKER ANIMATIONS DISTANCE ENERGY VOLUME'.split()
+    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA SPEAKER ANIMATIONS DISTANCE ENERGY VOLUME MUTE'.split()
     for i,tag in enumerate( tags ): proto[ tag ] = chr(i)		# up to 256
     return proto
 STREAM_PROTO = _create_stream_proto()
@@ -4679,13 +4682,22 @@ class Client(object):
             x,y,z = ob[SCALE]
             e.placeable.SetScale( x,y,z )
             #e.placeable.SetOrientation( ob[ROTATION] )
+
             if ob[TYPE] == LAMP:
                 e.light.range = ob[ DISTANCE ]
                 e.light.brightness = ob[ ENERGY ]
                 #e.light.diffColor = !! not wrapped !!
                 #e.light.specColor = !! not wrapped !!
+            elif ob[TYPE] == SPEAKER:
+                e.sound.soundGain = ob[VOLUME]
+                #e.sound.soundInnerRadius = 
+                #e.sound.soundOuterRadius = 
+                if ob[MUTE]: e.sound.StopSound()
+                else: e.sound.PlaySound()   # tundra API needs sound.IsPlaying()
+
             if ANIMATIONS in ob:
                 self.update_animation( e, ob )
+
             if not E: E = e
 
     def update_animation( self, e, ob ):
