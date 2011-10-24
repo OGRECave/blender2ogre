@@ -5557,19 +5557,26 @@ class OgreMaterialGenerator( _image_processing_ ):
         postname = texname = os.path.split(iurl)[-1]
         destpath = path
 
-        if texture.image.packed_file and self.touch_textures:
+        if texture.image.packed_file:
             orig = texture.image.filepath
             iurl = os.path.join(path, texname)
+            if '.' not in iurl:
+                print('WARNING: packed image is of unknown type - assuming PNG format')
+                iurl += '.png'
+                texname = postname = os.path.split(iurl)[-1]
+
             if not os.path.isfile( iurl ):
-                print('MESSAGE: unpacking image: ', iurl)
-                texture.image.filepath = iurl
-                texture.image.save()
-                texture.image.filepath = orig
+                if self.touch_textures:
+                    print('MESSAGE: unpacking image: ', iurl)
+                    texture.image.filepath = iurl
+                    texture.image.save()
+                    texture.image.filepath = orig
             else:
                 print('MESSAGE: packed image already in temp, not updating', iurl)
 
         if is_image_postprocessed( texture.image ):
             postname = self._reformat( texname, texture.image )
+            print('MESSAGE: image postproc',postname)
 
         M += indent(4, 'texture %s' %postname )    
 
