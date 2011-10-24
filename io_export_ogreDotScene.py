@@ -3421,7 +3421,9 @@ class Skeleton(object):
 
     def __init__(self, ob ):
         if ob.location.x != 0 or ob.location.y != 0 or ob.location.z != 0:
-            Report.warnings.append('Mesh (%s): is offset from Armature - zero transform is required' %ob.name)
+            Report.warnings.append('ERROR: Mesh (%s): is offset from Armature - zero transform is required' %ob.name)
+        if ob.scale.x != 1 or ob.scale.y != 1 or ob.scale.z != 1:
+            Report.warnings.append('ERROR: Mesh (%s): has been scaled - scale(1,1,1) is required' %ob.name)
 
         self.object = ob
         self.bones = []
@@ -3444,15 +3446,21 @@ class Skeleton(object):
         #self.object_space_transformation = e.to_matrix().to_4x4()
         x,y,z = arm.matrix_local.to_euler()
         if x != 0 or y != 0 or z != 0:
-            Report.warnings.append('Armature: %s is rotated - (rotation is ignored)' %arm.name)
+            Report.warnings.append('ERROR: Armature: %s is rotated - (rotation is ignored)' %arm.name)
 
         ## setup bones for Ogre format ##
         for b in self.bones: b.rebuild_tree()
         ## walk bones, convert them ##
         self.roots = []
+        ep = 0.0001
         for b in self.bones:
             if not b.parent:
                 b.compute_rest()
+                loc,rot,scl = b.ogre_rest_matrix.decompose()
+                if loc.x or loc.y or loc.z:
+                    Report.warnings.append('ERROR: root bone has non-zero transform (location offset)')
+                if rot.w > ep or rot.x > ep or rot.y > ep or rot.z < 1.0-ep:
+                    Report.warnings.append('ERROR: root bone has non-zero transform (rotation offset)')
                 self.roots.append( b )
 
     def to_xml( self ):
@@ -4567,6 +4575,7 @@ class Server(object):
         print('SERVER: thread exit')
 
     def threadsafe( self, reg ):
+        if not TundraSingleton: return
         if not self.ready.locked():
             self.ready.acquire()
             time.sleep(0.0001)
@@ -4702,7 +4711,7 @@ class TundraPipe(object):
   
   <option name="--accept_unknown_http_sources" />
   <option name="--accept_unknown_local_sources" />
-  <option name="--fpslimit" value="30" />
+  <option name="--fpslimit" value="60" />
   <!--  AssetAPI's file system watcher currently disabled because LocalAssetProvider implements
         the same functionality for LocalAssetStorages and HTTPAssetProviders do not yet support live-update. -->
   <option name="--nofilewatcher" />
