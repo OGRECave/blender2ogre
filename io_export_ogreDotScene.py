@@ -32,6 +32,7 @@ VERSION = '0.5.6 preview1'
 ## add realtime transform (rotation is missing)
 ## fix camera rotated -90 ogre-dot-scene
 ## 'Cast shadows' needs pyRNA
+## Draw Distance and multires
 
 ## Public API ##
 UI_CLASSES = []
@@ -80,10 +81,60 @@ bpy.types.Object.uid = IntProperty(
     name="unique ID", description="unique ID for Tundra", 
     default=0, min=0, max=2**14)
 
+bpy.types.Object.use_draw_distance = BoolProperty( name='enable draw distance', description='use LOD draw distance', default=False)
+bpy.types.Object.draw_distance = FloatProperty( name='draw distance', description='distance at which to begin drawing object', default=0.0, min=0.0, max=10000.0)
+
+bpy.types.Object.cast_shadows = BoolProperty( name='cast shadows', description='cast shadows', default=False)
+
+
+## Physics+ ##
+_physics_modes =  [
+    ('NONE', 'NONE', 'no physics'),
+    ('RIGID_BODY', 'RIGID_BODY', 'rigid body'),
+    ('SOFT_BODY', 'SOFT_BODY', 'soft body'),
+]
+bpy.types.Object.physics_mode = EnumProperty(
+    items = _physics_modes, 
+    name = 'physics mode', 
+    description='physics mode', 
+    default='NONE'
+)
+bpy.types.Object.physics_friction = FloatProperty(
+    name='Simple Friction', description='physics friction', default=0.1, min=0.0, max=1.0)
+bpy.types.Object.physics_bounce = FloatProperty(
+    name='Simple Bounce', description='physics bounce', default=0.01, min=0.0, max=1.0)
+bpy.types.Object.collision_terrain_x_steps = IntProperty(
+    name="Ogre Terrain: x samples", description="resolution in X of height map", 
+    default=64, min=4, max=8192)
+bpy.types.Object.collision_terrain_y_steps = IntProperty(
+    name="Ogre Terrain: y samples", description="resolution in Y of height map", 
+    default=64, min=4, max=8192)
+
+_collision_modes =  [
+    ('NONE', 'NONE', 'no collision'),
+    ('PRIMITIVE', 'PRIMITIVE', 'primitive collision type'),
+    ('MESH', 'MESH', 'triangle-mesh or convex-hull collision type'),
+    ('DECIMATED', 'DECIMATED', 'auto-decimated collision type'),
+    ('COMPOUND', 'COMPOUND', 'children primitive compound collision type'),
+    ('TERRAIN', 'TERRAIN', 'terrain (height map) collision type'),
+]
+bpy.types.Object.collision_mode = EnumProperty(
+    items = _collision_modes, 
+    name = 'primary collision mode', 
+    description='collision mode', 
+    default='NONE'
+)
+
+bpy.types.Object.subcollision = BoolProperty(
+    name="collision compound", description="member of a collision compound", default=False)
+
+
+## Sound+ ##
 bpy.types.Speaker.play_on_load = BoolProperty( name='play on load', default=False )
 bpy.types.Speaker.loop = BoolProperty( name='loop sound', default=False )
 bpy.types.Speaker.use_spatial = BoolProperty( name='3D spatial sound', default=True )
 
+## ImageMagick ##
 # Ogre supports .dds in both directx and opengl
 # http://www.ogre3d.org/forums/viewtopic.php?f=5&t=46847
 _IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IMAGE_FORMAT"
@@ -95,7 +146,6 @@ _IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IM
     ('tga', 'tga', 'targa format'),
     ('dds', 'dds', 'nvidia dds format'),
 ]
-
 bpy.types.Image.use_convert_format = BoolProperty( name='use convert format', default=False )
 bpy.types.Image.convert_format = EnumProperty( items=_IMAGE_FORMATS, name='convert to format',  description='converts to image format using imagemagick', default='NONE' )
 bpy.types.Image.jpeg_quality = IntProperty(
@@ -857,9 +907,6 @@ class ReportSingleton(object):
 Report = ReportSingleton()
 
 
-
-
-
 class MiniReport(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
     def draw(self, context):
@@ -867,56 +914,6 @@ class MiniReport(bpy.types.Menu):
         txt = Report.report()
         for line in txt.splitlines():
             layout.label(text=line)
-
-
-#################### New Physics ####################
-
-_physics_modes =  [
-    ('NONE', 'NONE', 'no physics'),
-    ('RIGID_BODY', 'RIGID_BODY', 'rigid body'),
-    ('SOFT_BODY', 'SOFT_BODY', 'soft body'),
-]
-
-bpy.types.Object.physics_mode = EnumProperty(
-    items = _physics_modes, 
-    name = 'physics mode', 
-    description='physics mode', 
-    default='NONE'
-)
-
-bpy.types.Object.physics_friction = FloatProperty(
-    name='Simple Friction', description='physics friction', default=0.1, min=0.0, max=1.0)
-
-bpy.types.Object.physics_bounce = FloatProperty(
-    name='Simple Bounce', description='physics bounce', default=0.01, min=0.0, max=1.0)
-
-
-bpy.types.Object.collision_terrain_x_steps = IntProperty(
-    name="Ogre Terrain: x samples", description="resolution in X of height map", 
-    default=64, min=4, max=8192)
-bpy.types.Object.collision_terrain_y_steps = IntProperty(
-    name="Ogre Terrain: y samples", description="resolution in Y of height map", 
-    default=64, min=4, max=8192)
-
-_collision_modes =  [
-    ('NONE', 'NONE', 'no collision'),
-    ('PRIMITIVE', 'PRIMITIVE', 'primitive collision type'),
-    ('MESH', 'MESH', 'triangle-mesh or convex-hull collision type'),
-    ('DECIMATED', 'DECIMATED', 'auto-decimated collision type'),
-    ('COMPOUND', 'COMPOUND', 'children primitive compound collision type'),
-    ('TERRAIN', 'TERRAIN', 'terrain (height map) collision type'),
-]
-
-bpy.types.Object.collision_mode = EnumProperty(
-    items = _collision_modes, 
-    name = 'primary collision mode', 
-    description='collision mode', 
-    default='NONE'
-)
-
-
-bpy.types.Object.subcollision = BoolProperty(
-    name="collision compound", description="member of a collision compound", default=False)
 
 
 ######################
@@ -2463,17 +2460,11 @@ class _TXML_(object):
         a.setAttribute('name', "Mesh materials" )
         # Query object its materials and make a proper material ref string of it.
         # note: We assume blindly here that the 'submesh' indexes are correct in the material list.
-        #       the most common usecase is to have one material per object for rex artists.
-        #       They can now assign multiple and they will at least go to the .txml data but I cant
-        #       guarantee that they are in correct submesh index slots! At least they have the refs and 
-        #       can manually shift them around in the viewer.
         mymaterials = ob.data.materials
         if mymaterials is not None and len(mymaterials) > 0:
-            mymatstring = ''
-            # generate ; separated material list
+            mymatstring = ''                 # generate ; separated material list
             for mymat in mymaterials: 
-                if mymat is None:
-                    continue
+                if mymat is None: continue
                 mymatstring += proto + material_name(mymat) + '.material;'
             mymatstring = mymatstring[:-1]  # strip ending ;
             a.setAttribute('value', mymatstring )
@@ -2488,11 +2479,13 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Draw distance" )
-        a.setAttribute('value', "0" )
+        if ob.use_draw_distance: a.setAttribute('value', ob.draw_distance )
+        else: a.setAttribute('value', "0" )
 
         a = doc.createElement('attribute'); c.appendChild(a)
-        a.setAttribute('name', 'Cast shadows' )	# cast shadows is per object. TODO pyRNA for this
-        a.setAttribute('value', 'false' )
+        a.setAttribute('name', 'Cast shadows' )
+        if ob.cast_shadows: a.setAttribute('value', 'true' )
+        else: a.setAttribute('value', 'false' )
 
     def tundra_light( self, e, ob ):
         '''
@@ -5757,6 +5750,23 @@ class TextureUnit(object):
     }
 
 
+@UI
+class PANEL_Object(bpy.types.Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "object"
+    bl_label = "Object+"
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.type=='MESH': return True
+    def draw(self, context):
+        ob = context.active_object
+        layout = self.layout
+        box = layout.box()
+        box.prop( ob, 'cast_shadows' )
+        box.prop( ob, 'use_draw_distance' )
+        if ob.use_draw_distance:
+            box.prop( ob, 'draw_distance' )
 
 
 @UI
