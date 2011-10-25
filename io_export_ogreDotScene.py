@@ -4746,7 +4746,23 @@ class Server(object):
         self.buffer.insert(0, w )
         return w
 
+    def multires_lod( self ):
+        ob = bpy.context.active_object
+        cam = bpy.context.scene.camera
+
+        if ob and cam and ob.type=='MESH':
+            delta = bpy.context.active_object.matrix_world.to_translation() - cam.matrix_world.to_translation()
+            dist = delta.length
+            print( 'Distance', dist )
+            if ob.modifiers and ob.modifiers[0].type == 'MULTIRES':
+                mod = ob.modifiers[0]
+                if mod.total_levels > 1:
+                    if dist > 10: mod.levels = 1
+                    elif dist < 10: mod.levels = 2
+
     def sync( self ):   # 153 bytes per object + n bytes for animation names and weights
+        self.multires_lod()
+
         p = STREAM_PROTO
         i = 0; msg = []
         for ob in bpy.context.selected_objects:
