@@ -25,7 +25,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.6 preview1'
+VERSION = '0.5.6 preview2'
 
 ## final TODO: 
 ## fix terrain collision offset bug
@@ -56,20 +56,222 @@ def uid(ob):
         ob.uid = high
     return ob.uid
 
+###########################################################
 ## END Public API ## -- (go to bottom for rest of API)
 ###########################################################
-###########################################################
-###### imports #####
-import os, sys, time, hashlib, getpass, tempfile, configparser
-import math, subprocess, pickle
-import array, time, ctypes
-from xml.sax.saxutils import XMLGenerator
 
-try:
+
+###### imports #####
+import os, sys, time, array, ctypes, math
+
+
+try:                                          # inside blender
     import bpy, mathutils
     from bpy.props import *
-except ImportError:
-    sys.exit("This script is an addon for blender, you must install it from blender.")
+except ImportError:             # outside blender (compile optional C module)
+    assert __name__ == '__main__'
+    print('Trying to compile Rpython C-library')
+    assert sys.version_info.major == 2  # rpython only works from Python2
+    print('...searching for rpythonic...')
+
+    sys.path.append('../rpythonic')
+    import rpythonic
+    rpythonic.set_pypy_root( '../pypy' )
+    import pypy.rpython.lltypesystem.rffi as rffi
+    from pypy.rlib import streamio
+    rpy = rpythonic.RPython( 'blender2ogre' )
+
+    @rpy.bind(
+        path=str,
+        facesAddr=int, 
+        facesSmoothAddr=int,
+        facesMatAddr=int,
+        vertsPosAddr=int,
+        vertsNorAddr=int,
+        numFaces=int,
+        numVerts=int,
+        #materials=[str],
+    )
+    def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts ):
+        print('PATH----------------', path)
+        #for matname in materials:
+        #    print( 'Material Name: %s' %matname )
+
+        file = streamio.open_file_as_stream( path, 'w')
+
+        faces = rffi.cast( rffi.UINTP, facesAddr )        # face vertex indices
+        facesSmooth = rffi.cast( rffi.CCHARP, facesSmoothAddr )
+        facesMat = rffi.cast( rffi.USHORTP, facesMatAddr )
+
+        vertsPos = rffi.cast( rffi.FLOATP, vertsPosAddr )
+        vertsNor = rffi.cast( rffi.FLOATP, vertsNorAddr )
+
+        VB = [
+            '<sharedgeometry>',
+            '<vertexbuffer positions="true" normals="true">'
+        ]
+        fastlookup = {}
+        ogre_vert_index = 0
+        triangles = []
+        for fidx in range( numFaces ):
+            smooth = ord( facesSmooth[ fidx ] )        # ctypes.c_bool > char > int
+
+            matidx = facesMat[ fidx ]
+            i = fidx*4
+            ai = faces[ i ]; bi = faces[ i+1 ]
+            ci = faces[ i+2 ]; di = faces[ i+3 ]
+
+            triangle = []
+            for J in [ai, bi, ci]:
+                i = J*3
+                x = rffi.cast( rffi.DOUBLE, vertsPos[ i ] )
+                y = rffi.cast( rffi.DOUBLE, vertsPos[ i+1 ] )
+                z = rffi.cast( rffi.DOUBLE, vertsPos[ i+2 ] )
+                pos = (x,y,z)
+                #if smooth:
+                x = rffi.cast( rffi.DOUBLE, vertsNor[ i ] )
+                y = rffi.cast( rffi.DOUBLE, vertsNor[ i+1 ] )
+                z = rffi.cast( rffi.DOUBLE, vertsNor[ i+2 ] )
+                nor = (x,y,z)
+
+                SIG = (pos,nor)#, matidx)
+                skip = False
+                if J in fastlookup:
+                    for otherSIG in fastlookup[ J ]:
+                        if SIG == otherSIG:
+                            triangle.append( fastlookup[J][otherSIG] )
+                            skip = True
+                            break
+
+                    if not skip:
+                        triangle.append( ogre_vert_index )
+                        fastlookup[ J ][ SIG ] = ogre_vert_index
+
+                else:
+                    triangle.append( ogre_vert_index )
+                    fastlookup[ J ] = { SIG : ogre_vert_index }
+
+                if skip: continue
+
+                xml = [
+                    '<vertex>',
+                    '<position x="%s" y="%s" z="%s" />' %pos,    # funny that tuple is valid here
+                    '<normal x="%s" y="%s" z="%s" />' %nor,
+                    '</vertex>'
+                ]
+                VB.append( '\n'.join(xml) )
+
+                ogre_vert_index += 1
+
+            triangles.append( triangle )
+        VB.append( '</vertexbuffer>' )
+        VB.append( '</sharedgeometry>' )
+
+        file.write( '\n'.join(VB) )
+        del VB        # free memory
+
+        SMS = ['<submeshes>']
+        #for matidx, matname in ...:
+        SM = [
+            '<submesh usesharedvertices="true" use32bitindexes="true" material="%s">' %'somemat',
+            '<faces count="%s">' %'100',
+        ]
+        for tri in triangles:
+            #x,y,z = tri    # rpython bug, when in a new 'block' need to unpack/repack tuple
+            #s = '<face v1="%s" v2="%s" v3="%s" />' %(x,y,z)
+            assert isinstance(tri,tuple) #and len(tri)==3        # this also works
+            s = '<face v1="%s" v2="%s" v3="%s" />' %tri        # but tuple is not valid here
+            SM.append( s )
+        SM.append( '</faces>' )
+        SM.append( '</submesh>' )
+
+        file.write( '\n'.join(SM) )
+        file.close()
+
+    rpy.cache(refresh=1)
+    sys.exit('OK: module compiled and cached')
+
+import hashlib, getpass, tempfile, configparser, subprocess, pickle
+from xml.sax.saxutils import XMLGenerator
+
+
+
+class CMesh(object):
+
+    def __init__(self, data):
+        self.numVerts = N = len( data.vertices )
+        self.numFaces = Nfaces = len(data.faces)
+
+        self.vertex_positions = (ctypes.c_float * (N * 3))()
+        data.vertices.foreach_get( 'co', self.vertex_positions )
+        v = self.vertex_positions
+
+        self.vertex_normals = (ctypes.c_float * (N * 3))()
+        data.vertices.foreach_get( 'normal', self.vertex_normals )
+
+        self.faces = (ctypes.c_uint * (Nfaces * 4))()
+        data.faces.foreach_get( 'vertices_raw', self.faces )
+
+        self.faces_normals = (ctypes.c_float * (Nfaces * 3))()
+        data.faces.foreach_get( 'normal', self.faces_normals )
+
+        self.faces_smooth = (ctypes.c_bool * Nfaces)() 
+        data.faces.foreach_get( 'use_smooth', self.faces_smooth )
+
+        self.faces_material_index = (ctypes.c_ushort * Nfaces)() 
+        data.faces.foreach_get( 'material_index', self.faces_material_index )
+
+        self.vertex_colors = []
+        if len( data.vertex_colors ):
+            vc = data.vertex_colors[0]
+            n = len(vc.data)
+            # no colors_raw !!?
+            self.vcolors1 = (ctypes.c_float * (n * 3))()  # face1
+            vc.data.foreach_get( 'color1', self.vcolors1 )
+            self.vertex_colors.append( self.vcolors1 )
+
+            self.vcolors2 = (ctypes.c_float * (n * 3))()  # face2
+            vc.data.foreach_get( 'color2', self.vcolors2 )
+            self.vertex_colors.append( self.vcolors2 )
+
+            self.vcolors3 = (ctypes.c_float * (n * 3))()  # face3
+            vc.data.foreach_get( 'color3', self.vcolors3 )
+            self.vertex_colors.append( self.vcolors3 )
+
+            self.vcolors4 = (ctypes.c_float * (n * 3))()  # face4
+            vc.data.foreach_get( 'color4', self.vcolors4 )
+            self.vertex_colors.append( self.vcolors4 )
+
+        self.uv_textures = []
+        if data.uv_textures.active:
+            for layer in data.uv_textures:
+                n = len(layer.data) * 8
+                a = (ctypes.c_float * n)()
+                layer.data.foreach_get( 'uv_raw', a )   # 4 faces
+                self.uv_textures.append( a )
+
+
+    def save( blenderobject, path ):
+        cmesh = Mesh( blenderobject.data )
+        start = time.time()
+        dotmesh(
+            path,
+            ctypes.addressof( cmesh.faces ),
+            ctypes.addressof( cmesh.faces_smooth ),
+            ctypes.addressof( cmesh.faces_material_index ),
+            ctypes.addressof( cmesh.vertex_positions ),
+            ctypes.addressof( cmesh.vertex_normals ),
+            cmesh.numFaces,
+            cmesh.numVerts,
+        )
+        print( 'mesh dumped in %s seconds' %(time.time()-start) )
+
+
+
+
+
+
+
 
 ## make sure we can import from same directory ##
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -3310,30 +3512,37 @@ class MeshMagick(object):
         print('-'*80)
 
 _ogre_command_line_tools_doc = '''
-Usage: OgreXMLConverter [options] sourcefile [destfile]
+Usage: OgreXMLConverter [options] sourcefile [destfile] 
 
 Available options:
-    -i             = interactive mode - prompt for options
-    (The next 4 options are only applicable when converting XML to Mesh)
-    -l lodlevels   = number of LOD levels
-    -d loddist     = distance increment to reduce LOD
-    -p lodpercent  = Percentage triangle reduction amount per LOD
-    -f lodnumtris  = Fixed vertex reduction per LOD
-    -e             = DON'T generate edge lists (for stencil shadows)
-    -r             = DON'T reorganise vertex buffers to OGRE recommended format.
-    -t             = Generate tangents (for normal mapping)
-    -o             = DON'T optimise out redundant tracks & keyframes
-    -d3d           = Prefer D3D packed colour formats (default on Windows)
-    -gl            = Prefer GL packed colour formats (default on non-Windows)
-    -E endian      = Set endian mode 'big' 'little' or 'native' (default)
-    -q             = Quiet mode, less output
-    -log filename  = name of the log file (default: 'OgreXMLConverter.log')
-    sourcefile     = name of file to convert
-    destfile       = optional name of file to write to. If you don't
-                       specify this OGRE works it out through the extension
-                       and the XML contents if the source is XML. For example
-                       test.mesh becomes test.xml, test.xml becomes test.mesh
-                       if the XML document root is <mesh> etc.
+-i             = interactive mode - prompt for options
+(The next 4 options are only applicable when converting XML to Mesh)
+-l lodlevels   = number of LOD levels
+-v lodvalue     = value increment to reduce LOD
+-s lodstrategy = LOD strategy to use for this mesh
+-p lodpercent  = Percentage triangle reduction amount per LOD
+-f lodnumtris  = Fixed vertex reduction per LOD
+-e             = DON'T generate edge lists (for stencil shadows)
+-r             = DON'T reorganise vertex buffers to OGRE recommended format.
+-t             = Generate tangents (for normal mapping)
+-td [uvw|tangent]
+           = Tangent vertex semantic destination (default tangent)
+-ts [3|4]      = Tangent size (3 or 4 components, 4 includes parity, default 3)
+-tm            = Split tangent vertices at UV mirror points
+-tr            = Split tangent vertices where basis is rotated > 90 degrees
+-o             = DON'T optimise out redundant tracks & keyframes
+-d3d           = Prefer D3D packed colour formats (default on Windows)
+-gl            = Prefer GL packed colour formats (default on non-Windows)
+-E endian      = Set endian mode 'big' 'little' or 'native' (default)
+-x num         = Generate no more than num eXtremes for every submesh (default 0)
+-q             = Quiet mode, less output
+-log filename  = name of the log file (default: 'OgreXMLConverter.log')
+sourcefile     = name of file to convert
+destfile       = optional name of file to write to. If you don't
+                 specify this OGRE works it out through the extension 
+                 and the XML contents if the source is XML. For example
+                 test.mesh becomes test.xml, test.xml becomes test.mesh 
+                 if the XML document root is <mesh> etc.
 '''
 
 def OgreXMLConverter( infile, has_uvs=False ):
@@ -3346,7 +3555,7 @@ def OgreXMLConverter( infile, has_uvs=False ):
     basicArguments = ''
 
     if CONFIG['lodLevels']:
-        basicArguments += ' -l %s -d %s -p %s' %(CONFIG['lodLevels'], CONFIG['lodDistance'], CONFIG['lodPercent'])
+        basicArguments += ' -l %s -v %s -p %s' %(CONFIG['lodLevels'], CONFIG['lodDistance'], CONFIG['lodPercent'])
         
     if CONFIG['nuextremityPoints'] > 0:
         basicArguments += ' -x %s' %CONFIG['nuextremityPoints']
@@ -6023,7 +6232,7 @@ class bpyShaders(bpy.types.Operator):
         r = []
         x = 680
         for i in range( n ):
-            node = tree.nodes.new( type='MATERIAL_EXT' ) #[‘OUTPUT’, ‘MATERIAL’, ‘RGB’, ‘VALUE’, ‘MIX_RGB’, ‘VALTORGB’, ‘RGBTOBW’, ‘TEXTURE’, ‘NORMAL’, ‘GEOMETRY’, ‘MAPPING’, ‘CURVE_VEC’, ‘CURVE_RGB’, ‘CAMERA’, ‘MATH’, ‘VECT_MATH’, ‘SQUEEZE’, ‘MATERIAL_EXT’, ‘INVERT’, ‘SEPRGB’, ‘COMBRGB’, ‘HUE_SAT’, ‘SCRIPT’, ‘GROUP’]
+            node = tree.nodes.new( type='MATERIAL_EXT' )
             node.name = 'GEN.%s' %i
             node.location.x = x; node.location.y = 640
             r.append( node )
