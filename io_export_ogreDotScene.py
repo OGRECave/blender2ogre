@@ -31,8 +31,8 @@ VERSION = '0.5.6 preview1'
 ## fix terrain collision offset bug
 ## add realtime transform (rotation is missing)
 ## fix camera rotated -90 ogre-dot-scene
-## 'Cast shadows' needs pyRNA
-## Draw Distance and multires
+## Draw Distance and multires (requires new tundra API, draw-dist-start draw-dist-end)
+
 
 ## Public API ##
 UI_CLASSES = []
