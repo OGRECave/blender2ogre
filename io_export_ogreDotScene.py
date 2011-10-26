@@ -2405,11 +2405,14 @@ class _TXML_(object):
             c.setAttribute('type', 'EC_Sound')
             c.setAttribute('sync', '1')
 
-            if ob.data.sound:   # requires absolute path for now
-                soundpath, soundfile = os.path.split( ob.data.sound.filepath )
+            if ob.data.sound:
+                abspath = bpy.path.abspath( ob.data.sound.filepath )
+                soundpath, soundfile = os.path.split( abspath )
                 a = doc.createElement('attribute'); c.appendChild(a)
                 a.setAttribute('name', 'Sound ref' )
                 a.setAttribute('value', 'local://%s'%soundfile)
+                if not os.path.isfile( os.path.join(path,soundfile) ):
+                    open( os.path.join(path,soundfile), 'wb' ).write( open(abspath,'rb').read() )
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Sound radius inner' )
@@ -3010,27 +3013,32 @@ class _OgreCommonExport_( _TXML_ ):
             ##########################################
             proxies = []
             for ob in objects:
-                if ob.type == 'MESH' and len(ob.data.faces):
+                if ob.type == 'LAMP':
+                    TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+                    self.tundra_light( TE, ob )
+
+                elif ob.type == 'SPEAKER':
+                    TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+
+                elif ob.type == 'MESH' and len(ob.data.faces):
                     if ob.modifiers and ob.modifiers[0].type=='MULTIRES' and ob.use_multires_lod:
                         mod = ob.modifiers[0]
                         basename = ob.name
                         dataname = ob.data.name
                         ID = uid( ob )   # ensure uid
+                        TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+
                         for level in range( mod.total_levels+1 ):
-                            mod.levels = level
-                            if level:
-                                ob.name = '%s.LOD%s' %(basename,level)
-                                ob.data.name = '%s.LOD%s' %(dataname,level)
-                                TE = self.tundra_entity( 
-                                    rex, ob, path=path, collision_proxies=proxies, parent=basename, 
-                                    matrix=mathutils.Matrix(), visible=False
-                                )
-                                self.tundra_mesh( TE, ob, url, exported_meshes )
-
-                            else:
-                                TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
-
                             ob.uid += 1
+                            mod.levels = level
+                            ob.name = '%s.LOD%s' %(basename,level)
+                            ob.data.name = '%s.LOD%s' %(dataname,level)
+                            TE = self.tundra_entity( 
+                                rex, ob, path=path, collision_proxies=proxies, parent=basename, 
+                                matrix=mathutils.Matrix(), visible=False
+                            )
+                            self.tundra_mesh( TE, ob, url, exported_meshes )
+
                         ob.uid = ID
                         ob.name = basename
                         ob.data.name = dataname
@@ -3038,9 +3046,6 @@ class _OgreCommonExport_( _TXML_ ):
                         TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
                         self.tundra_mesh( TE, ob, url, exported_meshes )
 
-                elif ob.type == 'LAMP':
-                    TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
-                    self.tundra_light( TE, ob )
 
             for proxy in proxies:
                 self.dot_mesh( 
@@ -4975,8 +4980,8 @@ class Client(object):
 
             if LOD in ob:
                 #print( 'LOD', ob[LOD] )
-                index = e.id + ob[LOD]
-                for i in range(1,10):
+                index = e.id + ob[LOD] + 1
+                for i in range(1,9):
                     elod = get_entity( e.id + i )
                     if elod:
                         if elod.id == index and not elod.placeable.visible:
