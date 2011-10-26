@@ -49,9 +49,11 @@ def hide_user_interface():
 def uid(ob):
     if ob.uid == 0:
         high = 0
+        multires = 0
         for o in bpy.data.objects:
             if o.uid > high: high = o.uid
-        high += 1
+            if o.use_multires_lod: multires += 1
+        high += 1 + (multires*10)
         if high < 100: high = 100   # start at 100
         ob.uid = high
     return ob.uid
@@ -287,6 +289,11 @@ bpy.types.Object.use_draw_distance = BoolProperty( name='enable draw distance', 
 bpy.types.Object.draw_distance = FloatProperty( name='draw distance', description='distance at which to begin drawing object', default=0.0, min=0.0, max=10000.0)
 
 bpy.types.Object.cast_shadows = BoolProperty( name='cast shadows', description='cast shadows', default=False)
+
+bpy.types.Object.use_multires_lod = BoolProperty( name='Enable Multires LOD', description='enables multires LOD', default=False)
+
+bpy.types.Object.multires_lod_range = FloatProperty( name='multires LOD range', description='far distance at which multires is set to base level', default=30.0, min=0.0, max=10000.0)
+
 
 
 ## Physics+ ##
@@ -2320,7 +2327,7 @@ class _TXML_(object):
         return doc
 
     ########################################
-    def tundra_entity( self, doc, ob, path='/tmp', collision_proxies=[] ):
+    def tundra_entity( self, doc, ob, path='/tmp', collision_proxies=[], parent=None, matrix=None,visible=True ):
         assert not ob.subcollision
         # txml has flat hierarchy
         e = doc.createElement( 'entity' )
@@ -2339,19 +2346,21 @@ class _TXML_(object):
 
 
         ############ Tundra TRANSFORM ####################
+        if not matrix: matrix = ob.matrix_world.copy()
+
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Placeable")
         c.setAttribute('sync', '1')
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Transform" )
-        x,y,z = swap(ob.matrix_world.to_translation())
+        x,y,z = swap(matrix.to_translation())
         loc = '%6f,%6f,%6f' %(x,y,z)
-        x,y,z = swap(ob.matrix_world.to_euler())
+        x,y,z = swap(matrix.to_euler())
         x = math.degrees( x ); y = math.degrees( y ); z = math.degrees( z )
         if ob.type == 'CAMERA': x -= 90
         elif ob.type == 'LAMP': x += 90
         rot = '%6f,%6f,%6f' %(x,y,z)
-        x,y,z = swap(ob.matrix_world.to_scale())
+        x,y,z = swap(matrix.to_scale())
         scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z))		# Tundra2 clamps any negative to zero
         a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
 
@@ -2362,11 +2371,18 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Visible" )
-        a.setAttribute('value', 'true')
+        if visible: a.setAttribute('value', 'true') # overrides children's setting - not good!
+        else: a.setAttribute('value', 'false')
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Selection layer" )
         a.setAttribute('value', 1)
+
+        if parent:
+            a = doc.createElement('attribute'); c.appendChild(a)
+            a.setAttribute('name', "Parent entity ref" )
+            a.setAttribute('value', parent)
+
 
         #<attribute value="1" name="Selection layer"/>
         #<attribute value="" name="Parent entity ref"/>
@@ -2994,13 +3010,37 @@ class _OgreCommonExport_( _TXML_ ):
             ##########################################
             proxies = []
             for ob in objects:
-                TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
                 if ob.type == 'MESH' and len(ob.data.faces):
-                    self.tundra_mesh( TE, ob, url, exported_meshes )
-                    #meshes.append( ob )
-                elif ob.type == 'LAMP':
-                    self.tundra_light( TE, ob )
+                    if ob.modifiers and ob.modifiers[0].type=='MULTIRES' and ob.use_multires_lod:
+                        mod = ob.modifiers[0]
+                        basename = ob.name
+                        dataname = ob.data.name
+                        ID = uid( ob )   # ensure uid
+                        for level in range( mod.total_levels+1 ):
+                            mod.levels = level
+                            if level:
+                                ob.name = '%s.LOD%s' %(basename,level)
+                                ob.data.name = '%s.LOD%s' %(dataname,level)
+                                TE = self.tundra_entity( 
+                                    rex, ob, path=path, collision_proxies=proxies, parent=basename, 
+                                    matrix=mathutils.Matrix(), visible=False
+                                )
+                                self.tundra_mesh( TE, ob, url, exported_meshes )
 
+                            else:
+                                TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+
+                            ob.uid += 1
+                        ob.uid = ID
+                        ob.name = basename
+                        ob.data.name = dataname
+                    else:
+                        TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+                        self.tundra_mesh( TE, ob, url, exported_meshes )
+
+                elif ob.type == 'LAMP':
+                    TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+                    self.tundra_light( TE, ob )
 
             for proxy in proxies:
                 self.dot_mesh( 
@@ -3008,7 +3048,6 @@ class _OgreCommonExport_( _TXML_ ):
                     path=os.path.split(url)[0], 
                     force_name='_collision_%s' %proxy.data.name
                 )
-
 
             if self.EX_SCENE:
                 if not url.endswith('.txml'): url += '.txml'
@@ -4747,27 +4786,30 @@ class Server(object):
         return w
 
     def multires_lod( self ):
+        '''
+        Ogre builtin LOD sucks for character animation
+        '''
         ob = bpy.context.active_object
         cam = bpy.context.scene.camera
 
-        if ob and cam and ob.type=='MESH':
+        if ob and cam and ob.type=='MESH' and ob.use_multires_lod:
             delta = bpy.context.active_object.matrix_world.to_translation() - cam.matrix_world.to_translation()
             dist = delta.length
-            print( 'Distance', dist )
-            if ob.modifiers and ob.modifiers[0].type == 'MULTIRES':
+            #print( 'Distance', dist )
+            if ob.modifiers and ob.modifiers[0].type == 'MULTIRES' and ob.modifiers[0].total_levels > 1:
                 mod = ob.modifiers[0]
-                if mod.total_levels > 1:
-                    if dist > 10: mod.levels = 1
-                    elif dist < 10: mod.levels = 2
+                step = ob.multires_lod_range / mod.total_levels
+                level = mod.total_levels - int( dist / step )
+                if mod.levels != level: mod.levels = level
+                return level
 
     def sync( self ):   # 153 bytes per object + n bytes for animation names and weights
-        self.multires_lod()
+        LOD = self.multires_lod()
 
         p = STREAM_PROTO
         i = 0; msg = []
         for ob in bpy.context.selected_objects:
             if ob.type not in ('MESH','LAMP','SPEAKER'): continue
-            print('sending ob', ob)
             loc, rot, scale = ob.matrix_world.decompose()
             loc = swap(loc).to_tuple()
             x,y,z = swap( rot.to_euler() )
@@ -4776,6 +4818,9 @@ class Server(object):
             scale = ( abs(x), abs(y), abs(z) )
             d = { p['ID']:uid(ob), p['POSITION']:loc, p['ROTATION']:rot, p['SCALE']:scale, p['TYPE']:p[ob.type] }
             msg.append( d )
+
+            if ob.name == bpy.context.active_object.name and LOD is not None:
+                d[ p['LOD'] ] = LOD
 
             if ob.type == 'MESH':
                 arm = ob.find_armature()
@@ -4820,7 +4865,7 @@ class Server(object):
             else:    # threadsafe start
                 if not bpy.context.active_object: continue
                 now = time.time()
-                if now - prev > 0.033:            # don't flood Tundra
+                if now - prev > 0.066:            # don't flood Tundra
                     prev = now
                     sel = bpy.context.active_object
                     msg = self.sync()
@@ -4867,7 +4912,7 @@ class Server(object):
 
 def _create_stream_proto():
     proto = {}
-    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA SPEAKER ANIMATIONS DISTANCE ENERGY VOLUME MUTE'.split()
+    tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA SPEAKER ANIMATIONS DISTANCE ENERGY VOLUME MUTE LOD'.split()
     for i,tag in enumerate( tags ): proto[ tag ] = chr(i)		# up to 256
     return proto
 STREAM_PROTO = _create_stream_proto()
@@ -4877,7 +4922,12 @@ TUNDRA_SCRIPT = '''
 import tundra, socket, select, pickle
 STREAM_BUFFER_SIZE = 2048
 globals().update( %s )
-E = None    # this is just for debugging from the pyconsole
+E = {}    # this is just for debugging from the pyconsole
+
+def get_entity(ID):
+    scn = tundra.Scene().MainCameraScene()
+    return scn.GetEntityRaw( ID )
+
 class Client(object):
     def __init__(self):
         self.socket = sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -4923,7 +4973,18 @@ class Client(object):
             if ANIMATIONS in ob:
                 self.update_animation( e, ob )
 
-            if not E: E = e
+            if LOD in ob:
+                #print( 'LOD', ob[LOD] )
+                index = e.id + ob[LOD]
+                for i in range(1,10):
+                    elod = get_entity( e.id + i )
+                    if elod:
+                        if elod.id == index and not elod.placeable.visible:
+                            elod.placeable.visible = True
+                        elif elod.id != index and elod.placeable.visible:
+                            elod.placeable.visible = False
+
+            if ob[ID] not in E: E[ ob[ID] ] = e
 
     def update_animation( self, e, ob ):
         if ob[ID] not in self._animated:
@@ -6010,6 +6071,25 @@ class PANEL_Speaker(bpy.types.Panel):
         box.prop( context.active_object.data, 'loop' )
         box.prop( context.active_object.data, 'use_spatial' )
 
+@UI
+class PANEL_MultiResLOD(bpy.types.Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "modifier"
+    bl_label = "Multi-Resolution LOD"
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.active_object.type=='MESH':
+            ob = context.active_object
+            if ob.modifiers and ob.modifiers[0].type=='MULTIRES':
+                return True
+    def draw(self, context):
+        ob = context.active_object
+        layout = self.layout
+        box = layout.box()
+        box.prop( ob, 'use_multires_lod' )
+        if ob.use_multires_lod:
+            box.prop( ob, 'multires_lod_range' )
 
 
 #####################################################################################
