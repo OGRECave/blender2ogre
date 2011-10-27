@@ -662,7 +662,7 @@ _CONFIG_DEFAULTS_ALL = {
     'optimiseAnimations' : True,
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVCOMPRESS NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
 #_CONFIG_TAGS_.append( 'JMONKEY_ROOT' )
 
 
@@ -676,6 +676,8 @@ _CONFIG_DEFAULTS_WINDOWS = {
     'NVIDIATOOLS_EXE' : 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe',
     'USER_MATERIALS' : 'C:\\Tundra2\\media\\materials',
     'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs',
+    'NVCOMPRESS' : 'C:\\nvcompress.exe'
+
 }
 
 _CONFIG_DEFAULTS_UNIX = {
@@ -690,6 +692,7 @@ _CONFIG_DEFAULTS_UNIX = {
     'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
 #    'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
 #    'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
+    'NVCOMPRESS' : '/usr/local/bin/nvcompress'
 }
 
 if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
@@ -5738,11 +5741,28 @@ class _image_processing_( object ):
         subprocess.call( cmd )
 
     def DDS_converter(self, texture, infile ):
+        nvcompress = CONFIG['NVCOMPRESS']
+        nvdxt = CONFIG['NVIDIATOOLS_EXE']
+        if os.path.isfile( nvcompress ): self.nvcompress( texture, infile )
+        elif os.path.isfile( nvdxt ): self.nvdxt( texture, infile )
+        else:
+            Report.warnings.append( 'Nvidia DDS tools not installed!' )
+            print( 'ERROR: can not find nvdxt or nvcompress')
+
+    def nvcompress(self, texture, infile, version=1, fast=False, blocking=True):
+        print('[NVCompress DDS Wrapper]', infile )
+        assert version in (1,2,3,4,5)
+        exe = CONFIG['NVCOMPRESS']
+        cmd = [ exe ]
+        cmd.append( '-bc%s' %version )
+        if fast: cmd.append( '-fast' )
+        cmd.append( infile )
+        if blocking: subprocess.call( cmd )
+        else: subprocess.Popen( cmd )
+
+    def nvdxt(self, texture, infile):
         print('[NVIDIA DDS Wrapper]', infile )
         exe = CONFIG['NVIDIATOOLS_EXE']
-        if not os.path.isfile( exe ):
-            Report.warnings.append( 'Nvidia DDS tools not installed!' )
-            print( 'ERROR: can not find nvdxt.exe', exe ); return
         opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
         path,name = os.path.split( infile )
         outfile = os.path.join( path, self._reformat(name,texture.image) )
@@ -5755,7 +5775,31 @@ class _image_processing_( object ):
         f.write(data)
         f.close()
 
+_nvcompress_doc = '''
+usage: nvcompress [options] infile [outfile]
 
+Input options:
+  -color   	The input image is a color map (default).
+  -alpha     	The input image has an alpha channel used for transparency.
+  -normal  	The input image is a normal map.
+  -tonormal	Convert input to normal map.
+  -clamp   	Clamp wrapping mode (default).
+  -repeat  	Repeat wrapping mode.
+  -nomips  	Disable mipmap generation.
+
+Compression options:
+  -fast    	Fast compression.
+  -nocuda  	Do not use cuda compressor.
+  -rgb     	RGBA format
+  -bc1     	BC1 format (DXT1)
+  -bc1n    	BC1 normal map format (DXT1nm)
+  -bc1a    	BC1 format with binary alpha (DXT1a)
+  -bc2     	BC2 format (DXT3)
+  -bc3     	BC3 format (DXT5)
+  -bc3n    	BC3 normal map format (DXT5nm)
+  -bc4     	BC4 format (ATI1)
+  -bc5     	BC5 format (3Dc/ATI2)
+'''
 
 class OgreMaterialGenerator( _image_processing_ ):
     def __init__(self, material, path='/tmp', touch_textures=False ):

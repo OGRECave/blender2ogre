@@ -2,7 +2,7 @@ Blender2Ogre
 By: Hartshorn, S.Rombauts, PForce and F00bar
 Sponsors: Adminotech Ltd
 License: GNU LGPL
-Version: 0.5.5 2011
+Version: 0.5.6 2011
 
 Supports:
 	Blender 2.6
@@ -23,7 +23,7 @@ blender by going to "Properties>Scene>Ogre Configuration File", and then click "
 Installing:
 	Installing the Addon:
 		. Use blenders interface, under user-prefs, click addons, click 'install-addon', and select: io_export_ogreDotScene.py
-		. or you can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.59/scripts/addons_contrib/
+		. or you can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.59/scripts/addons/
 
 	Installing Dependencies:
 		Linux:
@@ -32,9 +32,10 @@ Installing:
 			2. Get Ogre Meshy for Windows, install wine, extract OgreMeshy to /home/yourname/OgreMeshy
 
 		Windows:
-			1. extract the zip "blender2ogre-minimal-deps(win32,wine).zip"
-			2. install OgreCommandLineTools_1.6.3.msi and msvcpp_2008_sp1_redist_vcredist_x86.exe
-			3. copy OgreMeshy to C:\
+			NOTE: OgreCommandLineTools 1.6.3 is old. Upgrade to 1.7 if possible
+				1. extract the zip "blender2ogre-minimal-deps(win32,wine).zip"
+				2. install OgreCommandLineTools_1.6.3.msi and msvcpp_2008_sp1_redist_vcredist_x86.exe
+				3. copy OgreMeshy to C:\
 
 		Get the latest Ogre Meshy from: http://sourceforge.net/projects/ogremeshy/
 
@@ -45,9 +46,8 @@ Dependencies:
 			http://www.ogre3d.org/download/tools
 
 	Optional:
-		3. Install NVIDIA DDS Legacy Utilities	( install to default path )
-			http://developer.nvidia.com/object/dds_utilities_legacy.html
-			(Linux users will need to use Wine)
+		3. NVIDIA Texture Tools 2.0 (with CUDA acceleration)
+			http://code.google.com/p/nvidia-texture-tools/
 
 		4. Install Image Magick
 			http://www.imagemagick.org
@@ -60,6 +60,10 @@ Dependencies:
 			http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
 			Windows: extract to C:\Tundra2
 			Linux: extract to Tundra2 in your home directory (~/Tundra2)
+
+Note: Nvidia DDS, if you can not install "NVIDIA Texture Tools 2.0" above, you can still use
+Legacy Utils below:
+	http://developer.nvidia.com/object/dds_utilities_legacy.html
 
 
 ################################### OSX ########################################
