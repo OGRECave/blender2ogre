@@ -4873,9 +4873,12 @@ class Server(object):
         while self.active:
             if not self.ready.locked(): time.sleep(0.001)    # not threadsafe
             else:    # threadsafe start
-                if not bpy.context.active_object: continue
                 now = time.time()
                 if now - prev > 0.066:            # don't flood Tundra
+                    actob = None
+                    try: actob = bpy.context.active_object
+                    except: pass
+                    if not actob: continue
                     prev = now
                     sel = bpy.context.active_object
                     msg = self.sync()
@@ -5096,7 +5099,7 @@ class TundraPipe(object):
         #cmd += ['--file', '/tmp/rex/preview.txml']     # tundra2.1.2 bug loading from --file ignores entity ID's
         cmd.append( '--storage' )
         cmd.append( '/tmp/rex' )
-        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, cwd=CONFIG['TUNDRA_ROOT'])
 
         self.physics = True
         if self.proc:
@@ -6072,7 +6075,9 @@ class OgreMaterialGenerator( _image_processing_ ):
                     f = open( desturl, 'wb' )
                     f.write( open(iurl,'rb').read() )
                     f.close()
-                if is_image_postprocessed( texture.image ):     # TODO allow imagemagick to operate first, then DDS-convert
+                posturl = os.path.join(destpath,postname)
+                if is_image_postprocessed( texture.image ) and not os.path.isfile( posturl ):
+                    # TODO allow imagemagick to operate first, then DDS-convert
                     if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds': self.DDS_converter( texture, desturl )
                     else: self.image_magick( texture, desturl )
 
