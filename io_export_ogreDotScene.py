@@ -25,7 +25,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.6 preview2'
+VERSION = '0.5.6 preview3'
 
 ## final TODO: 
 ## fix terrain collision offset bug
@@ -92,12 +92,14 @@ except ImportError:             # outside blender (compile optional C module)
         vertsNorAddr=int,
         numFaces=int,
         numVerts=int,
-        #materials=[str],
+        materialNames=str,	# [str] is too tricky to convert py-list to rpy-list
     )
-    def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts ):
+    def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts, materialNames ):
         print('PATH----------------', path)
-        #for matname in materials:
-        #    print( 'Material Name: %s' %matname )
+        materials = []
+        for matname in materialNames.split(';'):
+            print( 'Material Name: %s' %matname )
+            materials.append( matname )
 
         file = streamio.open_file_as_stream( path, 'w')
 
@@ -5754,9 +5756,27 @@ class _image_processing_( object ):
         assert version in (1,2,3,4,5)
         exe = CONFIG['NVCOMPRESS']
         cmd = [ exe ]
-        cmd.append( '-bc%s' %version )
+
+        if texture.use_alpha and texture.image.depth==32:
+            cmd.append( '-alpha' )
+
+        if not texture.use_mipmap:
+            cmd.append( '-nomips' )
+
+        if texture.use_normal_map:
+            cmd.append( '-normal' )
+            if version in (1,3):
+                cmd.append( '-bc%sn' %version )
+            else:
+                cmd.append( '-bc%s' %version )
+
+        else:
+            cmd.append( '-bc%s' %version )
+
         if fast: cmd.append( '-fast' )
         cmd.append( infile )
+
+        print( cmd )
         if blocking: subprocess.call( cmd )
         else: subprocess.Popen( cmd )
 
