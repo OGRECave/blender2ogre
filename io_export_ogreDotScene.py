@@ -6071,15 +6071,18 @@ class OgreMaterialGenerator( _image_processing_ ):
             if not os.path.isfile( iurl ): Report.warnings.append( 'missing texture: %s' %iurl )
             else:
                 desturl = os.path.join( destpath, texname )
+                updated = False
                 if not os.path.isfile( desturl ) or os.stat( desturl ).st_mtime < os.stat( iurl ).st_mtime:
                     f = open( desturl, 'wb' )
                     f.write( open(iurl,'rb').read() )
                     f.close()
+                    updated = True
                 posturl = os.path.join(destpath,postname)
-                if is_image_postprocessed( texture.image ) and not os.path.isfile( posturl ):
-                    # TODO allow imagemagick to operate first, then DDS-convert
-                    if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds': self.DDS_converter( texture, desturl )
-                    else: self.image_magick( texture, desturl )
+                if is_image_postprocessed( texture.image ):
+                    if not os.path.isfile( posturl ) or updated:
+                        # TODO allow imagemagick to operate first, then DDS-convert
+                        if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds': self.DDS_converter( texture, desturl )
+                        else: self.image_magick( texture, desturl )
 
         return M
 
