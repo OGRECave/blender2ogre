@@ -31,7 +31,6 @@ VERSION = '0.5.6 preview3'
 ## fix terrain collision offset bug
 ## add realtime transform (rotation is missing)
 ## fix camera rotated -90 ogre-dot-scene
-## Draw Distance and multires (requires new tundra API, draw-dist-start draw-dist-end)
 
 
 ## Public API ##
@@ -283,6 +282,11 @@ if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
 
 
 ######################### bpy RNA #########################
+bpy.types.Object.use_avatar = BoolProperty( name='enable avatar', description='enables EC_Avatar', default=False)
+bpy.types.Object.avatar_reference = StringProperty( name='avatar reference', description='sets avatar reference URL', maxlen=128, default='')
+
+BoolProperty( name='enable avatar', description='enables EC_Avatar', default=False)
+
 bpy.types.Object.uid = IntProperty(
     name="unique ID", description="unique ID for Tundra", 
     default=0, min=0, max=2**14)
@@ -5873,7 +5877,7 @@ class OgreMaterialGenerator( _image_processing_ ):
             texnodes = bpyShaders.get_texture_subnodes( self.material, mat )
 
         M = ''
-        if not pass_name: pass_name = 'b2ogre_%s'%time.time()
+        if not pass_name: pass_name = mat.name
         if usermat:
             M += indent(2, 'pass %s : %s/PASS0' %(pass_name,usermat.name), '{' )
         else:
@@ -5961,7 +5965,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         path = self.path    #CONFIG['PATH']
 
         M = ''; _alphahack = None
-        if not name: name = 'b2ogre_%s' %time.time()
+        if not name: name = ''      #texture.name   # (its unsafe to use texture block name)
         M += indent(3, 'texture_unit %s' %name, '{' )
 
         if texture.library: # support library linked textures
@@ -6121,16 +6125,20 @@ class PANEL_Object(bpy.types.Panel):
     bl_label = "Object+"
     @classmethod
     def poll(cls, context):
-        if context.active_object and context.active_object.type=='MESH': return True
+        if _USE_TUNDRA_ and context.active_object: return True
     def draw(self, context):
         ob = context.active_object
         layout = self.layout
         box = layout.box()
         box.prop( ob, 'cast_shadows' )
+
         box.prop( ob, 'use_draw_distance' )
         if ob.use_draw_distance:
             box.prop( ob, 'draw_distance' )
-
+        #if ob.find_armature():
+        if ob.type == 'EMPTY':
+            box.prop( ob, 'use_avatar' )
+            box.prop( ob, 'avatar_reference' )
 
 @UI
 class PANEL_Speaker(bpy.types.Panel):
@@ -6189,7 +6197,7 @@ def generate_material( mat, path='/tmp', copy_programs=False, touch_textures=Fal
     M += 'material %s \n{\n'        %safename
     if mat.use_shadows: M += indent(1, 'receive_shadows on')
     else: M += indent(1, 'receive_shadows off')
-    M += indent(1, 'technique b2ogre_%s'%time.time(), '{' )    # technique GLSL, CG
+    M += indent(1, 'technique', '{' )    # technique GLSL, CG
     w = OgreMaterialGenerator( mat, path=path, touch_textures=touch_textures )
     if copy_programs:
         progs = w.get_active_programs()
