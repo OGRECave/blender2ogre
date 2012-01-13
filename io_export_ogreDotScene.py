@@ -25,7 +25,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.6 preview3'
+VERSION = '0.5.6 preview5'
 
 ## final TODO: 
 ## fix terrain collision offset bug
@@ -5102,7 +5102,8 @@ class TundraPipe(object):
 
         #cmd += ['--file', '/tmp/rex/preview.txml']     # tundra2.1.2 bug loading from --file ignores entity ID's
         cmd.append( '--storage' )
-        cmd.append( '/tmp/rex' )
+        if sys.platform.startswith('win'): cmd.append( 'C:\\tmp\\rex' )
+        else: cmd.append( '/tmp/rex' )
         self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, cwd=CONFIG['TUNDRA_ROOT'])
 
         self.physics = True
@@ -5697,17 +5698,22 @@ def is_image_postprocessed( image ):
         return False
 
 class _image_processing_( object ):
+
     def _reformat( self, name, image ):
-        if image.use_resize_half or image.use_resize_absolute:
-            name = 'R.%s' %name
-        if image.use_color_quantize:
-            name = 'Q.%s' %name
-        if image.use_convert_format:
-            name = 'F.%s' %name
-            if image.convert_format != 'NONE':
-                name = '%s.%s' %(name[:name.rindex('.')], image.convert_format)
-        elif CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE':
+        if image.convert_format != 'NONE':
+            name = '%s.%s' %(name[:name.rindex('.')], image.convert_format)
+            if image.convert_format == 'dds': name = '_DDS_.%s' %name
+
+        elif image.use_resize_half or image.use_resize_absolute or image.use_color_quantize or image.use_convert_format:
+            name = '_magick_.%s' %name
+
+
+        if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE' and not name.endswith('.dds'):
             name = '%s.%s' %(name[:name.rindex('.')], CONFIG['FORCE_IMAGE_FORMAT'])
+            if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds':
+                name = '_DDS_.%s' %name
+
+
         return name
 
     def image_magick( self, texture, infile ):
@@ -5744,21 +5750,22 @@ class _image_processing_( object ):
             cmd.append( str(texture.image.color_quantize) )
 
         path,name = os.path.split( infile )
+        #if (texture.image.use_convert_format and texture.image.convert_format == 'dds') or CONFIG['FORCE_IMAGE_FORMAT'] == 'dds':
         outfile = os.path.join( path, self._reformat(name,texture.image) )
-        cmd.append( outfile )
-        print( 'IMAGE MAGICK', cmd )
-        subprocess.call( cmd )
+        if outfile.endswith('.dds'):
+            temp = os.path.join( path, '_temp_.png' )
+            cmd.append( temp )
+            print( 'IMAGE MAGICK: %s' %cmd )
+            subprocess.call( cmd )
+            self.nvcompress( texture, temp, outfile=outfile )
 
-    def DDS_converter(self, texture, infile ):
-        nvcompress = CONFIG['NVCOMPRESS']
-        nvdxt = CONFIG['NVIDIATOOLS_EXE']
-        if os.path.isfile( nvcompress ): self.nvcompress( texture, infile )
-        elif os.path.isfile( nvdxt ): self.nvdxt( texture, infile )
         else:
-            Report.warnings.append( 'Nvidia DDS tools not installed!' )
-            print( 'ERROR: can not find nvdxt or nvcompress')
+            cmd.append( outfile )
+            print( 'IMAGE MAGICK: %s' %cmd )
+            subprocess.call( cmd )
 
-    def nvcompress(self, texture, infile, version=1, fast=False, blocking=True):
+
+    def nvcompress(self, texture, infile, outfile=None, version=1, fast=False, blocking=True):
         print('[NVCompress DDS Wrapper]', infile )
         assert version in (1,2,3,4,5)
         exe = CONFIG['NVCOMPRESS']
@@ -5783,24 +5790,12 @@ class _image_processing_( object ):
         if fast: cmd.append( '-fast' )
         cmd.append( infile )
 
+        if outfile: cmd.append( outfile )
+
         print( cmd )
         if blocking: subprocess.call( cmd )
         else: subprocess.Popen( cmd )
 
-    def nvdxt(self, texture, infile):
-        print('[NVIDIA DDS Wrapper]', infile )
-        exe = CONFIG['NVIDIATOOLS_EXE']
-        opts = '-quality_production -nmips %s -rescale nearest' %CONFIG['DDS_MIPS']
-        path,name = os.path.split( infile )
-        outfile = os.path.join( path, self._reformat(name,texture.image) )
-        opts = opts.split() + ['-file', infile, '-output', '_tmp_.dds']
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
-            subprocess.call( ['/usr/bin/wine', exe]+opts )
-        else: subprocess.call( [exe]+opts )         ## TODO support OSX
-        data = open( '_tmp_.dds', 'rb' ).read()
-        f = open( outfile, 'wb' )
-        f.write(data)
-        f.close()
 
 _nvcompress_doc = '''
 usage: nvcompress [options] infile [outfile]
@@ -6084,9 +6079,7 @@ class OgreMaterialGenerator( _image_processing_ ):
                 posturl = os.path.join(destpath,postname)
                 if is_image_postprocessed( texture.image ):
                     if not os.path.isfile( posturl ) or updated:
-                        # TODO allow imagemagick to operate first, then DDS-convert
-                        if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds': self.DDS_converter( texture, desturl )
-                        else: self.image_magick( texture, desturl )
+                        self.image_magick( texture, desturl )   # calls nvconvert if required
 
         return M
 
