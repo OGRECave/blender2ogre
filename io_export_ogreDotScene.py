@@ -16,16 +16,16 @@
 
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
-    "author": "HartsAntler, Sebastien Rombauts, and F00bar",
+    "author": "HartsAntler, Sebastien Rombauts, F00bar and Waruck",
     "version": (0,5,6),
-    "blender": (2,6,0),
+    "blender": (2,6,1),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.6 preview5'
+VERSION = '0.5.6 preview6'
 
 ## final TODO: 
 ## fix terrain collision offset bug
@@ -3652,7 +3652,8 @@ class Bone(object):
             if CONFIG['SWAP_AXIS'] == '-xzy':      # Tundra1
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
             elif CONFIG['SWAP_AXIS'] == 'xz-y':    # Tundra2
-                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+                #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
+                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))	# thanks to Waruck
             else:
                 print( 'ERROR - TODO: axis swap mode not supported with armature animation' )
                 assert 0
@@ -3754,10 +3755,10 @@ class Skeleton(object):
             if not b.parent:
                 b.compute_rest()
                 loc,rot,scl = b.ogre_rest_matrix.decompose()
-                if loc.x or loc.y or loc.z:
-                    Report.warnings.append('ERROR: root bone has non-zero transform (location offset)')
-                if rot.w > ep or rot.x > ep or rot.y > ep or rot.z < 1.0-ep:
-                    Report.warnings.append('ERROR: root bone has non-zero transform (rotation offset)')
+                #if loc.x or loc.y or loc.z:
+                #    Report.warnings.append('ERROR: root bone has non-zero transform (location offset)')
+                #if rot.w > ep or rot.x > ep or rot.y > ep or rot.z < 1.0-ep:
+                #    Report.warnings.append('ERROR: root bone has non-zero transform (rotation offset)')
                 self.roots.append( b )
 
     def to_xml( self ):
