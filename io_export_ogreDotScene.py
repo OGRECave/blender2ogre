@@ -16,7 +16,7 @@
 
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
-    "author": "HartsAntler, Sebastien Rombauts, F00bar and Waruck",
+    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne",
     "version": (0,5,6),
     "blender": (2,6,1),
     "location": "File > Export...",
@@ -25,7 +25,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.6 preview6'
+VERSION = '0.5.6 preview7'
 
 ## final TODO: 
 ## fix terrain collision offset bug
@@ -3172,6 +3172,14 @@ class _OgreCommonExport_( _TXML_ ):
                 user.setAttribute( 'name', propname )
                 user.setAttribute( 'value', str(propvalue) )
                 user.setAttribute( 'type', type(propvalue).__name__ )
+        ## custom user props from BGE props by Mind Calamity##
+        for prop in ob.game.properties:
+            e = doc.createElement( 'user_data' )
+            o.appendChild( e )
+            e.setAttribute('name', prop.name)
+            e.setAttribute('value', str(prop.value))
+            e.setAttribute('type', type(prop.value).__name__)
+        ## end of Mind Calamity patch ##
 
         ## BGE subset ##
         game = doc.createElement('game')
@@ -4500,8 +4508,17 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             Report.triangles += len(_sm_faces_[matidx])
         del(_sm_faces_)
         doc.end_tag('submeshes')
+        ## by MrMagne
+        doc.start_tag('submeshnames', {})
+        for matidx, mat in enumerate( materials ):
+            doc.start_tag('submesh', {
+                    'name' : material_name(mat),
+                    'index' : str(matidx)
+            })
+            doc.end_tag('submesh')
+        doc.end_tag('submeshnames')
+        ## end of MrMagne's patch
 
-        
         arm = ob.find_armature()
         if arm:
             doc.leaf_tag('skeletonlink', {
@@ -6088,7 +6105,7 @@ class OgreMaterialGenerator( _image_processing_ ):
 
 class TextureUnit(object):
     colour_op = {
-        'MIX'       :   'replace',
+        'MIX'       :   'modulate',		# Ogre Default - was "replace" but that kills lighting
         'ADD'     :   'add',
         'MULTIPLY' : 'modulate',
         #'alpha_blend' : '',
