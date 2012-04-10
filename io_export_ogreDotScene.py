@@ -25,7 +25,7 @@ bl_info = {
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.6 preview7'
+VERSION = '0.5.6 preview8'
 
 ## final TODO: 
 ## fix terrain collision offset bug
@@ -3284,13 +3284,15 @@ class _OgreCommonExport_( _TXML_ ):
                 fovY = 2*math.atan(sy*aspy*16.0/(ob.data.lens*sx*aspx))
             else:
                 fovY = 2*math.atan(16.0/ob.data.lens)
-            # fov in degree
-            fov = fovY*180.0/math.pi
+            # fov in radians - like OgreMax - requested by cyrfer
+            fov = math.radians( fovY*180.0/math.pi )
             c.setAttribute('fov', '%s'%fov)
             c.setAttribute('projectionType', "perspective")
             a = doc.createElement('clipping'); c.appendChild( a )
             a.setAttribute('nearPlaneDist', '%s' %ob.data.clip_start)
             a.setAttribute('farPlaneDist', '%s' %ob.data.clip_end)
+            a.setAttribute('near', '%s' %ob.data.clip_start)	# requested by cyrfer
+            a.setAttribute('far', '%s' %ob.data.clip_end)
 
 
         elif ob.type == 'LAMP' and ob.data.type in 'POINT SPOT SUN'.split():
