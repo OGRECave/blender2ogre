@@ -17,21 +17,30 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne",
-    "version": (0,5,6),
-    "blender": (2,6,1),
+    "version": (0,5,7),
+    "blender": (2,6,3),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
     "category": "Import-Export"}
 
-VERSION = '0.5.6 preview8'
+VERSION = '0.5.7'
 
-## final TODO: 
-## fix terrain collision offset bug
-## add realtime transform (rotation is missing)
-## fix camera rotated -90 ogre-dot-scene
+## CHANGELOG
+##
+## 0.5.7
+## * Update to Blender 2.6.3.
+## * Fixed xz-y Skeleton rotation (again)
+## * Added additional Keyframe at the end of each animation to prevent ogre from interpolating back to the start
+## * Added option to ignore non-deformable bones
+## * Added option to export nla-strips independently from each other
 
+## TODO
+##
+## * Fix terrain collision offset bug
+## * Add realtime transform (rotation is missing)
+## * Fix camera rotated -90 ogre-dot-scene
 
 ## Public API ##
 UI_CLASSES = []
@@ -203,7 +212,7 @@ class CMesh(object):
 
     def __init__(self, data):
         self.numVerts = N = len( data.vertices )
-        self.numFaces = Nfaces = len(data.faces)
+        self.numFaces = Nfaces = len(data.tessfaces)
 
         self.vertex_positions = (ctypes.c_float * (N * 3))()
         data.vertices.foreach_get( 'co', self.vertex_positions )
@@ -213,16 +222,16 @@ class CMesh(object):
         data.vertices.foreach_get( 'normal', self.vertex_normals )
 
         self.faces = (ctypes.c_uint * (Nfaces * 4))()
-        data.faces.foreach_get( 'vertices_raw', self.faces )
+        data.tessfaces.foreach_get( 'vertices_raw', self.faces )
 
         self.faces_normals = (ctypes.c_float * (Nfaces * 3))()
-        data.faces.foreach_get( 'normal', self.faces_normals )
+        data.tessfaces.foreach_get( 'normal', self.faces_normals )
 
         self.faces_smooth = (ctypes.c_bool * Nfaces)() 
-        data.faces.foreach_get( 'use_smooth', self.faces_smooth )
+        data.tessfaces.foreach_get( 'use_smooth', self.faces_smooth )
 
         self.faces_material_index = (ctypes.c_ushort * Nfaces)() 
-        data.faces.foreach_get( 'material_index', self.faces_material_index )
+        data.tessfaces.foreach_get( 'material_index', self.faces_material_index )
 
         self.vertex_colors = []
         if len( data.vertex_colors ):
@@ -636,6 +645,8 @@ _CONFIG_DEFAULTS_ALL = {
     'MAX_TEXTURE_SIZE' : 4096,
     'SWAP_AXIS' : 'xz-y',         # ogre standard
     'ONLY_ANIMATED_BONES' : False,
+    'ONLY_DEFORMABLE_BONES' : False,
+    'INDEPENDENT_ANIM' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : True,
 #    'PATH' : '/tmp',
@@ -808,14 +819,16 @@ material _missing_material_
 def find_bone_index( ob, arm, groupidx):    # sometimes the groups are out of order, this finds the right index.
     if groupidx < len(ob.vertex_groups):        # reported by Slacker
         vg = ob.vertex_groups[ groupidx ]
+        j = 0
         for i,bone in enumerate(arm.pose.bones):
-            if bone.name == vg.name: return i
+            if not bone.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']: j+=1           #if we skip bones we need to adjust the id
+            if bone.name == vg.name: return i-j
     else:
         print('WARNING: object vertex groups not in sync with armature', ob, arm, groupidx)
 
 
 def mesh_is_smooth( mesh ):
-    for face in mesh.faces:
+    for face in mesh.tessfaces:
         if face.use_smooth: return True
 
 ## this breaks if users have uv layers with same name with different indices over different objects ##
@@ -838,7 +851,7 @@ def has_custom_property( a, name ):
 
 # a default plane, with simple-subsurf and displace modifier on Z
 def is_strictly_simple_terrain( ob ):
-    if len(ob.data.vertices) != 4 and len(ob.data.faces) != 1: return False
+    if len(ob.data.vertices) != 4 and len(ob.data.tessfaces) != 1: return False
     elif len(ob.modifiers) < 2: return False
     elif ob.modifiers[0].type != 'SUBSURF' or ob.modifiers[1].type != 'DISPLACE': return False
     elif ob.modifiers[0].subdivision_type != 'SIMPLE': return False
@@ -2823,6 +2836,10 @@ class _OgreCommonExport_( _TXML_ ):
         name="Separate Materials", 
         description="exports a .material for each material (rather than putting all materials in a single .material file)", 
         default=CONFIG['SEP_MATS'])
+    EX_ONLY_DEFORMABLE_BONES = BoolProperty(
+        name="Only Deformable Bones",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        default=CONFIG['ONLY_DEFORMABLE_BONES'])
     EX_ONLY_ANIMATED_BONES = BoolProperty(
         name="Only Animated Bones", 
         description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
@@ -2835,6 +2852,10 @@ class _OgreCommonExport_( _TXML_ ):
     EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
     EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
     EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_INDEPENDENT_ANIM = BoolProperty(
+        name="Independent Animations",
+        description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
+        default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
@@ -3029,7 +3050,7 @@ class _OgreCommonExport_( _TXML_ ):
                 elif ob.type == 'SPEAKER':
                     TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
 
-                elif ob.type == 'MESH' and len(ob.data.faces):
+                elif ob.type == 'MESH' and len(ob.data.tessfaces):
                     if ob.modifiers and ob.modifiers[0].type=='MULTIRES' and ob.use_multires_lod:
                         mod = ob.modifiers[0]
                         basename = ob.name
@@ -3193,7 +3214,8 @@ class _OgreCommonExport_( _TXML_ ):
         for act in ob.game.actuators:
             acts.appendChild( WrapActuator(act).xml(doc) )
 
-        if ob.type == 'MESH' and len(ob.data.faces):
+        if ob.type == 'MESH': ob.data.update(calc_tessface=True)
+        if ob.type == 'MESH' and len(ob.data.tessfaces):
 
             collisionFile = None
             collisionPrim = None
@@ -3393,6 +3415,10 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         name="Separate Materials", 
         description="exports a .material for each material (rather than putting all materials in a single .material file)", 
         default=CONFIG['SEP_MATS'])
+    EX_ONLY_DEFORMABLE_BONES = BoolProperty(
+        name="Only Deformable Bones",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        default=CONFIG['ONLY_DEFORMABLE_BONES'])
     EX_ONLY_ANIMATED_BONES = BoolProperty(
         name="Only Animated Bones", 
         description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
@@ -3405,6 +3431,10 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
     EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
     EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_INDEPENDENT_ANIM = BoolProperty(
+        name="Independent Animations",
+        description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
+        default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
@@ -3449,6 +3479,10 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         name="Separate Materials", 
         description="exports a .material for each material (rather than putting all materials in a single .material file)", 
         default=CONFIG['SEP_MATS'])
+    EX_ONLY_DEFORMABLE_BONES = BoolProperty(
+        name="Only Deformable Bones",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        default=CONFIG['ONLY_DEFORMABLE_BONES'])
     EX_ONLY_ANIMATED_BONES = BoolProperty(
         name="Only Animated Bones", 
         description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
@@ -3462,6 +3496,10 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
     EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
     EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
     EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_INDEPENDENT_ANIM = BoolProperty(
+        name="Independent Animations",
+        description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
+        default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights", 
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
@@ -3663,7 +3701,7 @@ class Bone(object):
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
             elif CONFIG['SWAP_AXIS'] == 'xz-y':    # Tundra2
                 #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
-                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))	# thanks to Waruck
+                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1)))	# thanks to Waruck
             else:
                 print( 'ERROR - TODO: axis swap mode not supported with armature animation' )
                 assert 0
@@ -3674,7 +3712,9 @@ class Bone(object):
         #self.matrix_local = rbone.matrix.copy()    # space?
 
         self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
-        if not pbone.bone.use_deform: print('warning: bone <%s> is non-deformabled, this is inefficient!' %self.name)
+        if pbone.parent and not pbone.parent.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']:
+            print('warning: bone <%s> has non-deformable parent.' %self.name)
+            
         #TODO test#if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
         self.parent = pbone.parent
         self.children = []
@@ -3742,8 +3782,9 @@ class Skeleton(object):
         #arm.layers = [True]*20      # can not have anything hidden - REQUIRED?
 
         for pbone in arm.pose.bones:
-            mybone = Bone( arm.data.bones[pbone.name] ,pbone, self )
-            self.bones.append( mybone )
+            if pbone.bone.use_deform or not CONFIG['ONLY_DEFORMABLE_BONES']:
+                mybone = Bone( arm.data.bones[pbone.name] ,pbone, self )
+                self.bones.append( mybone )
 
         if arm.name not in Report.armatures: Report.armatures.append( arm.name )
 
@@ -3828,50 +3869,52 @@ class Skeleton(object):
             _keyframes = {}
             _bonenames_ = []
             for bone in arm.pose.bones:
-                _bonenames_.append( bone.name )
-                track = doc.createElement('track')
-                track.setAttribute('bone', bone.name)
-                tracks.appendChild( track )
-                keyframes = doc.createElement('keyframes')
-                track.appendChild( keyframes )
-                _keyframes[ bone.name ] = keyframes
+                if self.get_bone(bone.name):                     #check if the bone was exported
+                    _bonenames_.append( bone.name )
+                    track = doc.createElement('track')
+                    track.setAttribute('bone', bone.name)
+                    tracks.appendChild( track )
+                    keyframes = doc.createElement('keyframes')
+                    track.appendChild( keyframes )
+                    _keyframes[ bone.name ] = keyframes
 
-            for frame in range( int(start), int(end), bpy.context.scene.frame_step):
+            for frame in range( int(start), int(end)+1, bpy.context.scene.frame_step):
                 bpy.context.scene.frame_set(frame)
                 for bone in self.roots: bone.update()
                 print('\t\t Frame:', frame)
                 for bonename in _bonenames_:
-                    bone = self.get_bone( bonename )
-                    _loc = bone.pose_location
-                    _rot = bone.pose_rotation
-                    _scl = bone.pose_scale
+                    if self.get_bone(bonename):                         #check if the bone was exported
+                        bone = self.get_bone( bonename )
+                        _loc = bone.pose_location
+                        _rot = bone.pose_rotation
+                        _scl = bone.pose_scale
 
-                    keyframe = doc.createElement('keyframe')
-                    keyframe.setAttribute('time', str((frame-start)/_fps))
-                    _keyframes[ bonename ].appendChild( keyframe )
-                    trans = doc.createElement('translate')
-                    keyframe.appendChild( trans )
-                    x,y,z = _loc
-                    trans.setAttribute('x', '%6f' %x)
-                    trans.setAttribute('y', '%6f' %y)
-                    trans.setAttribute('z', '%6f' %z)
+                        keyframe = doc.createElement('keyframe')
+                        keyframe.setAttribute('time', str((frame-start)/_fps))
+                        _keyframes[ bonename ].appendChild( keyframe )
+                        trans = doc.createElement('translate')
+                        keyframe.appendChild( trans )
+                        x,y,z = _loc
+                        trans.setAttribute('x', '%6f' %x)
+                        trans.setAttribute('y', '%6f' %y)
+                        trans.setAttribute('z', '%6f' %z)
 
-                    rot =  doc.createElement( 'rotate' )
-                    keyframe.appendChild( rot )
-                    q = _rot
-                    rot.setAttribute('angle', '%6f' %q.angle )
-                    axis = doc.createElement('axis'); rot.appendChild( axis )
-                    x,y,z = q.axis
-                    axis.setAttribute('x', '%6f' %x )
-                    axis.setAttribute('y', '%6f' %y )
-                    axis.setAttribute('z', '%6f' %z )
+                        rot =  doc.createElement( 'rotate' )
+                        keyframe.appendChild( rot )
+                        q = _rot
+                        rot.setAttribute('angle', '%6f' %q.angle )
+                        axis = doc.createElement('axis'); rot.appendChild( axis )
+                        x,y,z = q.axis
+                        axis.setAttribute('x', '%6f' %x )
+                        axis.setAttribute('y', '%6f' %y )
+                        axis.setAttribute('z', '%6f' %z )
 
-                    scale = doc.createElement('scale')
-                    keyframe.appendChild( scale )
-                    x,y,z = _scl
-                    scale.setAttribute('x', '%6f' %x)
-                    scale.setAttribute('y', '%6f' %y)
-                    scale.setAttribute('z', '%6f' %z)
+                        scale = doc.createElement('scale')
+                        keyframe.appendChild( scale )
+                        x,y,z = _scl
+                        scale.setAttribute('x', '%6f' %x)
+                        scale.setAttribute('y', '%6f' %y)
+                        scale.setAttribute('z', '%6f' %z)
 
 
         elif arm.animation_data:
@@ -3879,11 +3922,21 @@ class Skeleton(object):
             if not len( arm.animation_data.nla_tracks ):
                 Report.warnings.append('you must assign an NLA strip to armature (%s) that defines the start and end frames' %arm.name)
 
+            if CONFIG['INDEPENDENT_ANIM']:
+                for nla in arm.animation_data.nla_tracks:
+                    nla.mute = True
+
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
                 if not len(nla.strips): print( 'skipping empty NLA track: %s' %nla.name ); continue
                 print('NLA track:',  nla.name)
+                
+                if CONFIG['INDEPENDENT_ANIM']:
+                    nla.mute = False
+                    for strip in nla.strips:
+                        strip.mute = True
 
                 for strip in nla.strips:
+                    if CONFIG['INDEPENDENT_ANIM']: strip.mute = False
                     print('   strip name:', strip.name)
                     anim = doc.createElement('animation'); anims.appendChild( anim )
                     tracks = doc.createElement('tracks'); anim.appendChild( tracks )
@@ -3903,48 +3956,61 @@ class Skeleton(object):
 
                     _keyframes = {}
                     for bonename in stripbones:
-                        track = doc.createElement('track')
-                        track.setAttribute('bone', bonename)
-                        tracks.appendChild( track )
-                        keyframes = doc.createElement('keyframes')
-                        track.appendChild( keyframes )
-                        _keyframes[ bonename ] = keyframes
+                        if self.get_bone(bonename):                     #check if the bone was exported
+                            track = doc.createElement('track')
+                            track.setAttribute('bone', bonename)
+                            tracks.appendChild( track )
+                            keyframes = doc.createElement('keyframes')
+                            track.appendChild( keyframes )
+                            _keyframes[ bonename ] = keyframes
 
-                    for frame in range( int(strip.frame_start), int(strip.frame_end), bpy.context.scene.frame_step):
+                    for frame in range( int(strip.frame_start), int(strip.frame_end)+1, bpy.context.scene.frame_step):#thanks to Vesa
                         bpy.context.scene.frame_set(frame)
                         for bone in self.roots: bone.update()
                         for bonename in stripbones:
-                            bone = self.get_bone( bonename )
-                            _loc = bone.pose_location
-                            _rot = bone.pose_rotation
-                            _scl = bone.pose_scale
+                            if self.get_bone( bonename ):               #check if the bone was exported
+                                bone = self.get_bone( bonename )
+                                _loc = bone.pose_location
+                                _rot = bone.pose_rotation
+                                _scl = bone.pose_scale
 
-                            keyframe = doc.createElement('keyframe')
-                            keyframe.setAttribute('time', str((frame-strip.frame_start)/_fps))
-                            _keyframes[ bonename ].appendChild( keyframe )
-                            trans = doc.createElement('translate')
-                            keyframe.appendChild( trans )
-                            x,y,z = _loc
-                            trans.setAttribute('x', '%6f' %x)
-                            trans.setAttribute('y', '%6f' %y)
-                            trans.setAttribute('z', '%6f' %z)
+                                keyframe = doc.createElement('keyframe')
+                                keyframe.setAttribute('time', str((frame-strip.frame_start)/_fps))
+                                _keyframes[ bonename ].appendChild( keyframe )
+                                trans = doc.createElement('translate')
+                                keyframe.appendChild( trans )
+                                x,y,z = _loc
+                                trans.setAttribute('x', '%6f' %x)
+                                trans.setAttribute('y', '%6f' %y)
+                                trans.setAttribute('z', '%6f' %z)
 
-                            rot =  doc.createElement( 'rotate' )
-                            keyframe.appendChild( rot )
-                            q = _rot
-                            rot.setAttribute('angle', '%6f' %q.angle )
-                            axis = doc.createElement('axis'); rot.appendChild( axis )
-                            x,y,z = q.axis
-                            axis.setAttribute('x', '%6f' %x )
-                            axis.setAttribute('y', '%6f' %y )
-                            axis.setAttribute('z', '%6f' %z )
+                                rot =  doc.createElement( 'rotate' )
+                                keyframe.appendChild( rot )
+                                q = _rot
+                                rot.setAttribute('angle', '%6f' %q.angle )
+                                axis = doc.createElement('axis'); rot.appendChild( axis )
+                                x,y,z = q.axis
+                                axis.setAttribute('x', '%6f' %x )
+                                axis.setAttribute('y', '%6f' %y )
+                                axis.setAttribute('z', '%6f' %z )
 
-                            scale = doc.createElement('scale')
-                            keyframe.appendChild( scale )
-                            x,y,z = _scl
-                            scale.setAttribute('x', '%6f' %x)
-                            scale.setAttribute('y', '%6f' %y)
-                            scale.setAttribute('z', '%6f' %z)
+                                scale = doc.createElement('scale')
+                                keyframe.appendChild( scale )
+                                x,y,z = _scl
+                                scale.setAttribute('x', '%6f' %x)
+                                scale.setAttribute('y', '%6f' %y)
+                                scale.setAttribute('z', '%6f' %z)
+
+                    if CONFIG['INDEPENDENT_ANIM']: strip.mute = True
+
+                if CONFIG['INDEPENDENT_ANIM']:
+                    nla.mute = True
+                    for strip in nla.strips:
+                        strip.mute = False
+
+            if CONFIG['INDEPENDENT_ANIM']:
+                for nla in arm.animation_data.nla_tracks:
+                    nla.mute = False
 
         return doc.toprettyxml()
 
@@ -4293,7 +4359,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         os.makedirs( path )
 
     Report.meshes.append( ob.data.name )
-    Report.faces += len( ob.data.faces )
+    Report.faces += len( ob.data.tessfaces )
     Report.orig_vertices += len( ob.data.vertices )
 
     cleanup = False
@@ -4337,9 +4403,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         ## vertex colors ##
         vcolors = None
         vcolors_alpha = None
-        if len( mesh.vertex_colors ):
-            vcolors = mesh.vertex_colors[0]
-            for bloc in mesh.vertex_colors:
+        if len( mesh.tessface_vertex_colors ):
+            vcolors = mesh.tessface_vertex_colors[0]
+            for bloc in mesh.tessface_vertex_colors:
                 if bloc.name.lower().startswith('alpha'):
                     vcolors_alpha = bloc; break
 
@@ -4359,9 +4425,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
         dotextures = False
         uvcache = []    # should get a little speed boost by this cache
-        if mesh.uv_textures.active:
+        if mesh.tessface_uv_textures.active:
             dotextures = True
-            for layer in mesh.uv_textures:
+            for layer in mesh.tessface_uv_textures:
                 uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
                 for uvface in layer.data:
                     uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
@@ -4370,7 +4436,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         _sm_vertices_ = {}
         _remap_verts_ = []
         numverts = 0
-        for F in mesh.faces:
+        for F in mesh.tessfaces:
             smooth = F.use_smooth
             #print(F, "is smooth=", smooth)
             faces = _sm_faces_[ F.material_index ]
@@ -4605,7 +4671,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                                 #'index' : '0'
                         })
                         doc.start_tag('keyframes', {})
-                        for frame in range( int(strip.frame_start), int(strip.frame_end), bpy.context.scene.frame_step):
+                        for frame in range( int(strip.frame_start), int(strip.frame_end)+1, bpy.context.scene.frame_step):#thanks to Vesa
                             bpy.context.scene.frame_set(frame)
                             doc.start_tag('keyframe', {
                                     'time' : str((frame-strip.frame_start)/_fps)
