@@ -20,6 +20,24 @@ VERSION = '0.5.8'
 '''
 CHANGELOG
     0.5.8
+    * Fix bug that .mesh files were not generated while doing a .txml export.
+      This was result of the late 2.63 mods that forgot to update object
+      facecount before determining if mesh should be exported.
+    * Fix bug that changed settings in the export dialog were forgotten when you
+      re-exported without closing blender. Now settings should persist always
+      from the last export. They are also stored to disk so the same settings
+      are in use when if you restart Blender.
+    * Fix bug that once you did a export, the next time the export location was
+      forgotten. Now on sequential exports, the last export path is remembered in
+      the export dialog.
+    * Remove all local:// from asset refs and make them relative in .txml export.
+      Having relative refs is the best for local preview and importing the txml
+      to existing scenes.
+    * Make .material generate what version of this plugins was used to generate
+      the material file. Will be helpful in production to catch things.
+      Added pretty printing line endings so the raw .material data is easier to read.
+    * Improve console logging for the export stages. Run Blender from
+      cmd prompt to see this information.
     * Clean/fix documentation in code for future development
     * Add todo to code for future development
     * Restructure/move code for easier readability
@@ -27,7 +45,8 @@ CHANGELOG
     0.5.7
     * Update to Blender 2.6.3.
     * Fixed xz-y Skeleton rotation (again)
-    * Added additional Keyframe at the end of each animation to prevent ogre from interpolating back to the start
+    * Added additional Keyframe at the end of each animation to prevent 
+      ogre from interpolating back to the start
     * Added option to ignore non-deformable bones
     * Added option to export nla-strips independently from each other
 
@@ -41,7 +60,7 @@ TODO
 
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
-    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne",
+    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha",
     "version": (0, 5, 8),
     "blender": (2, 6, 3),
     "location": "File > Export...",
@@ -80,7 +99,9 @@ def uid(ob):
 
 ## Imports
 
-import os, sys, time, array, ctypes, math
+import os, sys, time, array, ctypes, math, pprint
+
+printer = pprint.PrettyPrinter(indent=4)
 
 try:
     # Inside blender
@@ -284,8 +305,7 @@ class CMesh(object):
             cmesh.numFaces,
             cmesh.numVerts,
         )
-        print( 'mesh dumped in %s seconds' %(time.time()-start) )
-
+        print('Mesh dumped in %s seconds' % (time.time()-start))
 
 ## Make sure we can import from same directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -786,13 +806,13 @@ CONFIG = {}
 
 def load_config():
     global CONFIG
+
     if os.path.isfile( CONFIG_FILEPATH ):
         try:
             with open( CONFIG_FILEPATH, 'rb' ) as f:
                 CONFIG = pickle.load( f )
-                print('CONFIG LOADED')
         except:
-            print( 'IO ERROR, can not read: %s' %CONFIG_FILEPATH )
+            print('[ERROR]: Can not read config from %s' %CONFIG_FILEPATH)
 
     for tag in _CONFIG_DEFAULTS_ALL:
         if tag not in CONFIG:
@@ -808,7 +828,8 @@ def load_config():
                 print( 'ERROR: unknown platform' )
                 assert 0
 
-    for tag in _CONFIG_TAGS_: ## setup temp hidden RNA  to expose the file paths ##
+    # Setup temp hidden RNA to expose the file paths
+    for tag in _CONFIG_TAGS_: 
         default = CONFIG[ tag ]
         func = eval( 'lambda self,con: CONFIG.update( {"%s" : self.%s} )' %(tag,tag) )
         if type(default) is bool:
@@ -822,28 +843,28 @@ def load_config():
                 options={'SKIP_SAVE'}, update=func
             )
         setattr( bpy.types.WindowManager, tag, prop )
+
     return CONFIG
 
 CONFIG = load_config()
 
 def save_config():
-    print('saving config....')
     #for key in CONFIG: print( '%s =   %s' %(key, CONFIG[key]) )
     if os.path.isdir( CONFIG_PATH ):
         try:
             with open( CONFIG_FILEPATH, 'wb' ) as f:
                 pickle.dump( CONFIG, f, -1 )
-                print('SAVED CONFIG')
         except:
-            print( 'IO ERROR, can not write: %s' %CONFIG_FILEPATH )
+            print('[ERROR]: Can not write to %s' %CONFIG_FILEPATH)
     else:
-        print( 'ERROR: config path is missing %s' %CONFIG_PATH )
+        print('[ERROR:] Config directory does not exist %s' %CONFIG_PATH)
 
 class Blender2Ogre_ConfigOp(bpy.types.Operator):
     '''operator: saves current b2ogre configuration'''
     bl_idname = "ogre.save_config"
     bl_label = "save config file"
     bl_options = {'REGISTER'}
+
     @classmethod
     def poll(cls, context):
         return True
@@ -877,6 +898,9 @@ material _missing_material_
 '''
 
 ## Helper functions
+
+def timer_diff_str(start):
+    return "%0.2f" % (time.time()-start)
 
 def find_bone_index( ob, arm, groupidx): # sometimes the groups are out of order, this finds the right index.
     if groupidx < len(ob.vertex_groups): # reported by Slacker
@@ -936,7 +960,7 @@ def get_image_textures( mat ):
 
 def indent( level, *args ):
     if not args:
-        return '\t' * level
+        return '    ' * level
     else:
         a = ''
         for line in args:
@@ -1096,14 +1120,14 @@ class RElement(object):
             value = self.attributes[name]
             s += '%s="%s" ' %(name,value)
         if not self.childNodes:
-            s += '/>'; lines.append( ('\t'*indent)+s )
+            s += '/>'; lines.append( ('  '*indent)+s )
         else:
-            s += '>'; lines.append( ('\t'*indent)+s )
+            s += '>'; lines.append( ('  '*indent)+s )
             indent += 1
             for child in self.childNodes:
                 child.toprettyxml( lines, indent )
             indent -= 1
-            lines.append( ('\t'*indent)+'</%s>' %self.tagName )
+            lines.append(('  '*indent)+'</%s>' %self.tagName )
 
 class RDocument(object):
     def __init__(self): self.documentElement = None
@@ -2261,7 +2285,13 @@ class _TXML_(object):
     '''
 
     def create_tundra_document( self, context ):
-        proto = 'local://'
+        # todo: Make a way in the gui to give prefix for the refs
+        # This can be very useful if you want to give deployment URL
+        # eg. "http://www.myassets.com/myscene/". By default this needs
+        # to be an empty string, it will operate best for local preview
+        # and importing the scene content to existing scenes with relative refs.
+        proto = ''
+        
         doc = RDocument()
         scn = doc.createElement('scene')
         doc.appendChild( scn )
@@ -2414,12 +2444,24 @@ class _TXML_(object):
         if not matrix:
             matrix = ob.matrix_world.copy()
 
+        # todo: Make a way in the gui to give prefix for the refs
+        # This can be very useful if you want to give deployment URL
+        # eg. "http://www.myassets.com/myscene/". By default this needs
+        # to be an empty string, it will operate best for local preview
+        # and importing the scene content to existing scenes with relative refs.
+        proto = ''
+        
         # Entity
+        entityid = uid(ob)
+        print("  Creating Tundra Enitity with ID", entityid)
+        
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
-        e.setAttribute('id', uid(ob) )
+        e.setAttribute('id', entityid)
 
         # EC_Name
+        print ("    - EC_Name with", ob.name)
+        
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Name")
         c.setAttribute('sync', '1')
@@ -2431,6 +2473,8 @@ class _TXML_(object):
         a.setAttribute('value', "" )
 
         # EC_Placeable
+        print ("    - EC_Placeable ")
+        
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Placeable")
         c.setAttribute('sync', '1')
@@ -2449,14 +2493,14 @@ class _TXML_(object):
         scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z)) # Tundra2 clamps any negative to zero
         a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
 
-        # todo: We really should not set bouding box to show.
-        # It can be easily toggled in Tundra for visual debugging.
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Show bounding box" )
-        if ob.show_bounds or ob.type != 'MESH':
-            a.setAttribute('value', "true" )
-        else:
-            a.setAttribute('value', "false" )
+        a.setAttribute('value', "false" )
+        # Don't mark bounding boxes to show in Tundra!
+        #if ob.show_bounds or ob.type != 'MESH':
+        #    a.setAttribute('value', "true" )
+        #else:
+        #    a.setAttribute('value', "false" )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Visible" )
@@ -2469,22 +2513,16 @@ class _TXML_(object):
         a.setAttribute('name', "Selection layer" )
         a.setAttribute('value', 1)
 
+        # Tundra parenting to EC_Placeable. 
+        # todo: Verify this inserts correct ent name or id here.
+        #   <attribute value="" name="Parent entity ref"/>
+        #   <attribute value="" name="Parent bone name"/>
         if parent:
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Parent entity ref" )
             a.setAttribute('value', parent)
 
-        # todo: Tundra parenting to EC_Placeable
-        #<attribute value="" name="Parent entity ref"/>
-        #<attribute value="" name="Parent bone name"/>
-
-        # todo: Remove creating EC_TransformGizmos. It looks ugly
-        # and is unpractical. The artist will have to remove these by hand
-        # from the scene.
         if ob.type != 'MESH':
-            c = doc.createElement('component'); e.appendChild( c )
-            c.setAttribute('type', 'EC_TransformGizmo')
-            c.setAttribute('sync', '1')
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_Name')
             c.setAttribute('sync', '1')
@@ -2494,6 +2532,7 @@ class _TXML_(object):
 
         # EC_Sound: Supports wav and ogg
         if ob.type == 'SPEAKER':
+            print ("    - EC_Sound")
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_Sound')
             c.setAttribute('sync', '1')
@@ -2501,9 +2540,11 @@ class _TXML_(object):
             if ob.data.sound:
                 abspath = bpy.path.abspath( ob.data.sound.filepath )
                 soundpath, soundfile = os.path.split( abspath )
+                soundref = "%s%s" % (proto, soundfile)
+                print ("      Sounds ref:", soundref)
                 a = doc.createElement('attribute'); c.appendChild(a)
                 a.setAttribute('name', 'Sound ref' )
-                a.setAttribute('value', 'local://%s'%soundfile)
+                a.setAttribute('value', soundref)
                 if not os.path.isfile( os.path.join(path,soundfile) ):
                     open( os.path.join(path,soundfile), 'wb' ).write( open(abspath,'rb').read() )
 
@@ -2548,6 +2589,7 @@ class _TXML_(object):
             Best leave camera (creation) logic for the inworld apps.
             At least remove the default "export cameras" for txml. '''
         if ob.type == 'CAMERA':
+            print ("    - EC_Camera")
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_Camera')
             c.setAttribute('sync', '1')
@@ -2602,6 +2644,8 @@ class _TXML_(object):
             a.setAttribute('name', 'Shape type')
             a.setAttribute('value', TundraTypes[ ob.game.collision_bounds_type ] )
 
+            print ("    - EC_RigidBody with shape type", TundraTypes[ob.game.collision_bounds_type])
+            
             M = ob.game.collision_margin
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Size')
@@ -2621,11 +2665,12 @@ class _TXML_(object):
                     if child.subcollision and child.name.startswith('DECIMATED'):
                         proxy = child; break
                 if proxy:
-                    a.setAttribute('value', 'local://_collision_%s.mesh' %proxy.data.name)
+                    collisionref = "%s_collision_%s.mesh" % (proto, proxy.data.name)
+                    a.setAttribute('value', collisionref)
                     if proxy not in collision_proxies:
                         collision_proxies.append( proxy )
                 else:
-                    print( 'WARN: collision proxy mesh not found' )
+                    print('[WARNINIG]: Collision proxy mesh not found' )
                     assert 0
             elif ob.collision_mode == 'TERRAIN':
                 NTF = save_terrain_as_NTF( path, ob )
@@ -2634,7 +2679,8 @@ class _TXML_(object):
                 # todo: Remove this. There is no need to set mesh collision ref
                 # if TriMesh or ConvexHull is used, it will be auto picked from EC_Mesh
                 # in the same Entity.
-                a.setAttribute('value', 'local://%s.mesh' %ob.data.name)
+                collisionref = "%s%s.mesh" % (proto, ob.data.name)
+                a.setAttribute('value', collisionref)
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Friction')
@@ -2675,14 +2721,16 @@ class _TXML_(object):
             else:
                 a.setAttribute('value', 'false' )
 
-            # todo: Remove this. We should not enabled drag debug,
-            # it can be toggled in Tundra easily for visual debugging.
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Draw Debug')
-            if ob.collision_mode == 'NONE':
-                a.setAttribute('value', 'false' )
-            else:
-                a.setAttribute('value', 'true' )
+            a.setAttribute('value', 'false' )
+
+            # Never mark rigids to have draw debug, it can 
+            # be toggled in tundra for visual debugging.
+            #if ob.collision_mode == 'NONE':
+            #    a.setAttribute('value', 'false' )
+            #else:
+            #    a.setAttribute('value', 'true' )
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Linear velocity')
@@ -2705,6 +2753,8 @@ class _TXML_(object):
             xp = NTF['xpatches']
             yp = NTF['ypatches']
             depth = NTF['depth']
+            
+            print ("    - EC_Terrain")
             com = doc.createElement('component'); e.appendChild( com )
             com.setAttribute('type', 'EC_Terrain')
             com.setAttribute('sync', '1')
@@ -2751,17 +2801,29 @@ class _TXML_(object):
 
             # todo: Check that NTF['name'] is the actual valid asset ref
             # and not the disk path.
+            heightmapref = "%s%s" % (proto, NTF['name'])
+            print ("      Heightmap ref:", heightmapref)
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Heightmap')
-            a.setAttribute('value', NTF['name'] )
+            a.setAttribute('value', heightmapref )
 
         # Enitity XML generation done, return the element.
         return e
 
     # EC_Mesh
     def tundra_mesh( self, e, ob, url, exported_meshes ):
-        # todo: Fix bug that .mesh is never done if they dont exist on disk!
-        # It's probably around here somewhere...
+        # todo: Make a way in the gui to give prefix for the refs
+        # This can be very useful if you want to give deployment URL
+        # eg. "http://www.myassets.com/myscene/". By default this needs
+        # to be an empty string, it will operate best for local preview
+        # and importing the scene content to existing scenes with relative refs.
+        proto = ''
+        
+        meshref = "%s%s.mesh" % (proto, ob.data.name)
+        
+        print ("    - EC_Mesh")
+        print ("      - Mesh ref:", meshref)
+        
         if self.EX_MESH:
             murl = os.path.join( os.path.split(url)[0], '%s.mesh'%ob.data.name )
             exists = os.path.isfile( murl )
@@ -2771,9 +2833,9 @@ class _TXML_(object):
                     self.dot_mesh( ob, os.path.split(url)[0] )
 
         doc = e.document
-        proto = 'local://'
-
+        
         if ob.find_armature():
+            print ("    - EC_AnimationController")
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', "EC_AnimationController")
             c.setAttribute('sync', '1')
@@ -2784,7 +2846,7 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Mesh ref" )
-        a.setAttribute('value', "%s%s.mesh"%(proto,ob.data.name) )
+        a.setAttribute('value',  meshref)
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Mesh materials" )
@@ -2805,9 +2867,11 @@ class _TXML_(object):
             a.setAttribute('value', "" )
 
         if ob.find_armature():
+            skeletonref = "%s%s.skeleton" % (proto, ob.data.name)
+            print ("      Skeleton ref:", skeletonref)
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Skeleton ref" )
-            a.setAttribute('value', "%s%s.skeleton"%(proto,ob.data.name) )
+            a.setAttribute('value', skeletonref)
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Draw distance" )
@@ -2919,7 +2983,9 @@ class _TXML_(object):
 
 ## UI export panel
 
-class _OgreCommonExport_( _TXML_ ):
+last_export_filepath = ""
+
+class _OgreCommonExport_(_TXML_):
 
     @classmethod
     def poll(cls, context):
@@ -2927,15 +2993,79 @@ class _OgreCommonExport_( _TXML_ ):
             return True
 
     def invoke(self, context, event):
+        # Resolve path from opened .blend if available. It's not if
+        # blender normally was opened with "last open scene".
+        # After export is done once, remember that path when re-exporting.
+        global last_export_filepath
+        if last_export_filepath == "":
+            # First export during this blender run
+            if self.filepath == "" and context.blend_data.filepath != "":
+                path, name = os.path.split(context.blend_data.filepath)
+                self.filepath = os.path.join(path, name.split('.')[0])
+            if self.filepath == "":
+                self.filepath = "blender2ogre-export"
+            if self.EXPORT_TYPE == "OGRE":
+                self.filepath += ".scene"
+            elif self.EXPORT_TYPE == "REX":
+                self.filepath += ".txml"
+        else:
+            # Sequential export, use the previous path
+            self.filepath = last_export_filepath
+
+        # Replace file extension if we have swapped dialogs.
+        if self.EXPORT_TYPE == "OGRE":
+            self.filepath = self.filepath.replace(".txml", ".scene")
+        elif self.EXPORT_TYPE == "REX":
+            self.filepath = self.filepath.replace(".scene", ".txml")
+        
+        # Update ui setting from the last export, or file config.
+        self.update_ui()
+        
         wm = context.window_manager
-        fs = wm.fileselect_add(self)        # writes to filepath
+        fs = wm.fileselect_add(self) # writes to filepath
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
-        self.ogre_export(  self.filepath, context ); return {'FINISHED'}
+        # Store this path for later re-export
+        global last_export_filepath
+        last_export_filepath = self.filepath
 
-    # todo: Make this panel remember selected options
-    # when its reopened during same Blender run!
+        # Run the .scene or .txml export
+        self.ogre_export(self.filepath, context)
+        return {'FINISHED'}
+
+    def update_ui(self):
+        self.EX_SWAP_AXIS = CONFIG['SWAP_AXIS']
+        self.EX_SEP_MATS = CONFIG['SEP_MATS']
+        self.EX_ONLY_DEFORMABLE_BONES = CONFIG['ONLY_DEFORMABLE_BONES']
+        self.EX_ONLY_ANIMATED_BONES = CONFIG['ONLY_ANIMATED_BONES']
+        self.EX_SCENE = CONFIG['SCENE']
+        self.EX_SELONLY = CONFIG['SELONLY']
+        self.EX_FORCE_CAMERA = CONFIG['FORCE_CAMERA']
+        self.EX_FORCE_LAMPS = CONFIG['FORCE_LAMPS']
+        self.EX_MESH = CONFIG['MESH']
+        self.EX_MESH_OVERWRITE = CONFIG['MESH_OVERWRITE']
+        self.EX_ARM_ANIM = CONFIG['ARM_ANIM']
+        self.EX_SHAPE_ANIM = CONFIG['SHAPE_ANIM']
+        self.EX_INDEPENDENT_ANIM = CONFIG['INDEPENDENT_ANIM']
+        self.EX_TRIM_BONE_WEIGHTS = CONFIG['TRIM_BONE_WEIGHTS']
+        self.EX_ARRAY = CONFIG['ARRAY']
+        self.EX_MATERIALS = CONFIG['MATERIALS']
+        self.EX_FORCE_IMAGE_FORMAT = CONFIG['FORCE_IMAGE_FORMAT']
+        self.EX_DDS_MIPS = CONFIG['DDS_MIPS']
+        self.EX_COPY_SHADER_PROGRAMS = CONFIG['COPY_SHADER_PROGRAMS']
+        self.EX_lodLevels = CONFIG['lodLevels']
+        self.EX_lodDistance = CONFIG['lodDistance']
+        self.EX_lodPercent = CONFIG['lodPercent']
+        self.EX_nuextremityPoints = CONFIG['nuextremityPoints']
+        self.EX_generateEdgeLists = CONFIG['generateEdgeLists']
+        self.EX_generateTangents = CONFIG['generateTangents']
+        self.EX_tangentSemantic = CONFIG['tangentSemantic']
+        self.EX_tangentUseParity = CONFIG['tangentUseParity']
+        self.EX_tangentSplitMirrored = CONFIG['tangentSplitMirrored']
+        self.EX_tangentSplitRotated = CONFIG['tangentSplitRotated']
+        self.EX_reorganiseBuffers = CONFIG['reorganiseBuffers']
+        self.EX_optimiseAnimations = CONFIG['optimiseAnimations']
 
     # Basic options
     EX_SWAP_AXIS = EnumProperty(
@@ -3073,6 +3203,7 @@ class _OgreCommonExport_( _TXML_ ):
         description="when using script inheritance copy the source shader programs to the output path",
         default=CONFIG['COPY_SHADER_PROGRAMS'])
 
+    filepath_last = ""
     filepath = StringProperty(
         name="File Path",
         description="Filepath used for exporting file",
@@ -3111,7 +3242,7 @@ class _OgreCommonExport_( _TXML_ ):
         if not self.EX_SEP_MATS:
             url = os.path.join(path, '%s.material' % mat_file_name)
             f = open( url, 'wb' ); f.write( bytes(M,'utf-8') ); f.close()
-            print('saved', url)
+            print('    - Created material:', url)
             material_files.append( url )
 
         return material_files
@@ -3119,13 +3250,16 @@ class _OgreCommonExport_( _TXML_ ):
     def dot_material_write_separate( self, mat, data, path = '/tmp' ):
         url = os.path.join(path, '%s.material' % material_name(mat))
         f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
-        print('saved', url)
+        print('    - Exported Material:', url)
         return url
 
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
         dot_mesh( ob, path, force_name, ignore_shape_animation=False )
 
-    def ogre_export(self, url, context, force_material_update=[] ):
+    def ogre_export(self, url, context, force_material_update=[]):
+        print ("_"*80)
+
+        # Updating config to latest values?
         global CONFIG
         for name in dir(self):
             if name.startswith('EX_'):
@@ -3133,22 +3267,27 @@ class _OgreCommonExport_( _TXML_ ):
 
         Report.reset()
 
-        print('ogre export->', url)
+        print("Processing Scene")
         prefix = url.split('.')[0]
         path = os.path.split(url)[0]
 
-        # Nodes (objects)
-        objects = []        # gather because macros will change selection state
+        # Nodes (objects) - gather because macros will change selection state
+        objects = []
         linkedgroups = []
         for ob in bpy.context.scene.objects:
-            if ob.subcollision: continue
+            if ob.subcollision:
+                continue
             if self.EX_SELONLY and not ob.select:
-                if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA: pass
-                elif ob.type == 'LAMP' and self.EX_FORCE_LAMPS: pass
-                else: continue
+                if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA:
+                    pass
+                elif ob.type == 'LAMP' and self.EX_FORCE_LAMPS:
+                    pass
+                else:
+                    continue
             if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP':
-                linkedgroups.append( ob )
-            else: objects.append( ob )
+                linkedgroups.append(ob)
+            else:
+                objects.append(ob)
 
         # Linked groups - allows 3 levels of nested blender library linking
         temps = []
@@ -3212,9 +3351,9 @@ class _OgreCommonExport_( _TXML_ ):
             _flatten( ob, flat )
             root = flat[-1]
             if root not in roots:
-                roots.append( root )
+                roots.append(root)
             if ob.type=='MESH':
-                meshes.append( ob )
+                meshes.append(ob)
 
         mesh_collision_prims = {}
         mesh_collision_files = {}
@@ -3223,27 +3362,32 @@ class _OgreCommonExport_( _TXML_ ):
         exported_meshes = []
 
         if self.EX_MATERIALS:
-            material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
-            material_files = self.dot_material(
-                meshes + force_material_update,
-                path,
-                material_file_name_base
-            )
+            print ("  Processing Materials")
+            material_file_name_base = os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
+            material_files = self.dot_material(meshes + force_material_update, path, material_file_name_base)
         else:
             material_files = []
 
         # realXtend Tundra .txml scene description export
         if self.EXPORT_TYPE == 'REX':
-            rex = self.create_tundra_document( context )
+            rex = self.create_tundra_document(context)
             proxies = []
             for ob in objects:
+                print("  Processing %s [%s]" % (ob.name, ob.type))
+                
+                # This seemingly needs to be done as its done in .scene
+                # export. Fixed a bug that no .meshes were exported when doing
+                # a Tundra export.
+                if ob.type == 'MESH':
+                    ob.data.update(calc_tessface=True)
+                    
                 # EC_Light
                 if ob.type == 'LAMP':
-                    TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+                    TE = self.tundra_entity(rex, ob, path=path, collision_proxies=proxies)
                     self.tundra_light( TE, ob )
                 # EC_Sound
                 elif ob.type == 'SPEAKER':
-                    TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+                    TE = self.tundra_entity(rex, ob, path=path, collision_proxies=proxies)
                 # EC_Mesh
                 elif ob.type == 'MESH' and len(ob.data.tessfaces):
                     if ob.modifiers and ob.modifiers[0].type=='MULTIRES' and ob.use_multires_lod:
@@ -3251,7 +3395,7 @@ class _OgreCommonExport_( _TXML_ ):
                         basename = ob.name
                         dataname = ob.data.name
                         ID = uid( ob ) # ensure uid
-                        TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+                        TE = self.tundra_entity(rex, ob, path=path, collision_proxies=proxies)
 
                         for level in range( mod.total_levels+1 ):
                             ob.uid += 1
@@ -3280,39 +3424,41 @@ class _OgreCommonExport_( _TXML_ ):
                 )
 
             if self.EX_SCENE:
-                if not url.endswith('.txml'): url += '.txml'
+                if not url.endswith('.txml'): 
+                    url += '.txml'
                 data = rex.toprettyxml()
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
-                print('realxtend scene dumped', url)
+                print('  Exported Tundra Scene:', url)
 
         # Ogre .scene scene description export
         elif self.EXPORT_TYPE == 'OGRE':
             doc = self.create_ogre_document( context, material_files )
 
             for root in roots:
-                print('--------------- exporting root ->', root )
+                print('      - Exporting root node:', root.name)
                 self._node_export(
                     root,
-                    url=url,
+                    url = url,
                     doc = doc,
                     exported_meshes = exported_meshes,
                     meshes = meshes,
                     mesh_collision_prims = mesh_collision_prims,
                     mesh_collision_files = mesh_collision_files,
                     prefix = prefix,
-                    objects=objects,
-                    xmlparent=doc._scene_nodes
+                    objects = objects,
+                    xmlparent = doc._scene_nodes
                 )
 
             if self.EX_SCENE:
-                if not url.endswith('.scene'): url += '.scene'
+                if not url.endswith('.scene'): 
+                    url += '.scene'
                 data = doc.toprettyxml()
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
-                print('ogre scene dumped', url)
+                print('  Exported Ogre Scene:', url)
 
         for ob in temps:
             context.scene.objects.unlink( ob )
-        bpy.ops.wm.call_menu( name='MiniReport' )
+        bpy.ops.wm.call_menu(name='MiniReport')
 
         # Always save?
         # todo: This does not seem to stick! It might save to disk
@@ -4020,8 +4166,6 @@ destfile       = optional name of file to write to. If you don't
 ## Ogre Command Line Tools
 
 def OgreXMLConverter( infile, has_uvs=False ):
-    print('[Ogre Tools Wrapper]', infile )
-
     # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
     # We should show how to configure the converter location in config panel or tell the default path.
     exe = CONFIG['OGRETOOLS_XML_CONVERTER']
@@ -4055,14 +4199,14 @@ def OgreXMLConverter( infile, has_uvs=False ):
         basicArguments += ' -r'
     if not CONFIG['optimiseAnimations']:
         basicArguments += ' -o'
+        
+    # Make xml converter print less stuff, comment this if you want more debug info out
+    basicArguments += ' -q'
 
     opts = '-log _ogre_debug.txt %s' %basicArguments
     path,name = os.path.split( infile )
 
     cmd = '%s %s' %(exe, opts)
-    print('-'*80)
-    print(cmd)
-    print('_'*80)
     cmd = cmd.split() + [infile]
     subprocess.call( cmd )
 
@@ -4217,7 +4361,7 @@ class Skeleton(object):
             pos.setAttribute('x', '%6f' %x )
             pos.setAttribute('y', '%6f' %y )
             pos.setAttribute('z', '%6f' %z )
-            rot =  doc.createElement( 'rotation' )        # note "rotation", not "rotate"
+            rot =  doc.createElement( 'rotation' ) # "rotation", not "rotate"
             b.appendChild( rot )
 
             q = mat.to_quaternion()
@@ -4228,9 +4372,9 @@ class Skeleton(object):
             axis.setAttribute('y', '%6f' %y )
             axis.setAttribute('z', '%6f' %z )
 
-            ## Ogre bones do not have initial scaling? ##
-            ## NOTE: Ogre bones by default do not pass down their scaling in animation,
-            ## so in blender all bones are like 'do-not-inherit-scaling'
+            # Ogre bones do not have initial scaling? ##
+            # note: Ogre bones by default do not pass down their scaling in animation,
+            # so in blender all bones are like 'do-not-inherit-scaling'
             if 0:
                 scale = doc.createElement('scale'); b.appendChild( scale )
                 x,y,z = swap( mat.to_scale() )
@@ -4733,12 +4877,11 @@ class VertexNoPos(object):
 
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
     start = time.time()
-    print('mesh to Ogre mesh XML format', ob.name)
-
+    
     if not os.path.isdir( path ):
-        print('creating directory', path )
+        print('>> Creating working directory', path )
         os.makedirs( path )
-
+   
     Report.meshes.append( ob.data.name )
     Report.faces += len( ob.data.tessfaces )
     Report.orig_vertices += len( ob.data.vertices )
@@ -4752,17 +4895,17 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
             if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
         for mod in rem: copy.modifiers.remove( mod )
-        ## bake mesh ##
+        # bake mesh
         mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
     else:
         copy = ob
         mesh = ob.data
 
-    print('creating document...')
-
     name = force_name or ob.data.name
     xmlfile = os.path.join(path, '%s.mesh.xml' %name )
 
+    print('      - Generating:', '%s.mesh.xml' %name)
+    
     if _USE_RPYTHON_ and False:
         Rmesh.save( ob, xmlfile )
     else:
@@ -4772,7 +4915,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         # Very ugly, have to replace number of vertices later
         doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
 
-        print('    writing shared geometry')
+        print('      - Writing shared geometry')
         doc.start_tag('vertexbuffer', {
                 'positions':'true',
                 'normals':'true',
@@ -4795,7 +4938,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             if mat:
                 materials.append( mat )
             else:
-                print('WARNING: bad material data', ob)
+                print('[WARNING:] Bad material data in', ob)
                 materials.append( '_missing_material_' ) # fixed dec22, keep proper index
         if not materials:
             materials.append( '_missing_material_' )
@@ -4819,9 +4962,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
         for F in mesh.tessfaces:
             smooth = F.use_smooth
-            #print(F, "is smooth=", smooth)
             faces = _sm_faces_[ F.material_index ]
-            ## Ogre only supports triangles
+            # Ogre only supports triangles
             tris = []
             tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
             if len(F.vertices) >= 4: tris.append( (F.vertices[0], F.vertices[2], F.vertices[3]) )
@@ -4927,8 +5069,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
-        print(' time: ', time.time()-start )
-        print('    writing submeshes' )
+        print('        Done at', timer_diff_str(start), "seconds")
+        
+        print('      - Writing submeshes')
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
             if not len(_sm_faces_[matidx]):
@@ -4967,7 +5110,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             doc.end_tag('submesh')
         doc.end_tag('submeshnames')
         # -- end of MrMagne's patch
-
+        print('        Done at', timer_diff_str(start), "seconds")
+        
         arm = ob.find_armature()
         if arm:
             doc.leaf_tag('skeletonlink', {
@@ -4996,7 +5140,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
         # Updated June3 2011 - shape animation works
         if CONFIG['SHAPE_ANIM'] and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
-            print('    writing shape keys')
+            print('      - Writing shape keys')
 
             doc.start_tag('poses', {})
             for sidx, skey in enumerate(ob.data.shape_keys.key_blocks):
@@ -5031,9 +5175,10 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     })
                 doc.end_tag('pose')
             doc.end_tag('poses')
-
+            print('        Done at', timer_diff_str(start), "seconds")
+            
             if ob.data.shape_keys.animation_data and len(ob.data.shape_keys.animation_data.nla_tracks):
-                print('    writing shape animations')
+                print('      - Writing shape animations')
                 doc.start_tag('animations', {})
                 _fps = float( bpy.context.scene.render.fps )
                 for nla in ob.data.shape_keys.animation_data.nla_tracks:
@@ -5068,6 +5213,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                         doc.end_tag('tracks')
                         doc.end_tag('animation')
                 doc.end_tag('animations')
+                print('        Done at', timer_diff_str(start), "seconds")
 
         ## Clean up and save
         #bpy.context.scene.meshes.unlink(mesh)
@@ -5083,6 +5229,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         del uvcache
         doc.close() # reported by Reyn
         f.close()
+        
+        print('      - Created .mesh.xml at', timer_diff_str(start), "seconds")
 
     # todo: Very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
@@ -5097,7 +5245,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     del(replaceInplace)
 
     # Start .mesh.xml to .mesh convertion tool
-    OgreXMLConverter( xmlfile, has_uvs=dotextures )
+    OgreXMLConverter(xmlfile, has_uvs=dotextures)
 
     if arm and CONFIG['ARM_ANIM']:
         skel = Skeleton( ob )
@@ -5113,8 +5261,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     for mat in materials:
         if mat != '_missing_material_': mats.append( mat )
 
-    print('*'*80)
-    print( 'TIME: ', time.time()-start )
+    print('      - Created .mesh in total time', timer_diff_str(start), 'seconds')
     return mats
 
 ## Jmonkey preview
@@ -5754,14 +5901,10 @@ class INFO_HT_myheader(bpy.types.Header):
             else: layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_HLT')
 
 def export_menu_func_ogre(self, context):
-    path,name = os.path.split( context.blend_data.filepath )
     op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene and .mesh)")
-    op.filepath = os.path.join( path, name.split('.')[0]+'.scene' )
-
+    
 def export_menu_func_realxtend(self, context):
-    path,name = os.path.split( context.blend_data.filepath )
-    op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="RealXtend (.txml and .mesh)")
-    op.filepath = os.path.join( path, name.split('.')[0]+'.txml' )
+    op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="realXtend Tundra (.txml and .mesh)")
 
 try:
     _header_ = bpy.types.INFO_HT_header
@@ -5836,15 +5979,14 @@ def restore_minimal_interface():
 MyShaders = None
 
 def register():
-    print('-' * 80)
-    print('blender2ogre', VERSION)
+    print('Starting blender2ogre', VERSION)
     global MyShaders, _header_, _USE_TUNDRA_, _USE_JMONKEY_
     #bpy.utils.register_module(__name__)    ## do not load all the ogre panels by default
     #_header_ = bpy.types.INFO_HT_header
     #bpy.utils.unregister_class(_header_)
     restore_minimal_interface()
 
-    ## only test for Tundra2 once - do not do this every panel redraw ##
+    # only test for Tundra2 once - do not do this every panel redraw ##
     if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
     else: _USE_TUNDRA_ = False
     #if os.path.isdir( CONFIG['JMONKEY_ROOT'] ): _USE_JMONKEY_ = True
@@ -5856,17 +5998,16 @@ def register():
     if os.path.isdir( CONFIG['USER_MATERIALS'] ):
         scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
         for prog in progs:
-            print('ogre shader program', prog.name)
+            print('Ogre shader program', prog.name)
     else:
-        print('WARNING: invalid my-shaders path' )
-
-    print('-'*80)
+        print('[WARNING]: Invalid my-shaders path' )
 
 def unregister():
+    print('Unloading blender2ogre', VERSION)
     header = _header_
-    print('unreg-> ogre exporter')
     bpy.utils.unregister_module(__name__)
-    if header: bpy.utils.register_class(header)
+    if header: 
+        bpy.utils.register_class(header)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
 
@@ -6313,8 +6454,8 @@ Compression options:
 
 class OgreMaterialGenerator( _image_processing_ ):
     def __init__(self, material, path='/tmp', touch_textures=False ):
-        self.material = material    # top level material
-        self.path = path                # copy textures to path
+        self.material = material # top level material
+        self.path = path         # copy textures to path
         self.passes = []
         self.touch_textures = touch_textures
         if material.node_tree:
@@ -6336,7 +6477,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         for mat in self.passes:
             if mat.use_ogre_parent_material and mat.ogre_parent_material:
                 usermat = get_ogre_user_material( mat.ogre_parent_material )
-                r.append( '//user material: %s' %usermat.name )
+                r.append( '// user material: %s' %usermat.name )
                 for prog in usermat.get_programs():
                     r.append( prog.data )
                 r.append( '// abstract passes //' )
@@ -6347,7 +6488,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         r = []
         r.append( self.generate_pass(self.material) )
         for mat in self.passes:
-            if mat.use_in_ogre_material_pass:             # submaterials
+            if mat.use_in_ogre_material_pass: # submaterials
                 r.append( self.generate_pass(mat) )
         return r
 
@@ -6366,7 +6507,8 @@ class OgreMaterialGenerator( _image_processing_ ):
 
         color = mat.diffuse_color
         alpha = 1.0
-        if mat.use_transparency: alpha = mat.alpha
+        if mat.use_transparency:
+            alpha = mat.alpha
 
         slots = get_image_textures( mat )        # returns texture_slot objects (CLASSIC MATERIAL)
         usealpha = False #mat.ogre_depth_write
@@ -6401,6 +6543,7 @@ class OgreMaterialGenerator( _image_processing_ ):
                 M += indent(3, 'emissive vertexcolour' )
             else:
                 M += indent(3, 'emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
+            M += '\n' # pretty printing
 
         if mat.offset_z:
             M += indent(3, 'depth_bias %s'%mat.offset_z )
@@ -6414,7 +6557,7 @@ class OgreMaterialGenerator( _image_processing_ ):
                     if var: val = 'on'
                     else: val = 'off'
                 M += indent( 3, '%s %s' %(op,val) )
-
+        M += '\n' # pretty printing
 
         if texnodes and usermat.texture_units:
             for i,name in enumerate(usermat.texture_units_order):
@@ -6423,14 +6566,11 @@ class OgreMaterialGenerator( _image_processing_ ):
                     if node.texture:
                         geo = bpyShaders.get_connected_input_nodes( self.material, node )[0]
                         M += self.generate_texture_unit( node.texture, name=name, uv_layer=geo.uv_layer )
-
-        #if mat.use_fixed_pipeline:
         elif slots:
             for slot in slots:
                 M += self.generate_texture_unit( slot.texture, slot=slot )
 
         M += indent(2, '}' )    # end pass
-
         return M
 
     def generate_texture_unit(self, texture, slot=None, name=None, uv_layer=None):
@@ -6548,11 +6688,11 @@ class OgreMaterialGenerator( _image_processing_ ):
                 M += indent(4, 'tex_coord_set %s' %idx)
 
         M += indent(3, '}' )
-        ###############
 
         if self.touch_textures:
-            ## copy texture only if newer ##
-            if not os.path.isfile( iurl ): Report.warnings.append( 'missing texture: %s' %iurl )
+            # Copy texture only if newer
+            if not os.path.isfile(iurl):
+                Report.warnings.append('Missing texture: %s' %iurl )
             else:
                 desturl = os.path.join( destpath, texname )
                 updated = False
@@ -6662,32 +6802,43 @@ def material_name( mat ):
     elif not mat.library: return mat.name
     else: return mat.name + mat.library.filepath.replace('/','_')
 
-def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
+def export_mesh(ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True):
     ''' returns materials used by the mesh '''
     return dot_mesh( ob, path, force_name, ignore_shape_animation, normals )
 
-def generate_material( mat, path='/tmp', copy_programs=False, touch_textures=False ):
+def generate_material(mat, path='/tmp', copy_programs=False, touch_textures=False):
     ''' returns generated material string '''
-    safename = material_name(mat)     # supports blender library linking
-    M = '// blender material: %s\n' %(mat.name)
-    M += 'material %s \n{\n'        %safename
-    if mat.use_shadows: M += indent(1, 'receive_shadows on')
-    else: M += indent(1, 'receive_shadows off')
-    M += indent(1, 'technique', '{' )    # technique GLSL, CG
-    w = OgreMaterialGenerator( mat, path=path, touch_textures=touch_textures )
+
+    safename = material_name(mat) # supports blender library linking
+    M = '// %s genrated by blender2ogre %s\n\n' % (mat.name, VERSION)
+
+    M += 'material %s \n{\n' % safename # start material
+    if mat.use_shadows:
+        M += indent(1, 'receive_shadows on \n')
+    else:
+        M += indent(1, 'receive_shadows off \n')
+
+    M += indent(1, 'technique', '{' ) # technique GLSL, CG
+    w = OgreMaterialGenerator(mat, path=path, touch_textures=touch_textures)
+
     if copy_programs:
         progs = w.get_active_programs()
-        for prog in progs: prog.save( path )
+        for prog in progs:
+            prog.save(path)
 
     header = w.get_header()
     passes = w.get_passes()
-    M += '\n'.join( passes )
-    M += indent(1, '}' )    # end technique
-    M += '}\n'    # end material
-    return header + '\n' + M
+
+    M += '\n'.join(passes)
+    M += indent(1, '}' )      # end technique
+    M += '}\n'                # end material
+
+    if len(header) > 0:
+        return header + '\n' + M
+    else:
+        return M
 
 def get_ogre_user_material( name ):
-    #print('get_ogre_user_material(%s)'%name)
     if name in MaterialScripts.ALL_MATERIALS:
         return MaterialScripts.ALL_MATERIALS[ name ]
 
