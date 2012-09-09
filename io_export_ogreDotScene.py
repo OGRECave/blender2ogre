@@ -1,51 +1,63 @@
+
 # Copyright (C) 2010 Brett Hartshorn
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
 # License as published by the Free Software Foundation; either
 # version 2.1 of the License, or (at your option) any later version.
-# 
+#
 # This library is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+VERSION = '0.5.8'
+
+'''
+CHANGELOG
+    0.5.8
+    * Clean/fix documentation in code for future development
+    * Add todo to code for future development
+    * Restructure/move code for easier readability
+    * Remove extra white spaces and convert tabs to space
+    0.5.7
+    * Update to Blender 2.6.3.
+    * Fixed xz-y Skeleton rotation (again)
+    * Added additional Keyframe at the end of each animation to prevent ogre from interpolating back to the start
+    * Added option to ignore non-deformable bones
+    * Added option to export nla-strips independently from each other
+
+TODO
+    * Remove this section and integrate below with code :)
+    * Fix terrain collision offset bug
+    * Add realtime transform (rotation is missing)
+    * Fix camera rotated -90 ogre-dot-scene
+    * Set description field for all pyRNA
+'''
+
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne",
-    "version": (0,5,7),
-    "blender": (2,6,3),
+    "version": (0, 5, 8),
+    "blender": (2, 6, 3),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
     "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
-    "category": "Import-Export"}
+    "category": "Import-Export"
+}
 
-VERSION = '0.5.7'
+## Public API
+## Search for "Public API" to find more
 
-## CHANGELOG
-##
-## 0.5.7
-## * Update to Blender 2.6.3.
-## * Fixed xz-y Skeleton rotation (again)
-## * Added additional Keyframe at the end of each animation to prevent ogre from interpolating back to the start
-## * Added option to ignore non-deformable bones
-## * Added option to export nla-strips independently from each other
-
-## TODO
-##
-## * Fix terrain collision offset bug
-## * Add realtime transform (rotation is missing)
-## * Fix camera rotated -90 ogre-dot-scene
-
-## Public API ##
 UI_CLASSES = []
-def UI(cls): # @decorator
-    ''' these classes will be toggled on and off by the user - interface toggle '''
+
+def UI(cls):
+    ''' Toggles the Ogre interface panels '''
     if cls not in UI_CLASSES:
         UI_CLASSES.append(cls)
     return cls
@@ -66,24 +78,20 @@ def uid(ob):
         ob.uid = high
     return ob.uid
 
-###########################################################
-## END Public API ## -- (go to bottom for rest of API)
-###########################################################
+## Imports
 
-
-###### imports #####
 import os, sys, time, array, ctypes, math
 
-
-try:                                          # inside blender
+try:
+    # Inside blender
     import bpy, mathutils
     from bpy.props import *
-except ImportError:             # outside blender (compile optional C module)
+except ImportError:
+    # If we end up here we are outside blender (compile optional C module)
     assert __name__ == '__main__'
     print('Trying to compile Rpython C-library')
     assert sys.version_info.major == 2  # rpython only works from Python2
     print('...searching for rpythonic...')
-
     sys.path.append('../rpythonic')
     import rpythonic
     rpythonic.set_pypy_root( '../pypy' )
@@ -93,15 +101,16 @@ except ImportError:             # outside blender (compile optional C module)
 
     @rpy.bind(
         path=str,
-        facesAddr=int, 
+        facesAddr=int,
         facesSmoothAddr=int,
         facesMatAddr=int,
         vertsPosAddr=int,
         vertsNorAddr=int,
         numFaces=int,
         numVerts=int,
-        materialNames=str,	# [str] is too tricky to convert py-list to rpy-list
+        materialNames=str, # [str] is too tricky to convert py-list to rpy-list
     )
+
     def dotmesh( path, facesAddr, facesSmoothAddr, facesMatAddr, vertsPosAddr, vertsNorAddr, numFaces, numVerts, materialNames ):
         print('PATH----------------', path)
         materials = []
@@ -111,7 +120,7 @@ except ImportError:             # outside blender (compile optional C module)
 
         file = streamio.open_file_as_stream( path, 'w')
 
-        faces = rffi.cast( rffi.UINTP, facesAddr )        # face vertex indices
+        faces = rffi.cast( rffi.UINTP, facesAddr ) # face vertex indices
         facesSmooth = rffi.cast( rffi.CCHARP, facesSmoothAddr )
         facesMat = rffi.cast( rffi.USHORTP, facesMatAddr )
 
@@ -126,7 +135,7 @@ except ImportError:             # outside blender (compile optional C module)
         ogre_vert_index = 0
         triangles = []
         for fidx in range( numFaces ):
-            smooth = ord( facesSmooth[ fidx ] )        # ctypes.c_bool > char > int
+            smooth = ord( facesSmooth[ fidx ] ) # ctypes.c_bool > char > int
 
             matidx = facesMat[ fidx ]
             i = fidx*4
@@ -203,10 +212,10 @@ except ImportError:             # outside blender (compile optional C module)
     rpy.cache(refresh=1)
     sys.exit('OK: module compiled and cached')
 
+## More imports now that Blender is imported
+
 import hashlib, getpass, tempfile, configparser, subprocess, pickle
 from xml.sax.saxutils import XMLGenerator
-
-
 
 class CMesh(object):
 
@@ -227,10 +236,10 @@ class CMesh(object):
         self.faces_normals = (ctypes.c_float * (Nfaces * 3))()
         data.tessfaces.foreach_get( 'normal', self.faces_normals )
 
-        self.faces_smooth = (ctypes.c_bool * Nfaces)() 
+        self.faces_smooth = (ctypes.c_bool * Nfaces)()
         data.tessfaces.foreach_get( 'use_smooth', self.faces_smooth )
 
-        self.faces_material_index = (ctypes.c_ushort * Nfaces)() 
+        self.faces_material_index = (ctypes.c_ushort * Nfaces)()
         data.tessfaces.foreach_get( 'material_index', self.faces_material_index )
 
         self.vertex_colors = []
@@ -262,7 +271,6 @@ class CMesh(object):
                 layer.data.foreach_get( 'uv_raw', a )   # 4 faces
                 self.uv_textures.append( a )
 
-
     def save( blenderobject, path ):
         cmesh = Mesh( blenderobject.data )
         start = time.time()
@@ -279,61 +287,61 @@ class CMesh(object):
         print( 'mesh dumped in %s seconds' %(time.time()-start) )
 
 
-
-
-
-
-
-
-## make sure we can import from same directory ##
+## Make sure we can import from same directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path: sys.path.append( SCRIPT_DIR )
+if SCRIPT_DIR not in sys.path:
+    sys.path.append( SCRIPT_DIR )
 
+## Avatar
 
-######################### bpy RNA #########################
-bpy.types.Object.use_avatar = BoolProperty( name='enable avatar', description='enables EC_Avatar', default=False)
-bpy.types.Object.avatar_reference = StringProperty( name='avatar reference', description='sets avatar reference URL', maxlen=128, default='')
+bpy.types.Object.use_avatar = BoolProperty(
+    name='enable avatar',
+    description='enables EC_Avatar',
+    default=False)
+bpy.types.Object.avatar_reference = StringProperty(
+    name='avatar reference',
+    description='sets avatar reference URL',
+    maxlen=128,
+    default='')
+BoolProperty( name='enable avatar', description='enables EC_Avatar', default=False) # todo: is this used?
 
-BoolProperty( name='enable avatar', description='enables EC_Avatar', default=False)
+# Tundra IDs
 
 bpy.types.Object.uid = IntProperty(
-    name="unique ID", description="unique ID for Tundra", 
+    name="unique ID",
+    description="unique ID for Tundra",
     default=0, min=0, max=2**14)
 
-bpy.types.Object.use_draw_distance = BoolProperty( name='enable draw distance', description='use LOD draw distance', default=False)
-bpy.types.Object.draw_distance = FloatProperty( name='draw distance', description='distance at which to begin drawing object', default=0.0, min=0.0, max=10000.0)
+# Rendering
 
-bpy.types.Object.cast_shadows = BoolProperty( name='cast shadows', description='cast shadows', default=False)
+bpy.types.Object.use_draw_distance = BoolProperty(
+    name='enable draw distance',
+    description='use LOD draw distance',
+    default=False)
+bpy.types.Object.draw_distance = FloatProperty(
+    name='draw distance',
+    description='distance at which to begin drawing object',
+    default=0.0, min=0.0, max=10000.0)
+bpy.types.Object.cast_shadows = BoolProperty(
+    name='cast shadows',
+    description='cast shadows',
+    default=False)
+bpy.types.Object.use_multires_lod = BoolProperty(
+    name='Enable Multires LOD',
+    description='enables multires LOD',
+    default=False)
+bpy.types.Object.multires_lod_range = FloatProperty(
+    name='multires LOD range',
+    description='far distance at which multires is set to base level',
+    default=30.0, min=0.0, max=10000.0)
 
-bpy.types.Object.use_multires_lod = BoolProperty( name='Enable Multires LOD', description='enables multires LOD', default=False)
+## Physics
 
-bpy.types.Object.multires_lod_range = FloatProperty( name='multires LOD range', description='far distance at which multires is set to base level', default=30.0, min=0.0, max=10000.0)
-
-
-
-## Physics+ ##
 _physics_modes =  [
     ('NONE', 'NONE', 'no physics'),
     ('RIGID_BODY', 'RIGID_BODY', 'rigid body'),
     ('SOFT_BODY', 'SOFT_BODY', 'soft body'),
 ]
-bpy.types.Object.physics_mode = EnumProperty(
-    items = _physics_modes, 
-    name = 'physics mode', 
-    description='physics mode', 
-    default='NONE'
-)
-bpy.types.Object.physics_friction = FloatProperty(
-    name='Simple Friction', description='physics friction', default=0.1, min=0.0, max=1.0)
-bpy.types.Object.physics_bounce = FloatProperty(
-    name='Simple Bounce', description='physics bounce', default=0.01, min=0.0, max=1.0)
-bpy.types.Object.collision_terrain_x_steps = IntProperty(
-    name="Ogre Terrain: x samples", description="resolution in X of height map", 
-    default=64, min=4, max=8192)
-bpy.types.Object.collision_terrain_y_steps = IntProperty(
-    name="Ogre Terrain: y samples", description="resolution in Y of height map", 
-    default=64, min=4, max=8192)
-
 _collision_modes =  [
     ('NONE', 'NONE', 'no collision'),
     ('PRIMITIVE', 'PRIMITIVE', 'primitive collision type'),
@@ -342,26 +350,53 @@ _collision_modes =  [
     ('COMPOUND', 'COMPOUND', 'children primitive compound collision type'),
     ('TERRAIN', 'TERRAIN', 'terrain (height map) collision type'),
 ]
+
+bpy.types.Object.physics_mode = EnumProperty(
+    items = _physics_modes,
+    name = 'physics mode',
+    description='physics mode',
+    default='NONE')
+bpy.types.Object.physics_friction = FloatProperty(
+    name='Simple Friction',
+    description='physics friction',
+    default=0.1, min=0.0, max=1.0)
+bpy.types.Object.physics_bounce = FloatProperty(
+    name='Simple Bounce',
+    description='physics bounce',
+    default=0.01, min=0.0, max=1.0)
+bpy.types.Object.collision_terrain_x_steps = IntProperty(
+    name="Ogre Terrain: x samples",
+    description="resolution in X of height map",
+    default=64, min=4, max=8192)
+bpy.types.Object.collision_terrain_y_steps = IntProperty(
+    name="Ogre Terrain: y samples",
+    description="resolution in Y of height map",
+    default=64, min=4, max=8192)
 bpy.types.Object.collision_mode = EnumProperty(
-    items = _collision_modes, 
-    name = 'primary collision mode', 
-    description='collision mode', 
-    default='NONE'
-)
-
+    items = _collision_modes,
+    name = 'primary collision mode',
+    description='collision mode',
+    default='NONE')
 bpy.types.Object.subcollision = BoolProperty(
-    name="collision compound", description="member of a collision compound", default=False)
+    name="collision compound",
+    description="member of a collision compound",
+    default=False)
 
+## Sound
 
-## Sound+ ##
-bpy.types.Speaker.play_on_load = BoolProperty( name='play on load', default=False )
-bpy.types.Speaker.loop = BoolProperty( name='loop sound', default=False )
-bpy.types.Speaker.use_spatial = BoolProperty( name='3D spatial sound', default=True )
+bpy.types.Speaker.play_on_load = BoolProperty(
+    name='play on load',
+    default=False)
+bpy.types.Speaker.loop = BoolProperty(
+    name='loop sound',
+    default=False)
+bpy.types.Speaker.use_spatial = BoolProperty(
+    name='3D spatial sound',
+    default=True)
 
-## ImageMagick ##
-# Ogre supports .dds in both directx and opengl
-# http://www.ogre3d.org/forums/viewtopic.php?f=5&t=46847
-_IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IMAGE_FORMAT"
+## ImageMagick
+
+_IMAGE_FORMATS =  [
     ('NONE','NONE', 'do not convert image'),
     ('bmp', 'bmp', 'bitmap format'),
     ('jpg', 'jpg', 'jpeg format'),
@@ -370,129 +405,156 @@ _IMAGE_FORMATS =  [                                 # for EnumProperty "FORCE_IM
     ('tga', 'tga', 'targa format'),
     ('dds', 'dds', 'nvidia dds format'),
 ]
-bpy.types.Image.use_convert_format = BoolProperty( name='use convert format', default=False )
-bpy.types.Image.convert_format = EnumProperty( items=_IMAGE_FORMATS, name='convert to format',  description='converts to image format using imagemagick', default='NONE' )
+
+bpy.types.Image.use_convert_format = BoolProperty(
+    name='use convert format',
+    default=False
+)
+bpy.types.Image.convert_format = EnumProperty(
+    name='convert to format',
+    description='converts to image format using imagemagick',
+    items=_IMAGE_FORMATS,
+    default='NONE')
 bpy.types.Image.jpeg_quality = IntProperty(
-    name="jpeg quality", description="quality of jpeg", 
+    name="jpeg quality",
+    description="quality of jpeg",
     default=80, min=0, max=100)
-
-bpy.types.Image.use_color_quantize = BoolProperty( name='use color quantize', default=False )
-bpy.types.Image.use_color_quantize_dither = BoolProperty( name='use color quantize dither', default=True )
+bpy.types.Image.use_color_quantize = BoolProperty(
+    name='use color quantize',
+    default=False)
+bpy.types.Image.use_color_quantize_dither = BoolProperty(
+    name='use color quantize dither',
+    default=True)
 bpy.types.Image.color_quantize = IntProperty(
-    name="color quantize", description="reduce to N colors (requires ImageMagick)", 
+    name="color quantize",
+    description="reduce to N colors (requires ImageMagick)",
     default=32, min=2, max=256)
-
-bpy.types.Image.use_resize_half = BoolProperty( name='resize by 1/2', default=False )
-bpy.types.Image.use_resize_absolute = BoolProperty( name='force image resize', default=False )
+bpy.types.Image.use_resize_half = BoolProperty(
+    name='resize by 1/2',
+    default=False)
+bpy.types.Image.use_resize_absolute = BoolProperty(
+    name='force image resize',
+    default=False)
 bpy.types.Image.resize_x = IntProperty(
-    name="resize X", description="only if image is larger than defined, use ImageMagick to resize it down", 
+    name='resize X',
+    description='only if image is larger than defined, use ImageMagick to resize it down',
     default=256, min=2, max=4096)
 bpy.types.Image.resize_y = IntProperty(
-    name="resize Y", description="only if image is larger than defined, use ImageMagick to resize it down", 
+    name='resize Y',
+    description='only if image is larger than defined, use ImageMagick to resize it down',
     default=256, min=2, max=4096)
 
-## use Material.offset_z ## bpy.types.Material.ogre_depth_bias = IntProperty
+# Materials
 
-# ..Material.ogre_depth_write = AUTO|ON|OFF
-bpy.types.Material.ogre_depth_write = BoolProperty( name='depth write', default=True )
-
-#If depth-buffer checking is on, whenever a pixel is about to be written to the frame buffer the depth buffer is checked to see if the pixel is in front of all other pixels written at that point. If not, the pixel is not written. If depth checking is off, pixels are written no matter what has been rendered before.
-bpy.types.Material.ogre_depth_check = BoolProperty( name='depth check', default=True )
-
-#Sets whether this pass will use 'alpha to coverage', a way to multisample alpha texture edges so they blend more seamlessly with the background. This facility is typically only available on cards from around 2006 onwards, but it is safe to enable it anyway - Ogre will just ignore it if the hardware does not support it. The common use for alpha to coverage is foliage rendering and chain-link fence style textures.
-bpy.types.Material.ogre_alpha_to_coverage = BoolProperty( name='multisample alpha edges', default=False )
-
-#This option is usually only useful if this pass is an additive lighting pass, and is at least the second one in the technique. Ie areas which are not affected by the current light(s) will never need to be rendered. If there is more than one light being passed to the pass, then the scissor is defined to be the rectangle which covers all lights in screen-space. Directional lights are ignored since they are infinite.
-#This option does not need to be specified if you are using a standard additive shadow mode, i.e. SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE, since it is the default behaviour to use a scissor for each additive shadow pass. However, if you're not using shadows, or you're using Integrated Texture Shadows where passes are specified in a custom manner, then this could be of use to you.
-bpy.types.Material.ogre_light_scissor = BoolProperty( name='light scissor', default=False )
-
-bpy.types.Material.ogre_light_clip_planes = BoolProperty( name='light clip planes', default=False )
-
-# TODO set description for all pyRNA
-bpy.types.Material.ogre_normalise_normals = BoolProperty( name='normalise normals', default=False,
-    description='''
-Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.
-''')
-
-#Sets whether or not dynamic lighting is turned on for this pass or not. If lighting is turned off, all objects rendered using the pass will be fully lit. This attribute has no effect if a vertex program is used.
-bpy.types.Material.ogre_lighting = BoolProperty( name='dynamic lighting', default=True )
-
-#If colour writing is off no visible pixels are written to the screen during this pass. You might think this is useless, but if you render with colour writing off, and with very minimal other settings, you can use this pass to initialise the depth buffer before subsequently rendering other passes which fill in the colour data. This can give you significant performance boosts on some newer cards, especially when using complex fragment programs, because if the depth check fails then the fragment program is never run. 
-bpy.types.Material.ogre_colour_write = BoolProperty( name='color-write', default=True )
-
-bpy.types.Material.use_fixed_pipeline = BoolProperty( name='fixed pipeline', default=True )    # fixed pipeline is oldschool
-
-# hidden option - gets turned on by operator
-bpy.types.Material.use_material_passes = BoolProperty( name='use ogre extra material passes (layers)', default=False )
-
-bpy.types.Material.use_in_ogre_material_pass = BoolProperty( name='Layer Toggle', default=True )
-
-bpy.types.Material.use_ogre_advanced_options = BoolProperty( name='Show Advanced Options', default=False )
-
-bpy.types.Material.use_ogre_parent_material = BoolProperty( name='Use Script Inheritance', default=False )
-
+bpy.types.Material.ogre_depth_write = BoolProperty(
+    # Material.ogre_depth_write = AUTO|ON|OFF
+    name='depth write',
+    default=True)
+bpy.types.Material.ogre_depth_check = BoolProperty(
+    # If depth-buffer checking is on, whenever a pixel is about to be written to
+    # the frame buffer the depth buffer is checked to see if the pixel is in front
+    # of all other pixels written at that point. If not, the pixel is not written.
+    # If depth checking is off, pixels are written no matter what has been rendered before.
+    name='depth check',
+    default=True)
+bpy.types.Material.ogre_alpha_to_coverage = BoolProperty(
+    # Sets whether this pass will use 'alpha to coverage', a way to multisample alpha
+    # texture edges so they blend more seamlessly with the background. This facility
+    # is typically only available on cards from around 2006 onwards, but it is safe to
+    # enable it anyway - Ogre will just ignore it if the hardware does not support it.
+    # The common use for alpha to coverage is foliage rendering and chain-link fence style textures.
+    name='multisample alpha edges',
+    default=False)
+bpy.types.Material.ogre_light_scissor = BoolProperty(
+    # This option is usually only useful if this pass is an additive lighting pass, and is
+    # at least the second one in the technique. Ie areas which are not affected by the current
+    # light(s) will never need to be rendered. If there is more than one light being passed to
+    # the pass, then the scissor is defined to be the rectangle which covers all lights in screen-space.
+    # Directional lights are ignored since they are infinite. This option does not need to be specified
+    # if you are using a standard additive shadow mode, i.e. SHADOWTYPE_STENCIL_ADDITIVE or
+    # SHADOWTYPE_TEXTURE_ADDITIVE, since it is the default behaviour to use a scissor for each additive
+    # shadow pass. However, if you're not using shadows, or you're using Integrated Texture Shadows
+    # where passes are specified in a custom manner, then this could be of use to you.
+    name='light scissor',
+    default=False)
+bpy.types.Material.ogre_light_clip_planes = BoolProperty(
+    name='light clip planes',
+    default=False)
+bpy.types.Material.ogre_normalise_normals = BoolProperty(
+    name='normalise normals',
+    default=False,
+    description="Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.")
+bpy.types.Material.ogre_lighting = BoolProperty(
+    # Sets whether or not dynamic lighting is turned on for this pass or not. If lighting is turned off,
+    # all objects rendered using the pass will be fully lit. This attribute has no effect if a vertex program is used.
+    name='dynamic lighting',
+    default=True)
+bpy.types.Material.ogre_colour_write = BoolProperty(
+    # If colour writing is off no visible pixels are written to the screen during this pass. You might think
+    # this is useless, but if you render with colour writing off, and with very minimal other settings,
+    # you can use this pass to initialise the depth buffer before subsequently rendering other passes which
+    # fill in the colour data. This can give you significant performance boosts on some newer cards, especially
+    # when using complex fragment programs, because if the depth check fails then the fragment program is never run.
+    name='color-write',
+    default=True)
+bpy.types.Material.use_fixed_pipeline = BoolProperty(
+    # Fixed pipeline is oldschool
+    # todo: whats the meaning of this?
+    name='fixed pipeline',
+    default=True)
+bpy.types.Material.use_material_passes = BoolProperty(
+    # hidden option - gets turned on by operator
+    # todo: What is a hidden option, is this needed?
+    name='use ogre extra material passes (layers)',
+    default=False)
+bpy.types.Material.use_in_ogre_material_pass = BoolProperty(
+    name='Layer Toggle',
+    default=True)
+bpy.types.Material.use_ogre_advanced_options = BoolProperty(
+    name='Show Advanced Options',
+    default=False)
+bpy.types.Material.use_ogre_parent_material = BoolProperty(
+    name='Use Script Inheritance',
+    default=False)
 bpy.types.Material.ogre_parent_material = EnumProperty(
-  name="Script Inheritence", 
-  description='ogre parent material class', #default='NONE',
-  items=[],
-)
-
-
+    name="Script Inheritence",
+    description='ogre parent material class', #default='NONE',
+    items=[])
 bpy.types.Material.ogre_polygon_mode = EnumProperty(
-    items=[
-            ('solid', 'solid', 'SOLID'),
+    name='faces draw type',
+    description="ogre face draw mode",
+    items=[ ('solid', 'solid', 'SOLID'),
             ('wireframe', 'wireframe', 'WIREFRAME'),
-            ('points', 'points', 'POINTS'),
-    ],
-    name='faces draw type', 
-    description="ogre face draw mode", 
-    default='solid'
-)
-
+            ('points', 'points', 'POINTS') ],
+    default='solid')
 bpy.types.Material.ogre_shading = EnumProperty(
-    items=[
-            ('flat', 'flat', 'FLAT'),
+    name='hardware shading',
+    description="Sets the kind of shading which should be used for representing dynamic lighting for this pass.",
+    items=[ ('flat', 'flat', 'FLAT'),
             ('gouraud', 'gouraud', 'GOURAUD'),
-            ('phong', 'phong', 'PHONG'),
-    ],
-    name='hardware shading', 
-    description="Sets the kind of shading which should be used for representing dynamic lighting for this pass.", 
-    default='gouraud'
-)
-
-
+            ('phong', 'phong', 'PHONG') ],
+    default='gouraud')
 bpy.types.Material.ogre_cull_hardware = EnumProperty(
-    items=[
-            ('clockwise', 'clockwise', 'CLOCKWISE'),
+    name='hardware culling',
+    description="If the option 'cull_hardware clockwise' is set, all triangles whose vertices are viewed in clockwise order from the camera will be culled by the hardware.",
+    items=[ ('clockwise', 'clockwise', 'CLOCKWISE'),
             ('anticlockwise', 'anticlockwise', 'COUNTER CLOCKWISE'),
-            ('none', 'none', 'NONE'),
-    ],
-    name='hardware culling', 
-    description="If the option 'cull_hardware clockwise' is set, all triangles whose vertices are viewed in clockwise order from the camera will be culled by the hardware.", 
-    default='clockwise'
-)
-
-
+            ('none', 'none', 'NONE') ],
+    default='clockwise')
 bpy.types.Material.ogre_transparent_sorting = EnumProperty(
-    items=[
-            ('on', 'on', 'ON'),
+    name='transparent sorting',
+    description="By default all transparent materials are sorted such that renderables furthest away from the camera are rendered first. This is usually the desired behaviour but in certain cases this depth sorting may be unnecessary and undesirable. If for example it is necessary to ensure the rendering order does not change from one frame to the next. In this case you could set the value to 'off' to prevent sorting.",
+    items=[ ('on', 'on', 'ON'),
             ('off', 'off', 'OFF'),
-            ('force', 'force', 'FORCE ON'),
-    ],
-    name='transparent sorting', 
-    description="By default all transparent materials are sorted such that renderables furthest away from the camera are rendered first. This is usually the desired behaviour but in certain cases this depth sorting may be unnecessary and undesirable. If for example it is necessary to ensure the rendering order does not change from one frame to the next. In this case you could set the value to 'off' to prevent sorting.", 
-    default='on'
-)
-
+            ('force', 'force', 'FORCE ON') ],
+    default='on')
 bpy.types.Material.ogre_illumination_stage = EnumProperty(
-    items=[
-            ('', '', 'autodetect'),
+    name='illumination stage',
+    description='When using an additive lighting mode (SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE), the scene is rendered in 3 discrete stages, ambient (or pre-lighting), per-light (once per light, with shadowing) and decal (or post-lighting). Usually OGRE figures out how to categorise your passes automatically, but there are some effects you cannot achieve without manually controlling the illumination.',
+    items=[ ('', '', 'autodetect'),
             ('ambient', 'ambient', 'ambient'),
             ('per_light', 'per_light', 'lights'),
-            ('decal', 'decal', 'decal')
-    ],
-    name='illumination stage', 
-    description='When using an additive lighting mode (SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE), the scene is rendered in 3 discrete stages, ambient (or pre-lighting), per-light (once per light, with shadowing) and decal (or post-lighting). Usually OGRE figures out how to categorise your passes automatically, but there are some effects you cannot achieve without manually controlling the illumination.', 
+            ('decal', 'decal', 'decal') ],
     default=''
 )
 
@@ -506,14 +568,12 @@ _ogre_depth_func =  [
     ('always_fail', 'always_fail', 'false'),
     ('always_pass', 'always_pass', 'true'),
 ]
+
 bpy.types.Material.ogre_depth_func = EnumProperty(
-    items=_ogre_depth_func, 
-    name='depth buffer function', 
-    description='If depth checking is enabled (see depth_check) a comparison occurs between the depth value of the pixel to be written and the current contents of the buffer. This comparison is normally less_equal, i.e. the pixel is written if it is closer (or at the same distance) than the current contents', 
-    default='less_equal'
-)
-
-
+    items=_ogre_depth_func,
+    name='depth buffer function',
+    description='If depth checking is enabled (see depth_check) a comparison occurs between the depth value of the pixel to be written and the current contents of the buffer. This comparison is normally less_equal, i.e. the pixel is written if it is closer (or at the same distance) than the current contents',
+    default='less_equal')
 
 _ogre_scene_blend_ops =  [
     ('add', 'add', 'DEFAULT'),
@@ -521,14 +581,13 @@ _ogre_scene_blend_ops =  [
     ('reverse_subtract', 'reverse_subtract', 'REVERSE SUBTRACT'),
     ('min', 'min', 'MIN'),
     ('max', 'max', 'MAX'),
-
 ]
+
 bpy.types.Material.ogre_scene_blend_op = EnumProperty(
-    items=_ogre_scene_blend_ops, 
-    name='scene blending operation', 
-    description='This directive changes the operation which is applied between the two components of the scene blending equation', 
-    default='add'
-)
+    items=_ogre_scene_blend_ops,
+    name='scene blending operation',
+    description='This directive changes the operation which is applied between the two components of the scene blending equation',
+    default='add')
 
 _ogre_scene_blend_types =  [
     ('one zero', 'one zero', 'DEFAULT'),
@@ -542,74 +601,77 @@ for mode in 'dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha o
 del mode
 
 bpy.types.Material.ogre_scene_blend = EnumProperty(
-    items=_ogre_scene_blend_types, 
-    name='scene blend', 
-    description='blending operation of material to scene', 
-    default='one zero'
-)
+    items=_ogre_scene_blend_types,
+    name='scene blend',
+    description='blending operation of material to scene',
+    default='one zero')
 
+## FAQ
 
-
-###########################################################
 _faq_ = '''
 
-Q: i have hundres of objects, is there a way i can merge them on export only?
-A: yes, just add them to a group named starting with "merge", or link the group.
+Q: I have hundres of objects, is there a way i can merge them on export only?
+A: Yes, just add them to a group named starting with "merge", or link the group.
 
-Q: can i use subsurf or multi-res on a mesh with an armature?
-A: yes.
+Q: Can i use subsurf or multi-res on a mesh with an armature?
+A: Yes.
 
-Q: can i use subsurf or multi-res on a mesh with shape animation?
-A: no.
+Q: Can i use subsurf or multi-res on a mesh with shape animation?
+A: No.
 
-Q: i don't see any objects when i export?
-A: you must select the objects you wish to export.
+Q: I don't see any objects when i export?
+A: You must select the objects you wish to export.
 
-Q: i don't see my animations when exported?
-A: make sure you created an NLA strip on the armature.
+Q: I don't see my animations when exported?
+A: Make sure you created an NLA strip on the armature.
 
-Q: do i need to bake my IK and other constraints into FK on my armature before export?
-A: no.
+Q: Do i need to bake my IK and other constraints into FK on my armature before export?
+A: No.
 
 '''
 
+## DOCUMENTATION
+''' todo: Update the nonsense C:\Tundra2 paths from defaul config and fix this doc.
+    Additionally point to some doc how to build opengl only version on windows if that really is needed and
+    remove the old Tundra 7z link. '''
 
 _doc_installing_ = '''
 Installing:
     Installing the Addon:
-        You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.60/scripts/addons/
+        You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.6x/scripts/addons/
         and enable it in the user-prefs interface (CTRL+ALT+U)
         Or you can use blenders interface, under user-prefs, click addons, and click 'install-addon'
         (its a good idea to delete the old version first)
 
     Required:
-        1. blender2.60
+        1. Blender 2.63
 
-        2. Install Ogre Command Line tools to the default path ( C:\\OgreCommandLineTools )
-            http://www.ogre3d.org/download/tools
-            (Linux users may use above and Wine, or install from source, or install via apt-get install ogre-tools)
+        2. Install Ogre Command Line tools to the default path: C:\\OgreCommandLineTools from http://www.ogre3d.org/download/tools
+            * These tools are used to create the binary Mesh from the .xml mesh generated by this plugin.
+            * Linux users may use above and Wine, or install from source, or install via apt-get install ogre-tools.
 
     Optional:
-        3. Install NVIDIA DDS Legacy Utilities    ( install to default path )
-            http://developer.nvidia.com/object/dds_utilities_legacy.html
-            (Linux users will need to use Wine)
+        3. Install NVIDIA DDS Legacy Utilities - Install them to default path.
+            * http://developer.nvidia.com/object/dds_utilities_legacy.html
+            * Linux users will need to use Wine.
 
         4. Install Image Magick
-            http://www.imagemagick.org
+            * http://www.imagemagick.org
 
         5. Copy OgreMeshy to C:\\OgreMeshy
-            If your using 64bit Windows, you may need to download a 64bit OgreMeshy
-            (Linux copy to your home folder)
+            * If your using 64bit Windows, you may need to download a 64bit OgreMeshy
+            * Linux copy to your home folder.
 
-        6. RealXtend Tundra2
-            http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
-            Windows: extract to C:\Tundra2
-            Linux: extract to ~/Tundra2
+        6. realXtend Tundra
+            * For latest Tundra releases see http://code.google.com/p/realxtend-naali/downloads/list
+              - You may need to tweak the config to tell your Tundra path or install to C:\Tundra2
+            * Old OpenGL only build can be found from http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
+              - Windows: extract to C:\Tundra2
+              - Linux: extract to ~/Tundra2
 '''
 
+## Options
 
-
-## Options ##
 AXIS_MODES =  [
     ('xyz', 'xyz', 'no swapping'),
     ('xz-y', 'xz-y', 'ogre standard'),
@@ -631,28 +693,23 @@ def swap(vec):
         print( 'unknown swap axis mode', CONFIG['SWAP_AXIS'] )
         assert 0
 
+## Config
 
-############ CONFIG ##############
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'blender2ogre.pickle'
-CONFIG_FILEPATH = os.path.join( CONFIG_PATH, CONFIG_FILENAME)
-
-
+CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 
 _CONFIG_DEFAULTS_ALL = {
     'TUNDRA_STREAMING' : True,
     'COPY_SHADER_PROGRAMS' : True,
     'MAX_TEXTURE_SIZE' : 4096,
-    'SWAP_AXIS' : 'xz-y',         # ogre standard
+    'SWAP_AXIS' : 'xz-y', # ogre standard
     'ONLY_ANIMATED_BONES' : False,
     'ONLY_DEFORMABLE_BONES' : False,
     'INDEPENDENT_ANIM' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : True,
-#    'PATH' : '/tmp',
-
     'SEP_MATS' : True,
-
     'SCENE' : True,
     'SELONLY' : True,
     'FORCE_CAMERA' : True,
@@ -670,7 +727,7 @@ _CONFIG_DEFAULTS_ALL = {
     'lodPercent' : 40,
     'nuextremityPoints' : 0,
     'generateEdgeLists' : False,
-    'generateTangents' : True,     # this is now safe - ignored if mesh is missing UVs
+    'generateTangents' : True, # this is now safe - ignored if mesh is missing UVs
     'tangentSemantic' : 'uvw',
     'tangentUseParity' : 4,
     'tangentSplitMirrored' : False,
@@ -680,11 +737,12 @@ _CONFIG_DEFAULTS_ALL = {
 }
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVCOMPRESS NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
-#_CONFIG_TAGS_.append( 'JMONKEY_ROOT' )
 
+''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
+    Ogre tools and Tundra from various default folders. Also consider making a installer that
+    ships Ogre cmd line tools to ease the setup steps for end users. '''
 
 _CONFIG_DEFAULTS_WINDOWS = {
-#    'JMONKEY_ROOT' : 'C:\\jmonkeyplatform',
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
@@ -694,12 +752,10 @@ _CONFIG_DEFAULTS_WINDOWS = {
     'USER_MATERIALS' : 'C:\\Tundra2\\media\\materials',
     'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs',
     'NVCOMPRESS' : 'C:\\nvcompress.exe'
-
 }
 
 _CONFIG_DEFAULTS_UNIX = {
-#    'JMONKEY_ROOT' : '/usr/local/jmonkeyplatform',
-    'OGRETOOLS_XML_CONVERTER' : '/usr/local/bin/OgreXMLConverter',  # source build is better
+    'OGRETOOLS_XML_CONVERTER' : '/usr/local/bin/OgreXMLConverter', # source build is better
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
     'OGRE_MESHY' : '~/OgreMeshy/Ogre Meshy.exe',
@@ -707,23 +763,28 @@ _CONFIG_DEFAULTS_UNIX = {
     'NVIDIATOOLS_EXE' : '~/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities',
     'USER_MATERIALS' : '~/Tundra2/media/materials',
     'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
-#    'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
-#    'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
+    #'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
+    #'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
     'NVCOMPRESS' : '/usr/local/bin/nvcompress'
 }
 
+# Unix: Replace ~ with absolute home dir path
 if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
     for tag in _CONFIG_DEFAULTS_UNIX:
         path = _CONFIG_DEFAULTS_UNIX[ tag ]
-        if path.startswith('~'): _CONFIG_DEFAULTS_UNIX[ tag ] = os.path.expanduser( path )
+        if path.startswith('~'):
+            _CONFIG_DEFAULTS_UNIX[ tag ] = os.path.expanduser( path )
         elif tag.startswith('OGRETOOLS') and not os.path.isfile( path ):
             _CONFIG_DEFAULTS_UNIX[ tag ] = os.path.join( '/usr/bin', os.path.split( path )[-1] )
     del tag
     del path
 
 
+## PUBLIC API continues
+
 CONFIG = {}
-def load_config():  # PUBLIC API
+
+def load_config():
     global CONFIG
     if os.path.isfile( CONFIG_FILEPATH ):
         try:
@@ -752,19 +813,20 @@ def load_config():  # PUBLIC API
         func = eval( 'lambda self,con: CONFIG.update( {"%s" : self.%s} )' %(tag,tag) )
         if type(default) is bool:
             prop = BoolProperty(
-                name=tag, description='updates bool setting', default=default, 
+                name=tag, description='updates bool setting', default=default,
                 options={'SKIP_SAVE'}, update=func
             )
         else:
             prop = StringProperty(
-                name=tag, description='updates path setting', maxlen=128, default=default, 
+                name=tag, description='updates path setting', maxlen=128, default=default,
                 options={'SKIP_SAVE'}, update=func
             )
         setattr( bpy.types.WindowManager, tag, prop )
     return CONFIG
+
 CONFIG = load_config()
 
-def save_config():  # PUBLIC API
+def save_config():
     print('saving config....')
     #for key in CONFIG: print( '%s =   %s' %(key, CONFIG[key]) )
     if os.path.isdir( CONFIG_PATH ):
@@ -777,14 +839,14 @@ def save_config():  # PUBLIC API
     else:
         print( 'ERROR: config path is missing %s' %CONFIG_PATH )
 
-
 class Blender2Ogre_ConfigOp(bpy.types.Operator):
-    '''operator: saves current b2ogre configuration'''  
-    bl_idname = "ogre.save_config"  
+    '''operator: saves current b2ogre configuration'''
+    bl_idname = "ogre.save_config"
     bl_label = "save config file"
     bl_options = {'REGISTER'}
     @classmethod
-    def poll(cls, context): return True
+    def poll(cls, context):
+        return True
     def invoke(self, context, event):
         save_config()
         Report.reset()
@@ -793,10 +855,12 @@ class Blender2Ogre_ConfigOp(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# customize missing material - red flags for users so they can quickly see what they forgot to assign a material to.
-# (do not crash if no material on object - thats annoying for the user)
+# Make default material for missing materials:
+# * Red flags for users so they can quickly see what they forgot to assign a material to.
+# * Do not crash if no material on object - thats annoying for the user.
+
 MISSING_MATERIAL = '''
-material _missing_material_ 
+material _missing_material_
 {
     receive_shadows off
     technique
@@ -812,27 +876,26 @@ material _missing_material_
 }
 '''
 
+## Helper functions
 
-
-############# helper functions ##############
-
-def find_bone_index( ob, arm, groupidx):    # sometimes the groups are out of order, this finds the right index.
-    if groupidx < len(ob.vertex_groups):        # reported by Slacker
+def find_bone_index( ob, arm, groupidx): # sometimes the groups are out of order, this finds the right index.
+    if groupidx < len(ob.vertex_groups): # reported by Slacker
         vg = ob.vertex_groups[ groupidx ]
         j = 0
         for i,bone in enumerate(arm.pose.bones):
-            if not bone.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']: j+=1           #if we skip bones we need to adjust the id
-            if bone.name == vg.name: return i-j
+            if not bone.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']:
+                j+=1 # if we skip bones we need to adjust the id
+            if bone.name == vg.name:
+                return i-j
     else:
         print('WARNING: object vertex groups not in sync with armature', ob, arm, groupidx)
-
 
 def mesh_is_smooth( mesh ):
     for face in mesh.tessfaces:
         if face.use_smooth: return True
 
-## this breaks if users have uv layers with same name with different indices over different objects ##
 def find_uv_layer_index( uvname, material=None ):
+    # This breaks if users have uv layers with same name with different indices over different objects
     idx = 0
     for mesh in bpy.data.meshes:
         if material is None or material.name in mesh.materials:
@@ -840,33 +903,40 @@ def find_uv_layer_index( uvname, material=None ):
                 names = [ uv.name for uv in mesh.uv_textures ]
                 if uvname in names:
                     idx = names.index( uvname )
-                    break   # should we check all objects using material and enforce the same index?
+                    break # should we check all objects using material and enforce the same index?
     return idx
 
 def has_custom_property( a, name ):
     for prop in a.items():
         n,val = prop
-        if n == name: return True
+        if n == name:
+            return True
 
-
-# a default plane, with simple-subsurf and displace modifier on Z
 def is_strictly_simple_terrain( ob ):
-    if len(ob.data.vertices) != 4 and len(ob.data.tessfaces) != 1: return False
-    elif len(ob.modifiers) < 2: return False
-    elif ob.modifiers[0].type != 'SUBSURF' or ob.modifiers[1].type != 'DISPLACE': return False
-    elif ob.modifiers[0].subdivision_type != 'SIMPLE': return False
-    elif ob.modifiers[1].direction != 'Z': return False # disallow NORMAL and other modes
-    else: return True
+    # A default plane, with simple-subsurf and displace modifier on Z
+    if len(ob.data.vertices) != 4 and len(ob.data.tessfaces) != 1:
+        return False
+    elif len(ob.modifiers) < 2:
+        return False
+    elif ob.modifiers[0].type != 'SUBSURF' or ob.modifiers[1].type != 'DISPLACE':
+        return False
+    elif ob.modifiers[0].subdivision_type != 'SIMPLE':
+        return False
+    elif ob.modifiers[1].direction != 'Z':
+        return False # disallow NORMAL and other modes
+    else:
+        return True
 
 def get_image_textures( mat ):
     r = []
     for s in mat.texture_slots:
-        if s and s.texture.type == 'IMAGE': r.append( s )
+        if s and s.texture.type == 'IMAGE':
+            r.append( s )
     return r
 
-
 def indent( level, *args ):
-    if not args: return '\t' * level
+    if not args:
+        return '\t' * level
     else:
         a = ''
         for line in args:
@@ -879,29 +949,35 @@ def gather_instances():
     instances = {}
     for ob in bpy.context.scene.objects:
         if ob.data and ob.data.users > 1:
-            if ob.data not in instances: instances[ ob.data ] = []
+            if ob.data not in instances:
+                instances[ ob.data ] = []
             instances[ ob.data ].append( ob )
     return instances
 
 def select_instances( context, name ):
-    for ob in bpy.context.scene.objects: ob.select = False
+    for ob in bpy.context.scene.objects:
+        ob.select = False
     ob = bpy.context.scene.objects[ name ]
     if ob.data:
         inst = gather_instances()
         for ob in inst[ ob.data ]: ob.select = True
         bpy.context.scene.objects.active = ob
 
-
 def select_group( context, name, options={} ):
-    for ob in bpy.context.scene.objects: ob.select = False
+    for ob in bpy.context.scene.objects:
+        ob.select = False
     for grp in bpy.data.groups:
         if grp.name == name:
-            #context.scene.objects.active = grp.objects
-            #Note that the context is read-only. These values cannot be modified directly, though they may be changed by running API functions or by using the data API. So bpy.context.object = obj will raise an error. But bpy.context.scene.objects.active = obj will work as expected. - http://wiki.blender.org/index.php?title=Dev:2.5/Py/API/Intro&useskin=monobook
+            # context.scene.objects.active = grp.objects
+            # Note that the context is read-only. These values cannot be modified directly,
+            # though they may be changed by running API functions or by using the data API.
+            # So bpy.context.object = obj will raise an error. But bpy.context.scene.objects.active = obj
+            # will work as expected. - http://wiki.blender.org/index.php?title=Dev:2.5/Py/API/Intro&useskin=monobook
             bpy.context.scene.objects.active = grp.objects[0]
-            for ob in grp.objects: ob.select = True
-        else: pass
-
+            for ob in grp.objects:
+                ob.select = True
+        else:
+            pass
 
 def get_objects_using_materials( mats ):
     obs = []
@@ -909,7 +985,8 @@ def get_objects_using_materials( mats ):
         if ob.type == 'MESH':
             for mat in ob.data.materials:
                 if mat in mats:
-                    if ob not in obs: obs.append( ob )
+                    if ob not in obs:
+                        obs.append( ob )
                     break
     return obs
 
@@ -918,9 +995,9 @@ def get_materials_using_image( img ):
     for mat in bpy.data.materials:
         for slot in get_image_textures( mat ):
             if slot.texture.image == img:
-                if mat not in mats: mats.append( mat )
+                if mat not in mats:
+                    mats.append( mat )
     return mats
-
 
 def get_parent_matrix( ob, objects ):
     if not ob.parent:
@@ -931,7 +1008,6 @@ def get_parent_matrix( ob, objects ):
         else:
             return get_parent_matrix(ob.parent, objects)
 
-
 def merge_group( group ):
     print('--------------- merge group ->', group )
     copies = []
@@ -939,9 +1015,10 @@ def merge_group( group ):
         if ob.type == 'MESH':
             print( '\t group member', ob.name )
             o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
-            while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
-            bpy.context.scene.objects.link( o2 )#; o2.select = True
+            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
+            while o2.modifiers:
+                o2.modifiers.remove( o2.modifiers[0] )
+            bpy.context.scene.objects.link( o2 ) #; o2.select = True
     merged = merge( copies )
     merged.name = group.name
     merged.data.name = group.name
@@ -954,19 +1031,21 @@ def merge_objects( objects, name='_temp_', transform=None ):
         ob.select = False
         if ob.type == 'MESH':
             o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe modifiers
-            while o2.modifiers: o2.modifiers.remove( o2.modifiers[0] )
-            if transform: o2.matrix_world =  transform * o2.matrix_local
-            bpy.context.scene.objects.link( o2 )#; o2.select = True
+            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
+            while o2.modifiers:
+                o2.modifiers.remove( o2.modifiers[0] )
+            if transform:
+                o2.matrix_world =  transform * o2.matrix_local
+            bpy.context.scene.objects.link( o2 ) #; o2.select = True
     merged = merge( copies )
     merged.name = name
     merged.data.name = name
     return merged
 
-
 def merge( objects ):
     print('MERGE', objects)
-    for ob in bpy.context.selected_objects: ob.select = False
+    for ob in bpy.context.selected_objects:
+        ob.select = False
     for ob in objects:
         print('\t'+ob.name)
         ob.select = True
@@ -988,52 +1067,53 @@ def get_merge_group( ob, prefix='merge' ):
         print('WARNING: an object can not be in two merge groups at the same time', ob)
         return
 
-
 def wordwrap( txt ):
     r = ['']
-    for word in txt.split(' '):    # do not split on tabs
+    for word in txt.split(' '): # do not split on tabs
         word = word.replace('\t', ' '*3)
         r[-1] += word + ' '
-        if len(r[-1]) > 90: r.append( '' )
+        if len(r[-1]) > 90:
+            r.append( '' )
     return r
 
+## RPython xml dom
 
-###### RPython xml dom ######
 class RElement(object):
-	def appendChild( self, child ): self.childNodes.append( child )
-	def setAttribute( self, name, value ): self.attributes[name]=value
+    def appendChild( self, child ):
+        self.childNodes.append( child )
 
-	def __init__(self, tag):
-		self.tagName = tag
-		self.childNodes = []
-		self.attributes = {}
+    def setAttribute( self, name, value ):
+        self.attributes[name]=value
 
-	def toprettyxml(self, lines, indent ):
-		s = '<%s ' %self.tagName
-		for name in self.attributes:
-			value = self.attributes[name]
-			s += '%s="%s" ' %(name,value)
-		if not self.childNodes:
-			s += '/>'; lines.append( ('\t'*indent)+s )
-		else:
-			s += '>'; lines.append( ('\t'*indent)+s )
-			indent += 1
-			for child in self.childNodes:
-				child.toprettyxml( lines, indent )
-			indent -= 1
-			lines.append( ('\t'*indent)+'</%s>' %self.tagName )
+    def __init__(self, tag):
+        self.tagName = tag
+        self.childNodes = []
+        self.attributes = {}
 
+    def toprettyxml(self, lines, indent ):
+        s = '<%s ' %self.tagName
+        for name in self.attributes:
+            value = self.attributes[name]
+            s += '%s="%s" ' %(name,value)
+        if not self.childNodes:
+            s += '/>'; lines.append( ('\t'*indent)+s )
+        else:
+            s += '>'; lines.append( ('\t'*indent)+s )
+            indent += 1
+            for child in self.childNodes:
+                child.toprettyxml( lines, indent )
+            indent -= 1
+            lines.append( ('\t'*indent)+'</%s>' %self.tagName )
 
 class RDocument(object):
-	def __init__(self): self.documentElement = None
-	def appendChild(self,root): self.documentElement = root
-	def createElement(self,tag): e = RElement(tag); e.document = self; return e
-	def toprettyxml(self):
-		indent = 0
-		lines = []
-		self.documentElement.toprettyxml( lines, indent )
-		return '\n'.join( lines )
-
+    def __init__(self): self.documentElement = None
+    def appendChild(self,root): self.documentElement = root
+    def createElement(self,tag): e = RElement(tag); e.document = self; return e
+    def toprettyxml(self):
+        indent = 0
+        lines = []
+        self.documentElement.toprettyxml( lines, indent )
+        return '\n'.join( lines )
 
 class SimpleSaxWriter():
     def __init__(self, output, encoding, top_level_tag, attrs):
@@ -1067,11 +1147,15 @@ class SimpleSaxWriter():
         self._xml_writer.endElement(self.top_level_tag)
         self._xml_writer.endDocument()
 
+## Report Hack
 
-############## Report Hack ############
 class ReportSingleton(object):
-    def show(self): bpy.ops.wm.call_menu( name='MiniReport' )
-    def __init__(self): self.reset()
+    def __init__(self):
+        self.reset()
+
+    def show(self):
+        bpy.ops.wm.call_menu( name='MiniReport' )
+
     def reset(self):
         self.materials = []
         self.meshes = []
@@ -1110,7 +1194,6 @@ class ReportSingleton(object):
             r.append( '  PATHS:' )
             for a in self.paths: r.append( '    . %s' %a )
 
-
         if self.vertices:
             r.append( '  Original Vertices: %s' %self.orig_vertices)
             r.append( '  Exported Vertices: %s' %self.vertices )
@@ -1137,7 +1220,6 @@ class ReportSingleton(object):
 
 Report = ReportSingleton()
 
-
 class MiniReport(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
     def draw(self, context):
@@ -1146,15 +1228,15 @@ class MiniReport(bpy.types.Menu):
         for line in txt.splitlines():
             layout.label(text=line)
 
-
-######################
+## RPython xml dom ends
 
 def _get_proxy_decimate_mod( ob ):
     proxy = None
     for child in ob.children:
         if child.subcollision and child.name.startswith('DECIMATED'):
             for mod in child.modifiers:
-                if mod.type == 'DECIMATE': return mod
+                if mod.type == 'DECIMATE':
+                    return mod
 
 def bake_terrain( ob, normalize=True ):
     assert ob.collision_mode == 'TERRAIN'
@@ -1177,20 +1259,23 @@ def bake_terrain( ob, normalize=True ):
         row = []
         for y in range( ob.collision_terrain_y_steps ):
             v = data.vertices[ i ]
-            if normalize: z = (v.co.z - Zmin) * m
-            else: z = v.co.z
+            if normalize:
+                z = (v.co.z - Zmin) * m
+            else:
+                z = v.co.z
             row.append( z )
             i += 1
-        if x%2: row.reverse()   # blender grid prim zig-zags
+        if x%2:
+            row.reverse() # blender grid prim zig-zags
         rows.append( row )
-
     return {'data':rows, 'min':Zmin, 'max':Zmax, 'depth':depth}
 
-def save_terrain_as_NTF( path, ob ):    # Tundra format - hardcoded 16x16 patch format
+def save_terrain_as_NTF( path, ob ): # Tundra format - hardcoded 16x16 patch format
     info = bake_terrain( ob )
     url = os.path.join( path, '%s.ntf'%ob.data.name )
     f = open(url, "wb")
-    buf = array.array("I")  # header
+    # Header
+    buf = array.array("I")
     xs = ob.collision_terrain_x_steps
     ys = ob.collision_terrain_y_steps
     xpatches = int(xs/16)
@@ -1198,7 +1283,7 @@ def save_terrain_as_NTF( path, ob ):    # Tundra format - hardcoded 16x16 patch 
     header = [ xpatches, ypatches ]
     buf.fromlist( header )
     buf.tofile(f)
-    ########## body ###########
+    # Body
     rows = info['data']
     for x in range( xpatches ):
         for y in range( ypatches ):
@@ -1219,18 +1304,17 @@ def save_terrain_as_NTF( path, ob ):    # Tundra format - hardcoded 16x16 patch 
     }
     return R
 
-
 class OgreCollisionOp(bpy.types.Operator):
-    '''ogre collision'''  
-    bl_idname = "ogre.set_collision"  
+    '''Ogre Collision'''
+    bl_idname = "ogre.set_collision"
     bl_label = "modify collision"
     bl_options = {'REGISTER'}
-
     MODE = StringProperty(name="toggle mode", maxlen=32, default="disable")
 
     @classmethod
     def poll(cls, context):
-        if context.active_object and context.active_object.type == 'MESH': return True
+        if context.active_object and context.active_object.type == 'MESH':
+            return True
 
     def get_subcollisions( self, ob, create=True ):
         r = get_subcollisions( ob )
@@ -1263,8 +1347,8 @@ class OgreCollisionOp(bpy.types.Operator):
         #################################
         #pos = ob.matrix_world.to_translation()
         bpy.ops.mesh.primitive_grid_add(
-            x_subdivisions=x, 
-            y_subdivisions=y, 
+            x_subdivisions=x,
+            y_subdivisions=y,
             size=1.0 )      #, location=pos )
         grid = bpy.context.active_object
         assert grid.name.startswith('Grid')
@@ -1295,12 +1379,11 @@ class OgreCollisionOp(bpy.types.Operator):
         mod.cull_face = 'FRONT'
         return grid
 
-
     def invoke(self, context, event):
         ob = context.active_object
         game = ob.game
-
         subtype = None
+
         if ':' in self.MODE:
             mode, subtype = self.MODE.split(':')
             ##BLENDERBUG##ob.game.collision_bounds_type = subtype   # BUG this can not come before
@@ -1313,38 +1396,37 @@ class OgreCollisionOp(bpy.types.Operator):
             mode = self.MODE
         ob.collision_mode = mode
 
-        if ob.data.show_all_edges: ob.data.show_all_edges = False
-        if ob.show_texture_space: ob.show_texture_space = False
-        if ob.show_bounds: ob.show_bounds = False
-        if ob.show_wire: ob.show_wire = False
+        if ob.data.show_all_edges:
+            ob.data.show_all_edges = False
+        if ob.show_texture_space:
+            ob.show_texture_space = False
+        if ob.show_bounds:
+            ob.show_bounds = False
+        if ob.show_wire:
+            ob.show_wire = False
         for child in ob.children:
-            if child.subcollision and not child.hide: child.hide = True
-
+            if child.subcollision and not child.hide:
+                child.hide = True
 
         if mode == 'NONE':
             game.use_ghost = True
             game.use_collision_bounds = False
-
         elif mode == 'PRIMITIVE':
             game.use_ghost = False
             game.use_collision_bounds = True
             ob.show_bounds = True
-
         elif mode == 'MESH':
             game.use_ghost = False
             game.use_collision_bounds = True
             ob.show_wire = True
-
             if game.collision_bounds_type == 'CONVEX_HULL':
                 ob.show_texture_space = True
             else:
                 ob.data.show_all_edges = True
-
         elif mode == 'DECIMATED':
             game.use_ghost = True
             game.use_collision_bounds = False
             game.use_collision_compound = True
-
             proxy = self.get_subcollisions(ob)[0]
             if proxy.hide: proxy.hide = False
             ob.game.use_collision_compound = True  # proxy
@@ -1354,46 +1436,46 @@ class OgreCollisionOp(bpy.types.Operator):
                 proxy.hide_select = False
                 proxy.select = True
                 proxy.hide_select = True
-
             if game.collision_bounds_type == 'CONVEX_HULL':
                 ob.show_texture_space = True
-
-
         elif mode == 'TERRAIN':
             game.use_ghost = True
             game.use_collision_bounds = False
             game.use_collision_compound = True
-
             proxy = self.get_subcollisions(ob)[0]
-            if proxy.hide: proxy.hide = False
-
-
+            if proxy.hide:
+                proxy.hide = False
         elif mode == 'COMPOUND':
             game.use_ghost = True
             game.use_collision_bounds = False
             game.use_collision_compound = True
-
-        else: assert 0    # unknown mode
+        else:
+            assert 0 # unknown mode
 
         return {'FINISHED'}
 
-################################
+# UI panels
+
 @UI
 class PANEL_Physics(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_label = "Physics"
+
     @classmethod
     def poll(cls, context):
-        if context.active_object: return True
-        else: return False
+        if context.active_object:
+            return True
+        else:
+            return False
 
     def draw(self, context):
         layout = self.layout
         ob = context.active_object
         game = ob.game
 
-        if ob.type != 'MESH': return
+        if ob.type != 'MESH':
+            return
         elif ob.subcollision == True:
             box = layout.box()
             if ob.parent:
@@ -1402,7 +1484,6 @@ class PANEL_Physics(bpy.types.Panel):
                 box.label(text='WARNING: collision proxy missing parent')
             return
 
-        #####################
         box = layout.box()
         box.prop(ob, 'physics_mode')
         if ob.physics_mode != 'NONE':
@@ -1418,24 +1499,26 @@ class PANEL_Physics(bpy.types.Panel):
             box.prop(game, "velocity_min", text="Minimum")
             box.prop(game, "velocity_max", text="Maximum")
 
-
-################################
 @UI
 class PANEL_Collision(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_label = "Collision"
+
     @classmethod
     def poll(cls, context):
-        if context.active_object: return True
-        else: return False
+        if context.active_object:
+            return True
+        else:
+            return False
 
     def draw(self, context):
         layout = self.layout
         ob = context.active_object
         game = ob.game
 
-        if ob.type != 'MESH': return
+        if ob.type != 'MESH':
+            return
         elif ob.subcollision == True:
             box = layout.box()
             if ob.parent:
@@ -1444,13 +1527,11 @@ class PANEL_Collision(bpy.types.Panel):
                 box.label(text='WARNING: collision proxy missing parent')
             return
 
-        #####################
         mode = ob.collision_mode
         if mode == 'NONE':
             box = layout.box()
             op = box.operator( 'ogre.set_collision', text='Enable Collision', icon='PHYSICS' )
             op.MODE = 'PRIMITIVE:%s' %game.collision_bounds_type
-
         else:
             prim = game.collision_bounds_type
 
@@ -1459,10 +1540,12 @@ class PANEL_Collision(bpy.types.Panel):
             op.MODE = 'NONE'
             box.prop(game, "collision_margin", text="Collision Margin", slider=True)
 
-
             box = layout.box()
-            if mode == 'PRIMITIVE': box.label(text='Primitive: %s' %prim)
-            else: box.label(text='Primitive')
+            if mode == 'PRIMITIVE':
+                box.label(text='Primitive: %s' %prim)
+            else:
+                box.label(text='Primitive')
+
             row = box.row()
             _icons = {
                 'BOX':'MESH_CUBE', 'SPHERE':'MESH_UVSPHERE', 'CYLINDER':'MESH_CYLINDER',
@@ -1497,7 +1580,6 @@ class PANEL_Collision(bpy.types.Panel):
                 assert mod  # decimate modifier is missing
                 row.label(text='Faces: %s' %mod.face_count )
                 box.prop( mod, 'ratio', text='' )
-
             else:
                 box.label(text='Decimate')
                 row = box.row()
@@ -1520,14 +1602,12 @@ class PANEL_Collision(bpy.types.Panel):
                     op.MODE = 'TERRAIN'
                 else:
                     box.label(text='Terrain:')
-
                 row = box.row()
                 row.prop( ob, 'collision_terrain_x_steps', 'X' )
                 row.prop( ob, 'collision_terrain_y_steps', 'Y' )
                 #box.prop( terrain.modifiers[0], 'offset' ) # gets normalized away
                 box.prop( terrain.modifiers[0], 'cull_face', text='Cull' )
                 box.prop( terrain, 'location' )     # TODO hide X and Y
-
             else:
                 op = box.operator( 'ogre.set_collision', text='Terrain Collision', icon='MESH_GRID' )
                 op.MODE = 'TERRAIN'
@@ -1545,15 +1625,15 @@ class PANEL_Configure(bpy.types.Panel):
     bl_region_type = 'WINDOW'
     bl_context = "scene"
     bl_label = "Ogre Configuration File"
+
     def draw(self, context):
         layout = self.layout
         op = layout.operator( 'ogre.save_config', text='update config file', icon='FILE' )
         for tag in _CONFIG_TAGS_:
             layout.prop( context.window_manager, tag )
 
+## Game Logic Documentation
 
-
-##################################################################
 _game_logic_intro_doc_ = '''
 Hijacking the BGE
 
@@ -1563,7 +1643,6 @@ The OgreDocScene format can easily be extened to include extra game logic data. 
 
 The rules for which Sensors trigger which Actuators is left undefined, as explained above we are hijacking the BGE interface not trying to export and reimplement everything.  BGE Controllers and all links are ignored by the exporter, so whats the best way to define Sensor/Actuator relationships?  One convention that seems logical is to group Sensors and Actuators by name.  More complex syntax could be used in Sensor/Actuators names, or they could be completely ignored and instead all the mapping is done by the game programmer using other rules.  This issue is not easily solved so designers and the engine programmers will have to decide upon their own conventions, there is no one size fits all solution.
 '''
-
 
 _ogre_logic_types_doc_ = '''
 Supported Sensors:
@@ -1586,18 +1665,16 @@ Supported Actuators:
 
 *note: Shape Action
 The most common thing a designer will want to do is have an event trigger an animation.  The BGE contains an Actuator called "Shape Action", with useful properties like: start/end frame, and blending.  It also contains a property called "Action" but this is hidden because the exporter ignores action names and instead uses the names of NLA strips when exporting Ogre animation tracks.  The current workaround is to hijack the "Frame Property" attribute and change its name to "animation".  The designer can then simply type the name of the animation track (NLA strip).  Any custom syntax could actually be implemented here for calling animations, its up to the engine programmer to define how this field will be used.  For example: "*.explode" could be implemented to mean "on all objects" play the "explode" animation.
-
 '''
 
 class _WrapLogic(object):
-    ## custom name hacks ##
-    SwapName = {
-        'frame_property' : 'animation',
-    }
+    SwapName = { 'frame_property' : 'animation' } # custom name hacks
+
     def __init__(self, node):
         self.node = node
         self.name = node.name
         self.type = node.type
+
     def widget(self, layout):
         box = layout.box()
         row = box.row()
@@ -1615,7 +1692,6 @@ class _WrapLogic(object):
         g = doc.createElement( self.LogicType )
         g.setAttribute('name', self.name)
         g.setAttribute('type', self.type)
-
         if self.type in self.TYPES:
             for name in self.TYPES[ self.type ]:
                 attr = getattr( self.node, name )
@@ -1634,7 +1710,6 @@ class _WrapLogic(object):
                     a.setAttribute('value', '%s %s %s' %(attr.x, attr.y, attr.z))
                 else:
                     print('ERROR: unknown type', attr)
-
         return g
 
 class WrapSensor( _WrapLogic ):
@@ -1652,7 +1727,7 @@ class WrapActuator( _WrapLogic ):
     LogicType = 'actuator'
     TYPES = {
         'CAMERA'  :  ['object', 'height', 'min', 'max', 'axis'],
-        'CONSTRAINT'  :  ['mode', 'limit', 'limit_min', 'limit_max', 'damping'], 
+        'CONSTRAINT'  :  ['mode', 'limit', 'limit_min', 'limit_max', 'damping'],
         'MESSAGE' : ['to_property', 'subject', 'body_message'],        #skipping body_type
         'OBJECT'  :  'damping derivate_coefficient force force_max_x force_max_y force_max_z force_min_x force_min_y force_min_z integral_coefficient linear_velocity mode offset_location offset_rotation proportional_coefficient reference_object torque use_local_location use_local_rotation use_local_torque use_servo_limit_x use_servo_limit_y use_servo_limit_z'.split(),
         'SOUND'  :  'cone_inner_angle_3d cone_outer_angle_3d cone_outer_gain_3d distance_3d_max distance_3d_reference gain_3d_max gain_3d_min mode pitch rolloff_factor_3d sound use_sound_3d volume'.split(),        # note .sound contains .filepath
@@ -1660,8 +1735,6 @@ class WrapActuator( _WrapLogic ):
         'SHAPE_ACTION'  :  'frame_blend_in frame_end frame_property frame_start mode property use_continue_last_frame'.split(),
         'EDIT_OBJECT'  :  'dynamic_operation linear_velocity mass mesh mode object time track_object use_3d_tracking use_local_angular_velocity use_local_linear_velocity use_replace_display_mesh use_replace_physics_mesh'.split(),
     }
-
-
 
 class _OgreMatPass( object ):
     bl_space_type = 'PROPERTIES'
@@ -1674,9 +1747,12 @@ class _OgreMatPass( object ):
             return True
 
     def draw(self, context):
-        if not hasattr(context, "material"): return
-        if not context.active_object: return
-        if not context.active_object.active_material: return
+        if not hasattr(context, "material"):
+            return
+        if not context.active_object:
+            return
+        if not context.active_object.active_material:
+            return
 
         mat = context.material
         ob = context.object
@@ -1693,20 +1769,18 @@ class _OgreMatPass( object ):
             if not node.material:
                 op = split.operator( 'ogre.helper_create_attach_material_layer', icon="PLUS", text='' )
                 op.INDEX = self.INDEX
-
             if node.material and node.material.use_in_ogre_material_pass:
                 dbb = db.box()
                 ogre_material_panel( dbb, node.material, parent=mat )
                 ogre_material_panel_extra( dbb, node.material )
 
-
-## operator ##
 class _create_new_material_layer_helper(bpy.types.Operator):
     '''helper to create new material layer'''
     bl_idname = "ogre.helper_create_attach_material_layer"
     bl_label = "creates and assigns new material to layer"
     bl_options = {'REGISTER'}
     INDEX = IntProperty(name="material layer index", description="index", default=0, min=0, max=8)
+
     @classmethod
     def poll(cls, context):
         if context.active_object and context.active_object.active_material and context.active_object.active_material.use_material_passes:
@@ -1721,6 +1795,7 @@ class _create_new_material_layer_helper(bpy.types.Operator):
         node.material.offset_z = (self.INDEX*2) + 2     # nudge each pass by 2
         return {'FINISHED'}
 
+# UI panels continues
 
 @UI
 class PANEL_properties_window_ogre_material( bpy.types.Panel ):
@@ -1765,14 +1840,13 @@ class MatPass7( _OgreMatPass, bpy.types.Panel ): INDEX = 6; bl_label = "Ogre Mat
 @UI
 class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
 
-
-
 @UI
 class PANEL_Textures(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "texture"
     bl_label = "Ogre Texture"
+
     @classmethod
     def poll(cls, context):
         if not hasattr(context, "texture_slot"):
@@ -1785,14 +1859,15 @@ class PANEL_Textures(bpy.types.Panel):
         layout = self.layout
         #idblock = context_tex_datablock(context)
         slot = context.texture_slot
-        if not slot or not slot.texture: return
+        if not slot or not slot.texture:
+            return
 
-
-        btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
+        btype = slot.blend_type  # todo: fix this hack if/when slots support pyRNA
         ex = False; texop = None
         if btype in TextureUnit.colour_op:
             if btype=='MIX' and slot.use_map_alpha and not slot.use_stencil:
-                if slot.diffuse_color_factor >= 1.0: texop = 'alpha_blend'
+                if slot.diffuse_color_factor >= 1.0:
+                    texop = 'alpha_blend'
                 else:
                     texop = TextureUnit.colour_op_ex[ btype ]
                     ex = True
@@ -1803,27 +1878,27 @@ class PANEL_Textures(bpy.types.Panel):
             else:
                 texop = TextureUnit.colour_op[ btype ]
         elif btype in TextureUnit.colour_op_ex:
-                texop = TextureUnit.colour_op_ex[ btype ]
+                texop = TextureUnit.colour_op_ex[ btype ] #todo: Is this a intendation bug?
                 ex = True
 
         box = layout.box()
         row = box.row()
         if texop:
-            if ex: row.prop(slot, "blend_type", text=texop, icon='NEW')
-            else: row.prop(slot, "blend_type", text=texop)
-
-        else: row.prop(slot, "blend_type", text='(invalid option)')
+            if ex:
+                row.prop(slot, "blend_type", text=texop, icon='NEW')
+            else:
+                row.prop(slot, "blend_type", text=texop)
+        else:
+            row.prop(slot, "blend_type", text='(invalid option)')
 
         if btype == 'MIX':
             row.prop(slot, "use_stencil", text="")
             row.prop(slot, "use_map_alpha", text="")
-
             if texop == 'blend_manual':
                 row = box.row()
                 row.label(text="Alpha:")
                 row.prop(slot, "diffuse_color_factor", text="")
 
-        ###########################
         if hasattr(slot.texture, 'image') and slot.texture.image:
             row = box.row()
             n = '(invalid option)'
@@ -1845,7 +1920,7 @@ class PANEL_Textures(bpy.types.Panel):
         else:
             row.prop(slot, "texture_coords", text="(invalid mapping option)")
 
-        ########### animation and offset options ############
+        # Animation and offset options
         split = layout.row()
         box = split.box()
         box.prop(slot, "offset", text="XY=offset,  Z=rotation")
@@ -1855,7 +1930,8 @@ class PANEL_Textures(bpy.types.Panel):
         box = layout.box()
         row = box.row()
         row.label(text='scrolling animation')
-        #cant use if its enabled by default row.prop(slot, "use_map_density", text="")
+
+        # Can't use if its enabled by default row.prop(slot, "use_map_density", text="")
         row.prop(slot, "use_map_scatter", text="")
         row = box.row()
         row.prop(slot, "density_factor", text="X")
@@ -1867,11 +1943,10 @@ class PANEL_Textures(bpy.types.Panel):
         row.prop(slot, "emission_color_factor", text="")
         row.prop(slot, "use_from_dupli", text="")
 
-        ############# image magick #############
+        ## Image magick
         if hasattr(slot.texture, 'image') and slot.texture.image:
             img = slot.texture.image
             box = layout.box()
-
             row = box.row()
             row.prop( img, 'use_convert_format' )
             if img.use_convert_format:
@@ -1894,17 +1969,8 @@ class PANEL_Textures(bpy.types.Panel):
                     row.prop( img, 'resize_x' )
                     row.prop( img, 'resize_y' )
 
-###################
+## OgreMeshy
 
-
-
-
-
-
-
-
-########################################
-############### OgreMeshy ##############
 class OgreMeshyPreviewOp(bpy.types.Operator):
     '''helper to open ogremeshy'''
     bl_idname = 'ogremeshy.preview'
@@ -1913,11 +1979,14 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
     preview = BoolProperty(name="preview", description="fast preview", default=True)
     groups = BoolProperty(name="preview merge groups", description="use merge groups", default=False)
     mesh = BoolProperty(name="update mesh", description="update mesh (disable for fast material preview", default=True)
+
     @classmethod
     def poll(cls, context):
         if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
-            if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
-            else: return True
+            if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP':
+                return False
+            else:
+                return True
 
     def execute(self, context):
         Report.reset()
@@ -1933,9 +2002,10 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
         mat = None
         mgroup = merged = None
         umaterials = []
-        
-        if context.active_object.type == 'MESH': mat = context.active_object.active_material
-        elif context.active_object.type == 'EMPTY':     # assume group
+
+        if context.active_object.type == 'MESH':
+            mat = context.active_object.active_material
+        elif context.active_object.type == 'EMPTY': # assume group
             obs = []
             for e in context.selected_objects:
                 if e.type != 'EMPTY' and e.dupli_group: continue
@@ -1951,7 +2021,6 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
                 umaterials = dot_mesh( merged, path=path, force_name='preview' )
                 for o in obs: context.scene.objects.unlink(o)
 
-        
         if not self.mesh:
             for ob in context.selected_objects:
                 if ob.type == 'MESH':
@@ -2008,9 +2077,7 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
         Report.show()
         return {'FINISHED'}
 
-
-
-#############################
+## Ogre Documentation to UI
 
 _OGRE_DOCS_ = []
 def ogredoc( cls ):
@@ -2019,9 +2086,9 @@ def ogredoc( cls ):
     _OGRE_DOCS_.append( cls )
     return cls
 
-############ USED BY DOCS ##########
 class INFO_MT_ogre_helper(bpy.types.Menu):
     bl_label = '_overloaded_'
+
     def draw(self, context):
         layout = self.layout
         #row = self.layout.box().split(percentage=0.05)
@@ -2035,9 +2102,9 @@ class INFO_MT_ogre_helper(bpy.types.Menu):
                 for ww in wordwrap( line ): layout.label(text=ww)
         layout.separator()
 
-
 class INFO_MT_ogre_docs(bpy.types.Menu):
     bl_label = "Ogre Help"
+
     def draw(self, context):
         layout = self.layout
         for cls in _OGRE_DOCS_:
@@ -2048,6 +2115,7 @@ class INFO_MT_ogre_docs(bpy.types.Menu):
 
 class INFO_MT_ogre_shader_pass_attributes(bpy.types.Menu):
     bl_label = "Shader-Pass"
+
     def draw(self, context):
         layout = self.layout
         for cls in _OGRE_SHADER_REF_:
@@ -2055,11 +2123,11 @@ class INFO_MT_ogre_shader_pass_attributes(bpy.types.Menu):
 
 class INFO_MT_ogre_shader_texture_attributes(bpy.types.Menu):
     bl_label = "Shader-Texture"
+
     def draw(self, context):
         layout = self.layout
         for cls in _OGRE_SHADER_REF_TEX_:
             layout.menu( cls.__name__ )
-
 
 @ogredoc
 class _ogredoc_Installing( INFO_MT_ogre_helper ):
@@ -2068,7 +2136,6 @@ class _ogredoc_Installing( INFO_MT_ogre_helper ):
 @ogredoc
 class _ogredoc_FAQ( INFO_MT_ogre_helper ):
     mydoc = _faq_
-
 
 @ogredoc
 class _ogredoc_Animation_System( INFO_MT_ogre_helper ):
@@ -2095,7 +2162,6 @@ Armature Animation System | OgreDotSkeleton
         ( you may use multiple NLA tracks, multiple strips per-track is ok, and strips may overlap in time )
 
 '''
-
 
 @ogredoc
 class _ogredoc_Physics( INFO_MT_ogre_helper ):
@@ -2136,9 +2202,7 @@ Tundra Streaming:
     . animation playback is broken if you rename your NLA strips after opening Tundra
 '''
 
-
-
-############ Ogre v.17 Doc ######
+# Ogre v1.7 Doc
 
 def _mesh_entity_helper( doc, ob, o ):
     ## extended format - BGE Physics ##
@@ -2149,28 +2213,23 @@ def _mesh_entity_helper( doc, ob, o ):
     o.setAttribute('ghost', str(ob.game.use_ghost))
     o.setAttribute('velocity_min', str(ob.game.velocity_min))
     o.setAttribute('velocity_max', str(ob.game.velocity_max))
-
     o.setAttribute('lock_trans_x', str(ob.game.lock_location_x))
     o.setAttribute('lock_trans_y', str(ob.game.lock_location_y))
     o.setAttribute('lock_trans_z', str(ob.game.lock_location_z))
-
     o.setAttribute('lock_rot_x', str(ob.game.lock_rotation_x))
     o.setAttribute('lock_rot_y', str(ob.game.lock_rotation_y))
     o.setAttribute('lock_rot_z', str(ob.game.lock_rotation_z))
-
     o.setAttribute('anisotropic_friction', str(ob.game.use_anisotropic_friction))
     x,y,z = ob.game.friction_coefficients
     o.setAttribute('friction_x', str(x))
     o.setAttribute('friction_y', str(y))
     o.setAttribute('friction_z', str(z))
-
     o.setAttribute('damping_trans', str(ob.game.damping))
     o.setAttribute('damping_rot', str(ob.game.rotation_damping))
-
     o.setAttribute('inertia_tensor', str(ob.game.form_factor))
 
     mesh = ob.data
-    ## custom user props ##
+    # custom user props
     for prop in mesh.items():
         propname, propvalue = prop
         if not propname.startswith('_'):
@@ -2179,7 +2238,6 @@ def _mesh_entity_helper( doc, ob, o ):
             user.setAttribute( 'name', propname )
             user.setAttribute( 'value', str(propvalue) )
             user.setAttribute( 'type', type(propvalue).__name__ )
-
 
 #class _type(bpy.types.IDPropertyGroup):
 #    name = StringProperty(name="jpeg format", description="", maxlen=64, default="")
@@ -2192,26 +2250,24 @@ def get_lights_by_type( T ):
     return r
 
 class _TXML_(object):
-
     '''
-  <component type="EC_Script" sync="1" name="myscript">
-   <attribute value="" name="Script ref"/>
-   <attribute value="false" name="Run on load"/>
-   <attribute value="0" name="Run mode"/>
-   <attribute value="" name="Script application name"/>
-   <attribute value="" name="Script class name"/>
-  </component>
+    <component type="EC_Script" sync="1" name="myscript">
+        <attribute value="" name="Script ref"/>
+        <attribute value="false" name="Run on load"/>
+        <attribute value="0" name="Run mode"/>
+        <attribute value="" name="Script application name"/>
+        <attribute value="" name="Script class name"/>
+    </component>
     '''
-
 
     def create_tundra_document( self, context ):
-        proto = 'local://'      # antont says file:// is also valid
-
+        proto = 'local://'
         doc = RDocument()
         scn = doc.createElement('scene')
         doc.appendChild( scn )
 
-        if 0:       # Tundra bug
+        # EC_Script
+        if 0: # todo: tundra bug (what does this mean?)
             e = doc.createElement( 'entity' )
             doc.documentElement.appendChild( e )
             e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
@@ -2224,7 +2280,7 @@ class _TXML_(object):
             a = doc.createElement('attribute'); c.appendChild( a )
             a.setAttribute('name', 'Script ref')
             #a.setAttribute('value', "%s%s"%(proto,TUNDRA_GEN_SCRIPT_PATH) )
-            
+
             a = doc.createElement('attribute'); c.appendChild( a )
             a.setAttribute('name', 'Run on load')
             a.setAttribute('value', 'true' )
@@ -2237,20 +2293,25 @@ class _TXML_(object):
             a.setAttribute('name', 'Script application name')
             a.setAttribute('value', 'blender2ogre' )
 
-
-        ############### environment ################
+        # Check lighting settings
         sun = hemi = None
-        if get_lights_by_type('SUN'): sun = get_lights_by_type('SUN')[0]
-        if get_lights_by_type('HEMI'): hemi = get_lights_by_type('HEMI')[0]
+        if get_lights_by_type('SUN'):
+            sun = get_lights_by_type('SUN')[0]
+        if get_lights_by_type('HEMI'):
+            hemi = get_lights_by_type('HEMI')[0]
+
+        # Environment
         if bpy.context.scene.world.mist_settings.use_mist or sun or hemi:
+            # Entity for environment components
             e = doc.createElement( 'entity' )
             doc.documentElement.appendChild( e )
             e.setAttribute('id', len(doc.documentElement.childNodes)+1 )
 
+            # EC_Fog
             c = doc.createElement( 'component' ); e.appendChild( c )
             c.setAttribute( 'type', 'EC_Fog' )
             c.setAttribute( 'sync', '1' )
-            c.setAttribute( 'name', 'blender-environment-fog' )
+            c.setAttribute( 'name', 'Fog' )
 
             a = doc.createElement('attribute'); c.appendChild( a )
             a.setAttribute('name', 'Color')
@@ -2276,12 +2337,11 @@ class _TXML_(object):
             a.setAttribute('name', 'Exponential density')
             a.setAttribute('value', 0.001)
 
-            ##############################################
+            # EC_EnvironmentLight
             c = doc.createElement( 'component' ); e.appendChild( c )
             c.setAttribute( 'type', 'EC_EnvironmentLight' )
             c.setAttribute( 'sync', '1' )
-            c.setAttribute( 'name', 'blender-environment-light' )
-
+            c.setAttribute( 'name', 'Environment Light' )
 
             a = doc.createElement('attribute'); c.appendChild( a )
             a.setAttribute('name', 'Sunlight color')
@@ -2292,9 +2352,9 @@ class _TXML_(object):
                 a.setAttribute('value', '0 0 0 1')
 
             a = doc.createElement('attribute'); c.appendChild( a )
-            a.setAttribute('name', 'Brightness')    # brightness of sunlight
+            a.setAttribute('name', 'Brightness') # brightness of sunlight
             if sun:
-                a.setAttribute('value', sun.data.energy*10)     # 10=magic
+                a.setAttribute('value', sun.data.energy*10) # 10=magic
             else:
                 a.setAttribute('value', '0')
 
@@ -2317,26 +2377,24 @@ class _TXML_(object):
             a.setAttribute('name', 'Sunlight cast shadows')
             a.setAttribute('value', 'true')
 
-
+        # EC_SkyX
         if context.scene.world.ogre_skyX:
-
-            ################# SKYX ################
             c = doc.createElement( 'component' ); e.appendChild( c )
             c.setAttribute( 'type', 'EC_SkyX' )
             c.setAttribute( 'sync', '1' )
-            c.setAttribute( 'name', 'myskyx' )
+            c.setAttribute( 'name', 'SkyX' )
 
             a = doc.createElement('attribute'); a.setAttribute('name', 'Weather (volumetric clouds only)')
             den = (
-                context.scene.world.ogre_skyX_cloud_density_x, 
+                context.scene.world.ogre_skyX_cloud_density_x,
                 context.scene.world.ogre_skyX_cloud_density_y
             )
             a.setAttribute('value', '%s %s' %den)
             c.appendChild( a )
 
             config = (
-                ('time', 'Time multiplier'), 
-                ('volumetric_clouds','Volumetric clouds'), 
+                ('time', 'Time multiplier'),
+                ('volumetric_clouds','Volumetric clouds'),
                 ('wind','Wind direction'),
             )
             for bname, aname in config:
@@ -2348,14 +2406,20 @@ class _TXML_(object):
 
         return doc
 
-    ########################################
+    # Creates new Tundra entity
     def tundra_entity( self, doc, ob, path='/tmp', collision_proxies=[], parent=None, matrix=None,visible=True ):
         assert not ob.subcollision
-        # txml has flat hierarchy
+
+        #  Tundra TRANSFORM
+        if not matrix:
+            matrix = ob.matrix_world.copy()
+
+        # Entity
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
         e.setAttribute('id', uid(ob) )
 
+        # EC_Name
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Name")
         c.setAttribute('sync', '1')
@@ -2366,10 +2430,7 @@ class _TXML_(object):
         a.setAttribute('name', "description" )
         a.setAttribute('value', "" )
 
-
-        ############ Tundra TRANSFORM ####################
-        if not matrix: matrix = ob.matrix_world.copy()
-
+        # EC_Placeable
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Placeable")
         c.setAttribute('sync', '1')
@@ -2379,22 +2440,30 @@ class _TXML_(object):
         loc = '%6f,%6f,%6f' %(x,y,z)
         x,y,z = swap(matrix.to_euler())
         x = math.degrees( x ); y = math.degrees( y ); z = math.degrees( z )
-        if ob.type == 'CAMERA': x -= 90
-        elif ob.type == 'LAMP': x += 90
+        if ob.type == 'CAMERA':
+            x -= 90
+        elif ob.type == 'LAMP':
+            x += 90
         rot = '%6f,%6f,%6f' %(x,y,z)
         x,y,z = swap(matrix.to_scale())
-        scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z))		# Tundra2 clamps any negative to zero
+        scl = '%6f,%6f,%6f' %(abs(x),abs(y),abs(z)) # Tundra2 clamps any negative to zero
         a.setAttribute('value', "%s,%s,%s" %(loc,rot,scl) )
 
+        # todo: We really should not set bouding box to show.
+        # It can be easily toggled in Tundra for visual debugging.
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Show bounding box" )
-        if ob.show_bounds or ob.type != 'MESH': a.setAttribute('value', "true" )
-        else: a.setAttribute('value', "false" )
+        if ob.show_bounds or ob.type != 'MESH':
+            a.setAttribute('value', "true" )
+        else:
+            a.setAttribute('value', "false" )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Visible" )
-        if visible: a.setAttribute('value', 'true') # overrides children's setting - not good!
-        else: a.setAttribute('value', 'false')
+        if visible:
+            a.setAttribute('value', 'true') # overrides children's setting - not good!
+        else:
+            a.setAttribute('value', 'false')
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Selection layer" )
@@ -2405,16 +2474,17 @@ class _TXML_(object):
             a.setAttribute('name', "Parent entity ref" )
             a.setAttribute('value', parent)
 
-
-        #<attribute value="1" name="Selection layer"/>
+        # todo: Tundra parenting to EC_Placeable
         #<attribute value="" name="Parent entity ref"/>
         #<attribute value="" name="Parent bone name"/>
 
+        # todo: Remove creating EC_TransformGizmos. It looks ugly
+        # and is unpractical. The artist will have to remove these by hand
+        # from the scene.
         if ob.type != 'MESH':
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_TransformGizmo')
             c.setAttribute('sync', '1')
-
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_Name')
             c.setAttribute('sync', '1')
@@ -2422,6 +2492,7 @@ class _TXML_(object):
             a.setAttribute('name', "name" )
             a.setAttribute('value', ob.name)
 
+        # EC_Sound: Supports wav and ogg
         if ob.type == 'SPEAKER':
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_Sound')
@@ -2450,75 +2521,82 @@ class _TXML_(object):
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Play on load' )
-            if ob.data.play_on_load: a.setAttribute('value', 'true')
-            else: a.setAttribute('value', 'false')
+            if ob.data.play_on_load:
+                a.setAttribute('value', 'true')
+            else:
+                a.setAttribute('value', 'false')
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Loop sound' )
-            if ob.data.loop: a.setAttribute('value', 'true')
-            else: a.setAttribute('value', 'false')
+            if ob.data.loop:
+                a.setAttribute('value', 'true')
+            else:
+                a.setAttribute('value', 'false')
 
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', 'Spatial' )
-            if ob.data.use_spatial: a.setAttribute('value', 'true')
-            else: a.setAttribute('value', 'false')
+            if ob.data.use_spatial:
+                a.setAttribute('value', 'true')
+            else:
+                a.setAttribute('value', 'false')
 
-
+        # EC_Camera
+        ''' todo: This is really not very helpful. Apps define
+            camera logic in Tundra. By default you will have
+            a freecamera to move around the scene etc. This created
+            camera wont be activated except if a script does so.
+            Best leave camera (creation) logic for the inworld apps.
+            At least remove the default "export cameras" for txml. '''
         if ob.type == 'CAMERA':
             c = doc.createElement('component'); e.appendChild( c )
             c.setAttribute('type', 'EC_Camera')
             c.setAttribute('sync', '1')
-
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Up vector" )
             a.setAttribute('value', '0.0 1.0 0.0')
-
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Near plane" )
             a.setAttribute('value', '0.01')
-
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Far plane" )
             a.setAttribute('value', '2000')
-
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Vertical FOV" )
             a.setAttribute('value', '45')
-
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Aspect ratio" )
             a.setAttribute('value', '')
 
-
-        ## any object can have physics ##
-        #if ob.game.physics_type == 'RIGID_BODY':
-        #if not ob.game.use_ghost and ob.game.physics_type in 'RIGID_BODY SENSOR'.split():
         NTF = None
 
+        # EC_Rigidbody
+        # Any object can have physics, although it needs
+        # EC_Placeable to have position etc.
         if ob.physics_mode != 'NONE' or ob.collision_mode != 'NONE':
             TundraTypes = {
                 'BOX' : 0,
                 'SPHERE' : 1,
                 'CYLINDER' : 2,
-                'CONE' : 0,    # tundra is missing
+                'CONE' : 0, # Missing in Tundra
                 'CAPSULE' : 3,
                 'TRIANGLE_MESH' : 4,
-                #'HEIGHT_FIELD': 5, #blender is missing
+                #'HEIGHT_FIELD': 5, # Missing in Blender
                 'CONVEX_HULL' : 6
             }
-
 
             com = doc.createElement('component'); e.appendChild( com )
             com.setAttribute('type', 'EC_RigidBody')
             com.setAttribute('sync', '1')
 
+            # Mass
+            # * Does not affect static collision types (TriMesh and ConvexHull)
+            # * You can have working collisions with mass 0
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Mass')
             if ob.physics_mode == 'RIGID_BODY':
                 a.setAttribute('value', ob.game.mass)
             else:
-                a.setAttribute('value', '0.0')  # disables physics in Tundra?
-
+                a.setAttribute('value', '0.0')
 
             SHAPE = a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Shape type')
@@ -2544,16 +2622,18 @@ class _TXML_(object):
                         proxy = child; break
                 if proxy:
                     a.setAttribute('value', 'local://_collision_%s.mesh' %proxy.data.name)
-                    if proxy not in collision_proxies: collision_proxies.append( proxy )
+                    if proxy not in collision_proxies:
+                        collision_proxies.append( proxy )
                 else:
                     print( 'WARN: collision proxy mesh not found' )
                     assert 0
-
             elif ob.collision_mode == 'TERRAIN':
                 NTF = save_terrain_as_NTF( path, ob )
-                SHAPE.setAttribute( 'value', '5' )  # HEIGHT_FIELD
-
+                SHAPE.setAttribute( 'value', '5' ) # HEIGHT_FIELD
             elif ob.type == 'MESH':
+                # todo: Remove this. There is no need to set mesh collision ref
+                # if TriMesh or ConvexHull is used, it will be auto picked from EC_Mesh
+                # in the same Entity.
                 a.setAttribute('value', 'local://%s.mesh' %ob.data.name)
 
             a = doc.createElement('attribute'); com.appendChild( a )
@@ -2573,7 +2653,6 @@ class _TXML_(object):
             a.setAttribute('name', 'Angular damping')
             a.setAttribute('value', ob.game.rotation_damping)
 
-
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Linear factor')
             a.setAttribute('value', '1.0 1.0 1.0')
@@ -2582,25 +2661,28 @@ class _TXML_(object):
             a.setAttribute('name', 'Angular factor')
             a.setAttribute('value', '1.0 1.0 1.0')
 
-
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Kinematic')
             a.setAttribute('value', 'false' )
 
+            # todo: Find out what Phantom actually means and if this
+            # needs to be set for NONE collision rigids. I don't actually
+            # see any reason to make EC_RigidBody if collision is NONE
             a = doc.createElement('attribute'); com.appendChild( a )
-            a.setAttribute('name', 'Phantom')        # this must mean no-collide
+            a.setAttribute('name', 'Phantom')
             if ob.collision_mode == 'NONE':
                 a.setAttribute('value', 'true' )
             else:
                 a.setAttribute('value', 'false' )
 
+            # todo: Remove this. We should not enabled drag debug,
+            # it can be toggled in Tundra easily for visual debugging.
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Draw Debug')
             if ob.collision_mode == 'NONE':
                 a.setAttribute('value', 'false' )
             else:
                 a.setAttribute('value', 'true' )
-
 
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Linear velocity')
@@ -2618,7 +2700,8 @@ class _TXML_(object):
             a.setAttribute('name', 'Collision Mask')
             a.setAttribute('value', -1)
 
-        if NTF:     # Terrain
+        # EC_Terrain
+        if NTF:
             xp = NTF['xpatches']
             yp = NTF['ypatches']
             depth = NTF['depth']
@@ -2666,15 +2749,19 @@ class _TXML_(object):
                 a.setAttribute('name', 'Texture %s' %i)
                 a.setAttribute('value', '')
 
+            # todo: Check that NTF['name'] is the actual valid asset ref
+            # and not the disk path.
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Heightmap')
             a.setAttribute('value', NTF['name'] )
 
-
+        # Enitity XML generation done, return the element.
         return e
 
-
+    # EC_Mesh
     def tundra_mesh( self, e, ob, url, exported_meshes ):
+        # todo: Fix bug that .mesh is never done if they dont exist on disk!
+        # It's probably around here somewhere...
         if self.EX_MESH:
             murl = os.path.join( os.path.split(url)[0], '%s.mesh'%ob.data.name )
             exists = os.path.isfile( murl )
@@ -2684,7 +2771,7 @@ class _TXML_(object):
                     self.dot_mesh( ob, os.path.split(url)[0] )
 
         doc = e.document
-        proto = 'local://'      # antont says file:// is also valid
+        proto = 'local://'
 
         if ob.find_armature():
             c = doc.createElement('component'); e.appendChild( c )
@@ -2701,19 +2788,21 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Mesh materials" )
+
         # Query object its materials and make a proper material ref string of it.
         # note: We assume blindly here that the 'submesh' indexes are correct in the material list.
         mymaterials = ob.data.materials
         if mymaterials is not None and len(mymaterials) > 0:
-            mymatstring = ''                 # generate ; separated material list
-            for mymat in mymaterials: 
-                if mymat is None: continue
+            mymatstring = '' # generate ; separated material list
+            for mymat in mymaterials:
+                if mymat is None:
+                    continue
                 mymatstring += proto + material_name(mymat) + '.material;'
             mymatstring = mymatstring[:-1]  # strip ending ;
             a.setAttribute('value', mymatstring )
         else:
             # default to nothing to avoid error prints in .txml import
-            a.setAttribute('value', "" ) 
+            a.setAttribute('value', "" )
 
         if ob.find_armature():
             a = doc.createElement('attribute'); c.appendChild(a)
@@ -2722,14 +2811,19 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "Draw distance" )
-        if ob.use_draw_distance: a.setAttribute('value', ob.draw_distance )
-        else: a.setAttribute('value', "0" )
+        if ob.use_draw_distance:
+            a.setAttribute('value', ob.draw_distance )
+        else:
+            a.setAttribute('value', "0" )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'Cast shadows' )
-        if ob.cast_shadows: a.setAttribute('value', 'true' )
-        else: a.setAttribute('value', 'false' )
+        if ob.cast_shadows:
+            a.setAttribute('value', 'true' )
+        else:
+            a.setAttribute('value', 'false' )
 
+    # EC_Light
     def tundra_light( self, e, ob ):
         '''
             <component type="EC_Light" sync="1">
@@ -2747,7 +2841,8 @@ class _TXML_(object):
             </component>
         '''
 
-        if ob.data.type not in 'POINT SPOT'.split(): return
+        if ob.data.type not in 'POINT SPOT'.split():
+            return
 
         doc = e.document
 
@@ -2757,26 +2852,35 @@ class _TXML_(object):
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'light type' )
-        if ob.data.type=='POINT': a.setAttribute('value', '0' )
-        elif ob.data.type=='SPOT': a.setAttribute('value', '1' )
+        if ob.data.type=='POINT':
+            a.setAttribute('value', '0' )
+        elif ob.data.type=='SPOT':
+            a.setAttribute('value', '1' )
         #2 = directional light.  blender has no directional light?
 
         R,G,B = ob.data.color
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'diffuse color' )
-        if ob.data.use_diffuse: a.setAttribute('value', '%s %s %s 1' %(R,G,B) )
-        else: a.setAttribute('value', '0 0 0 1' )
+        if ob.data.use_diffuse:
+            a.setAttribute('value', '%s %s %s 1' %(R,G,B) )
+        else:
+            a.setAttribute('value', '0 0 0 1' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'specular color' )
-        if ob.data.use_specular: a.setAttribute('value', '%s %s %s 1' %(R,G,B) )
-        else: a.setAttribute('value', '0 0 0 1' )
+        if ob.data.use_specular:
+            a.setAttribute('value', '%s %s %s 1' %(R,G,B) )
+        else:
+            a.setAttribute('value', '0 0 0 1' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'cast shadows' )
-        if ob.data.type=='HEMI': a.setAttribute('value', 'false' ) # HEMI no .shadow_method
-        elif ob.data.shadow_method != 'NOSHADOW': a.setAttribute('value', 'true' )
-        else: a.setAttribute('value', 'false' )
+        if ob.data.type=='HEMI':
+            a.setAttribute('value', 'false' ) # HEMI no .shadow_method
+        elif ob.data.shadow_method != 'NOSHADOW':
+            a.setAttribute('value', 'true' )
+        else:
+            a.setAttribute('value', 'false' )
 
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'light range' )
@@ -2793,7 +2897,8 @@ class _TXML_(object):
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', 'linear atten' )
         energy = ob.data.energy
-        if energy <= 0.0: energy = 0.001
+        if energy <= 0.0:
+            energy = 0.001
         a.setAttribute('value', (1.0/energy)*0.25 )
 
         a = doc.createElement('attribute'); c.appendChild(a)
@@ -2812,79 +2917,167 @@ class _TXML_(object):
             a.setAttribute('name', 'light outer angle' )
             a.setAttribute('value', '%s' %outer )
 
+## UI export panel
+
 class _OgreCommonExport_( _TXML_ ):
-    #EXPORT_TYPE = 'OGRE'   # defined in subclass
-    #@classmethod
-    #def poll(cls, context): return True
+
     @classmethod
     def poll(cls, context):
-        if context.active_object and context.mode != 'EDIT_MESH': return True
+        if context.active_object and context.mode != 'EDIT_MESH':
+            return True
 
     def invoke(self, context, event):
         wm = context.window_manager
         fs = wm.fileselect_add(self)        # writes to filepath
         return {'RUNNING_MODAL'}
-    def execute(self, context): self.ogre_export(  self.filepath, context ); return {'FINISHED'}
 
-    EX_SWAP_AXIS = EnumProperty( 
-        items=AXIS_MODES, 
-        name='swap axis',  
-        description='axis swapping mode', 
-        default= CONFIG['SWAP_AXIS'] 
-    )
+    def execute(self, context):
+        self.ogre_export(  self.filepath, context ); return {'FINISHED'}
+
+    # todo: Make this panel remember selected options
+    # when its reopened during same Blender run!
+
+    # Basic options
+    EX_SWAP_AXIS = EnumProperty(
+        items=AXIS_MODES,
+        name='swap axis',
+        description='axis swapping mode',
+        default= CONFIG['SWAP_AXIS'])
     EX_SEP_MATS = BoolProperty(
-        name="Separate Materials", 
-        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
+        name="Separate Materials",
+        description="exports a .material for each material (rather than putting all materials in a single .material file)",
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
     EX_ONLY_ANIMATED_BONES = BoolProperty(
-        name="Only Animated Bones", 
-        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
+        name="Only Animated Bones",
+        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)",
         default=CONFIG['ONLY_ANIMATED_BONES'])
-    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
-    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
-    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
-    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
-    EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
-    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_SCENE = BoolProperty(
+        name="Export Scene",
+        description="export current scene (OgreDotScene xml)",
+        default=CONFIG['SCENE'])
+    EX_SELONLY = BoolProperty(
+        name="Export Selected Only",
+        description="export selected",
+        default=CONFIG['SELONLY'])
+    EX_FORCE_CAMERA = BoolProperty(
+        name="Force Camera",
+        description="export active camera",
+        default=CONFIG['FORCE_CAMERA'])
+    EX_FORCE_LAMPS = BoolProperty(
+        name="Force Lamps",
+        description="export all lamps",
+        default=CONFIG['FORCE_LAMPS'])
+    EX_MESH = BoolProperty(
+        name="Export Meshes",
+        description="export meshes",
+        default=CONFIG['MESH'])
+    EX_MESH_OVERWRITE = BoolProperty(
+        name="Export Meshes (overwrite)",
+        description="export meshes (overwrite existing files)",
+        default=CONFIG['MESH_OVERWRITE'])
+    EX_ARM_ANIM = BoolProperty(
+        name="Armature Animation",
+        description="export armature animations - updates the .skeleton file",
+        default=CONFIG['ARM_ANIM'])
+    EX_SHAPE_ANIM = BoolProperty(
+        name="Shape Animation",
+        description="export shape animations - updates the .mesh file",
+        default=CONFIG['SHAPE_ANIM'])
     EX_INDEPENDENT_ANIM = BoolProperty(
         name="Independent Animations",
         description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
         default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
-        name="Trim Weights", 
-        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
+        name="Trim Weights",
+        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
         min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
-    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
+    EX_ARRAY = BoolProperty(
+        name="Optimize Arrays",
+        description="optimize array modifiers as instances (constant offset only)",
+        default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(
+        name="Export Materials",
+        description="exports .material script",
+        default=CONFIG['MATERIALS'])
+    EX_FORCE_IMAGE_FORMAT = EnumProperty(
+        items=_IMAGE_FORMATS,
+        name='Convert Images',
+        description='convert all textures to format',
+        default=CONFIG['FORCE_IMAGE_FORMAT'] )
+    EX_DDS_MIPS = IntProperty(
+        name="DDS Mips",
+        description="number of mip maps (DDS)",
+        min=0, max=16,
+        default=CONFIG['DDS_MIPS'])
 
-    ## Mesh Options ##
-    EX_lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", min=0, max=32, default=CONFIG['lodLevels'])
-    EX_lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", min=0, max=2000, default=CONFIG['lodDistance'])
-    EX_lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", min=0, max=99, default=CONFIG['lodPercent'])
-    EX_nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", min=0, max=65536, default=CONFIG['nuextremityPoints'])
-    EX_generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=CONFIG['generateEdgeLists'])
-    EX_generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=CONFIG['generateTangents'])
-    EX_tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default=CONFIG['tangentSemantic'])
-    EX_tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", min=0, max=16, default=CONFIG['tangentUseParity'])
-    EX_tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=CONFIG['tangentSplitMirrored'])
-    EX_tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=CONFIG['tangentSplitRotated'])
-    EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
-    EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
-
+    # Mesh options
+    EX_lodLevels = IntProperty(
+        name="LOD Levels",
+        description="MESH number of LOD levels",
+        min=0, max=32,
+        default=CONFIG['lodLevels'])
+    EX_lodDistance = IntProperty(
+        name="LOD Distance",
+        description="MESH distance increment to reduce LOD",
+        min=0, max=2000, default=CONFIG['lodDistance'])
+    EX_lodPercent = IntProperty(
+        name="LOD Percentage",
+        description="LOD percentage reduction",
+        min=0, max=99,
+        default=CONFIG['lodPercent'])
+    EX_nuextremityPoints = IntProperty(
+        name="Extremity Points",
+        description="MESH Extremity Points",
+        min=0, max=65536,
+        default=CONFIG['nuextremityPoints'])
+    EX_generateEdgeLists = BoolProperty(
+        name="Edge Lists",
+        description="MESH generate edge lists (for stencil shadows)",
+        default=CONFIG['generateEdgeLists'])
+    EX_generateTangents = BoolProperty(
+        name="Tangents",
+        description="MESH generate tangents",
+        default=CONFIG['generateTangents'])
+    EX_tangentSemantic = StringProperty(
+        name="Tangent Semantic",
+        description="MESH tangent semantic",
+        maxlen=3,
+        default=CONFIG['tangentSemantic'])
+    EX_tangentUseParity = IntProperty(
+        name="Tangent Parity",
+        description="MESH tangent use parity",
+        min=0, max=16,
+        default=CONFIG['tangentUseParity'])
+    EX_tangentSplitMirrored = BoolProperty(
+        name="Tangent Split Mirrored",
+        description="MESH split mirrored tangents",
+        default=CONFIG['tangentSplitMirrored'])
+    EX_tangentSplitRotated = BoolProperty(
+        name="Tangent Split Rotated",
+        description="MESH split rotated tangents",
+        default=CONFIG['tangentSplitRotated'])
+    EX_reorganiseBuffers = BoolProperty(
+        name="Reorganise Buffers",
+        description="MESH reorganise vertex buffers",
+        default=CONFIG['reorganiseBuffers'])
+    EX_optimiseAnimations = BoolProperty(
+        name="Optimize Animations",
+        description="MESH optimize animations",
+        default=CONFIG['optimiseAnimations'])
     EX_COPY_SHADER_PROGRAMS = BoolProperty(
-        name="copy shader programs", 
-        description="when using script inheritance copy the source shader programs to the output path", 
+        name="copy shader programs",
+        description="when using script inheritance copy the source shader programs to the output path",
         default=CONFIG['COPY_SHADER_PROGRAMS'])
 
-    filepath = StringProperty(name="File Path", description="Filepath used for exporting file", maxlen=1024, default="", subtype='FILE_PATH')
+    filepath = StringProperty(
+        name="File Path",
+        description="Filepath used for exporting file",
+        maxlen=1024, default="",
+        subtype='FILE_PATH')
 
     def dot_material( self, meshes, path='/tmp', mat_file_name='SceneMaterial'):
         material_files = []
@@ -2892,14 +3085,16 @@ class _OgreCommonExport_( _TXML_ ):
         for ob in meshes:
             if len(ob.data.materials):
                 for mat in ob.data.materials:
-                    if mat not in mats: mats.append( mat )
+                    if mat not in mats:
+                        mats.append( mat )
 
         if not mats:
             print('WARNING: no materials, not writting .material script'); return []
 
         M = MISSING_MATERIAL + '\n'
         for mat in mats:
-            if mat is None: continue
+            if mat is None:
+                continue
             Report.materials.append( material_name(mat) )
             if CONFIG['COPY_SHADER_PROGRAMS']:
                 data = generate_material( mat, path=path, copy_programs=True, touch_textures=CONFIG['TOUCH_TEXTURES'] )
@@ -2907,10 +3102,12 @@ class _OgreCommonExport_( _TXML_ ):
                 data = generate_material( mat, path=path, touch_textures=CONFIG['TOUCH_TEXTURES'] )
 
             M += data
+            # Write own .material file per material
             if self.EX_SEP_MATS:
                 url = self.dot_material_write_separate( mat, data, path )
                 material_files.append( url )
 
+        # Write one .material file for everything
         if not self.EX_SEP_MATS:
             url = os.path.join(path, '%s.material' % mat_file_name)
             f = open( url, 'wb' ); f.write( bytes(M,'utf-8') ); f.close()
@@ -2919,12 +3116,11 @@ class _OgreCommonExport_( _TXML_ ):
 
         return material_files
 
-    def dot_material_write_separate( self, mat, data, path = '/tmp' ):      # thanks Pforce
+    def dot_material_write_separate( self, mat, data, path = '/tmp' ):
         url = os.path.join(path, '%s.material' % material_name(mat))
         f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
         print('saved', url)
         return url
-
 
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
         dot_mesh( ob, path, force_name, ignore_shape_animation=False )
@@ -2941,7 +3137,7 @@ class _OgreCommonExport_( _TXML_ ):
         prefix = url.split('.')[0]
         path = os.path.split(url)[0]
 
-        ## nodes (objects) ##
+        # Nodes (objects)
         objects = []        # gather because macros will change selection state
         linkedgroups = []
         for ob in bpy.context.scene.objects:
@@ -2950,27 +3146,28 @@ class _OgreCommonExport_( _TXML_ ):
                 if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA: pass
                 elif ob.type == 'LAMP' and self.EX_FORCE_LAMPS: pass
                 else: continue
-            if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP': 
+            if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP':
                 linkedgroups.append( ob )
             else: objects.append( ob )
 
-        ######## LINKED GROUPS - allows 3 levels of nested blender library linking ########
+        # Linked groups - allows 3 levels of nested blender library linking
         temps = []
         for e in linkedgroups:
             grp = e.dupli_group
             subs = []
             for o in grp.objects:
-                if o.type=='MESH': subs.append( o )     # TOP-LEVEL
-
+                if o.type=='MESH':
+                    subs.append( o )     # TOP-LEVEL
                 elif o.type == 'EMPTY' and o.dupli_group and o.dupli_type == 'GROUP':
                     ss = []     # LEVEL2
                     for oo in o.dupli_group.objects:
-                        if oo.type=='MESH': ss.append( oo )
-
+                        if oo.type=='MESH':
+                            ss.append( oo )
                         elif oo.type == 'EMPTY' and oo.dupli_group and oo.dupli_type == 'GROUP':
                             sss = []    # LEVEL3
                             for ooo in oo.dupli_group.objects:
-                                if ooo.type=='MESH': sss.append( ooo )
+                                if ooo.type=='MESH':
+                                    sss.append( ooo )
                             if sss:
                                 m = merge_objects( sss, name=oo.name, transform=oo.matrix_world )
                                 subs.append( m )
@@ -2979,15 +3176,12 @@ class _OgreCommonExport_( _TXML_ ):
                         m = merge_objects( ss, name=o.name, transform=o.matrix_world )
                         subs.append( m )
                         temps.append( m )
-
-
             if subs:
                 m = merge_objects( subs, name=e.name, transform=e.matrix_world )
                 objects.append( m )
                 temps.append( m )
 
-
-        ## find merge groups
+        # Find merge groups
         mgroups = []
         mobjects = []
         for ob in objects:
@@ -3004,7 +3198,7 @@ class _OgreCommonExport_( _TXML_ ):
             objects.append( merged )
             temps.append( merged )
 
-        ## gather roots because ogredotscene supports parents and children ##
+        # Gather roots because ogredotscene supports parents and children
         def _flatten( _c, _f ):
             if _c.parent in objects: _f.append( _c.parent )
             if _c.parent: _flatten( _c.parent, _f )
@@ -3017,45 +3211,46 @@ class _OgreCommonExport_( _TXML_ ):
             flat = []
             _flatten( ob, flat )
             root = flat[-1]
-            if root not in roots: roots.append( root )
-
-            if ob.type=='MESH': meshes.append( ob )
+            if root not in roots:
+                roots.append( root )
+            if ob.type=='MESH':
+                meshes.append( ob )
 
         mesh_collision_prims = {}
         mesh_collision_files = {}
 
-        exported_meshes = []        # don't export same data multiple times
+        # Track that we don't export same data multiple times
+        exported_meshes = []
 
         if self.EX_MATERIALS:
             material_file_name_base=os.path.split(url)[1].replace('.scene', '').replace('.txml', '')
-            material_files = self.dot_material( 
-                meshes + force_material_update, 
-                path, 
+            material_files = self.dot_material(
+                meshes + force_material_update,
+                path,
                 material_file_name_base
             )
         else:
             material_files = []
 
-
+        # realXtend Tundra .txml scene description export
         if self.EXPORT_TYPE == 'REX':
-            ################# TUNDRA #################
             rex = self.create_tundra_document( context )
-            ##########################################
             proxies = []
             for ob in objects:
+                # EC_Light
                 if ob.type == 'LAMP':
                     TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
                     self.tundra_light( TE, ob )
-
+                # EC_Sound
                 elif ob.type == 'SPEAKER':
                     TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
-
+                # EC_Mesh
                 elif ob.type == 'MESH' and len(ob.data.tessfaces):
                     if ob.modifiers and ob.modifiers[0].type=='MULTIRES' and ob.use_multires_lod:
                         mod = ob.modifiers[0]
                         basename = ob.name
                         dataname = ob.data.name
-                        ID = uid( ob )   # ensure uid
+                        ID = uid( ob ) # ensure uid
                         TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
 
                         for level in range( mod.total_levels+1 ):
@@ -3063,8 +3258,8 @@ class _OgreCommonExport_( _TXML_ ):
                             mod.levels = level
                             ob.name = '%s.LOD%s' %(basename,level)
                             ob.data.name = '%s.LOD%s' %(dataname,level)
-                            TE = self.tundra_entity( 
-                                rex, ob, path=path, collision_proxies=proxies, parent=basename, 
+                            TE = self.tundra_entity(
+                                rex, ob, path=path, collision_proxies=proxies, parent=basename,
                                 matrix=mathutils.Matrix(), visible=False
                             )
                             self.tundra_mesh( TE, ob, url, exported_meshes )
@@ -3076,11 +3271,11 @@ class _OgreCommonExport_( _TXML_ ):
                         TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
                         self.tundra_mesh( TE, ob, url, exported_meshes )
 
-
+            # EC_RigidBody separate collision meshes
             for proxy in proxies:
-                self.dot_mesh( 
-                    proxy, 
-                    path=os.path.split(url)[0], 
+                self.dot_mesh(
+                    proxy,
+                    path=os.path.split(url)[0],
                     force_name='_collision_%s' %proxy.data.name
                 )
 
@@ -3090,28 +3285,24 @@ class _OgreCommonExport_( _TXML_ ):
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
                 print('realxtend scene dumped', url)
 
-
-        elif self.EXPORT_TYPE == 'OGRE':       # ogre-dot-scene
-            ############# OgreDotScene ###############
+        # Ogre .scene scene description export
+        elif self.EXPORT_TYPE == 'OGRE':
             doc = self.create_ogre_document( context, material_files )
-            ##########################################
-
 
             for root in roots:
                 print('--------------- exporting root ->', root )
-                self._node_export( 
-                    root, 
+                self._node_export(
+                    root,
                     url=url,
                     doc = doc,
-                    exported_meshes = exported_meshes, 
+                    exported_meshes = exported_meshes,
                     meshes = meshes,
                     mesh_collision_prims = mesh_collision_prims,
                     mesh_collision_files = mesh_collision_files,
                     prefix = prefix,
-                    objects=objects, 
-                    xmlparent=doc._scene_nodes 
+                    objects=objects,
+                    xmlparent=doc._scene_nodes
                 )
-
 
             if self.EX_SCENE:
                 if not url.endswith('.scene'): url += '.scene'
@@ -3119,10 +3310,14 @@ class _OgreCommonExport_( _TXML_ ):
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
                 print('ogre scene dumped', url)
 
-        for ob in temps: context.scene.objects.unlink( ob )
+        for ob in temps:
+            context.scene.objects.unlink( ob )
         bpy.ops.wm.call_menu( name='MiniReport' )
 
-        save_config()   # always save?
+        # Always save?
+        # todo: This does not seem to stick! It might save to disk
+        # but the old config defaults are read when this panel is opened!
+        save_config()
 
     def create_ogre_document(self, context, material_files=[] ):
         now = time.time()
@@ -3131,8 +3326,11 @@ class _OgreCommonExport_( _TXML_ ):
         scn.setAttribute('export_time', str(now))
         scn.setAttribute('formatVersion', '1.0.1')
         bscn = bpy.context.scene
-        if '_previous_export_time_' in bscn.keys(): scn.setAttribute('previous_export_time', str(bscn['_previous_export_time_']))
-        else: scn.setAttribute('previous_export_time', '0')
+
+        if '_previous_export_time_' in bscn.keys():
+            scn.setAttribute('previous_export_time', str(bscn['_previous_export_time_']))
+        else:
+            scn.setAttribute('previous_export_time', '0')
         bscn[ '_previous_export_time_' ] = now
         scn.setAttribute('exported_by', getpass.getuser())
 
@@ -3140,20 +3338,19 @@ class _OgreCommonExport_( _TXML_ ):
         doc._scene_nodes = nodes
         extern = doc.createElement('externals')
         environ = doc.createElement('environment')
-        for n in (nodes,extern,environ): scn.appendChild( n )
-        ############################
+        for n in (nodes,extern,environ):
+            scn.appendChild( n )
 
-        ## extern files ##
+        # Extern files
         for url in material_files:
             item = doc.createElement('item'); extern.appendChild( item )
             item.setAttribute('type','material')
             a = doc.createElement('file'); item.appendChild( a )
             a.setAttribute('name', url)
 
-
-        ## environ settings ##
+        # Environ settings
         world = context.scene.world
-        if world:   # multiple scenes - other scenes may not have a world
+        if world: # multiple scenes - other scenes may not have a world
             _c = {'colourAmbient':world.ambient_color, 'colourBackground':world.horizon_color, 'colourDiffuse':world.horizon_color}
             for ctag in _c:
                 a = doc.createElement(ctag); environ.appendChild( a )
@@ -3166,10 +3363,10 @@ class _OgreCommonExport_( _TXML_ ):
             a = doc.createElement('fog'); environ.appendChild( a )
             a.setAttribute('linearStart', '%s'%world.mist_settings.start )
             mist_falloff = world.mist_settings.falloff
-            if mist_falloff == 'QUADRATIC': a.setAttribute('mode', 'exp')	# on DTD spec (none | exp | exp2 | linear)
+            if mist_falloff == 'QUADRATIC': a.setAttribute('mode', 'exp')    # on DTD spec (none | exp | exp2 | linear)
             elif mist_falloff == 'LINEAR': a.setAttribute('mode', 'linear')
             else: a.setAttribute('mode', 'exp2')
-            #a.setAttribute('mode', world.mist_settings.falloff.lower() )	# not on DTD spec
+            #a.setAttribute('mode', world.mist_settings.falloff.lower() )    # not on DTD spec
             a.setAttribute('linearEnd', '%s' %(world.mist_settings.start+world.mist_settings.depth))
             a.setAttribute('expDensity', world.mist_settings.intensity)
             a.setAttribute('colourR', world.horizon_color.r)
@@ -3178,13 +3375,12 @@ class _OgreCommonExport_( _TXML_ ):
 
         return doc
 
-    ############# node export - recursive ###############
+    # Recursive Node export
     def _node_export( self, ob, url='', doc=None, rex=None, exported_meshes=[], meshes=[], mesh_collision_prims={}, mesh_collision_files={}, prefix='', objects=[], xmlparent=None ):
-
         o = _ogre_node_helper( doc, ob, objects )
         xmlparent.appendChild(o)
 
-        ## custom user props ##
+        # Custom user props
         for prop in ob.items():
             propname, propvalue = prop
             if not propname.startswith('_'):
@@ -3193,16 +3389,17 @@ class _OgreCommonExport_( _TXML_ ):
                 user.setAttribute( 'name', propname )
                 user.setAttribute( 'value', str(propvalue) )
                 user.setAttribute( 'type', type(propvalue).__name__ )
-        ## custom user props from BGE props by Mind Calamity##
+
+        # Custom user props from BGE props by Mind Calamity
         for prop in ob.game.properties:
             e = doc.createElement( 'user_data' )
             o.appendChild( e )
             e.setAttribute('name', prop.name)
             e.setAttribute('value', str(prop.value))
             e.setAttribute('type', type(prop.value).__name__)
-        ## end of Mind Calamity patch ##
+        # -- end of Mind Calamity patch
 
-        ## BGE subset ##
+        # BGE subset
         game = doc.createElement('game')
         o.appendChild( game )
         sens = doc.createElement('sensors')
@@ -3214,19 +3411,20 @@ class _OgreCommonExport_( _TXML_ ):
         for act in ob.game.actuators:
             acts.appendChild( WrapActuator(act).xml(doc) )
 
-        if ob.type == 'MESH': ob.data.update(calc_tessface=True)
-        if ob.type == 'MESH' and len(ob.data.tessfaces):
+        if ob.type == 'MESH':
+            ob.data.update(calc_tessface=True)
 
+        if ob.type == 'MESH' and len(ob.data.tessfaces):
             collisionFile = None
             collisionPrim = None
-            if ob.data.name in mesh_collision_prims: collisionPrim = mesh_collision_prims[ ob.data.name ]
-            if ob.data.name in mesh_collision_files: collisionFile = mesh_collision_files[ ob.data.name ]
+            if ob.data.name in mesh_collision_prims:
+                collisionPrim = mesh_collision_prims[ ob.data.name ]
+            if ob.data.name in mesh_collision_files:
+                collisionFile = mesh_collision_files[ ob.data.name ]
 
-            #meshes.append( ob )
-            e = doc.createElement('entity') 
+            e = doc.createElement('entity')
             o.appendChild(e); e.setAttribute('name', ob.data.name)
             prefix = ''
-            #if self.EX_MESH_SUBDIR: prefix = 'meshes/'
             e.setAttribute('meshFile', '%s%s.mesh' %(prefix,ob.data.name) )
 
             if not collisionPrim and not collisionFile:
@@ -3240,14 +3438,16 @@ class _OgreCommonExport_( _TXML_ ):
                             break
                     if collisionFile:
                         mesh_collision_files[ ob.data.name ] = collisionFile
-                        self.dot_mesh( 
-                            child, 
-                            path=os.path.split(url)[0], 
+                        self.dot_mesh(
+                            child,
+                            path=os.path.split(url)[0],
                             force_name='_collision_%s' %ob.data.name
                         )
 
-            if collisionPrim: e.setAttribute('collisionPrim', collisionPrim )
-            elif collisionFile: e.setAttribute('collisionFile', collisionFile )
+            if collisionPrim:
+                e.setAttribute('collisionPrim', collisionPrim )
+            elif collisionFile:
+                e.setAttribute('collisionFile', collisionFile )
 
             _mesh_entity_helper( doc, ob, e )
 
@@ -3259,7 +3459,7 @@ class _OgreCommonExport_( _TXML_ ):
                         exported_meshes.append( ob.data.name )
                         self.dot_mesh( ob, os.path.split(url)[0] )
 
-            ## deal with Array mod ##
+            # Deal with Array modifier
             vecs = [ ob.matrix_world.to_translation() ]
             for mod in ob.modifiers:
                 if mod.type == 'ARRAY':
@@ -3269,10 +3469,8 @@ class _OgreCommonExport_( _TXML_ ):
                     if not mod.use_constant_offset:
                         print( 'WARNING: unsupport array-modifier mode, must be "constant offset" type' )
                         continue
-
                     else:
                         #v = ob.matrix_world.to_translation()
-
                         newvecs = []
                         for prev in vecs:
                             for i in range( mod.count-1 ):
@@ -3281,7 +3479,7 @@ class _OgreCommonExport_( _TXML_ ):
                                 ao = _ogre_node_helper( doc, ob, objects, prefix='_array_%s_'%len(vecs+newvecs), pos=v )
                                 xmlparent.appendChild(ao)
 
-                                e = doc.createElement('entity') 
+                                e = doc.createElement('entity')
                                 ao.appendChild(e); e.setAttribute('name', ob.data.name)
                                 #if self.EX_MESH_SUBDIR: e.setAttribute('meshFile', 'meshes/%s.mesh' %ob.data.name)
                                 #else:
@@ -3289,9 +3487,7 @@ class _OgreCommonExport_( _TXML_ ):
 
                                 if collisionPrim: e.setAttribute('collisionPrim', collisionPrim )
                                 elif collisionFile: e.setAttribute('collisionFile', collisionFile )
-
                         vecs += newvecs
-
 
         elif ob.type == 'CAMERA':
             Report.cameras.append( ob.name )
@@ -3313,12 +3509,10 @@ class _OgreCommonExport_( _TXML_ ):
             a = doc.createElement('clipping'); c.appendChild( a )
             a.setAttribute('nearPlaneDist', '%s' %ob.data.clip_start)
             a.setAttribute('farPlaneDist', '%s' %ob.data.clip_end)
-            a.setAttribute('near', '%s' %ob.data.clip_start)	# requested by cyrfer
+            a.setAttribute('near', '%s' %ob.data.clip_start)    # requested by cyrfer
             a.setAttribute('far', '%s' %ob.data.clip_end)
 
-
         elif ob.type == 'LAMP' and ob.data.type in 'POINT SPOT SUN'.split():
-
             Report.lights.append( ob.name )
             l = doc.createElement('light')
             o.appendChild(l)
@@ -3332,9 +3526,12 @@ class _OgreCommonExport_( _TXML_ ):
             p.setAttribute('y', '%6f'%v.y)
             p.setAttribute('z', '%6f'%v.z)
 
-            if ob.data.type == 'POINT': l.setAttribute('type', 'point')
-            elif ob.data.type == 'SPOT': l.setAttribute('type', 'spot')
-            elif ob.data.type == 'SUN': l.setAttribute('type', 'directional')
+            if ob.data.type == 'POINT':
+                l.setAttribute('type', 'point')
+            elif ob.data.type == 'SPOT':
+                l.setAttribute('type', 'spot')
+            elif ob.data.type == 'SUN':
+                l.setAttribute('type', 'directional')
 
             l.setAttribute('name', ob.name )
             l.setAttribute('powerScale', str(ob.data.energy))
@@ -3344,7 +3541,6 @@ class _OgreCommonExport_( _TXML_ ):
             a.setAttribute('constant', '1.0')        # TODO support quadratic light
             a.setAttribute('linear', '%s'%(1.0/ob.data.distance))
             a.setAttribute('quadratic', '0.0')
-
 
             if ob.data.type in ('SPOT', 'SUN'):
                 vector = swap(mathutils.Euler.to_matrix(ob.rotation_euler)[2])
@@ -3382,22 +3578,18 @@ class _OgreCommonExport_( _TXML_ ):
                     l.setAttribute('shadow','true')
 
         for child in ob.children:
-            self._node_export( child, 
-                url = url, doc = doc, rex = rex, 
-                exported_meshes = exported_meshes, 
+            self._node_export( child,
+                url = url, doc = doc, rex = rex,
+                exported_meshes = exported_meshes,
                 meshes = meshes,
                 mesh_collision_prims = mesh_collision_prims,
                 mesh_collision_files = mesh_collision_files,
                 prefix = prefix,
-                objects=objects, 
+                objects=objects,
                 xmlparent=o
             )
-        ## end _node_export
 
-
-
-
-################################################################
+## UI panel Ogre export - Subclasses _OgreCommonExport_
 
 class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
@@ -3405,63 +3597,149 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     bl_label = "Export Ogre"
     bl_options = {'REGISTER'}
 
-    EX_SWAP_AXIS = EnumProperty( 
-        items=AXIS_MODES, 
-        name='swap axis',  
-        description='axis swapping mode', 
-        default= CONFIG['SWAP_AXIS'] 
-    )
+    # Basic options
+    EX_SWAP_AXIS = EnumProperty(
+        items=AXIS_MODES,
+        name='swap axis',
+        description='axis swapping mode',
+        default= CONFIG['SWAP_AXIS'])
     EX_SEP_MATS = BoolProperty(
-        name="Separate Materials", 
-        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
+        name="Separate Materials",
+        description="exports a .material for each material (rather than putting all materials in a single .material file)",
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
     EX_ONLY_ANIMATED_BONES = BoolProperty(
-        name="Only Animated Bones", 
-        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
+        name="Only Animated Bones",
+        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)",
         default=CONFIG['ONLY_ANIMATED_BONES'])
-    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
-    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
-    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
-    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
-    EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
-    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_SCENE = BoolProperty(
+        name="Export Scene",
+        description="export current scene (OgreDotScene xml)",
+        default=CONFIG['SCENE'])
+    EX_SELONLY = BoolProperty(
+        name="Export Selected Only",
+        description="export selected",
+        default=CONFIG['SELONLY'])
+    EX_FORCE_CAMERA = BoolProperty(
+        name="Force Camera",
+        description="export active camera",
+        default=CONFIG['FORCE_CAMERA'])
+    EX_FORCE_LAMPS = BoolProperty(
+        name="Force Lamps",
+        description="export all lamps",
+        default=CONFIG['FORCE_LAMPS'])
+    EX_MESH = BoolProperty(
+        name="Export Meshes",
+        description="export meshes",
+        default=CONFIG['MESH'])
+    EX_MESH_OVERWRITE = BoolProperty(
+        name="Export Meshes (overwrite)",
+        description="export meshes (overwrite existing files)",
+        default=CONFIG['MESH_OVERWRITE'])
+    EX_ARM_ANIM = BoolProperty(
+        name="Armature Animation",
+        description="export armature animations - updates the .skeleton file",
+        default=CONFIG['ARM_ANIM'])
+    EX_SHAPE_ANIM = BoolProperty(
+        name="Shape Animation",
+        description="export shape animations - updates the .mesh file",
+        default=CONFIG['SHAPE_ANIM'])
     EX_INDEPENDENT_ANIM = BoolProperty(
         name="Independent Animations",
         description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
         default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
-        name="Trim Weights", 
-        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
+        name="Trim Weights",
+        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
         min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
-    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
+    EX_ARRAY = BoolProperty(
+        name="Optimize Arrays",
+        description="optimize array modifiers as instances (constant offset only)",
+        default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(
+        name="Export Materials",
+        description="exports .material script",
+        default=CONFIG['MATERIALS'])
+    EX_FORCE_IMAGE_FORMAT = EnumProperty(
+        items=_IMAGE_FORMATS,
+        name='Convert Images',
+        description='convert all textures to format',
+        default=CONFIG['FORCE_IMAGE_FORMAT'] )
+    EX_DDS_MIPS = IntProperty(
+        name="DDS Mips",
+        description="number of mip maps (DDS)",
+        min=0, max=16,
+        default=CONFIG['DDS_MIPS'])
 
-    ## Mesh Options ##
-    EX_lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", min=0, max=32, default=CONFIG['lodLevels'])
-    EX_lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", min=0, max=2000, default=CONFIG['lodDistance'])
-    EX_lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", min=0, max=99, default=CONFIG['lodPercent'])
-    EX_nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", min=0, max=65536, default=CONFIG['nuextremityPoints'])
-    EX_generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=CONFIG['generateEdgeLists'])
-    EX_generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=CONFIG['generateTangents'])
-    EX_tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default=CONFIG['tangentSemantic'])
-    EX_tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", min=0, max=16, default=CONFIG['tangentUseParity'])
-    EX_tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=CONFIG['tangentSplitMirrored'])
-    EX_tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=CONFIG['tangentSplitRotated'])
-    EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
-    EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
+    # Mesh options
+    EX_lodLevels = IntProperty(
+        name="LOD Levels",
+        description="MESH number of LOD levels",
+        min=0, max=32,
+        default=CONFIG['lodLevels'])
+    EX_lodDistance = IntProperty(
+        name="LOD Distance",
+        description="MESH distance increment to reduce LOD",
+        min=0, max=2000,
+        default=CONFIG['lodDistance'])
+    EX_lodPercent = IntProperty(
+        name="LOD Percentage",
+        description="LOD percentage reduction",
+        min=0, max=99,
+        default=CONFIG['lodPercent'])
+    EX_nuextremityPoints = IntProperty(
+        name="Extremity Points",
+        description="MESH Extremity Points",
+        min=0, max=65536,
+        default=CONFIG['nuextremityPoints'])
+    EX_generateEdgeLists = BoolProperty(
+        name="Edge Lists",
+        description="MESH generate edge lists (for stencil shadows)",
+        default=CONFIG['generateEdgeLists'])
+    EX_generateTangents = BoolProperty(
+        name="Tangents",
+        description="MESH generate tangents",
+        default=CONFIG['generateTangents'])
+    EX_tangentSemantic = StringProperty(
+        name="Tangent Semantic",
+        description="MESH tangent semantic",
+        maxlen=3,
+        default=CONFIG['tangentSemantic'])
+    EX_tangentUseParity = IntProperty(
+        name="Tangent Parity",
+        description="MESH tangent use parity",
+        min=0, max=16,
+        default=CONFIG['tangentUseParity'])
+    EX_tangentSplitMirrored = BoolProperty(
+        name="Tangent Split Mirrored",
+        description="MESH split mirrored tangents",
+        default=CONFIG['tangentSplitMirrored'])
+    EX_tangentSplitRotated = BoolProperty(
+        name="Tangent Split Rotated",
+        description="MESH split rotated tangents",
+        default=CONFIG['tangentSplitRotated'])
+    EX_reorganiseBuffers = BoolProperty(
+        name="Reorganise Buffers",
+        description="MESH reorganise vertex buffers",
+        default=CONFIG['reorganiseBuffers'])
+    EX_optimiseAnimations = BoolProperty(
+        name="Optimize Animations",
+        description="MESH optimize animations",
+        default=CONFIG['optimiseAnimations'])
 
-    filepath= StringProperty(name="File Path", description="Filepath used for exporting Ogre .scene file", maxlen=1024, default="", subtype='FILE_PATH')
+    filepath= StringProperty(
+        name="File Path",
+        description="Filepath used for exporting Ogre .scene file",
+        maxlen=1024,
+        default="",
+        subtype='FILE_PATH')
+
     EXPORT_TYPE = 'OGRE'
 
-
+## UI panel Tundra export - Subclasses _OgreCommonExport_
 
 class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
     '''Export RealXtend Scene'''
@@ -3469,84 +3747,176 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
     bl_label = "Export RealXtend"
     bl_options = {'REGISTER', 'UNDO'}
 
-    EX_SWAP_AXIS = EnumProperty( 
-        items=AXIS_MODES, 
-        name='swap axis',  
-        description='axis swapping mode', 
-        default= CONFIG['SWAP_AXIS'] 
+    EX_SWAP_AXIS = EnumProperty(
+        items=AXIS_MODES,
+        name='swap axis',
+        description='axis swapping mode',
+        default= CONFIG['SWAP_AXIS']
     )
+
+    # Basic options
     EX_SEP_MATS = BoolProperty(
-        name="Separate Materials", 
-        description="exports a .material for each material (rather than putting all materials in a single .material file)", 
+        name="Separate Materials",
+        description="exports a .material for each material (rather than putting all materials in a single .material file)",
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
     EX_ONLY_ANIMATED_BONES = BoolProperty(
-        name="Only Animated Bones", 
-        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)", 
+        name="Only Animated Bones",
+        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)",
         default=CONFIG['ONLY_ANIMATED_BONES'])
-
-    EX_SCENE = BoolProperty(name="Export Scene", description="export current scene (OgreDotScene xml)", default=CONFIG['SCENE'])
-    EX_SELONLY = BoolProperty(name="Export Selected Only", description="export selected", default=CONFIG['SELONLY'])
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=CONFIG['FORCE_CAMERA'])
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=CONFIG['FORCE_LAMPS'])
-    EX_MESH = BoolProperty(name="Export Meshes", description="export meshes", default=CONFIG['MESH'])
-    EX_MESH_OVERWRITE = BoolProperty(name="Export Meshes (overwrite)", description="export meshes (overwrite existing files)", default=CONFIG['MESH_OVERWRITE'])
-    EX_ARM_ANIM = BoolProperty(name="Armature Animation", description="export armature animations - updates the .skeleton file", default=CONFIG['ARM_ANIM'])
-    EX_SHAPE_ANIM = BoolProperty(name="Shape Animation", description="export shape animations - updates the .mesh file", default=CONFIG['SHAPE_ANIM'])
+    EX_SCENE = BoolProperty(
+        name="Export Scene",
+        description="export current scene (OgreDotScene xml)",
+        default=CONFIG['SCENE'])
+    EX_SELONLY = BoolProperty(
+        name="Export Selected Only",
+        description="export selected",
+        default=CONFIG['SELONLY'])
+    EX_FORCE_CAMERA = BoolProperty(
+        name="Force Camera",
+        description="export active camera",
+        default=CONFIG['FORCE_CAMERA'])
+    EX_FORCE_LAMPS = BoolProperty(
+        name="Force Lamps",
+        description="export all lamps",
+        default=CONFIG['FORCE_LAMPS'])
+    EX_MESH = BoolProperty(
+        name="Export Meshes",
+        description="export meshes",
+        default=CONFIG['MESH'])
+    EX_MESH_OVERWRITE = BoolProperty(
+        name="Export Meshes (overwrite)",
+        description="export meshes (overwrite existing files)",
+        default=CONFIG['MESH_OVERWRITE'])
+    EX_ARM_ANIM = BoolProperty(
+        name="Armature Animation",
+        description="export armature animations - updates the .skeleton file",
+        default=CONFIG['ARM_ANIM'])
+    EX_SHAPE_ANIM = BoolProperty(
+        name="Shape Animation",
+        description="export shape animations - updates the .mesh file",
+        default=CONFIG['SHAPE_ANIM'])
     EX_INDEPENDENT_ANIM = BoolProperty(
         name="Independent Animations",
         description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
         default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
-        name="Trim Weights", 
-        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)", 
+        name="Trim Weights",
+        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
         min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+    EX_ARRAY = BoolProperty(
+        name="Optimize Arrays",
+        description="optimize array modifiers as instances (constant offset only)",
+        default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(
+        name="Export Materials",
+        description="exports .material script",
+        default=CONFIG['MATERIALS'])
+    EX_FORCE_IMAGE_FORMAT = EnumProperty(
+        name='Convert Images',
+        description='convert all textures to format',
+        items=_IMAGE_FORMATS,
+        default=CONFIG['FORCE_IMAGE_FORMAT'])
+    EX_DDS_MIPS = IntProperty(
+        name="DDS Mips",
+        description="number of mip maps (DDS)",
+        min=0, max=16,
+        default=CONFIG['DDS_MIPS'])
 
-    EX_ARRAY = BoolProperty(name="Optimize Arrays", description="optimize array modifiers as instances (constant offset only)", default=CONFIG['ARRAY'])
-    EX_MATERIALS = BoolProperty(name="Export Materials", description="exports .material script", default=CONFIG['MATERIALS'])
-    EX_FORCE_IMAGE_FORMAT = EnumProperty( items=_IMAGE_FORMATS, name='Convert Images',  description='convert all textures to format', default=CONFIG['FORCE_IMAGE_FORMAT'] )
-    EX_DDS_MIPS = IntProperty(name="DDS Mips", description="number of mip maps (DDS)", min=0, max=16, default=CONFIG['DDS_MIPS'])
+    # Mesh options
+    EX_lodLevels = IntProperty(
+        name="LOD Levels",
+        description="MESH number of LOD levels",
+        min=0, max=32,
+        default=CONFIG['lodLevels'])
+    EX_lodDistance = IntProperty(
+        name="LOD Distance",
+        description="MESH distance increment to reduce LOD",
+        min=0, max=2000,
+        default=CONFIG['lodDistance'])
+    EX_lodPercent = IntProperty(
+        name="LOD Percentage",
+        description="LOD percentage reduction",
+        min=0, max=99,
+        default=CONFIG['lodPercent'])
+    EX_nuextremityPoints = IntProperty(
+        name="Extremity Points",
+        description="MESH Extremity Points",
+        min=0, max=65536,
+        default=CONFIG['nuextremityPoints'])
+    EX_generateEdgeLists = BoolProperty(
+        name="Edge Lists",
+        description="MESH generate edge lists (for stencil shadows)",
+        default=CONFIG['generateEdgeLists'])
+    EX_generateTangents = BoolProperty(
+        name="Tangents",
+        description="MESH generate tangents",
+        default=CONFIG['generateTangents'])
+    EX_tangentSemantic = StringProperty(
+        name="Tangent Semantic",
+        description="MESH tangent semantic",
+        maxlen=3,
+        default=CONFIG['tangentSemantic'])
+    EX_tangentUseParity = IntProperty(
+        name="Tangent Parity",
+        description="MESH tangent use parity",
+        min=0, max=16,
+        default=CONFIG['tangentUseParity'])
+    EX_tangentSplitMirrored = BoolProperty(
+        name="Tangent Split Mirrored",
+        description="MESH split mirrored tangents",
+        default=CONFIG['tangentSplitMirrored'])
+    EX_tangentSplitRotated = BoolProperty(
+        name="Tangent Split Rotated",
+        description="MESH split rotated tangents",
+        default=CONFIG['tangentSplitRotated'])
+    EX_reorganiseBuffers = BoolProperty(
+        name="Reorganise Buffers",
+        description="MESH reorganise vertex buffers",
+        default=CONFIG['reorganiseBuffers'])
+    EX_optimiseAnimations = BoolProperty(
+        name="Optimize Animations",
+        description="MESH optimize animations",
+        default=CONFIG['optimiseAnimations'])
 
-    ## Mesh Options ##
-    EX_lodLevels = IntProperty(name="LOD Levels", description="MESH number of LOD levels", min=0, max=32, default=CONFIG['lodLevels'])
-    EX_lodDistance = IntProperty(name="LOD Distance", description="MESH distance increment to reduce LOD", min=0, max=2000, default=CONFIG['lodDistance'])
-    EX_lodPercent = IntProperty(name="LOD Percentage", description="LOD percentage reduction", min=0, max=99, default=CONFIG['lodPercent'])
-    EX_nuextremityPoints = IntProperty(name="Extremity Points", description="MESH Extremity Points", min=0, max=65536, default=CONFIG['nuextremityPoints'])
-    EX_generateEdgeLists = BoolProperty(name="Edge Lists", description="MESH generate edge lists (for stencil shadows)", default=CONFIG['generateEdgeLists'])
-    EX_generateTangents = BoolProperty(name="Tangents", description="MESH generate tangents", default=CONFIG['generateTangents'])
-    EX_tangentSemantic = StringProperty(name="Tangent Semantic", description="MESH tangent semantic", maxlen=3, default=CONFIG['tangentSemantic'])
-    EX_tangentUseParity = IntProperty(name="Tangent Parity", description="MESH tangent use parity", min=0, max=16, default=CONFIG['tangentUseParity'])
-    EX_tangentSplitMirrored = BoolProperty(name="Tangent Split Mirrored", description="MESH split mirrored tangents", default=CONFIG['tangentSplitMirrored'])
-    EX_tangentSplitRotated = BoolProperty(name="Tangent Split Rotated", description="MESH split rotated tangents", default=CONFIG['tangentSplitRotated'])
-    EX_reorganiseBuffers = BoolProperty(name="Reorganise Buffers", description="MESH reorganise vertex buffers", default=CONFIG['reorganiseBuffers'])
-    EX_optimiseAnimations = BoolProperty(name="Optimize Animations", description="MESH optimize animations", default=CONFIG['optimiseAnimations'])
+    filepath = StringProperty(
+        name="File Path",
+        description="Filepath used for exporting .txml file",
+        maxlen=1024,
+        default="",
+        subtype='FILE_PATH')
 
-    filepath= StringProperty(name="File Path", description="Filepath used for exporting .txml file", maxlen=1024, default="", subtype='FILE_PATH')
     EXPORT_TYPE = 'REX'
 
-
+## Ogre node helper
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
-    mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world   # shouldn't this be matrix_local?
+    # shouldn't this be matrix_local?
+    mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
 
     o = doc.createElement('node')
     o.setAttribute('name',prefix+ob.name)
     p = doc.createElement('position')
     q = doc.createElement('rotation')       #('quaternion')
     s = doc.createElement('scale')
-    for n in (p,q,s): o.appendChild(n)
+    for n in (p,q,s):
+        o.appendChild(n)
 
-    if pos: v = swap(pos)
-    else: v = swap( mat.to_translation() )
+    if pos:
+        v = swap(pos)
+    else:
+        v = swap( mat.to_translation() )
     p.setAttribute('x', '%6f'%v.x)
     p.setAttribute('y', '%6f'%v.y)
     p.setAttribute('z', '%6f'%v.z)
 
-    if rot: v = swap(rot)
-    else: v = swap( mat.to_quaternion() )
+    if rot:
+        v = swap(rot)
+    else:
+        v = swap( mat.to_quaternion() )
     q.setAttribute('qx', '%6f'%v.x)
     q.setAttribute('qy', '%6f'%v.y)
     q.setAttribute('qz', '%6f'%v.z)
@@ -3566,12 +3936,10 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
         s.setAttribute('x', '%6f'%x)
         s.setAttribute('y', '%6f'%y)
         s.setAttribute('z', '%6f'%z)
-
     return o
 
+## MeshMagick
 
-
-############ Ogre Command Line Tools ###########
 class MeshMagick(object):
     ''' Usage: MeshMagick [global_options] toolname [tool_options] infile(s) -- [outfile(s)]
     Available Tools
@@ -3584,7 +3952,8 @@ class MeshMagick(object):
     '''
 
     @staticmethod
-    def get_merge_group( ob ): return get_merge_group( ob, prefix='magicmerge' )
+    def get_merge_group( ob ):
+        return get_merge_group( ob, prefix='magicmerge' )
 
     @staticmethod
     def merge( group, path='/tmp', force_name=None ):
@@ -3612,8 +3981,10 @@ class MeshMagick(object):
         print(' mesh magick - complete ')
         print('-'*80)
 
+## Ogre Command Line Tools Documentation
+
 _ogre_command_line_tools_doc = '''
-Usage: OgreXMLConverter [options] sourcefile [destfile] 
+Usage: OgreXMLConverter [options] sourcefile [destfile]
 
 Available options:
 -i             = interactive mode - prompt for options
@@ -3640,14 +4011,19 @@ Available options:
 -log filename  = name of the log file (default: 'OgreXMLConverter.log')
 sourcefile     = name of file to convert
 destfile       = optional name of file to write to. If you don't
-                 specify this OGRE works it out through the extension 
+                 specify this OGRE works it out through the extension
                  and the XML contents if the source is XML. For example
-                 test.mesh becomes test.xml, test.xml becomes test.mesh 
+                 test.mesh becomes test.xml, test.xml becomes test.mesh
                  if the XML document root is <mesh> etc.
 '''
 
+## Ogre Command Line Tools
+
 def OgreXMLConverter( infile, has_uvs=False ):
     print('[Ogre Tools Wrapper]', infile )
+
+    # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
+    # We should show how to configure the converter location in config panel or tell the default path.
     exe = CONFIG['OGRETOOLS_XML_CONVERTER']
     if not os.path.isfile( exe ):
         print( 'WARNING: can not find OgreXMLConverter (can not convert XXX.mesh.xml to XXX.mesh' )
@@ -3657,14 +4033,15 @@ def OgreXMLConverter( infile, has_uvs=False ):
 
     if CONFIG['lodLevels']:
         basicArguments += ' -l %s -v %s -p %s' %(CONFIG['lodLevels'], CONFIG['lodDistance'], CONFIG['lodPercent'])
-        
+
     if CONFIG['nuextremityPoints'] > 0:
         basicArguments += ' -x %s' %CONFIG['nuextremityPoints']
 
     if not CONFIG['generateEdgeLists']:
         basicArguments += ' -e'
 
-    if CONFIG['generateTangents'] and has_uvs:  # OgreXmlConverter fails to convert meshes without UVs
+    # note: OgreXmlConverter fails to convert meshes without UVs
+    if CONFIG['generateTangents'] and has_uvs:
         basicArguments += ' -t'
         if CONFIG['tangentSemantic']:
             basicArguments += ' -td %s' %CONFIG['tangentSemantic']
@@ -3689,6 +4066,7 @@ def OgreXMLConverter( infile, has_uvs=False ):
     cmd = cmd.split() + [infile]
     subprocess.call( cmd )
 
+## Bone
 
 class Bone(object):
 
@@ -3697,11 +4075,11 @@ class Bone(object):
             self.fixUpAxis = False
         else:
             self.fixUpAxis = True
-            if CONFIG['SWAP_AXIS'] == '-xzy':      # Tundra1
+            if CONFIG['SWAP_AXIS'] == '-xzy':      # Tundra 1.x
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
-            elif CONFIG['SWAP_AXIS'] == 'xz-y':    # Tundra2
+            elif CONFIG['SWAP_AXIS'] == 'xz-y':    # Tundra 2.x current generation
                 #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
-                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1)))	# thanks to Waruck
+                self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1))) # thanks to Waruck
             else:
                 print( 'ERROR - TODO: axis swap mode not supported with armature animation' )
                 assert 0
@@ -3709,13 +4087,13 @@ class Bone(object):
         self.skeleton = skeleton
         self.name = pbone.name
         self.matrix = rbone.matrix_local.copy() # armature space
-        #self.matrix_local = rbone.matrix.copy()    # space?
+        #self.matrix_local = rbone.matrix.copy() # space?
 
         self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
         if pbone.parent and not pbone.parent.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']:
             print('warning: bone <%s> has non-deformable parent.' %self.name)
-            
-        #TODO test#if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
+
+        # todo: Test -> #if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
         self.parent = pbone.parent
         self.children = []
 
@@ -3730,7 +4108,7 @@ class Bone(object):
         else:
             pass
 
-        self.pose_location =  pose.to_translation()  -  self.ogre_rest_matrix.to_translation()
+        self.pose_location =  pose.to_translation() - self.ogre_rest_matrix.to_translation()
         pose = self.inverse_ogre_rest_matrix * pose
         self.pose_rotation = pose.to_quaternion()
         self.pose_scale = pose.to_scale()
@@ -3758,9 +4136,11 @@ class Bone(object):
         self.ogre_rest_matrix = inverseParentMatrix * self.ogre_rest_matrix
         self.inverse_ogre_rest_matrix = self.ogre_rest_matrix.inverted()
 
-        ## recursion ##
+        # recursion
         for child in self.children:
             child.compute_rest()
+
+# Skeleton
 
 class Skeleton(object):
     def get_bone( self, name ):
@@ -3786,7 +4166,8 @@ class Skeleton(object):
                 mybone = Bone( arm.data.bones[pbone.name] ,pbone, self )
                 self.bones.append( mybone )
 
-        if arm.name not in Report.armatures: Report.armatures.append( arm.name )
+        if arm.name not in Report.armatures:
+            Report.armatures.append( arm.name )
 
         ## bad idea - allowing rotation of armature, means vertices must also be rotated,
         ## also a bug with applying the rotation, the Z rotation is lost
@@ -3916,7 +4297,6 @@ class Skeleton(object):
                         scale.setAttribute('y', '%6f' %y)
                         scale.setAttribute('z', '%6f' %z)
 
-
         elif arm.animation_data:
             anims = doc.createElement('animations'); root.appendChild( anims )
             if not len( arm.animation_data.nla_tracks ):
@@ -3929,7 +4309,7 @@ class Skeleton(object):
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
                 if not len(nla.strips): print( 'skipping empty NLA track: %s' %nla.name ); continue
                 print('NLA track:',  nla.name)
-                
+
                 if CONFIG['INDEPENDENT_ANIM']:
                     nla.mute = False
                     for strip in nla.strips:
@@ -4015,15 +4395,17 @@ class Skeleton(object):
         return doc.toprettyxml()
 
 
-############ selector extras ############
+## Selector extras
+
 class INFO_MT_instances(bpy.types.Menu):
     bl_label = "Instances"
+
     def draw(self, context):
         layout = self.layout
         inst = gather_instances()
         for data in inst:
             ob = inst[data][0]
-            op = layout.operator(INFO_MT_instance.bl_idname, text=ob.name)    # operator has no variable for button name?
+            op = layout.operator(INFO_MT_instance.bl_idname, text=ob.name) # operator has no variable for button name?
             op.mystring = ob.name
         layout.separator()
 
@@ -4031,11 +4413,13 @@ class INFO_MT_instance(bpy.types.Operator):
     '''select instance group'''
     bl_idname = "ogre.select_instances"
     bl_label = "Select Instance Group"
-    bl_options = {'REGISTER', 'UNDO'}                              # Options for this panel type
+    bl_options = {'REGISTER', 'UNDO'} # Options for this panel type
     mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
+
     @classmethod
     def poll(cls, context):
         return True
+
     def invoke(self, context, event):
         print( 'invoke select_instances op', event )
         select_instances( context, self.mystring )
@@ -4043,6 +4427,7 @@ class INFO_MT_instance(bpy.types.Operator):
 
 class INFO_MT_groups(bpy.types.Menu):
     bl_label = "Groups"
+
     def draw(self, context):
         layout = self.layout
         for group in bpy.data.groups:
@@ -4056,17 +4441,16 @@ class INFO_MT_group(bpy.types.Operator):
     bl_label = "Select Group"
     bl_options = {'REGISTER'}                              # Options for this panel type
     mystring= StringProperty(name="MyString", description="hidden string", maxlen=1024, default="my string")
+
     @classmethod
     def poll(cls, context):
         return True
+
     def invoke(self, context, event):
         select_group( context, self.mystring )
         return {'FINISHED'}
 
-#############
-
-
-
+## NVIDIA texture tool documentation
 
 NVDXT_DOC = '''
 Version 8.30
@@ -4108,14 +4492,14 @@ Optional Filtering for rescaling. Default cube filter:
   -RescaleBlackman
   -RescaleKaiser
   -clamp <int, int> : maximum image size. image width and height are clamped
-  -clampScale <int, int> : maximum image size. image width and height are scaled 
+  -clampScale <int, int> : maximum image size. image width and height are scaled
   -window <left, top, right, bottom> : window of original window to compress
   -nomipmap : don't generate MIP maps
   -nmips <int> : specify the number of MIP maps to generate
   -rgbe : Image is RGBE format
   -dither : add dithering
   -sharpenMethod <method>: sharpen method MIP maps
-  <method> is 
+  <method> is
         None
         Negative
         Lighter
@@ -4136,16 +4520,16 @@ Optional Filtering for rescaling. Default cube filter:
         XSharpen <xsharpen_strength, xsharpen_threshold>
         Custom
   -pause : wait for keyboard on error
-  -flip : flip top to bottom 
+  -flip : flip top to bottom
   -timestamp : Update only changed files
   -list <filename> : list of files to convert
-  -cubeMap : create cube map . 
+  -cubeMap : create cube map .
             Cube faces specified with individual files with -list option
                   positive x, negative x, positive y, negative y, positive z, negative z
                   Use -output option to specify filename
             Cube faces specified in one file.  Use -file to specify input filename
 
-  -volumeMap : create volume texture. 
+  -volumeMap : create volume texture.
             Volume slices specified with individual files with -list option
                   Use -output option to specify filename
             Volume specified in one file.  Use -file to specify input filename
@@ -4169,11 +4553,11 @@ Optional Filtering for rescaling. Default cube filter:
   -gamma <float value>: gamma correcting during filtering
   -outputScale <float, float, float, float>: scale the output by this (r,g,b,a)
   -outputBias <float, float, float, float>: bias the output by this amount (r,g,b,a)
-  -outputWrap : wraps overflow values modulo the output format 
+  -outputWrap : wraps overflow values modulo the output format
   -inputScale <float, float, float, float>: scale the inpput by this (r,g,b,a)
   -inputBias <float, float, float, float>: bias the input by this amount (r,g,b,a)
   -binaryalpha : treat alpha as 0 or 1
-  -alpha_threshold <byte>: [0-255] alpha reference value 
+  -alpha_threshold <byte>: [0-255] alpha reference value
   -alphaborder : border images with alpha = 0
   -alphaborderLeft : border images with alpha (left) = 0
   -alphaborderRight : border images with alpha (right)= 0
@@ -4192,7 +4576,7 @@ Optional Filtering for rescaling. Default cube filter:
   -weight <float, float, float>: Compression weightings for R G and B
   -luminance :  convert color values to luminance for L8 formats
   -greyScale : Convert to grey scale
-  -greyScaleWeights <float, float, float, float>: override greyscale conversion weights of (0.3086, 0.6094, 0.0820, 0)  
+  -greyScaleWeights <float, float, float, float>: override greyscale conversion weights of (0.3086, 0.6094, 0.0820, 0)
   -brightness <float, float, float, float>: per channel brightness. Default 0.0  usual range [0,1]
   -contrast <float, float, float, float>: per channel contrast. Default 1.0  usual range [0.5, 1.5]
 
@@ -4309,21 +4693,18 @@ Examples
 
 '''
 
-
-
-
-
-try: import io_export_rogremesh.rogremesh as Rmesh
+try:
+    import io_export_rogremesh.rogremesh as Rmesh
 except:
     Rmesh = None
     print( 'WARNING: "io_export_rogremesh" is missing' )
 
-if Rmesh and Rmesh.rpy.load(): _USE_RPYTHON_ = True
+if Rmesh and Rmesh.rpy.load():
+    _USE_RPYTHON_ = True
 else:
     _USE_RPYTHON_ = False
     print( 'Rpython module is not cached, you must exit Blender to compile the module:' )
     print( 'cd io_export_rogremesh; python rogremesh.py' )
-
 
 class VertexNoPos(object):
     def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
@@ -4348,8 +4729,8 @@ class VertexNoPos(object):
                 if uv1 != uv2: return False
         return True
 
+## Creating .mesh
 
-#######################################################################################
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
     start = time.time()
     print('mesh to Ogre mesh XML format', ob.name)
@@ -4384,12 +4765,11 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
     if _USE_RPYTHON_ and False:
         Rmesh.save( ob, xmlfile )
-
     else:
         f = open( xmlfile, 'w' )
         doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
 
-        #//very ugly, have to replace number of vertices later
+        # Very ugly, have to replace number of vertices later
         doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
 
         print('    writing shared geometry')
@@ -4400,7 +4780,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                 'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
         })
 
-        ## vertex colors ##
+        # Vertex colors
         vcolors = None
         vcolors_alpha = None
         if len( mesh.tessface_vertex_colors ):
@@ -4409,22 +4789,23 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                 if bloc.name.lower().startswith('alpha'):
                     vcolors_alpha = bloc; break
 
-        ######################################################
-
+        # Materials
         materials = []
         for mat in ob.data.materials:
-            if mat: materials.append( mat )
+            if mat:
+                materials.append( mat )
             else:
                 print('WARNING: bad material data', ob)
-                materials.append( '_missing_material_' )        # fixed dec22, keep proper index
-        if not materials: materials.append( '_missing_material_' )
+                materials.append( '_missing_material_' ) # fixed dec22, keep proper index
+        if not materials:
+            materials.append( '_missing_material_' )
         _sm_faces_ = []
         for matidx, mat in enumerate( materials ):
             _sm_faces_.append([])
 
-
+        # Textures
         dotextures = False
-        uvcache = []    # should get a little speed boost by this cache
+        uvcache = [] # should get a little speed boost by this cache
         if mesh.tessface_uv_textures.active:
             dotextures = True
             for layer in mesh.tessface_uv_textures:
@@ -4432,10 +4813,10 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                 for uvface in layer.data:
                     uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
 
-
         _sm_vertices_ = {}
         _remap_verts_ = []
         numverts = 0
+
         for F in mesh.tessfaces:
             smooth = F.use_smooth
             #print(F, "is smooth=", smooth)
@@ -4451,17 +4832,17 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     uv1, uv2, uv3, uv4 = layer[ F.index ]
                     a.append( (uv1, uv2, uv3) )
                     b.append( (uv1, uv3, uv4) )
-                    
-                    
-            
+
             for tidx, tri in enumerate(tris):
                 face = []
                 for vidx, idx in enumerate(tri):
                     v = mesh.vertices[ idx ]
-                    
-                    if smooth: nx,ny,nz = swap( v.normal )     # fixed june 17th 2011
-                    else: nx,ny,nz = swap( F.normal )
-                    
+
+                    if smooth:
+                        nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
+                    else:
+                        nx,ny,nz = swap( F.normal )
+
                     r = 1.0
                     g = 1.0
                     b = 1.0
@@ -4474,18 +4855,19 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                         else:
                             ra = 1.0
 
-                    ## texture maps ##
+                    # Texture maps
                     vert_uvs = []
                     if dotextures:
                         for layer in uvtris[ tidx ]:
                             vert_uvs.append(layer[ vidx ])
-                    
-                    
-                    #check if we already exported that vertex with same normal, do not export in that case, (flat shading in blender seems to 
-                    #work with face normals, so we copy each flat face' vertices, if this vertex with same normals was already exported,
-                    #TODO: maybe not best solution, check other ways (let blender do all the work, or only support smooth shading, what about seems, smoothing groups, materials, ...)
+
+                    ''' Check if we already exported that vertex with same normal, do not export in that case,
+                        (flat shading in blender seems to work with face normals, so we copy each flat face'
+                        vertices, if this vertex with same normals was already exported,
+                        todo: maybe not best solution, check other ways (let blender do all the work, or only
+                        support smooth shading, what about seems, smoothing groups, materials, ...)
+                    '''
                     vert = VertexNoPos(numverts, nx, ny, nz, r, g, b, ra, vert_uvs)
-                    #print("DEBUG: %i %.9f %.9f %.9f len^2: %.9f" % (numverts, nx, ny, nz, nx*nx+ny*ny+nz*nz))
                     alreadyExported = False
                     if idx in _sm_vertices_:
                         for vert2 in _sm_vertices_[idx]:
@@ -4503,23 +4885,22 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                         face.append(vert.ogre_vidx)
                         _sm_vertices_[idx] = [vert]
                         #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "created")
-                    
+
                     if alreadyExported:
                         continue
-                    
+
                     numverts += 1
                     _remap_verts_.append( v )
 
                     x,y,z = swap(v.co)        # xz-y is correct!
-                    
+
                     doc.start_tag('vertex', {})
                     doc.leaf_tag('position', {
                             'x' : '%6f' % x,
                             'y' : '%6f' % y,
                             'z' : '%6f' % z
                     })
-                    
-                    
+
                     doc.leaf_tag('normal', {
                             'x' : '%6f' % nx,
                             'y' : '%6f' % ny,
@@ -4529,22 +4910,21 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     if vcolors:
                         doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
 
-                    ## texture maps ##
+                    # Texture maps
                     if dotextures:
                         for uv in vert_uvs:
                             doc.leaf_tag('texcoord', {
                                     'u' : '%6f' % uv[0],
                                     'v' : '%6f' % (1.0-uv[1])
                             })
-                    
-                    
+
                     doc.end_tag('vertex')
-                
+
                 faces.append( (face[0], face[1], face[2]) )
-                
+
         del(_sm_vertices_)
         Report.vertices += numverts
-        
+
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
         print(' time: ', time.time()-start )
@@ -4553,13 +4933,13 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         for matidx, mat in enumerate( materials ):
             if not len(_sm_faces_[matidx]):
                 Report.warnings.append( 'BAD SUBMESH: %s' %ob.name )
-                continue	# fixes corrupt unused materials
+                continue # fixes corrupt unused materials
 
             doc.start_tag('submesh', {
                     'usesharedvertices' : 'true',
                     'material' : material_name(mat),
-                    #maybe better look at index of all faces, if one over 65535 set to true;
-                    #problem: we know it too late, postprocessing of file needed
+                    # Maybe better look at index of all faces, if one over 65535 set to true;
+                    # Problem: we know it too late, postprocessing of file needed
                     "use32bitindexes" : str(bool(numverts > 65535))
             })
             doc.start_tag('faces', {
@@ -4576,6 +4956,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             Report.triangles += len(_sm_faces_[matidx])
         del(_sm_faces_)
         doc.end_tag('submeshes')
+
         ## by MrMagne
         doc.start_tag('submeshnames', {})
         for matidx, mat in enumerate( materials ):
@@ -4585,7 +4966,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             })
             doc.end_tag('submesh')
         doc.end_tag('submeshnames')
-        ## end of MrMagne's patch
+        # -- end of MrMagne's patch
 
         arm = ob.find_armature()
         if arm:
@@ -4613,8 +4994,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                 Report.warnings.append( '%s has %s vertices weighted to too many bones (Ogre limits a vertex to 4 bones)\n[try increaseing the Trim-Weights threshold option]' %(mesh.name, badverts) )
             doc.end_tag('boneassignments')
 
-        ############################################
-        ## updated June3 2011 - shape animation works ##
+        # Updated June3 2011 - shape animation works
         if CONFIG['SHAPE_ANIM'] and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
             print('    writing shape keys')
 
@@ -4689,8 +5069,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                         doc.end_tag('animation')
                 doc.end_tag('animations')
 
-
-        ########## clean up and save #############
+        ## Clean up and save
         #bpy.context.scene.meshes.unlink(mesh)
         if cleanup:
             #bpy.context.scene.objects.unlink(copy)
@@ -4700,25 +5079,24 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             copy.user_clear()
             del copy
             del mesh
-
         del _remap_verts_
         del uvcache
-
-        doc.close()     # reported by Reyn
+        doc.close() # reported by Reyn
         f.close()
 
-    #very ugly, find better way
+    # todo: Very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
             import fileinput
             for line in fileinput.input(f, inplace=1):
                 if searchExp in line:
                     line = line.replace(searchExp,replaceExp)
                 sys.stdout.write(line)
-            fileinput.close()   # reported by jakob
-    
+            fileinput.close() # reported by jakob
+
     replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
     del(replaceInplace)
-        
+
+    # Start .mesh.xml to .mesh convertion tool
     OgreXMLConverter( xmlfile, has_uvs=dotextures )
 
     if arm and CONFIG['ARM_ANIM']:
@@ -4739,9 +5117,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     print( 'TIME: ', time.time()-start )
     return mats
 
-## end dot_mesh ##
+## Jmonkey preview
+## todo: remove jmonkey
 
-############### Jmonkey ################ TODO remove jmonkey
 class JmonkeyPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
     '''helper to open jMonkey (JME)'''
     bl_idname = 'jmonkey.preview'
@@ -4774,21 +5152,37 @@ def JmonkeyPipe( path ):
     proc = subprocess.Popen(cmd)#, stdin=subprocess.PIPE)
     return proc
 
-############### Tundra ################
+## realXtend Tundra preview
+## todo: This only work if the custom py script is enabled in Tundra
+## It's nice when it works but PythonScriptModule is not part of the
+## default Tundra distro anymore, so this is atm kind of dead.
 
 class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
     '''helper to open Tundra2 (realXtend)'''
     bl_idname = 'tundra.preview'
     bl_label = "opens Tundra2 in a non-blocking subprocess"
     bl_options = {'REGISTER'}
-    filepath= StringProperty(name="File Path", description="Filepath used for exporting Tundra .txml file", maxlen=1024, default="/tmp/preview.txml", subtype='FILE_PATH')
     EXPORT_TYPE = 'REX'
-    EX_FORCE_CAMERA = BoolProperty(name="Force Camera", description="export active camera", default=False)
-    EX_FORCE_LAMPS = BoolProperty(name="Force Lamps", description="export all lamps", default=False)
+
+    filepath= StringProperty(
+        name="File Path",
+        description="Filepath used for exporting Tundra .txml file",
+        maxlen=1024,
+        default="/tmp/preview.txml",
+        subtype='FILE_PATH')
+    EX_FORCE_CAMERA = BoolProperty(
+        name="Force Camera",
+        description="export active camera",
+        default=False)
+    EX_FORCE_LAMPS = BoolProperty(
+        name="Force Lamps",
+        description="export all lamps",
+        default=False)
 
     @classmethod
     def poll(cls, context):
-        if context.active_object and context.mode != 'EDIT_MESH': return True
+        if context.active_object and context.mode != 'EDIT_MESH':
+            return True
 
     def invoke(self, context, event):
         global TundraSingleton
@@ -4811,7 +5205,8 @@ class TundraPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
         elif self.EX_SCENE:
             TundraSingleton.load( context, path )
 
-        for ob in obs: ob.select = True     # restore selection
+        for ob in obs:
+            ob.select = True # restore selection
         return {'FINISHED'}
 
 TundraSingleton = None
@@ -4821,6 +5216,7 @@ class Tundra_StartPhysicsOp(bpy.types.Operator):
     bl_idname = 'tundra.start_physics'
     bl_label = "start physics"
     bl_options = {'REGISTER'}
+
     @classmethod
     def poll(cls, context):
         if TundraSingleton: return True
@@ -4833,6 +5229,7 @@ class Tundra_StopPhysicsOp(bpy.types.Operator):
     bl_idname = 'tundra.stop_physics'
     bl_label = "stop physics"
     bl_options = {'REGISTER'}
+
     @classmethod
     def poll(cls, context):
         if TundraSingleton: return True
@@ -4845,6 +5242,7 @@ class Tundra_PhysicsDebugOp(bpy.types.Operator):
     bl_idname = 'tundra.toggle_physics_debug'
     bl_label = "stop physics"
     bl_options = {'REGISTER'}
+
     @classmethod
     def poll(cls, context):
         if TundraSingleton: return True
@@ -4857,6 +5255,7 @@ class Tundra_ExitOp(bpy.types.Operator):
     bl_idname = 'tundra.exit'
     bl_label = "quit tundra"
     bl_options = {'REGISTER'}
+
     @classmethod
     def poll(cls, context):
         if TundraSingleton: return True
@@ -4864,7 +5263,9 @@ class Tundra_ExitOp(bpy.types.Operator):
         TundraSingleton.exit()
         return {'FINISHED'}
 
-#######################
+## Server object to talk with realXtend Tundra with UDP
+## Requires Tundra to be running a py script.
+
 class Server(object):
     def stream( self, o ):
         b = pickle.dumps( o, protocol=2 ) #protocol2 is python2 compatible
@@ -4952,8 +5353,8 @@ class Server(object):
         self.setup_callback( bpy.context )
         import threading
         self.ready = threading._allocate_lock()
-        self.ID = threading._start_new_thread( 
-            self.loop, (None,) 
+        self.ID = threading._start_new_thread(
+            self.loop, (None,)
         )
         print( 'SERVER: thread started')
 
@@ -5012,14 +5413,16 @@ class Server(object):
         if not self._handle:
             print('SERVER: FAILED to setup frame update callback')
 
-
 def _create_stream_proto():
     proto = {}
     tags = 'ID NAME POSITION ROTATION SCALE DATA SELECTED TYPE MESH LAMP CAMERA SPEAKER ANIMATIONS DISTANCE ENERGY VOLUME MUTE LOD'.split()
-    for i,tag in enumerate( tags ): proto[ tag ] = chr(i)		# up to 256
+    for i,tag in enumerate( tags ):
+        proto[ tag ] = chr(i) # up to 256
     return proto
+
 STREAM_PROTO = _create_stream_proto()
 STREAM_BUFFER_SIZE = 2048
+
 TUNDRA_SCRIPT = '''
 # this file was generated by blender2ogre #
 import tundra, socket, select, pickle
@@ -5051,7 +5454,7 @@ class Client(object):
         header = data[ : 4]
         s = data[ 4 : int(header)+4 ]
         objects = pickle.loads( s )
-        scn = tundra.Scene().MainCameraScene()	# replaces GetDefaultScene()
+        scn = tundra.Scene().MainCameraScene()    # replaces GetDefaultScene()
         for ob in objects:
             e = scn.GetEntityRaw( ob[ID] )
             if not e: continue
@@ -5068,8 +5471,8 @@ class Client(object):
                 #e.light.specColor = !! not wrapped !!
             elif ob[TYPE] == SPEAKER:
                 e.sound.soundGain = ob[VOLUME]
-                #e.sound.soundInnerRadius = 
-                #e.sound.soundOuterRadius = 
+                #e.sound.soundInnerRadius =
+                #e.sound.soundOuterRadius =
                 if ob[MUTE]: e.sound.StopSound()
                 else: e.sound.PlaySound()   # tundra API needs sound.IsPlaying()
 
@@ -5126,7 +5529,7 @@ class TundraPipe(object):
   <plugin path="EnvironmentModule" />           <!-- EnvironmentModule depends on OgreRenderingModule -->
   <plugin path="PhysicsModule" />               <!-- PhysicsModule depends on OgreRenderingModule and EnvironmentModule -->
   <plugin path="TundraProtocolModule" />        <!-- TundraProtocolModule depends on OgreRenderingModule -->
-  <plugin path="JavascriptModule" />            <!-- JavascriptModule depends on TundraProtocolModule --> 
+  <plugin path="JavascriptModule" />            <!-- JavascriptModule depends on TundraProtocolModule -->
   <plugin path="AssetModule" />                 <!-- AssetModule depends on TundraProtocolModule -->
   <plugin path="AvatarModule" />                <!-- AvatarModule depends on AssetModule and OgreRenderingModule -->
   <plugin path="ECEditorModule" />              <!-- ECEditorModule depends on OgreRenderingModule, TundraProtocolModule, OgreRenderingModule and AssetModule -->
@@ -5142,11 +5545,11 @@ class TundraPipe(object):
   <jsplugin path="cameraapplication.js" />
   <jsplugin path="FirstPersonMouseLook.js" />
   <jsplugin path="MenuBar.js" />
-  
+
   <!-- Python plugins -->
   <!-- <pyplugin path="lib/apitests.py" /> -->          <!-- Runs framework api tests -->
   <pyplugin path="%s" />         <!-- shows qt py console. could enable by default when add to menu etc. for controls, now just shows directly when is enabled here -->
-  
+
   <option name="--accept_unknown_http_sources" />
   <option name="--accept_unknown_local_sources" />
   <option name="--fpslimit" value="60" />
@@ -5247,16 +5650,16 @@ class TundraPipe(object):
         TundraSingleton = None
 
 
+## More UI
 
-
-
-
-###########################################
 class MENU_preview_material_text(bpy.types.Menu):
     bl_label = 'preview'
+
     @classmethod
     def poll(self,context):
-        if context.active_object and context.active_object.active_material: return True
+        if context.active_object and context.active_object.active_material:
+            return True
+
     def draw(self, context):
         layout = self.layout
         mat = context.active_object.active_material
@@ -5265,7 +5668,8 @@ class MENU_preview_material_text(bpy.types.Menu):
             preview = generate_material( mat )
             for line in preview.splitlines():
                 if line.strip():
-                    for ww in wordwrap( line ): layout.label(text=ww)
+                    for ww in wordwrap( line ):
+                        layout.label(text=ww)
 
 @UI
 class INFO_HT_myheader(bpy.types.Header):
@@ -5300,7 +5704,6 @@ class INFO_HT_myheader(bpy.types.Header):
 
         op = layout.operator( 'ogremeshy.preview', text='', icon='PLUGIN' ); op.mesh = True
 
-
         row = layout.row(align=True)
         sub = row.row(align=True)
         sub.menu("INFO_MT_file")
@@ -5311,7 +5714,6 @@ class INFO_HT_myheader(bpy.types.Header):
         row = layout.row(align=False); row.scale_x = 1.25
         row.menu("INFO_MT_instances", icon='NODETREE', text='')
         row.menu("INFO_MT_groups", icon='GROUP', text='')
-
 
         layout.template_header()
         if not context.area.show_menus:
@@ -5327,7 +5729,6 @@ class INFO_HT_myheader(bpy.types.Header):
 
             layout.label(text=scene.statistics())
             layout.menu( "INFO_MT_help" )
-
         else:
             layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
 
@@ -5352,7 +5753,6 @@ class INFO_HT_myheader(bpy.types.Header):
             if OgreToggleInterfaceOp.TOGGLE: layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_DEHLT')
             else: layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_HLT')
 
-
 def export_menu_func_ogre(self, context):
     path,name = os.path.split( context.blend_data.filepath )
     op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene and .mesh)")
@@ -5363,10 +5763,12 @@ def export_menu_func_realxtend(self, context):
     op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="RealXtend (.txml and .mesh)")
     op.filepath = os.path.join( path, name.split('.')[0]+'.txml' )
 
-
-try: _header_ = bpy.types.INFO_HT_header
+try:
+    _header_ = bpy.types.INFO_HT_header
 except:
     print('---blender2ogre addon enable---')
+
+## Toggle button for blender2ogre UI panels
 
 class OgreToggleInterfaceOp(bpy.types.Operator):
     '''Toggle Ogre UI'''
@@ -5375,8 +5777,11 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
     bl_options = {'REGISTER'}
     TOGGLE = True  #restore_minimal_interface()
     BLENDER_DEFAULT_HEADER = _header_
+
     @classmethod
-    def poll(cls, context): return True
+    def poll(cls, context):
+        return True
+
     def invoke(self, context, event):
         #global _header_
         if OgreToggleInterfaceOp.TOGGLE: #_header_:
@@ -5394,10 +5799,7 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
             bpy.utils.register_class(_header_)
             restore_minimal_interface()
             OgreToggleInterfaceOp.TOGGLE = True
-
         return {'FINISHED'}
-
-
 
 class INFO_HT_microheader(bpy.types.Header):
     bl_space_type = 'INFO'
@@ -5431,13 +5833,11 @@ def restore_minimal_interface():
         print( 'b2ogre minimal UI already setup' )
         return True
 
-
-
-
 MyShaders = None
+
 def register():
-    print( '-'*80)
-    print(VERSION)
+    print('-' * 80)
+    print('blender2ogre', VERSION)
     global MyShaders, _header_, _USE_TUNDRA_, _USE_JMONKEY_
     #bpy.utils.register_module(__name__)    ## do not load all the ogre panels by default
     #_header_ = bpy.types.INFO_HT_header
@@ -5457,10 +5857,10 @@ def register():
         scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
         for prog in progs:
             print('ogre shader program', prog.name)
+    else:
+        print('WARNING: invalid my-shaders path' )
 
-    else: print( 'WARNING: invalid my-shaders path' )
-
-    print( '-'*80)
+    print('-'*80)
 
 def unregister():
     header = _header_
@@ -5470,40 +5870,45 @@ def unregister():
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
 
-
-########### Tundra SkyX - TODO move to tundra.py #############
+## Blender world panel options for EC_SkyX creation
+## todo: EC_SkyX has changes a bit lately, see that
+## all these options are still correct and valid
+## old todo (?): Move to tundra.py
 
 bpy.types.World.ogre_skyX = BoolProperty(
     name="enable sky", description="ogre sky",
     default=False
 )
-
 bpy.types.World.ogre_skyX_time = FloatProperty(
     name="Time Multiplier",
-    description="change speed of day/night cycle", 
-    default=0.3, min=0.0, max=5.0
+    description="change speed of day/night cycle",
+    default=0.3,
+    min=0.0, max=5.0
 )
-
 bpy.types.World.ogre_skyX_wind = FloatProperty(
     name="Wind Direction",
-    description="change direction of wind", 
-    default=33.0, min=0.0, max=360.0
+    description="change direction of wind",
+    default=33.0,
+    min=0.0, max=360.0
 )
-
 bpy.types.World.ogre_skyX_volumetric_clouds = BoolProperty(
     name="volumetric clouds", description="toggle ogre volumetric clouds",
     default=True
 )
 bpy.types.World.ogre_skyX_cloud_density_x = FloatProperty(
     name="Cloud Density X",
-    description="change density of volumetric clouds on X", 
-    default=0.1, min=0.0, max=5.0
+    description="change density of volumetric clouds on X",
+    default=0.1,
+    min=0.0, max=5.0
 )
 bpy.types.World.ogre_skyX_cloud_density_y = FloatProperty(
     name="Cloud Density Y",
-    description="change density of volumetric clouds on Y", 
-    default=1.0, min=0.0, max=5.0
+    description="change density of volumetric clouds on Y",
+    default=1.0,
+    min=0.0, max=5.0
 )
+
+## Sky UI panel
 
 @UI
 class OgreSkyPanel(bpy.types.Panel):
@@ -5511,8 +5916,11 @@ class OgreSkyPanel(bpy.types.Panel):
     bl_region_type = 'WINDOW'
     bl_context = "world"
     bl_label = "Ogre Sky Settings"
+
     @classmethod
-    def poll(cls, context): return True
+    def poll(cls, context):
+        return True
+
     def draw(self, context):
         layout = self.layout
         box = layout.box()
@@ -5533,8 +5941,8 @@ class OgreProgram(object):
 
     self.name = name of program reference
     self.source = name of shader program (.cg, .glsl)
-
     '''
+
     def save( self, path ):
         print('saving program to', path)
         f = open( os.path.join(path,self.source), 'wb' )
@@ -5545,11 +5953,10 @@ class OgreProgram(object):
             f.write( self.includes[name] )
             f.close()
 
-    ######################################
     PROGRAMS = {}
     SOURCES = {}
 
-    def reload(self):   # only one directory is allowed to hold shader programs
+    def reload(self): # only one directory is allowed to hold shader programs
         if self.source not in os.listdir( CONFIG['SHADER_PROGRAMS'] ):
             print( 'ERROR: ogre material %s is missing source: %s' %(self.name,self.source) )
             print( CONFIG['SHADER_PROGRAMS'] )
@@ -5598,6 +6005,8 @@ class OgreProgram(object):
             elif line.startswith('source'): self.source = line.split()[-1]
             elif line.startswith('entry_point'): self.entry_point = line.split()[-1]
             elif line.startswith('profiles'): self.profiles = line.split()[1:]
+
+## Ogre Material object(s) that is utilized during export stages
 
 class OgreMaterialScript(object):
     def get_programs(self):
@@ -5712,14 +6121,12 @@ class OgreMaterialScript(object):
         if len(self.techniques)>1:
             print('WARNING: user material %s has more than one technique' %self.url)
 
-
     def as_abstract_passes( self ):
         r = []
         for i,P in enumerate(self.passes):
             head = 'abstract pass %s/PASS%s' %(self.name,i)
             r.append( head + '\n' + P['body'] )
         return r
-
 
 class MaterialScripts(object):
     ALL_MATERIALS = {}
@@ -5766,17 +6173,17 @@ class MaterialScripts(object):
             if omat.vertex_programs or omat.fragment_programs:  # ignore materials without programs
                 self.ENUM_ITEMS.append( (omat.name, omat.name, url) )
 
-    @classmethod    # only call after parsing all material scripts
+    @classmethod # only call after parsing all material scripts
     def reset_rna(self, callback=None):
         bpy.types.Material.ogre_parent_material = EnumProperty(
-            name="Script Inheritence", 
+            name="Script Inheritence",
             description='ogre parent material class',
             items=self.ENUM_ITEMS,
             #update=callback
         )
 
+## Image/texture proecssing
 
-############################################################################
 def is_image_postprocessed( image ):
     if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE' or image.use_resize_half or image.use_resize_absolute or image.use_color_quantize or image.use_convert_format:
         return True
@@ -5784,22 +6191,16 @@ def is_image_postprocessed( image ):
         return False
 
 class _image_processing_( object ):
-
     def _reformat( self, name, image ):
         if image.convert_format != 'NONE':
             name = '%s.%s' %(name[:name.rindex('.')], image.convert_format)
             if image.convert_format == 'dds': name = '_DDS_.%s' %name
-
         elif image.use_resize_half or image.use_resize_absolute or image.use_color_quantize or image.use_convert_format:
             name = '_magick_.%s' %name
-
-
         if CONFIG['FORCE_IMAGE_FORMAT'] != 'NONE' and not name.endswith('.dds'):
             name = '%s.%s' %(name[:name.rindex('.')], CONFIG['FORCE_IMAGE_FORMAT'])
             if CONFIG['FORCE_IMAGE_FORMAT'] == 'dds':
                 name = '_DDS_.%s' %name
-
-
         return name
 
     def image_magick( self, texture, infile ):
@@ -5850,7 +6251,6 @@ class _image_processing_( object ):
             print( 'IMAGE MAGICK: %s' %cmd )
             subprocess.call( cmd )
 
-
     def nvcompress(self, texture, infile, outfile=None, version=1, fast=False, blocking=True):
         print('[NVCompress DDS Wrapper]', infile )
         assert version in (1,2,3,4,5)
@@ -5859,7 +6259,6 @@ class _image_processing_( object ):
 
         if texture.use_alpha and texture.image.depth==32:
             cmd.append( '-alpha' )
-
         if not texture.use_mipmap:
             cmd.append( '-nomips' )
 
@@ -5869,44 +6268,47 @@ class _image_processing_( object ):
                 cmd.append( '-bc%sn' %version )
             else:
                 cmd.append( '-bc%s' %version )
-
         else:
             cmd.append( '-bc%s' %version )
 
-        if fast: cmd.append( '-fast' )
+        if fast:
+            cmd.append( '-fast' )
         cmd.append( infile )
 
         if outfile: cmd.append( outfile )
 
         print( cmd )
-        if blocking: subprocess.call( cmd )
-        else: subprocess.Popen( cmd )
+        if blocking:
+            subprocess.call( cmd )
+        else:
+            subprocess.Popen( cmd )
 
+## NVIDIA texture compress documentation
 
 _nvcompress_doc = '''
 usage: nvcompress [options] infile [outfile]
 
 Input options:
-  -color   	The input image is a color map (default).
-  -alpha     	The input image has an alpha channel used for transparency.
-  -normal  	The input image is a normal map.
-  -tonormal	Convert input to normal map.
-  -clamp   	Clamp wrapping mode (default).
-  -repeat  	Repeat wrapping mode.
-  -nomips  	Disable mipmap generation.
+  -color       The input image is a color map (default).
+  -alpha         The input image has an alpha channel used for transparency.
+  -normal      The input image is a normal map.
+  -tonormal    Convert input to normal map.
+  -clamp       Clamp wrapping mode (default).
+  -repeat      Repeat wrapping mode.
+  -nomips      Disable mipmap generation.
 
 Compression options:
-  -fast    	Fast compression.
-  -nocuda  	Do not use cuda compressor.
-  -rgb     	RGBA format
-  -bc1     	BC1 format (DXT1)
-  -bc1n    	BC1 normal map format (DXT1nm)
-  -bc1a    	BC1 format with binary alpha (DXT1a)
-  -bc2     	BC2 format (DXT3)
-  -bc3     	BC3 format (DXT5)
-  -bc3n    	BC3 normal map format (DXT5nm)
-  -bc4     	BC4 format (ATI1)
-  -bc5     	BC5 format (3Dc/ATI2)
+  -fast        Fast compression.
+  -nocuda      Do not use cuda compressor.
+  -rgb         RGBA format
+  -bc1         BC1 format (DXT1)
+  -bc1n        BC1 normal map format (DXT1nm)
+  -bc1a        BC1 format with binary alpha (DXT1a)
+  -bc2         BC2 format (DXT3)
+  -bc3         BC3 format (DXT5)
+  -bc3n        BC3 normal map format (DXT5nm)
+  -bc4         BC4 format (ATI1)
+  -bc5         BC5 format (3Dc/ATI2)
 '''
 
 class OgreMaterialGenerator( _image_processing_ ):
@@ -5941,7 +6343,6 @@ class OgreMaterialGenerator( _image_processing_ ):
                 r += usermat.as_abstract_passes()
         return '\n'.join( r )
 
-
     def get_passes(self):
         r = []
         r.append( self.generate_pass(self.material) )
@@ -5949,7 +6350,6 @@ class OgreMaterialGenerator( _image_processing_ ):
             if mat.use_in_ogre_material_pass:             # submaterials
                 r.append( self.generate_pass(mat) )
         return r
-
 
     def generate_pass( self, mat, pass_name=None ):
         usermat = texnodes = None
@@ -5987,7 +6387,7 @@ class OgreMaterialGenerator( _image_processing_ ):
             f = mat.diffuse_intensity
             if mat.use_vertex_color_paint:
                 M += indent(3, 'diffuse vertexcolour' )
-            else:        # fall back to basic material 
+            else:        # fall back to basic material
                 M += indent(3, 'diffuse %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
             f = mat.specular_intensity
@@ -6079,7 +6479,7 @@ class OgreMaterialGenerator( _image_processing_ ):
             postname = self._reformat( texname, texture.image )
             print('MESSAGE: image postproc',postname)
 
-        M += indent(4, 'texture %s' %postname )    
+        M += indent(4, 'texture %s' %postname )
 
         exmode = texture.extension
         if exmode in TextureUnit.tex_address_mode:
@@ -6088,7 +6488,7 @@ class OgreMaterialGenerator( _image_processing_ ):
 
         # TODO - hijack nodes for better control?
         if slot:        # classic blender material slot options
-            if exmode == 'CLIP': M += indent(4, 'tex_border_colour %s %s %s' %(slot.color.r, slot.color.g, slot.color.b) )    
+            if exmode == 'CLIP': M += indent(4, 'tex_border_colour %s %s %s' %(slot.color.r, slot.color.g, slot.color.b) )
             M += indent(4, 'scale %s %s' %(1.0/slot.scale.x, 1.0/slot.scale.y) )
             if slot.texture_coords == 'REFLECTION':
                 if slot.mapping == 'SPHERE':
@@ -6147,7 +6547,6 @@ class OgreMaterialGenerator( _image_processing_ ):
                 idx = find_uv_layer_index( uv_layer )
                 M += indent(4, 'tex_coord_set %s' %idx)
 
-
         M += indent(3, '}' )
         ###############
 
@@ -6169,11 +6568,9 @@ class OgreMaterialGenerator( _image_processing_ ):
 
         return M
 
-
-
 class TextureUnit(object):
     colour_op = {
-        'MIX'       :   'modulate',		# Ogre Default - was "replace" but that kills lighting
+        'MIX'       :   'modulate',        # Ogre Default - was "replace" but that kills lighting
         'ADD'     :   'add',
         'MULTIPLY' : 'modulate',
         #'alpha_blend' : '',
@@ -6202,9 +6599,12 @@ class PANEL_Object(bpy.types.Panel):
     bl_region_type = 'WINDOW'
     bl_context = "object"
     bl_label = "Object+"
+
     @classmethod
     def poll(cls, context):
-        if _USE_TUNDRA_ and context.active_object: return True
+        if _USE_TUNDRA_ and context.active_object:
+            return True
+
     def draw(self, context):
         ob = context.active_object
         layout = self.layout
@@ -6255,19 +6655,16 @@ class PANEL_MultiResLOD(bpy.types.Panel):
         if ob.use_multires_lod:
             box.prop( ob, 'multires_lod_range' )
 
+## Public API (continued)
 
-#####################################################################################
-###################################### Public API #####################################
 def material_name( mat ):
     if type(mat) is str: return mat
     elif not mat.library: return mat.name
     else: return mat.name + mat.library.filepath.replace('/','_')
 
-
 def export_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
     ''' returns materials used by the mesh '''
     return dot_mesh( ob, path, force_name, ignore_shape_animation, normals )
-
 
 def generate_material( mat, path='/tmp', copy_programs=False, touch_textures=False ):
     ''' returns generated material string '''
@@ -6303,7 +6700,6 @@ def get_shader_program( name ):
 def get_shader_programs():
     return OgreProgram.PROGRAMS.values()
 
-
 def parse_material_and_program_scripts( path, scripts, progs, missing ):   # recursive
     for name in os.listdir(path):
         url = os.path.join(path,name)
@@ -6336,9 +6732,8 @@ def parse_material_and_program_scripts( path, scripts, progs, missing ):   # rec
                         if not ok: missing.append( p )
                         else: progs.append( p )
 
-
-## updates RNA ##
 def update_parent_material_path( path ):
+    ''' updates RNA '''
     print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
     scripts = []
     progs = []
@@ -6353,9 +6748,6 @@ def update_parent_material_path( path ):
 
     MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
     return scripts, progs
-
-
-
 
 def get_subcollision_meshes():
     ''' returns all collision meshes found in the scene '''
@@ -6380,11 +6772,9 @@ def get_subcollisions(ob):
             r.append( child )
     return r
 
-
-
 class bpyShaders(bpy.types.Operator):
-    '''operator: enables material nodes (workaround for not having IDPointers in pyRNA)'''  
-    bl_idname = "ogre.force_setup_material_passes"  
+    '''operator: enables material nodes (workaround for not having IDPointers in pyRNA)'''
+    bl_idname = "ogre.force_setup_material_passes"
     bl_label = "force bpyShaders"
     bl_options = {'REGISTER'}
 
@@ -6396,7 +6786,6 @@ class bpyShaders(bpy.types.Operator):
         mat.use_material_passes = True
         bpyShaders.create_material_passes( mat )
         return {'FINISHED'}
-
 
     ## setup from MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
     @staticmethod
@@ -6478,12 +6867,11 @@ class bpyShaders(bpy.types.Operator):
             r = bpyShaders.create_texture_nodes( mat, n )
         return r
 
-
     @staticmethod
     def create_material_passes( mat, n=8, textures=True ):
         #print('bpyShaders.create_material_passes( %s, %s )' %(mat,n))
         mat.use_nodes = True
-        tree = mat.node_tree	# valid pointer now
+        tree = mat.node_tree    # valid pointer now
 
         nodes = bpyShaders.get_subnodes( tree, 'MATERIAL' )  # assign base material
         if nodes and not nodes[0].material:
@@ -6522,7 +6910,6 @@ class bpyShaders(bpy.types.Operator):
                 input = inputs[j]; output = tex.outputs['Color']
                 link = mat.node_tree.links.new( input, output )
                 r['textures'].append( tex )
-
                 if geoms:
                     geo = mat.node_tree.nodes.new( type='GEOMETRY' )
                     link = mat.node_tree.links.new( tex.inputs['Vector'], geo.outputs['UV'] )
@@ -6532,15 +6919,17 @@ class bpyShaders(bpy.types.Operator):
             x += 220
         return r
 
-
 @UI
 class PANEL_node_editor_ui( bpy.types.Panel ):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'UI'
     bl_label = "Ogre Material"
+
     @classmethod
     def poll(self,context):
-        if context.space_data.id: return True
+        if context.space_data.id:
+            return True
+
     def draw(self, context):
         layout = self.layout
         topmat = context.space_data.id             # the top level node_tree
@@ -6549,15 +6938,14 @@ class PANEL_node_editor_ui( bpy.types.Panel ):
             self.bl_label = topmat.name
             if not topmat.use_material_passes:
                 layout.operator(
-                    'ogre.force_setup_material_passes', 
-                    text="Ogre Material Layers", 
-                    icon='SCENE_DATA' 
+                    'ogre.force_setup_material_passes',
+                    text="Ogre Material Layers",
+                    icon='SCENE_DATA'
                 )
             ogre_material_panel( layout, topmat, show_programs=False )
         elif mat:
             self.bl_label = mat.name
             ogre_material_panel( layout, mat, topmat, show_programs=False )
-
 
 @UI
 class PANEL_node_editor_ui_extra( bpy.types.Panel ):
@@ -6579,16 +6967,12 @@ class PANEL_node_editor_ui_extra( bpy.types.Panel ):
             self.bl_label = topmat.name + ' (advanced)'
             ogre_material_panel_extra( layout, topmat )
 
-
-
-
 def ogre_material_panel_extra( parent, mat ):
     box = parent.box()
     header = box.row()
 
     if mat.use_fixed_pipeline:
         header.prop( mat, 'use_fixed_pipeline', text='Fixed Pipeline', icon='LAMP_SUN' )
-
         row = box.row()
         row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
         row.prop(mat, "use_shadeless")
@@ -6610,7 +6994,6 @@ def ogre_material_panel_extra( parent, mat ):
             #row = box.row()
             row.prop(mat, "emit")
         box.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
-
     else:
         header.prop( mat, 'use_fixed_pipeline', text='', icon='LAMP_SUN' )
         header.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
@@ -6619,13 +7002,10 @@ def ogre_material_panel_extra( parent, mat ):
         box.prop(mat, 'offset_z')
         box.prop(mat, "use_shadows")
         box.prop(mat, 'ogre_depth_write' )
-
         for tag in 'ogre_colour_write ogre_lighting ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
             box.prop(mat, tag)
-
         for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
             box.prop(mat, tag)
-
 
 def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
     box = layout.box()
@@ -6638,7 +7018,8 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
             row.prop(mat, "alpha")
         else:
             row.prop(mat, "use_transparency", text='Transparent')
-    if not parent: return   # only allow on pass1 and higher
+    if not parent:
+        return # only allow on pass1 and higher
 
     header.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='')
 
@@ -6649,10 +7030,9 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
         s = get_ogre_user_material( mat.ogre_parent_material )  # gets by name
         if s and (s.vertex_programs or s.fragment_programs):
             progs = s.get_programs()
-
             split = box.row()
-
             texnodes = None
+
             if parent:
                 texnodes = bpyShaders.get_texture_subnodes( parent, submaterial=mat )
             elif mat.node_tree:
@@ -6685,8 +7065,8 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                 for name in s.fragment_programs:
                     bx.label( text=name )
 
+## Blender addon main entry point.
+## Allows directly running by "blender --python blender2ogre.py"
 
-###########################################################################
-if __name__ == "__main__":  # allows directly running by "blender --python blender2ogre.py"
+if __name__ == "__main__":
     register()
-

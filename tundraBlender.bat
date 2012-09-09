@@ -1,3 +1,1 @@
-mkdir C:\tmp
-C:\Blender25\blender.exe --python integrateTundra.py
-
+"C:\Program Files (x86)\Blender Foundation\Blender\blender.exe" --debug-python --python io_export_ogreDotScene.py
