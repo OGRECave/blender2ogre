@@ -20,6 +20,10 @@ VERSION = '0.5.8'
 '''
 CHANGELOG
     0.5.8
+    * Implement a modal dialog that reports if material names have invalid
+      characters and cant be saved on disk. This small popup will show until
+      user presses left or right mouse (anywhere).
+    * Fix tracker issue 44: XML Attributes not properly escaped in .scene file
     * Implemented reading OgreXmlConverter path from windows registry.
       The .msi installer will ship with certain tools so we can stop guessing
       and making the user install tools separately and setting up paths.
@@ -237,7 +241,7 @@ except ImportError:
 ## More imports now that Blender is imported
 
 import hashlib, getpass, tempfile, configparser, subprocess, pickle
-from xml.sax.saxutils import XMLGenerator
+from xml.sax.saxutils import XMLGenerator, quoteattr
 
 class CMesh(object):
 
@@ -831,18 +835,19 @@ def load_config():
 
     # Windows .msi installer spesific tool paths, always overrides config.
     try:
-        import winreg
-        registry_key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r'Software\blender2ogre', 0, winreg.KEY_READ)
-        msi_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
-        if msi_install_dir != "":
-            # todo: Enable more when/if more tools can be shipped.
-            print("Using windows registry install path for certain tools:", msi_install_dir)
-            CONFIG['OGRETOOLS_XML_CONVERTER'] = msi_install_dir + 'OgreXmlConverter.exe'
-            #CONFIG['OGRETOOLS_MESH_MAGICK'] = msi_install_dir + 'MeshMagick.exe'
-            #CONFIG['OGRE_MESHY'] = msi_install_dir + 'Ogre Meshy.exe'
-            #CONFIG['IMAGE_MAGICK_CONVERT'] = msi_install_dir + 'convert.exe'
-            #CONFIG['NVIDIATOOLS_EXE'] = msi_install_dir + 'nvdxt.exe'
-            #CONFIG['NVCOMPRESS'] = msi_install_dir + 'nvcompress.exe'
+        if sys.platform.startswith('win'):
+            import winreg
+            registry_key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r'Software\blender2ogre', 0, winreg.KEY_READ)
+            msi_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
+            if msi_install_dir != "":
+                # todo: Enable more when/if more tools can be shipped.
+                print("Using windows registry install path for certain tools:", msi_install_dir)
+                CONFIG['OGRETOOLS_XML_CONVERTER'] = msi_install_dir + 'OgreXmlConverter.exe'
+                #CONFIG['OGRETOOLS_MESH_MAGICK'] = msi_install_dir + 'MeshMagick.exe'
+                #CONFIG['OGRE_MESHY'] = msi_install_dir + 'Ogre Meshy.exe'
+                #CONFIG['IMAGE_MAGICK_CONVERT'] = msi_install_dir + 'convert.exe'
+                #CONFIG['NVIDIATOOLS_EXE'] = msi_install_dir + 'nvdxt.exe'
+                #CONFIG['NVCOMPRESS'] = msi_install_dir + 'nvcompress.exe'
     except Exception as e:
         print("Exception while reading windows registry:", e)
         
@@ -1133,10 +1138,12 @@ class RElement(object):
         self.attributes = {}
 
     def toprettyxml(self, lines, indent ):
-        s = '<%s ' %self.tagName
+        s = '<%s ' % self.tagName
         for name in self.attributes:
             value = self.attributes[name]
-            s += '%s="%s" ' %(name,value)
+            if not isinstance(value, str):
+                value = str(value)
+            s += '%s=%s ' % (name, quoteattr(value))
         if not self.childNodes:
             s += '/>'; lines.append( ('  '*indent)+s )
         else:
@@ -1145,17 +1152,25 @@ class RElement(object):
             for child in self.childNodes:
                 child.toprettyxml( lines, indent )
             indent -= 1
-            lines.append(('  '*indent)+'</%s>' %self.tagName )
+            lines.append(('  '*indent) + '</%s>' % self.tagName )
 
 class RDocument(object):
-    def __init__(self): self.documentElement = None
-    def appendChild(self,root): self.documentElement = root
-    def createElement(self,tag): e = RElement(tag); e.document = self; return e
+    def __init__(self): 
+        self.documentElement = None
+
+    def appendChild(self, root): 
+        self.documentElement = root
+
+    def createElement(self, tag): 
+        e = RElement(tag)
+        e.document = self
+        return e
+
     def toprettyxml(self):
         indent = 0
         lines = []
-        self.documentElement.toprettyxml( lines, indent )
-        return '\n'.join( lines )
+        self.documentElement.toprettyxml(lines, indent)
+        return '\n'.join(lines)
 
 class SimpleSaxWriter():
     def __init__(self, output, encoding, top_level_tag, attrs):
@@ -1221,20 +1236,20 @@ class ReportSingleton(object):
         ex = ['Extended Report:']
         if self.errors:
             r.append( '  ERRORS:' )
-            for a in self.errors: r.append( '    . %s' %a )
+            for a in self.errors: r.append( '    - %s' %a )
 
         #if not bpy.context.selected_objects:
         #    self.warnings.append('YOU DID NOT SELECT ANYTHING TO EXPORT')
         if self.warnings:
             r.append( '  WARNINGS:' )
-            for a in self.warnings: r.append( '    . %s' %a )
+            for a in self.warnings: r.append( '    - %s' %a )
 
         if self.messages:
             r.append( '  MESSAGES:' )
-            for a in self.messages: r.append( '    . %s' %a )
+            for a in self.messages: r.append( '    - %s' %a )
         if self.paths:
             r.append( '  PATHS:' )
-            for a in self.paths: r.append( '    . %s' %a )
+            for a in self.paths: r.append( '    - %s' %a )
 
         if self.vertices:
             r.append( '  Original Vertices: %s' %self.orig_vertices)
@@ -1673,6 +1688,59 @@ class PANEL_Configure(bpy.types.Panel):
         op = layout.operator( 'ogre.save_config', text='update config file', icon='FILE' )
         for tag in _CONFIG_TAGS_:
             layout.prop( context.window_manager, tag )
+
+
+## Pop up dialog for various info/error messages
+
+popup_message = ""
+
+class PopUpDialogOperator(bpy.types.Operator): 
+    bl_idname = "object.popup_dialog_operator" 
+    bl_label = "blender2ogre" 
+
+    def __init__(self):
+        print("dialog Start")
+
+    def __del__(self):
+        print("dialog End")
+        
+    def execute(self, context): 
+        print ("execute")
+        return {'RUNNING_MODAL'}
+        
+    def draw(self, context):
+        # todo: Make this bigger and center on screen.
+        # Blender UI stuff seems quite complex, would
+        # think that showing a dialog with a message thath
+        # does not hide when mouse is moved would be simpler!
+        global popup_message
+        layout = self.layout
+        col = layout.column()
+        col.label(popup_message, 'ERROR')
+
+    def invoke(self, context, event):        
+        wm = context.window_manager 
+        wm.invoke_popup(self)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        # Close
+        if event.type == 'LEFTMOUSE':
+            print ("Left mouse")
+            return {'FINISHED'}
+        # Close
+        elif event.type in ('RIGHTMOUSE', 'ESC'):
+            print ("right mouse")
+            return {'FINISHED'}
+
+        print("running modal")
+        return {'RUNNING_MODAL'}
+
+def show_dialog(message):
+    global popup_message
+    popup_message = message
+    bpy.ops.object.popup_dialog_operator('INVOKE_DEFAULT')
 
 ## Game Logic Documentation
 
@@ -3258,18 +3326,25 @@ class _OgreCommonExport_(_TXML_):
 
         # Write one .material file for everything
         if not self.EX_SEP_MATS:
-            url = os.path.join(path, '%s.material' % mat_file_name)
-            f = open( url, 'wb' ); f.write( bytes(M,'utf-8') ); f.close()
-            print('    - Created material:', url)
-            material_files.append( url )
+            try:
+                url = os.path.join(path, '%s.material' % mat_file_name)
+                f = open( url, 'wb' ); f.write( bytes(M,'utf-8') ); f.close()
+                print('    - Created material:', url)
+                material_files.append( url )
+            except Exception as e:
+                show_dialog("Invalid material object name: " + mat_file_name)
 
         return material_files
 
     def dot_material_write_separate( self, mat, data, path = '/tmp' ):
-        url = os.path.join(path, '%s.material' % material_name(mat))
-        f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
-        print('    - Exported Material:', url)
-        return url
+        try:
+            url = os.path.join(path, '%s.material' % material_name(mat))
+            f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
+            print('    - Exported Material:', url)
+            return url
+        except Exception as e:
+            show_dialog("Invalid material object name: " + material_name(mat))
+            return ""
 
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
         dot_mesh( ob, path, force_name, ignore_shape_animation=False )
@@ -4927,7 +5002,13 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     if _USE_RPYTHON_ and False:
         Rmesh.save( ob, xmlfile )
     else:
-        f = open( xmlfile, 'w' )
+        f = None
+        try:
+            f = open( xmlfile, 'w' )
+        except Exception as e:
+            show_dialog("Invalid mesh object name: " + name)
+            return
+
         doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
 
         # Very ugly, have to replace number of vertices later
@@ -6013,6 +6094,8 @@ def register():
     bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
 
+    bpy.utils.register_class(PopUpDialogOperator)
+
     if os.path.isdir( CONFIG['USER_MATERIALS'] ):
         scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
         for prog in progs:
@@ -6028,6 +6111,7 @@ def unregister():
         bpy.utils.register_class(header)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
+    bpy.utils.unregister_class(PopUpDialogOperator)
 
 ## Blender world panel options for EC_SkyX creation
 ## todo: EC_SkyX has changes a bit lately, see that
