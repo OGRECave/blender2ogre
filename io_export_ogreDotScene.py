@@ -23,6 +23,7 @@ CHANGELOG
     * Implement a modal dialog that reports if material names have invalid
       characters and cant be saved on disk. This small popup will show until
       user presses left or right mouse (anywhere).
+    * Fix tracker issue 46: add operationtype to <submesh>
     * Fix tracker issue 44: XML Attributes not properly escaped in .scene file
     * Implemented reading OgreXmlConverter path from windows registry.
       The .msi installer will ship with certain tools so we can stop guessing
@@ -220,7 +221,7 @@ except ImportError:
         SMS = ['<submeshes>']
         #for matidx, matname in ...:
         SM = [
-            '<submesh usesharedvertices="true" use32bitindexes="true" material="%s">' %'somemat',
+            '<submesh usesharedvertices="true" use32bitindexes="true" material="%s" operationtype="triangle_list">' % 'somemat',
             '<faces count="%s">' %'100',
         ]
         for tri in triangles:
@@ -1988,8 +1989,8 @@ class PANEL_Textures(bpy.types.Panel):
             else:
                 texop = TextureUnit.colour_op[ btype ]
         elif btype in TextureUnit.colour_op_ex:
-                texop = TextureUnit.colour_op_ex[ btype ] #todo: Is this a intendation bug?
-                ex = True
+            texop = TextureUnit.colour_op_ex[ btype ]
+            ex = True
 
         box = layout.box()
         row = box.row()
@@ -5182,7 +5183,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     'material' : material_name(mat),
                     # Maybe better look at index of all faces, if one over 65535 set to true;
                     # Problem: we know it too late, postprocessing of file needed
-                    "use32bitindexes" : str(bool(numverts > 65535))
+                    "use32bitindexes" : str(bool(numverts > 65535)),
+                    "operationtype" : "triangle_list"
             })
             doc.start_tag('faces', {
                     'count' : str(len(_sm_faces_[matidx]))
