@@ -1,9 +1,10 @@
-blender2ogre
-By: Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha
-Sponsors: Adminotech Ltd
-License: GNU LGPL
-Version: 0.5.8
-
+***************************************************************************
+Name      blender2ogre 
+Version   0.5.8
+License   GNU LGPL
+Authors   Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, 
+          Mr.Magne, Jonne Nauha, vax456
+Sponsors  Adminotech Ltd.
 ***************************************************************************
 
 Supports

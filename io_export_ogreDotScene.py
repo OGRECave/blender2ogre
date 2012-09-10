@@ -20,10 +20,14 @@ VERSION = '0.5.8'
 '''
 CHANGELOG
     0.5.8
+    * Fix tracker issue 48: Needs to check if outputting to /tmp or 
+      ~/.wine/drive_c/tmp on Linux. Thanks to vax456 for providing the patch,
+      added him to contributors. Preview mesh's are now placed under /tmp 
+      on Linux systems if the OgreMeshy executable ends with .exe
+    * Fix tracker issue 46: add operationtype to <submesh>
     * Implement a modal dialog that reports if material names have invalid
       characters and cant be saved on disk. This small popup will show until
       user presses left or right mouse (anywhere).
-    * Fix tracker issue 46: add operationtype to <submesh>
     * Fix tracker issue 44: XML Attributes not properly escaped in .scene file
     * Implemented reading OgreXmlConverter path from windows registry.
       The .msi installer will ship with certain tools so we can stop guessing
@@ -68,7 +72,7 @@ TODO
 
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
-    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha",
+    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456",
     "version": (0, 5, 8),
     "blender": (2, 6, 3),
     "location": "File > Export...",
@@ -2103,8 +2107,13 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
         Report.reset()
         Report.messages.append('running %s' %CONFIG['OGRE_MESHY'])
 
-        if sys.platform.startswith('linux'):    # TODO use native OgreMeshy on linux
-            path = '%s/.wine/drive_c/tmp' %os.environ['HOME']
+        if sys.platform.startswith('linux'):
+            # If OgreMeshy ends with .exe, set the path for preview meshes to
+            # the user's wine directory, otherwise to /tmp.
+            if CONFIG['OGRE_MESHY'].endswith('.exe'):
+                path = '%s/.wine/drive_c/tmp' % os.environ['HOME']
+            else:
+                path = '/tmp'
         elif sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
             path = '/tmp'
         else:
