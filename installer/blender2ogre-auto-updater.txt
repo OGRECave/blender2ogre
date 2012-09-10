@@ -1,0 +1,29 @@
+;aiu;
+
+[0.5.8]
+Name=blender2ogre 0.5.8
+ProductVersion=0.5.8.0
+URL=http://blender2ogre.googlecode.com/files/blender2ogre-0.5.8.exe
+Size=2766806
+MD5=2ce6e423116b245636ceda0529d8948f
+ServerFileName=blender2ogre-0.5.8.exe
+Flags=NoCache
+RegistryKey=HKCR\Software\blender2ogre\Version
+Version=0.5.8.0
+Feature=* Added silent auto update checks if blender2ogre was installed using
+Feature1= the .exe installer. This will keep people up to date when new versions are out.
+Feature2=* Fix tracker issue 48: Needs to check if outputting to /tmp or ~/.wine/drive_c/tmp on Linux. Thanks to vax456 for providing the patch, added him to contributors. Preview mesh's are now placed under /tmp on Linux systems if the OgreMeshy executable ends with .exe
+Feature3=* Fix tracker issue 46: add operationtype to <submesh>
+Feature4=* Implement a modal dialog that reports if material names have invalid characters and cant be saved on disk. This small popup will show until user presses left or right mouse (anywhere).
+Feature5=* Fix tracker issue 44: XML Attributes not properly escaped in .scene file 
+Feature6=* Implemented reading OgreXmlConverter path from windows registry. The .msi installer will ship with certain tools so we can stop guessing and making the user install tools separately and setting up paths.
+Feature7=* Fix bug that .mesh files were not generated while doing a .txml export. This was result of the late 2.63 mods that forgot to update object facecount before determining if mesh should be exported.
+Feature8=* Fix bug that changed settings in the export dialog were forgotten when you re-exported without closing blender. Now settings should persist always from the last export. They are also stored to disk so the same settings are in use when if you restart Blender.
+Feature9=* Fix bug that once you did a export, the next time the export location was forgotten. Now on sequential exports, the last export path is remembered in the export dialog.
+Feature10=* Remove all local:// from asset refs and make them relative in .txml export. Having relative refs is the best for local preview and importing the txml to existing scenes.
+Feature11=* Make .material generate what version of this plugins was used to generate the material file. Will be helpful in production to catch things. Added pretty printing line endings so the raw .material data is easier to read.
+Feature12=* Improve console logging for the export stages. Run Blender from cmd prompt to see this information.
+Feature13=* Clean/fix documentation in code for future development
+Feature14=* Add todo to code for future development
+Feature15=* Restructure/move code for easier readability
+Feature16=* Remove extra white spaces and convert tabs to space

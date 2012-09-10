@@ -20,6 +20,8 @@ VERSION = '0.5.8'
 '''
 CHANGELOG
     0.5.8
+    * Added silent auto update checks if blender2ogre was installed using
+      the .exe installer. This will keep people up to date when new versions are out.
     * Fix tracker issue 48: Needs to check if outputting to /tmp or 
       ~/.wine/drive_c/tmp on Linux. Thanks to vax456 for providing the patch,
       added him to contributors. Preview mesh's are now placed under /tmp 
@@ -30,7 +32,7 @@ CHANGELOG
       user presses left or right mouse (anywhere).
     * Fix tracker issue 44: XML Attributes not properly escaped in .scene file
     * Implemented reading OgreXmlConverter path from windows registry.
-      The .msi installer will ship with certain tools so we can stop guessing
+      The .exe installer will ship with certain tools so we can stop guessing
       and making the user install tools separately and setting up paths.
     * Fix bug that .mesh files were not generated while doing a .txml export.
       This was result of the late 2.63 mods that forgot to update object
@@ -838,21 +840,23 @@ def load_config():
                 print( 'ERROR: unknown platform' )
                 assert 0
 
-    # Windows .msi installer spesific tool paths, always overrides config.
     try:
         if sys.platform.startswith('win'):
             import winreg
+            # Find the blender2ogre install path from windows registry
             registry_key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r'Software\blender2ogre', 0, winreg.KEY_READ)
-            msi_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
-            if msi_install_dir != "":
-                # todo: Enable more when/if more tools can be shipped.
-                print("Using windows registry install path for certain tools:", msi_install_dir)
-                CONFIG['OGRETOOLS_XML_CONVERTER'] = msi_install_dir + 'OgreXmlConverter.exe'
-                #CONFIG['OGRETOOLS_MESH_MAGICK'] = msi_install_dir + 'MeshMagick.exe'
-                #CONFIG['OGRE_MESHY'] = msi_install_dir + 'Ogre Meshy.exe'
-                #CONFIG['IMAGE_MAGICK_CONVERT'] = msi_install_dir + 'convert.exe'
-                #CONFIG['NVIDIATOOLS_EXE'] = msi_install_dir + 'nvdxt.exe'
-                #CONFIG['NVCOMPRESS'] = msi_install_dir + 'nvcompress.exe'
+            exe_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
+            if exe_install_dir != "":
+                # OgreXmlConverter
+                if os.path.isfile(exe_install_dir + "OgreXmlConverter.exe"):
+                    print ("Using OgreXmlConverter from install path:", exe_install_dir + "OgreXmlConverter.exe")
+                    CONFIG['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXmlConverter.exe"
+                # Run auto updater as silent. Notifies user if there is a new version out.
+                # This will not show any UI if there are no update and will go to network
+                # only once per 2 days so it wont be spending much resources either.
+                # todo: Move this to a more appropriate place than load_config()
+                if os.path.isfile(exe_install_dir + "check-for-updates.exe"):
+                    subprocess.Popen([exe_install_dir + "check-for-updates.exe", "/silent"])
     except Exception as e:
         print("Exception while reading windows registry:", e)
         
@@ -2189,7 +2193,6 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
             print( cmd )
             #subprocess.call(cmd)
             subprocess.Popen(cmd)
-
         else:
             #subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
             subprocess.Popen( [CONFIG['OGRE_MESHY'], 'C:\\tmp\\preview.mesh'] )
