@@ -20,6 +20,9 @@ VERSION = '0.5.8'
 '''
 CHANGELOG
     0.5.8
+    * Implemented reading OgreXmlConverter path from windows registry.
+      The .msi installer will ship with certain tools so we can stop guessing
+      and making the user install tools separately and setting up paths.
     * Fix bug that .mesh files were not generated while doing a .txml export.
       This was result of the late 2.63 mods that forgot to update object
       facecount before determining if mesh should be exported.
@@ -99,9 +102,7 @@ def uid(ob):
 
 ## Imports
 
-import os, sys, time, array, ctypes, math, pprint
-
-printer = pprint.PrettyPrinter(indent=4)
+import os, sys, time, array, ctypes, math
 
 try:
     # Inside blender
@@ -828,6 +829,23 @@ def load_config():
                 print( 'ERROR: unknown platform' )
                 assert 0
 
+    # Windows .msi installer spesific tool paths, always overrides config.
+    try:
+        import winreg
+        registry_key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r'Software\blender2ogre', 0, winreg.KEY_READ)
+        msi_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
+        if msi_install_dir != "":
+            # todo: Enable more when/if more tools can be shipped.
+            print("Using windows registry install path for certain tools:", msi_install_dir)
+            CONFIG['OGRETOOLS_XML_CONVERTER'] = msi_install_dir + 'OgreXmlConverter.exe'
+            #CONFIG['OGRETOOLS_MESH_MAGICK'] = msi_install_dir + 'MeshMagick.exe'
+            #CONFIG['OGRE_MESHY'] = msi_install_dir + 'Ogre Meshy.exe'
+            #CONFIG['IMAGE_MAGICK_CONVERT'] = msi_install_dir + 'convert.exe'
+            #CONFIG['NVIDIATOOLS_EXE'] = msi_install_dir + 'nvdxt.exe'
+            #CONFIG['NVCOMPRESS'] = msi_install_dir + 'nvcompress.exe'
+    except Exception as e:
+        print("Exception while reading windows registry:", e)
+        
     # Setup temp hidden RNA to expose the file paths
     for tag in _CONFIG_TAGS_: 
         default = CONFIG[ tag ]
