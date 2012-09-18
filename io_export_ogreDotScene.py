@@ -20,6 +20,12 @@ VERSION = '0.5.8'
 '''
 CHANGELOG
     0.5.8
+    * Clean all names that will be used as filenames on disk. Adjust all places
+      that use these names for refs instead of ob.name/ob.data.name. Replaced chars
+      are \, /, :, *, ?, ", <, >, | and spaces. Tested on work with ogre 
+      material, mesh and skeleton writing/refs inside the files and txml refs.
+      Shows warning at final report if we had to resort to the renaming so user 
+      can possibly rename the object.
     * Added silent auto update checks if blender2ogre was installed using
       the .exe installer. This will keep people up to date when new versions are out.
     * Fix tracker issue 48: Needs to check if outputting to /tmp or 
@@ -1338,7 +1344,7 @@ def bake_terrain( ob, normalize=True ):
 
 def save_terrain_as_NTF( path, ob ): # Tundra format - hardcoded 16x16 patch format
     info = bake_terrain( ob )
-    url = os.path.join( path, '%s.ntf'%ob.data.name )
+    url = os.path.join( path, '%s.ntf' % clean_object_name(ob.data.name) )
     f = open(url, "wb")
     # Header
     buf = array.array("I")
@@ -2552,6 +2558,7 @@ class _TXML_(object):
         
         # Entity
         entityid = uid(ob)
+        objectname = clean_object_name(ob.name)
         print("  Creating Tundra Enitity with ID", entityid)
         
         e = doc.createElement( 'entity' )
@@ -2559,14 +2566,14 @@ class _TXML_(object):
         e.setAttribute('id', entityid)
 
         # EC_Name
-        print ("    - EC_Name with", ob.name)
+        print ("    - EC_Name with", objectname)
         
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Name")
         c.setAttribute('sync', '1')
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "name" )
-        a.setAttribute('value', ob.name )
+        a.setAttribute('value', objectname )
         a = doc.createElement('attribute'); c.appendChild(a)
         a.setAttribute('name', "description" )
         a.setAttribute('value', "" )
@@ -2627,7 +2634,7 @@ class _TXML_(object):
             c.setAttribute('sync', '1')
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "name" )
-            a.setAttribute('value', ob.name)
+            a.setAttribute('value', objectname)
 
         # EC_Sound: Supports wav and ogg
         if ob.type == 'SPEAKER':
@@ -2778,7 +2785,7 @@ class _TXML_(object):
                 # todo: Remove this. There is no need to set mesh collision ref
                 # if TriMesh or ConvexHull is used, it will be auto picked from EC_Mesh
                 # in the same Entity.
-                collisionref = "%s%s.mesh" % (proto, ob.data.name)
+                collisionref = "%s%s.mesh" % (proto, clean_object_name(ob.data.name))
                 a.setAttribute('value', collisionref)
 
             a = doc.createElement('attribute'); com.appendChild( a )
@@ -2918,17 +2925,19 @@ class _TXML_(object):
         # and importing the scene content to existing scenes with relative refs.
         proto = ''
         
-        meshref = "%s%s.mesh" % (proto, ob.data.name)
+        objectname = clean_object_name(ob.data.name)
+        meshname = "%s.mesh" % objectname
+        meshref = "%s%s.mesh" % (proto, objectname)
         
         print ("    - EC_Mesh")
         print ("      - Mesh ref:", meshref)
         
         if self.EX_MESH:
-            murl = os.path.join( os.path.split(url)[0], '%s.mesh'%ob.data.name )
+            murl = os.path.join( os.path.split(url)[0], meshname )
             exists = os.path.isfile( murl )
             if not exists or (exists and self.EX_MESH_OVERWRITE):
-                if ob.data.name not in exported_meshes:
-                    exported_meshes.append( ob.data.name )
+                if meshname not in exported_meshes:
+                    exported_meshes.append( meshname )
                     self.dot_mesh( ob, os.path.split(url)[0] )
 
         doc = e.document
@@ -2966,7 +2975,7 @@ class _TXML_(object):
             a.setAttribute('value', "" )
 
         if ob.find_armature():
-            skeletonref = "%s%s.skeleton" % (proto, ob.data.name)
+            skeletonref = "%s%s.skeleton" % (proto, clean_object_name(ob.data.name))
             print ("      Skeleton ref:", skeletonref)
             a = doc.createElement('attribute'); c.appendChild(a)
             a.setAttribute('name', "Skeleton ref" )
@@ -3081,6 +3090,21 @@ class _TXML_(object):
             a.setAttribute('value', '%s' %outer )
 
 ## UI export panel
+
+invalid_chars = '\/:*?"<>|'
+
+def clean_object_name(value):
+    global invalid_chars
+    for invalid_char in invalid_chars:
+        value = value.replace(invalid_char, '_')
+    value = value.replace(' ', '_')
+    return value;
+    
+def clean_object_name_with_spaces(value):
+    global invalid_chars
+    for invalid_char in invalid_chars:
+        value = value.replace(invalid_char, '_')
+    return value;
 
 last_export_filepath = ""
 
@@ -3335,7 +3359,7 @@ class _OgreCommonExport_(_TXML_):
             # Write own .material file per material
             if self.EX_SEP_MATS:
                 url = self.dot_material_write_separate( mat, data, path )
-                material_files.append( url )
+                material_files.append(url)
 
         # Write one .material file for everything
         if not self.EX_SEP_MATS:
@@ -3380,6 +3404,7 @@ class _OgreCommonExport_(_TXML_):
         # Nodes (objects) - gather because macros will change selection state
         objects = []
         linkedgroups = []
+        invalidnamewarnings = []
         for ob in bpy.context.scene.objects:
             if ob.subcollision:
                 continue
@@ -3393,7 +3418,21 @@ class _OgreCommonExport_(_TXML_):
             if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP':
                 linkedgroups.append(ob)
             else:
+                # Gather data of invalid names. Don't bother user with warnings on names 
+                # that only get spaces converted to _, just do that automatically.
+                cleanname = clean_object_name(ob.name)
+                cleannamespaces = clean_object_name_with_spaces(ob.name)
+                if cleanname != ob.name:
+                    if cleannamespaces != ob.name:
+                        invalidnamewarnings.append(ob.name + " -> " + cleanname)
                 objects.append(ob)
+        
+        # Print invalid obj names so user can go and fix them.
+        if len(invalidnamewarnings) > 0:
+            print ("[Warning]: Following object names have invalid characters for creating files. They will be automatically converted.")
+            for namewarning in invalidnamewarnings:
+                Report.warnings.append("Auto correcting object name: " + namewarning)
+                print ("  - ", namewarning)
 
         # Linked groups - allows 3 levels of nested blender library linking
         temps = []
@@ -4362,8 +4401,8 @@ class Bone(object):
         pose = self.inverse_ogre_rest_matrix * pose
         self.pose_rotation = pose.to_quaternion()
         self.pose_scale = pose.to_scale()
-        for child in self.children: child.update()
-
+        for child in self.children:
+            child.update()
 
     def rebuild_tree( self ):        # called first on all bones
         if self.parent:
@@ -4395,7 +4434,8 @@ class Bone(object):
 class Skeleton(object):
     def get_bone( self, name ):
         for b in self.bones:
-            if b.name == name: return b
+            if b.name == name: 
+                return b
 
     def __init__(self, ob ):
         if ob.location.x != 0 or ob.location.y != 0 or ob.location.z != 0:
@@ -5008,9 +5048,10 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         mesh = ob.data
 
     name = force_name or ob.data.name
-    xmlfile = os.path.join(path, '%s.mesh.xml' %name )
+    name = clean_object_name(name)
+    xmlfile = os.path.join(path, '%s.mesh.xml' % name )
 
-    print('      - Generating:', '%s.mesh.xml' %name)
+    print('      - Generating:', '%s.mesh.xml' % name)
     
     if _USE_RPYTHON_ and False:
         Rmesh.save( ob, xmlfile )
@@ -5228,7 +5269,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         arm = ob.find_armature()
         if arm:
             doc.leaf_tag('skeletonlink', {
-                    'name' : '%s.skeleton' %(force_name or ob.data.name)
+                    'name' : '%s.skeleton' % name
             })
             doc.start_tag('boneassignments', {})
             badverts = 0
@@ -5364,7 +5405,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         skel = Skeleton( ob )
         data = skel.to_xml()
         name = force_name or ob.data.name
-        xmlfile = os.path.join(path, '%s.skeleton.xml' %name )
+        name = clean_object_name(name)
+        xmlfile = os.path.join(path, '%s.skeleton.xml' % name)
         f = open( xmlfile, 'wb' )
         f.write( bytes(data,'utf-8') )
         f.close()
@@ -6914,9 +6956,12 @@ class PANEL_MultiResLOD(bpy.types.Panel):
 ## Public API (continued)
 
 def material_name( mat ):
-    if type(mat) is str: return mat
-    elif not mat.library: return mat.name
-    else: return mat.name + mat.library.filepath.replace('/','_')
+    if type(mat) is str: 
+        return clean_object_name(mat)
+    elif not mat.library: 
+        return clean_object_name(mat.name)
+    else: 
+        return clean_object_name(mat.name + mat.library.filepath.replace('/','_'))
 
 def export_mesh(ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True):
     ''' returns materials used by the mesh '''
