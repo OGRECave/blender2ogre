@@ -15,10 +15,12 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-VERSION = '0.5.8'
+VERSION = '0.5.9'
 
 '''
 CHANGELOG
+    0.5.9
+    * apply patch from Thomas for Blender 2.6x support
     0.5.8
     * Clean all names that will be used as filenames on disk. Adjust all places
       that use these names for refs instead of ob.name/ob.data.name. Replaced chars
@@ -5373,10 +5375,10 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         #bpy.context.scene.meshes.unlink(mesh)
         if cleanup:
             #bpy.context.scene.objects.unlink(copy)
-            bpy.data.objects.remove(copy)
-            bpy.data.meshes.remove(mesh)
-            mesh.user_clear()
             copy.user_clear()
+            bpy.data.objects.remove(copy)
+            mesh.user_clear()
+            bpy.data.meshes.remove(mesh)
             del copy
             del mesh
         del _remap_verts_
