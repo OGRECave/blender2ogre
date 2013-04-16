@@ -8,7 +8,7 @@ Sponsors  Adminotech Ltd.
 ***************************************************************************
 
 Supports
-    - Blender 2.63
+    - Blender 2.66
     - Linux, Windows, OSX
 
 Note for upgrading

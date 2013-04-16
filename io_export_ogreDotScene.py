@@ -15,10 +15,12 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-VERSION = '0.5.9'
+VERSION = '0.6.0'
 
 '''
 CHANGELOG
+    0.6.0
+    * patched to work with 2.66.
     0.5.9
     * apply patch from Thomas for Blender 2.6x support
     0.5.8
@@ -83,8 +85,8 @@ TODO
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456",
-    "version": (0, 5, 8),
-    "blender": (2, 6, 3),
+    "version": (0, 6, 0),
+    "blender": (2, 6, 6),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
@@ -3334,7 +3336,7 @@ class _OgreCommonExport_(_TXML_):
         description="Filepath used for exporting file",
         maxlen=1024, default="",
         subtype='FILE_PATH')
-
+    
     def dot_material( self, meshes, path='/tmp', mat_file_name='SceneMaterial'):
         material_files = []
         mats = []
@@ -3362,7 +3364,7 @@ class _OgreCommonExport_(_TXML_):
             if self.EX_SEP_MATS:
                 url = self.dot_material_write_separate( mat, data, path )
                 material_files.append(url)
-
+        
         # Write one .material file for everything
         if not self.EX_SEP_MATS:
             try:
@@ -3377,12 +3379,13 @@ class _OgreCommonExport_(_TXML_):
 
     def dot_material_write_separate( self, mat, data, path = '/tmp' ):
         try:
-            url = os.path.join(path, '%s.material' % material_name(mat))
+            clean_filename = clean_object_name(mat.name);
+            url = os.path.join(path, '%s.material' % clean_filename)
             f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
             print('    - Exported Material:', url)
             return url
         except Exception as e:
-            show_dialog("Invalid material object name: " + material_name(mat))
+            show_dialog("Invalid material object name: " + clean_filename)
             return ""
 
     def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
@@ -5230,7 +5233,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
             if not len(_sm_faces_[matidx]):
-                Report.warnings.append( 'BAD SUBMESH: %s' %ob.name )
+                Report.warnings.append( 'BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (ob.name, mat.name) )
                 continue # fixes corrupt unused materials
 
             doc.start_tag('submesh', {
@@ -6558,7 +6561,7 @@ class _image_processing_( object ):
         exe = CONFIG['NVCOMPRESS']
         cmd = [ exe ]
 
-        if texture.use_alpha and texture.image.depth==32:
+        if texture.image.use_alpha and texture.image.depth==32:
             cmd.append( '-alpha' )
         if not texture.use_mipmap:
             cmd.append( '-nomips' )
@@ -6674,7 +6677,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         usealpha = False #mat.ogre_depth_write
         for slot in slots:
             #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
-            if slot.texture.use_alpha: usealpha = True; break
+            if slot.texture.image.use_alpha: usealpha = True; break
 
         ## force material alpha to 1.0 if textures use_alpha?
         #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
@@ -6959,9 +6962,9 @@ class PANEL_MultiResLOD(bpy.types.Panel):
 
 def material_name( mat ):
     if type(mat) is str: 
-        return clean_object_name(mat)
+        return mat
     elif not mat.library: 
-        return clean_object_name(mat.name)
+        return mat.name
     else: 
         return clean_object_name(mat.name + mat.library.filepath.replace('/','_'))
 
