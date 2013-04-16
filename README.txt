@@ -1,6 +1,6 @@
 ***************************************************************************
 Name      blender2ogre 
-Version   0.5.8
+Version   0.6.0
 License   GNU LGPL
 Authors   Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, 
           Mr.Magne, Jonne Nauha, vax456
