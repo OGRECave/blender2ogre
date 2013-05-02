@@ -4,7 +4,7 @@ Version         0.6.0
 License         GNU LGPL
 Authors         Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, 
                 Mr.Magne, Jonne Nauha, vax456, Sybren Stüvel
-Sponsors  		Adminotech Ltd.
+Sponsors        Adminotech Ltd.
 Forums Thread   http://ogre3d.org/forums/viewtopic.php?f=8&t=61485
 ***************************************************************************
 
