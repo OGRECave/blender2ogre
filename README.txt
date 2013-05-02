@@ -1,11 +1,17 @@
 ***************************************************************************
-Name      blender2ogre 
-Version   0.6.0
-License   GNU LGPL
-Authors   Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, 
-          Mr.Magne, Jonne Nauha, vax456
-Sponsors  Adminotech Ltd.
+Name      		blender2ogre 
+Version   		0.6.0
+License   		GNU LGPL
+Authors   		Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, 
+				Mr.Magne, Jonne Nauha, vax456, Sybren Stüvel
+Sponsors  		Adminotech Ltd.
+Forums Thread	http://ogre3d.org/forums/viewtopic.php?f=8&t=6148
 ***************************************************************************
+
+Repository notes:
+	This is a fork of the original version, which seems to be no longer
+	maintained. There are going to be some updates and some new features
+	coming to this version.
 
 Supports
     - Blender 2.66
