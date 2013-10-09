@@ -771,7 +771,7 @@ _CONFIG_DEFAULTS_ALL = {
     'nuextremityPoints' : 0,
     'generateEdgeLists' : False,
     'generateTangents' : True, # this is now safe - ignored if mesh is missing UVs
-    'tangentSemantic' : 'uvw',
+    'tangentSemantic' : 'tangent', # used to default to "uvw" but that doesn't seem to work with anything and breaks shaders
     'tangentUseParity' : 4,
     'tangentSplitMirrored' : False,
     'tangentSplitRotated' : False,
@@ -2972,7 +2972,8 @@ class _TXML_(object):
             for mymat in mymaterials:
                 if mymat is None:
                     continue
-                mymatstring += proto + material_name(mymat) + '.material;'
+                
+                mymatstring += proto + material_name(mymat, True) + '.material;'
             mymatstring = mymatstring[:-1]  # strip ending ;
             a.setAttribute('value', mymatstring )
         else:
@@ -3307,8 +3308,8 @@ class _OgreCommonExport_(_TXML_):
         default=CONFIG['generateTangents'])
     EX_tangentSemantic = StringProperty(
         name="Tangent Semantic",
-        description="MESH tangent semantic",
-        maxlen=3,
+        description="MESH tangent semantic - can be 'uvw' or 'tangent'",
+        maxlen=16,
         default=CONFIG['tangentSemantic'])
     EX_tangentUseParity = IntProperty(
         name="Tangent Parity",
@@ -3359,7 +3360,7 @@ class _OgreCommonExport_(_TXML_):
         for mat in mats:
             if mat is None:
                 continue
-            Report.materials.append( material_name(mat) )
+            Report.materials.append( 3(mat) )
             if CONFIG['COPY_SHADER_PROGRAMS']:
                 data = generate_material( mat, path=path, copy_programs=True, touch_textures=CONFIG['TOUCH_TEXTURES'] )
             else:
@@ -4012,7 +4013,7 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     EX_tangentSemantic = StringProperty(
         name="Tangent Semantic",
         description="MESH tangent semantic",
-        maxlen=3,
+        maxlen=16,
         default=CONFIG['tangentSemantic'])
     EX_tangentUseParity = IntProperty(
         name="Tangent Parity",
@@ -5306,7 +5307,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
             doc.start_tag('submesh', {
                     'usesharedvertices' : 'true',
-                    'material' : material_name(mat),
+                    'material' : material_name(mat, False),
                     # Maybe better look at index of all faces, if one over 65535 set to true;
                     # Problem: we know it too late, postprocessing of file needed
                     "use32bitindexes" : str(bool(numverts > 65535)),
@@ -5331,7 +5332,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         doc.start_tag('submeshnames', {})
         for matidx, mat in enumerate( materials ):
             doc.start_tag('submesh', {
-                    'name' : material_name(mat),
+                    'name' : material_name(mat, False),
                     'index' : str(matidx)
             })
             doc.end_tag('submesh')
@@ -6745,7 +6746,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         usealpha = False #mat.ogre_depth_write
         for slot in slots:
             #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
-            if slot.texture.image.use_alpha: usealpha = True; break
+            if (slot.texture.image is not None) and (slot.texture.image.use_alpha): usealpha = True; break
 
         ## force material alpha to 1.0 if textures use_alpha?
         #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
@@ -7028,13 +7029,14 @@ class PANEL_MultiResLOD(bpy.types.Panel):
 
 ## Public API (continued)
 
-def material_name( mat ):
+def material_name( mat, clean = False ):
     if type(mat) is str: 
         return mat
     elif not mat.library: 
         return mat.name
-    else: 
-        return clean_object_name(mat.name + mat.library.filepath.replace('/','_'))
+    else:
+        if clean:
+            return clean_object_name(mat.name + mat.library.filepath.replace('/','_'))
 
 def export_mesh(ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True):
     ''' returns materials used by the mesh '''
