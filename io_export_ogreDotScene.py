@@ -1159,7 +1159,8 @@ class RElement(object):
 
     def toprettyxml(self, lines, indent ):
         s = '<%s ' % self.tagName
-        for name in self.attributes:
+        sortedNames = sorted( self.attributes.keys() )
+        for name in sortedNames:
             value = self.attributes[name]
             if not isinstance(value, str):
                 value = str(value)
@@ -1197,6 +1198,7 @@ class SimpleSaxWriter():
         xml_writer = XMLGenerator(output, encoding, True)
         xml_writer.startDocument()
         xml_writer.startElement(top_level_tag, attrs)
+        self.output = output
         self._xml_writer = xml_writer
         self.top_level_tag = top_level_tag
         self.ident=4
@@ -1216,8 +1218,18 @@ class SimpleSaxWriter():
 
     def leaf_tag(self, name, attrs):
         self._xml_writer.characters(" " * self.ident)
-        self._xml_writer.startElement(name, attrs)
-        self._xml_writer.endElement(name)
+        # sorted attributes -- don't want attributes output in random order, which is what the XMLGenerator class does
+        # to override this behavior, we write directly to file because XML writer would mangle '<' and '>'
+        self.output.write("<%s " % name)
+        sortedNames = sorted( attrs.keys() )  # sorted list of attribute names
+        for name in sortedNames:
+            value = attrs[ name ]
+            # if not of type string,
+            if not isinstance(value, str):
+                # turn it into a string
+                value = str(value)
+            self.output.write("%s=%s " % (name, quoteattr(value)))
+        self.output.write("/>")
         self._xml_writer.characters('\n')
 
     def close(self):
