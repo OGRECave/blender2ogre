@@ -3360,7 +3360,7 @@ class _OgreCommonExport_(_TXML_):
         for mat in mats:
             if mat is None:
                 continue
-            Report.materials.append( 3(mat) )
+            Report.materials.append( material_name(mat) )
             if CONFIG['COPY_SHADER_PROGRAMS']:
                 data = generate_material( mat, path=path, copy_programs=True, touch_textures=CONFIG['TOUCH_TEXTURES'] )
             else:
