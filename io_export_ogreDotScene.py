@@ -4507,7 +4507,17 @@ class Bone_Track:
         return keyframe
 
 # Skeleton
-
+def findArmature( ob ):
+    arm = ob.find_armature()
+    # if this armature has no animation,
+    if not arm.animation_data:
+        # search for another armature that is a proxy for it
+        for ob2 in bpy.data.objects:
+            if ob2.type == 'ARMATURE' and ob2.proxy == arm:
+                print( "proxy armature %s found" % ob2.name )
+                return ob2
+    return arm
+     
 class Skeleton(object):
     def get_bone( self, name ):
         for b in self.bones:
@@ -4524,7 +4534,7 @@ class Skeleton(object):
         self.object = ob
         self.bones = []
         mats = {}
-        self.arm = arm = ob.find_armature()
+        self.arm = arm = findArmature( ob )
         arm.hide = False
         self._restore_layers = list(arm.layers)
         #arm.layers = [True]*20      # can not have anything hidden - REQUIRED?
@@ -4693,7 +4703,7 @@ class Skeleton(object):
         constraints = self.get_constraints(self.arm.pose)
 
         arm = self.arm
-        if not arm.animation_data or (arm.animation_data and not arm.animation_data.nla_tracks):  # assume animated via constraints and use blender timeline.
+        if not CONFIG['ONLY_ANIMATED_BONES'] and (not arm.animation_data or (arm.animation_data and not arm.animation_data.nla_tracks)):  # assume animated via constraints and use blender timeline.
             anims = doc.createElement('animations'); root.appendChild( anims )
             anim = doc.createElement('animation'); anims.appendChild( anim )
             tracks = doc.createElement('tracks'); anim.appendChild( tracks )
