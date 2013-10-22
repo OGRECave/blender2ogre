@@ -5362,7 +5362,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         arm = ob.find_armature()
         if arm:
             doc.leaf_tag('skeletonlink', {
-                    'name' : '.%s%s.skeleton' % (os.sep, name)
+                    'name' : '%s.skeleton' % name
             })
             doc.start_tag('boneassignments', {})
             badverts = 0
