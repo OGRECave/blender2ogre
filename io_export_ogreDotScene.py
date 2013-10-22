@@ -1194,33 +1194,17 @@ class RDocument(object):
         return '\n'.join(lines)
 
 class SimpleSaxWriter():
-    def __init__(self, output, encoding, top_level_tag, attrs):
-        xml_writer = XMLGenerator(output, encoding, True)
-        xml_writer.startDocument()
-        xml_writer.startElement(top_level_tag, attrs)
+    def __init__(self, output, root_tag, root_attrs):
         self.output = output
-        self._xml_writer = xml_writer
-        self.top_level_tag = top_level_tag
-        self.ident=4
-        self._xml_writer.characters('\n')
+        self.root_tag = root_tag
+        self.indent=0
+        output.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+        self.start_tag(root_tag, root_attrs)
 
-    def start_tag(self, name, attrs):
-        self._xml_writer.characters(" " * self.ident)
-        self._xml_writer.startElement(name, attrs)
-        self.ident += 4
-        self._xml_writer.characters('\n')
-
-    def end_tag(self, name):
-        self.ident -= 4
-        self._xml_writer.characters(" " * self.ident)
-        self._xml_writer.endElement(name)
-        self._xml_writer.characters('\n')
-
-    def leaf_tag(self, name, attrs):
-        self._xml_writer.characters(" " * self.ident)
+    def _out_tag(self, name, attrs, isLeaf):
         # sorted attributes -- don't want attributes output in random order, which is what the XMLGenerator class does
-        # to override this behavior, we write directly to file because XML writer would mangle '<' and '>'
-        self.output.write("<%s " % name)
+        self.output.write(" " * self.indent)
+        self.output.write("<%s" % name)
         sortedNames = sorted( attrs.keys() )  # sorted list of attribute names
         for name in sortedNames:
             value = attrs[ name ]
@@ -1228,13 +1212,26 @@ class SimpleSaxWriter():
             if not isinstance(value, str):
                 # turn it into a string
                 value = str(value)
-            self.output.write("%s=%s " % (name, quoteattr(value)))
-        self.output.write("/>")
-        self._xml_writer.characters('\n')
+            self.output.write(" %s=%s" % (name, quoteattr(value)))
+        if isLeaf:
+            self.output.write("/")
+        else:
+            self.indent += 4
+        self.output.write(">\n")
+
+    def start_tag(self, name, attrs):
+        self._out_tag(name, attrs, False)
+    
+    def end_tag(self, name):
+        self.indent -= 4
+        self.output.write(" " * self.indent)
+        self.output.write("</%s>\n" % name)
+
+    def leaf_tag(self, name, attrs):
+        self._out_tag(name, attrs, True)
 
     def close(self):
-        self._xml_writer.endElement(self.top_level_tag)
-        self._xml_writer.endDocument()
+        self.end_tag( self.root_tag )
 
 ## Report Hack
 
@@ -5159,7 +5156,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             show_dialog("Invalid mesh object name: " + name)
             return
 
-        doc = SimpleSaxWriter(f, 'UTF-8', "mesh", {})
+        doc = SimpleSaxWriter(f, 'mesh', {})
 
         # Very ugly, have to replace number of vertices later
         doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
@@ -5378,7 +5375,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                             doc.leaf_tag('vertexboneassignment', {
                                     'vertexindex' : str(vidx),
                                     'boneindex' : str(bnidx),
-                                    'weight' : str(vgroup.weight)
+                                    'weight' : '%6f' % vgroup.weight
                             })
                             check += 1
                 if check > 4:
