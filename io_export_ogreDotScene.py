@@ -4430,6 +4430,24 @@ class Bone(object):
         pose = self.inverse_ogre_rest_matrix * pose
         self.pose_rotation = pose.to_quaternion()
         self.pose_scale = pose.to_scale()
+        # special case workaround for broken Ogre nonuniform scaling:
+        # Ogre can't deal with arbitrary nonuniform scaling, but it can handle certain special cases
+        # The special case we are trying to handle here is when a bone has a nonuniform scale and it's
+        # child bones are not inheriting the scale.  We should be able to do this without having to
+        # do any extra setup in Ogre (like turning off "inherit scale" on the Ogre bones)
+        self.ogreDerivedScale = self.pose_scale.copy()
+        if self.parent:
+            # this is how Ogre handles inheritance of scale
+            self.ogreDerivedScale[0] *= self.parent.ogreDerivedScale[0]
+            self.ogreDerivedScale[1] *= self.parent.ogreDerivedScale[1]
+            self.ogreDerivedScale[2] *= self.parent.ogreDerivedScale[2]
+            # if we don't want inherited scale,
+            if not self.bone.bone.use_inherit_scale:
+                # cancel out the scale that Ogre will calculate
+                scl = self.parent.ogreDerivedScale
+                self.pose_scale = mathutils.Vector((1.0/scl[0], 1.0/scl[1], 1.0/scl[2]))
+                self.ogreDerivedScale = mathutils.Vector((1.0, 1.0, 1.0))
+
         for child in self.children:
             child.update()
 
