@@ -4476,51 +4476,90 @@ class Bone(object):
         for child in self.children:
             child.compute_rest()
 
+class Keyframe:
+    def __init__(self, time, pos, rot, scale):
+        self.time = time
+        self.pos = pos.copy()
+        self.rot = rot.copy()
+        self.scale = scale.copy()
+
+    
 # Bone_Track
 # Encapsulates all of the key information for an individual bone within a single animation,
 # and srores that information as XML.
 class Bone_Track:
-    def __init__(self, doc, bone):
+    def __init__(self, bone):
         self.bone = bone
-        self.element = doc.createElement('track')
-        self.element.setAttribute('bone', bone.name)
-        self.keyframes_element = doc.createElement('keyframes')
-        self.element.appendChild( self.keyframes_element )
+        self.keyframes = []
 
-    def create_keyframe( self, doc, time ):
+    def is_pos_animated( self ):
+        # take note if any keyframe is anything other than the IDENTITY transform
+        for kf in self.keyframes:
+            if kf.pos.length > 0.0001:
+                return True
+        return False
+    
+    def is_rot_animated( self ):
+        # take note if any keyframe is anything other than the IDENTITY transform
+        for kf in self.keyframes:
+            if kf.rot.angle > 0.0001:
+                return True
+        return False
+
+    def is_scale_animated( self ):
+        # take note if any keyframe is anything other than the IDENTITY transform
+        for kf in self.keyframes:
+            scaleDiff = mathutils.Vector((1,1,1)) - kf.scale
+            if scaleDiff.length > 0.0001:
+                return True
+        return False
+
+    def add_keyframe( self, time ):
         bone = self.bone
-        _loc = bone.pose_location
-        _rot = bone.pose_rotation
-        _scl = bone.pose_scale
+        kf = Keyframe(time, bone.pose_location, bone.pose_rotation, bone.pose_scale)
+        self.keyframes.append( kf )
+        
+    def write_track( self, doc, tracks_element ):
+        isPosAnimated = self.is_pos_animated()
+        isRotAnimated = self.is_rot_animated()
+        isScaleAnimated = self.is_scale_animated()
+        if not isPosAnimated and not isRotAnimated and not isScaleAnimated:
+            return
+        track = doc.createElement('track')
+        track.setAttribute('bone', self.bone.name)
+        keyframes_element = doc.createElement('keyframes')
+        track.appendChild( keyframes_element )
+        for kf in self.keyframes:
+            keyframe = doc.createElement('keyframe')
+            keyframe.setAttribute('time', '%6f' % kf.time)
+            if isPosAnimated:
+                trans = doc.createElement('translate')
+                keyframe.appendChild( trans )
+                trans.setAttribute('x', '%6f' % kf.pos.x)
+                trans.setAttribute('y', '%6f' % kf.pos.y)
+                trans.setAttribute('z', '%6f' % kf.pos.z)
 
-        keyframe = doc.createElement('keyframe')
-        keyframe.setAttribute('time', str(time))
-        trans = doc.createElement('translate')
-        keyframe.appendChild( trans )
-        x,y,z = _loc
-        trans.setAttribute('x', '%6f' %x)
-        trans.setAttribute('y', '%6f' %y)
-        trans.setAttribute('z', '%6f' %z)
+            if isRotAnimated:
+                rot =  doc.createElement( 'rotate' )
+                keyframe.appendChild( rot )
+                q = kf.rot
+                rot.setAttribute('angle', '%6f' %q.angle )
+                axis = doc.createElement('axis'); rot.appendChild( axis )
+                x,y,z = q.axis
+                axis.setAttribute('x', '%6f' %x )
+                axis.setAttribute('y', '%6f' %y )
+                axis.setAttribute('z', '%6f' %z )
 
-        rot =  doc.createElement( 'rotate' )
-        keyframe.appendChild( rot )
-        q = _rot
-        rot.setAttribute('angle', '%6f' %q.angle )
-        axis = doc.createElement('axis'); rot.appendChild( axis )
-        x,y,z = q.axis
-        axis.setAttribute('x', '%6f' %x )
-        axis.setAttribute('y', '%6f' %y )
-        axis.setAttribute('z', '%6f' %z )
-
-        scale = doc.createElement('scale')
-        keyframe.appendChild( scale )
-        x,y,z = _scl
-        scale.setAttribute('x', '%6f' %x)
-        scale.setAttribute('y', '%6f' %y)
-        scale.setAttribute('z', '%6f' %z)
-        self.keyframes_element.appendChild( keyframe )
-        return keyframe
-
+            if isScaleAnimated:
+                scale = doc.createElement('scale')
+                keyframe.appendChild( scale )
+                x,y,z = kf.scale
+                scale.setAttribute('x', '%6f' %x)
+                scale.setAttribute('y', '%6f' %y)
+                scale.setAttribute('z', '%6f' %z)
+            keyframes_element.appendChild( keyframe )
+        tracks_element.appendChild( track )
+    
 # Skeleton
 def findArmature( ob ):
     arm = ob.find_armature()
@@ -4620,7 +4659,7 @@ class Skeleton(object):
         return constraints
 
     # Returns a list of bone tracks based on the initial list of bone names.
-    def get_bone_tracks( self, bone_names, tracks_element, doc, constraints ):
+    def get_bone_tracks( self, bone_names, constraints ):
         result = {}
 
         #print('Constraint Tree:')
@@ -4640,9 +4679,8 @@ class Skeleton(object):
             # Eventually non-deformable bones filtering should be applied exclusively at this stage of
             # the pipeline.
             if bone.bone.bone.use_deform:
-                bone_track = Bone_Track(doc, bone)
+                bone_track = Bone_Track(bone)
                 result[bone.name] = bone_track
-                tracks_element.appendChild( bone_track.element )
             else:
                 # Even if the bone is ignored, check to see if it has children that are deformable and add those
                 for child in bone.bone.bone.children:
@@ -4663,9 +4701,8 @@ class Skeleton(object):
                     add_track(bone, '')
                 else:
                     # Use the original, simpler method
-                    bone_track = Bone_Track(doc, bone)
+                    bone_track = Bone_Track(bone)
                     result[bone.name] = bone_track
-                    tracks_element.appendChild( bone_track.element )
 
         return result
 
@@ -4728,15 +4765,18 @@ class Skeleton(object):
 
             # Construct a list of Bone_Track objects
             bone_names = [bone.name for bone in arm.pose.bones]
-            bone_tracks = self.get_bone_tracks( bone_names, tracks, doc, constraints )
+            bone_tracks = self.get_bone_tracks( bone_names, constraints )
 
             # Generate the keyframe XML for each Bone_Track inside bone_tracks
             for frame in range( int(start), int(end)+1, bpy.context.scene.frame_step):
                 bpy.context.scene.frame_set(frame)
-                for bone in self.roots: bone.update()
+                for bone in self.roots:
+                    bone.update()
                 print('\t\t Frame:', frame)
                 for i, track in bone_tracks.items():
-                    track.create_keyframe(doc, (frame - start) / _fps)
+                    track.add_keyframe( (frame - start) / _fps)
+            for i, track in bone_tracks.items():
+                track.write_track( doc, tracks )
 
         elif arm.animation_data:
             anims = doc.createElement('animations'); root.appendChild( anims )
@@ -4769,18 +4809,22 @@ class Skeleton(object):
                     stripbones = []
                     if CONFIG['ONLY_ANIMATED_BONES']:
                         for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
-                            if group.name in arm.pose.bones: stripbones.append( group.name )
+                            if group.name in arm.pose.bones:
+                                stripbones.append( group.name )
                         if not stripbones:                                    # otherwise we use all bones
                             stripbones = [ bone.name for bone in arm.pose.bones ]
                     else:
                         stripbones = [ bone.name for bone in arm.pose.bones ]
 
-                    bone_tracks = self.get_bone_tracks( stripbones, tracks, doc, constraints )
+                    bone_tracks = self.get_bone_tracks( stripbones, constraints )
                     for frame in range( int(strip.frame_start), int(strip.frame_end)+1, bpy.context.scene.frame_step):#thanks to Vesa
                         bpy.context.scene.frame_set(frame)
-                        for bone in self.roots: bone.update()
+                        for bone in self.roots:
+                            bone.update()
                         for i, track in bone_tracks.items():
-                            track.create_keyframe(doc, (frame - strip.frame_start) / _fps)
+                            track.add_keyframe((frame - strip.frame_start) / _fps)
+                    for i, track in bone_tracks.items():
+                        track.write_track( doc, tracks )
 
                     if CONFIG['INDEPENDENT_ANIM']: strip.mute = True
 
