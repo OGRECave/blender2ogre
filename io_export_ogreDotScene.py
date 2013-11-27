@@ -4451,6 +4451,13 @@ class Bone(object):
         for child in self.children:
             child.update()
 
+    def clear_pose_transform( self ):
+        self.bone.location.zero()
+        self.bone.scale.Fill(3, 1.0)
+        self.bone.rotation_quaternion.identity()
+        self.bone.rotation_euler.zero()
+        #self.bone.rotation_axis_angle  #ignore axis angle mode
+
     def rebuild_tree( self ):        # called first on all bones
         if self.parent:
             self.parent = self.skeleton.get_bone( self.parent.name )
@@ -4821,6 +4828,7 @@ class Skeleton(object):
                     for boneName in boneNames:
                         bone = self.get_bone(boneName)
                         bone_tracks.append( Bone_Track(bone) )
+                        bone.clear_pose_transform()
                     for frame in range( int(strip.frame_start), int(strip.frame_end)+1, bpy.context.scene.frame_step):#thanks to Vesa
                         bpy.context.scene.frame_set(frame)
                         for bone in self.roots:
