@@ -4788,6 +4788,10 @@ class Skeleton(object):
                 for nla in arm.animation_data.nla_tracks:
                     nla.mute = True
 
+            # remember some things so we can put them back later                    
+            savedFrame = bpy.context.scene.frame_current
+            savedAction = arm.animation_data.action
+            boneNames = sorted( [bone.name for bone in arm.pose.bones] )
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
                 if not len(nla.strips):
                     print( 'skipping empty NLA track: %s' %nla.name )
@@ -4812,25 +4816,21 @@ class Skeleton(object):
                     anim.setAttribute('name', strip.name)                       # USE the strip name
                     anim.setAttribute('length', '%6f' %( (strip.frame_end-strip.frame_start)/_fps ) )
 
-                    stripbones = []
-                    if CONFIG['ONLY_ANIMATED_BONES']:
-                        for group in strip.action.groups:        # check if the user has keyed only some of the bones (for anim blending)
-                            if group.name in arm.pose.bones:
-                                stripbones.append( group.name )
-                        if not stripbones:                                    # otherwise we use all bones
-                            stripbones = [ bone.name for bone in arm.pose.bones ]
-                    else:
-                        stripbones = [ bone.name for bone in arm.pose.bones ]
-
-                    bone_tracks = self.get_bone_tracks( stripbones, constraints )
+                    arm.animation_data.action = strip.action
+                    bone_tracks = []
+                    for boneName in boneNames:
+                        bone = self.get_bone(boneName)
+                        bone_tracks.append( Bone_Track(bone) )
                     for frame in range( int(strip.frame_start), int(strip.frame_end)+1, bpy.context.scene.frame_step):#thanks to Vesa
                         bpy.context.scene.frame_set(frame)
                         for bone in self.roots:
                             bone.update()
-                        for i, track in bone_tracks.items():
+                        for track in bone_tracks:
                             track.add_keyframe((frame - strip.frame_start) / _fps)
-                    for i, track in bone_tracks.items():
+                    for track in bone_tracks:
+                        # will only write a track if there is some kind of animation there
                         track.write_track( doc, tracks )
+
 
                     if CONFIG['INDEPENDENT_ANIM']:
                         strip.mute = True
@@ -4843,6 +4843,10 @@ class Skeleton(object):
             if CONFIG['INDEPENDENT_ANIM']:
                 for nla in arm.animation_data.nla_tracks:
                     nla.mute = False
+
+            # restore these to what they originally were
+            arm.animation_data.action = savedAction
+            bpy.context.scene.frame_set( savedFrame )
 
         return doc.toprettyxml()
 
