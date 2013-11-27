@@ -4595,7 +4595,7 @@ class Skeleton(object):
 
         for pbone in arm.pose.bones:
             if pbone.bone.use_deform or not CONFIG['ONLY_DEFORMABLE_BONES']:
-                mybone = Bone( arm.data.bones[pbone.name] ,pbone, self )
+                mybone = Bone( arm.data.bones[pbone.name], pbone, self )
                 self.bones.append( mybone )
 
         if arm.name not in Report.armatures:
@@ -4611,7 +4611,8 @@ class Skeleton(object):
             Report.warnings.append('ERROR: Armature: %s is rotated - (rotation is ignored)' %arm.name)
 
         ## setup bones for Ogre format ##
-        for b in self.bones: b.rebuild_tree()
+        for b in self.bones:
+            b.rebuild_tree()
         ## walk bones, convert them ##
         self.roots = []
         ep = 0.0001
@@ -4761,7 +4762,7 @@ class Skeleton(object):
             tracks = doc.createElement('tracks'); anim.appendChild( tracks )
             anim.setAttribute('name', 'my_animation')
             start = bpy.context.scene.frame_start; end = bpy.context.scene.frame_end
-            anim.setAttribute('length', str( (end-start)/_fps ) )
+            anim.setAttribute('length', '%6f' %( (end-start)/_fps ) )
 
             # Construct a list of Bone_Track objects
             bone_names = [bone.name for bone in arm.pose.bones]
@@ -4788,7 +4789,9 @@ class Skeleton(object):
                     nla.mute = True
 
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
-                if not len(nla.strips): print( 'skipping empty NLA track: %s' %nla.name ); continue
+                if not len(nla.strips):
+                    print( 'skipping empty NLA track: %s' %nla.name )
+                    continue
                 print('NLA track:',  nla.name)
 
                 if CONFIG['INDEPENDENT_ANIM']:
@@ -4797,14 +4800,17 @@ class Skeleton(object):
                         strip.mute = True
 
                 for strip in nla.strips:
-                    if CONFIG['INDEPENDENT_ANIM']: strip.mute = False
+                    if CONFIG['INDEPENDENT_ANIM']:
+                        strip.mute = False
                     print('   strip name:', strip.name)
-                    anim = doc.createElement('animation'); anims.appendChild( anim )
-                    tracks = doc.createElement('tracks'); anim.appendChild( tracks )
+                    anim = doc.createElement('animation')
+                    anims.appendChild( anim )
+                    tracks = doc.createElement('tracks')
+                    anim.appendChild( tracks )
                     Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]' %(arm.name, nla.name, strip.frame_start, strip.frame_end) )
 
                     anim.setAttribute('name', strip.name)                       # USE the strip name
-                    anim.setAttribute('length', str( (strip.frame_end-strip.frame_start)/_fps ) )
+                    anim.setAttribute('length', '%6f' %( (strip.frame_end-strip.frame_start)/_fps ) )
 
                     stripbones = []
                     if CONFIG['ONLY_ANIMATED_BONES']:
@@ -4826,7 +4832,8 @@ class Skeleton(object):
                     for i, track in bone_tracks.items():
                         track.write_track( doc, tracks )
 
-                    if CONFIG['INDEPENDENT_ANIM']: strip.mute = True
+                    if CONFIG['INDEPENDENT_ANIM']:
+                        strip.mute = True
 
                 if CONFIG['INDEPENDENT_ANIM']:
                     nla.mute = True
