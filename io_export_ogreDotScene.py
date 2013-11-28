@@ -4458,6 +4458,20 @@ class Bone(object):
         self.bone.rotation_euler.zero()
         #self.bone.rotation_axis_angle  #ignore axis angle mode
 
+    def save_pose_transform( self ):
+        self.savedPoseLocation = self.bone.location.copy()
+        self.savedPoseScale = self.bone.scale.copy()
+        self.savedPoseRotationQ = self.bone.rotation_quaternion
+        self.savedPoseRotationE = self.bone.rotation_euler
+        #self.bone.rotation_axis_angle  #ignore axis angle mode
+
+    def restore_pose_transform( self ):
+        self.bone.location = self.savedPoseLocation
+        self.bone.scale = self.savedPoseScale
+        self.bone.rotation_quaternion = self.savedPoseRotationQ
+        self.bone.rotation_euler = self.savedPoseRotationE
+        #self.bone.rotation_axis_angle  #ignore axis angle mode
+
     def rebuild_tree( self ):        # called first on all bones
         if self.parent:
             self.parent = self.skeleton.get_bone( self.parent.name )
@@ -4633,90 +4647,34 @@ class Skeleton(object):
                 #    Report.warnings.append('ERROR: root bone has non-zero transform (rotation offset)')
                 self.roots.append( b )
 
-    # Traverses all of the constraints in the Pose.  It returns a dictionary where each key is the name of a bone that
-    # affects other bones via constraints, and the value of each key is a list of the bones it affects.
-    def get_constraints( self, pose ):
-        constraints = {}
-        def add_constraint(target, bone):
-            # Create a new list entry if it does not already exist for the target key
-            if target not in constraints:
-                constraints[target] = []
-            constraints[target].append(bone)
-
-        # Embedded function that mainly exists to streamline the IK logic.  The step parameter
-        # is only used to keep track of IK chains.
-        def store_targets(bone, constraint, step = 1):
-            # Some constraint types do not target other bones.  The code doesn't need to deal with those.
-            if hasattr(constraint, 'subtarget'):
-                add_constraint(constraint.subtarget, bone)
-
-            # Also include the pole targets of any IK constraints
-            if hasattr(constraint, 'pole_target'):
-                add_constraint(constraint.pole_target, bone)
-
-                # If there is a pole_target attribute then the constraint must be IK so
-                # check for multiple targets.
-                # This doesn't currently consider indefinite chain lengths (chain_count == 0)
-                if step < constraint.chain_count:
-                    store_targets(bone.parent, constraint, step + 1)
-
-        for bone in pose.bones:
-            for constraint in bone.constraints:
-                store_targets(bone, constraint)
-
-        return constraints
-
-    # Returns a list of bone tracks based on the initial list of bone names.
-    def get_bone_tracks( self, bone_names, constraints ):
-        result = {}
-
-        #print('Constraint Tree:')
-
-        # Recursive function for adding bone tracks to _tracks
-        def add_track(bone, indent):
-            if len(indent) > 10:
-                raise Error('Possible infinite recursion.')
-
-            #print(indent + bone.name)
-            if bone.name in result:
-                return
-
-            # Eventually it would be good to consider CONFIG['ONLY_DEFORMABLE_BONES'] in this logic,
-            # but since currently non-deformable bones are filtered out before this point,
-            # Some animated bones would get filtered out before they could be filtered out here.
-            # Eventually non-deformable bones filtering should be applied exclusively at this stage of
-            # the pipeline.
-            if bone.bone.bone.use_deform:
-                bone_track = Bone_Track(bone)
-                result[bone.name] = bone_track
-            else:
-                # Even if the bone is ignored, check to see if it has children that are deformable and add those
-                for child in bone.bone.bone.children:
-                    add_track(self.get_bone(child.name), indent + ' ')
-
-            # Follow any constraints and add the affected bones
-            if bone.name in constraints:
-                # Each key value in constraints holds a list of constraint targets
-                for posebone in constraints[bone.name]:
-                    add_track(self.get_bone(posebone.name), indent + ' ')
-
-        # Populate _tracks
-        for bonename in bone_names:
-            bone = self.get_bone(bonename)
-            if bone:
-                # New, fancy method
-                if CONFIG['ADVANCED_KEYFRAME_LOGIC']:
-                    add_track(bone, '')
-                else:
-                    # Use the original, simpler method
-                    bone_track = Bone_Track(bone)
-                    result[bone.name] = bone_track
-
-        return result
-
-    def to_xml( self ):
+    def write_animation( self, arm, actionName, frameBegin, frameEnd, doc, parentElement ):
         _fps = float( bpy.context.scene.render.fps )
+        anim = doc.createElement('animation')
+        parentElement.appendChild( anim )
+        tracks = doc.createElement('tracks')
+        anim.appendChild( tracks )
+        Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]' %(arm.name, actionName, frameBegin, frameEnd) )
 
+        anim.setAttribute('name', actionName)                       # USE the action name
+        anim.setAttribute('length', '%6f' %( (frameEnd - frameBegin)/_fps ) )
+
+        boneNames = sorted( [bone.name for bone in arm.pose.bones] )
+        bone_tracks = []
+        for boneName in boneNames:
+            bone = self.get_bone(boneName)
+            bone_tracks.append( Bone_Track(bone) )
+            bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
+        for frame in range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step):#thanks to Vesa
+            bpy.context.scene.frame_set(frame)
+            for bone in self.roots:
+                bone.update()
+            for track in bone_tracks:
+                track.add_keyframe((frame - frameBegin) / _fps)
+        for track in bone_tracks:
+            # will only write a track if there is some kind of animation there
+            track.write_track( doc, tracks )
+    
+    def to_xml( self ):
         doc = RDocument()
         root = doc.createElement('skeleton'); doc.appendChild( root )
         bones = doc.createElement('bones'); root.appendChild( bones )
@@ -4759,102 +4717,51 @@ class Skeleton(object):
                 scale.setAttribute('y', str(y))
                 scale.setAttribute('z', str(z))
 
-        # Generate a dictionary of bones that affect other bones via constraints
-        constraints = self.get_constraints(self.arm.pose)
-
         arm = self.arm
+        # remember some things so we can put them back later                    
+        savedUseNla = arm.animation_data.use_nla
+        savedFrame = bpy.context.scene.frame_current
+        savedAction = arm.animation_data.action
+        # save the current pose
+        for b in self.bones:
+            b.save_pose_transform()
+        arm.animation_data.use_nla = False
+
+        anims = doc.createElement('animations')
+        root.appendChild( anims )
         if not CONFIG['ONLY_ANIMATED_BONES'] and (not arm.animation_data or (arm.animation_data and not arm.animation_data.nla_tracks)):  # assume animated via constraints and use blender timeline.
-            anims = doc.createElement('animations'); root.appendChild( anims )
-            anim = doc.createElement('animation'); anims.appendChild( anim )
-            tracks = doc.createElement('tracks'); anim.appendChild( tracks )
-            anim.setAttribute('name', 'my_animation')
-            start = bpy.context.scene.frame_start; end = bpy.context.scene.frame_end
-            anim.setAttribute('length', '%6f' %( (end-start)/_fps ) )
-
-            # Construct a list of Bone_Track objects
-            bone_names = [bone.name for bone in arm.pose.bones]
-            bone_tracks = self.get_bone_tracks( bone_names, constraints )
-
-            # Generate the keyframe XML for each Bone_Track inside bone_tracks
-            for frame in range( int(start), int(end)+1, bpy.context.scene.frame_step):
-                bpy.context.scene.frame_set(frame)
-                for bone in self.roots:
-                    bone.update()
-                print('\t\t Frame:', frame)
-                for i, track in bone_tracks.items():
-                    track.add_keyframe( (frame - start) / _fps)
-            for i, track in bone_tracks.items():
-                track.write_track( doc, tracks )
+            # write a single animation from the blender timeline
+            self.write_animation( arm, 'my_animation', bpy.context.scene.frame_start, bpy.context.scene.frame_end, doc, anims )
 
         elif arm.animation_data:
-            anims = doc.createElement('animations'); root.appendChild( anims )
             if not len( arm.animation_data.nla_tracks ):
                 Report.warnings.append('you must assign an NLA strip to armature (%s) that defines the start and end frames' %arm.name)
 
-            if CONFIG['INDEPENDENT_ANIM']:
-                for nla in arm.animation_data.nla_tracks:
-                    nla.mute = True
-
-            # remember some things so we can put them back later                    
-            savedFrame = bpy.context.scene.frame_current
-            savedAction = arm.animation_data.action
-            boneNames = sorted( [bone.name for bone in arm.pose.bones] )
+            actions = {}  # actions by name
+            # the only thing NLA is used for is to gather the names of the actions
+            # it doesn't matter if the actions are all in the same NLA track or in different tracks
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
-                if not len(nla.strips):
-                    print( 'skipping empty NLA track: %s' %nla.name )
-                    continue
                 print('NLA track:',  nla.name)
 
-                if CONFIG['INDEPENDENT_ANIM']:
-                    nla.mute = False
-                    for strip in nla.strips:
-                        strip.mute = True
-
                 for strip in nla.strips:
-                    if CONFIG['INDEPENDENT_ANIM']:
-                        strip.mute = False
+                    action = strip.action
+                    actions[ action.name ] = action
                     print('   strip name:', strip.name)
-                    anim = doc.createElement('animation')
-                    anims.appendChild( anim )
-                    tracks = doc.createElement('tracks')
-                    anim.appendChild( tracks )
-                    Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]' %(arm.name, nla.name, strip.frame_start, strip.frame_end) )
+                    print('   action name:', action.name)
 
-                    anim.setAttribute('name', strip.name)                       # USE the strip name
-                    anim.setAttribute('length', '%6f' %( (strip.frame_end-strip.frame_start)/_fps ) )
+            actionNames = sorted( actions.keys() )  # output actions in alphabetical order
+            for actionName in actionNames:
+                action = actions[ actionName ]
+                arm.animation_data.action = action  # set as the current action
+                self.write_animation( arm, actionName, action.frame_range[0], action.frame_range[1], doc, anims )
 
-                    arm.animation_data.action = strip.action
-                    bone_tracks = []
-                    for boneName in boneNames:
-                        bone = self.get_bone(boneName)
-                        bone_tracks.append( Bone_Track(bone) )
-                        bone.clear_pose_transform()
-                    for frame in range( int(strip.frame_start), int(strip.frame_end)+1, bpy.context.scene.frame_step):#thanks to Vesa
-                        bpy.context.scene.frame_set(frame)
-                        for bone in self.roots:
-                            bone.update()
-                        for track in bone_tracks:
-                            track.add_keyframe((frame - strip.frame_start) / _fps)
-                    for track in bone_tracks:
-                        # will only write a track if there is some kind of animation there
-                        track.write_track( doc, tracks )
-
-
-                    if CONFIG['INDEPENDENT_ANIM']:
-                        strip.mute = True
-
-                if CONFIG['INDEPENDENT_ANIM']:
-                    nla.mute = True
-                    for strip in nla.strips:
-                        strip.mute = False
-
-            if CONFIG['INDEPENDENT_ANIM']:
-                for nla in arm.animation_data.nla_tracks:
-                    nla.mute = False
-
-            # restore these to what they originally were
-            arm.animation_data.action = savedAction
-            bpy.context.scene.frame_set( savedFrame )
+        # restore these to what they originally were
+        arm.animation_data.action = savedAction
+        arm.animation_data.use_nla = savedUseNla
+        bpy.context.scene.frame_set( savedFrame )
+        # restore the current pose
+        for b in self.bones:
+            b.restore_pose_transform()
 
         return doc.toprettyxml()
 
