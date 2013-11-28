@@ -746,10 +746,7 @@ _CONFIG_DEFAULTS_ALL = {
     'COPY_SHADER_PROGRAMS' : True,
     'MAX_TEXTURE_SIZE' : 4096,
     'SWAP_AXIS' : 'xz-y', # ogre standard
-    'ONLY_ANIMATED_BONES' : False,
     'ONLY_DEFORMABLE_BONES' : False,
-    'ADVANCED_KEYFRAME_LOGIC': False,
-    'INDEPENDENT_ANIM' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : True,
     'SEP_MATS' : True,
@@ -3176,8 +3173,6 @@ class _OgreCommonExport_(_TXML_):
         self.EX_SWAP_AXIS = CONFIG['SWAP_AXIS']
         self.EX_SEP_MATS = CONFIG['SEP_MATS']
         self.EX_ONLY_DEFORMABLE_BONES = CONFIG['ONLY_DEFORMABLE_BONES']
-        self.EX_ONLY_ANIMATED_BONES = CONFIG['ONLY_ANIMATED_BONES']
-        self.ADVANCED_KEYFRAME_LOGIC = CONFIG['ADVANCED_KEYFRAME_LOGIC']
         self.EX_SCENE = CONFIG['SCENE']
         self.EX_SELONLY = CONFIG['SELONLY']
         self.EX_FORCE_CAMERA = CONFIG['FORCE_CAMERA']
@@ -3186,7 +3181,6 @@ class _OgreCommonExport_(_TXML_):
         self.EX_MESH_OVERWRITE = CONFIG['MESH_OVERWRITE']
         self.EX_ARM_ANIM = CONFIG['ARM_ANIM']
         self.EX_SHAPE_ANIM = CONFIG['SHAPE_ANIM']
-        self.EX_INDEPENDENT_ANIM = CONFIG['INDEPENDENT_ANIM']
         self.EX_TRIM_BONE_WEIGHTS = CONFIG['TRIM_BONE_WEIGHTS']
         self.EX_ARRAY = CONFIG['ARRAY']
         self.EX_MATERIALS = CONFIG['MATERIALS']
@@ -3220,14 +3214,6 @@ class _OgreCommonExport_(_TXML_):
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
-    EX_ONLY_ANIMATED_BONES = BoolProperty(
-        name="Only Animated Bones",
-        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)",
-        default=CONFIG['ONLY_ANIMATED_BONES'])
-    EX_ADVANCED_KEYFRAME_LOGIC = BoolProperty(
-        name="Advanced Keyframe Logic",
-        description="traces constraints and parents to include keyframes of any deformable bones being affected by other bones while ignoring keys for non-deformable bones.  Eventually this could be better seperated into the 'Only Deformable Bones' option but right now that is implemented to early in the pipeline to be useful.",
-        default=CONFIG['ADVANCED_KEYFRAME_LOGIC'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -3260,10 +3246,6 @@ class _OgreCommonExport_(_TXML_):
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
         default=CONFIG['SHAPE_ANIM'])
-    EX_INDEPENDENT_ANIM = BoolProperty(
-        name="Independent Animations",
-        description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
-        default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
@@ -3923,14 +3905,6 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
-    EX_ONLY_ANIMATED_BONES = BoolProperty(
-        name="Only Animated Bones",
-        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)",
-        default=CONFIG['ONLY_ANIMATED_BONES'])
-    EX_ADVANCED_KEYFRAME_LOGIC = BoolProperty(
-        name="Advanced Keyframe Logic",
-        description="traces constraints and parents to include keyframes of any deformable bones being affected by other bones while ignoring keys for non-deformable bones.  Eventually this could be better seperated into the 'Only Deformable Bones' option but right now that is implemented to early in the pipeline to be useful.",
-        default=CONFIG['ADVANCED_KEYFRAME_LOGIC'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -3963,10 +3937,6 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
         default=CONFIG['SHAPE_ANIM'])
-    EX_INDEPENDENT_ANIM = BoolProperty(
-        name="Independent Animations",
-        description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
-        default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
@@ -4079,14 +4049,6 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
-    EX_ONLY_ANIMATED_BONES = BoolProperty(
-        name="Only Animated Bones",
-        description="only exports bones that have been keyframed, useful for run-time animation blending (example: upper/lower torso split)",
-        default=CONFIG['ONLY_ANIMATED_BONES'])
-    EX_ADVANCED_KEYFRAME_LOGIC = BoolProperty(
-        name="Advanced Keyframe Logic",
-        description="traces constraints and parents to include keyframes of any deformable bones being affected by other bones while ignoring keys for non-deformable bones.  Eventually this could be better seperated into the 'Only Deformable Bones' option but right now that is implemented to early in the pipeline to be useful.",
-        default=CONFIG['ADVANCED_KEYFRAME_LOGIC'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -4119,10 +4081,6 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
         default=CONFIG['SHAPE_ANIM'])
-    EX_INDEPENDENT_ANIM = BoolProperty(
-        name="Independent Animations",
-        description="Export each NLA-Strip independently. If unchecked NLA-Strips that overlap influence each other.",
-        default=CONFIG['INDEPENDENT_ANIM'])
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
@@ -4729,7 +4687,7 @@ class Skeleton(object):
 
         anims = doc.createElement('animations')
         root.appendChild( anims )
-        if not CONFIG['ONLY_ANIMATED_BONES'] and (not arm.animation_data or (arm.animation_data and not arm.animation_data.nla_tracks)):  # assume animated via constraints and use blender timeline.
+        if not arm.animation_data or (arm.animation_data and not arm.animation_data.nla_tracks):
             # write a single animation from the blender timeline
             self.write_animation( arm, 'my_animation', bpy.context.scene.frame_start, bpy.context.scene.frame_end, doc, anims )
 
