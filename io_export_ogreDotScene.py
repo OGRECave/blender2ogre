@@ -747,6 +747,7 @@ _CONFIG_DEFAULTS_ALL = {
     'MAX_TEXTURE_SIZE' : 4096,
     'SWAP_AXIS' : 'xz-y', # ogre standard
     'ONLY_DEFORMABLE_BONES' : False,
+    'OGRE_INHERIT_SCALE' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : True,
     'SEP_MATS' : True,
@@ -3173,6 +3174,7 @@ class _OgreCommonExport_(_TXML_):
         self.EX_SWAP_AXIS = CONFIG['SWAP_AXIS']
         self.EX_SEP_MATS = CONFIG['SEP_MATS']
         self.EX_ONLY_DEFORMABLE_BONES = CONFIG['ONLY_DEFORMABLE_BONES']
+        self.EX_OGRE_INHERIT_SCALE = CONFIG['OGRE_INHERIT_SCALE']
         self.EX_SCENE = CONFIG['SCENE']
         self.EX_SELONLY = CONFIG['SELONLY']
         self.EX_FORCE_CAMERA = CONFIG['FORCE_CAMERA']
@@ -3214,6 +3216,10 @@ class _OgreCommonExport_(_TXML_):
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_OGRE_INHERIT_SCALE = BoolProperty(
+        name="OGRE inherit scale",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        default=CONFIG['OGRE_INHERIT_SCALE'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -3905,6 +3911,10 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_OGRE_INHERIT_SCALE = BoolProperty(
+        name="OGRE inherit scale",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        default=CONFIG['OGRE_INHERIT_SCALE'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -4049,6 +4059,10 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_OGRE_INHERIT_SCALE = BoolProperty(
+        name="OGRE inherit scale",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        default=CONFIG['OGRE_INHERIT_SCALE'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -4374,7 +4388,8 @@ class Bone(object):
         self.children = []
 
     def update(self):        # called on frame update
-        pose =  self.bone.matrix.copy()
+        pbone = self.bone
+        pose =  pbone.matrix.copy()
         self._inverse_total_trans_pose = pose.inverted()
         # calculate difference to parent bone
         if self.parent:
@@ -4387,24 +4402,37 @@ class Bone(object):
         self.pose_location =  pose.to_translation() - self.ogre_rest_matrix.to_translation()
         pose = self.inverse_ogre_rest_matrix * pose
         self.pose_rotation = pose.to_quaternion()
-        self.pose_scale = pose.to_scale()
-        # special case workaround for broken Ogre nonuniform scaling:
-        # Ogre can't deal with arbitrary nonuniform scaling, but it can handle certain special cases
-        # The special case we are trying to handle here is when a bone has a nonuniform scale and it's
-        # child bones are not inheriting the scale.  We should be able to do this without having to
-        # do any extra setup in Ogre (like turning off "inherit scale" on the Ogre bones)
-        self.ogreDerivedScale = self.pose_scale.copy()
-        if self.parent:
-            # this is how Ogre handles inheritance of scale
-            self.ogreDerivedScale[0] *= self.parent.ogreDerivedScale[0]
-            self.ogreDerivedScale[1] *= self.parent.ogreDerivedScale[1]
-            self.ogreDerivedScale[2] *= self.parent.ogreDerivedScale[2]
-            # if we don't want inherited scale,
-            if not self.bone.bone.use_inherit_scale:
-                # cancel out the scale that Ogre will calculate
-                scl = self.parent.ogreDerivedScale
-                self.pose_scale = mathutils.Vector((1.0/scl[0], 1.0/scl[1], 1.0/scl[2]))
-                self.ogreDerivedScale = mathutils.Vector((1.0, 1.0, 1.0))
+
+        #self.pose_location = pbone.location.copy()
+        #self.pose_scale = pbone.scale.copy()
+        #if pbone.rotation_mode == 'QUATERNION':
+        #    self.pose_rotation = pbone.rotation_quaternion.copy()
+        #else:
+        #    self.pose_rotation = pbone.rotation_euler.to_quaternion()
+            
+        if CONFIG['OGRE_INHERIT_SCALE']:
+            # special case workaround for broken Ogre nonuniform scaling:
+            # Ogre can't deal with arbitrary nonuniform scaling, but it can handle certain special cases
+            # The special case we are trying to handle here is when a bone has a nonuniform scale and it's
+            # child bones are not inheriting the scale.  We should be able to do this without having to
+            # do any extra setup in Ogre (like turning off "inherit scale" on the Ogre bones)
+            # if Ogre is inheriting scale, we just output the scale relative to the parent
+            self.pose_scale = pose.to_scale()
+            self.ogreDerivedScale = self.pose_scale.copy()
+            if self.parent:
+                # this is how Ogre handles inheritance of scale
+                self.ogreDerivedScale[0] *= self.parent.ogreDerivedScale[0]
+                self.ogreDerivedScale[1] *= self.parent.ogreDerivedScale[1]
+                self.ogreDerivedScale[2] *= self.parent.ogreDerivedScale[2]
+                # if we don't want inherited scale,
+                if not self.bone.bone.use_inherit_scale:
+                    # cancel out the scale that Ogre will calculate
+                    scl = self.parent.ogreDerivedScale
+                    self.pose_scale = mathutils.Vector((1.0/scl[0], 1.0/scl[1], 1.0/scl[2]))
+                    self.ogreDerivedScale = mathutils.Vector((1.0, 1.0, 1.0))
+        else:
+            # if Ogre is not inheriting the scale, then we should output the cumulative scale from Blender for each bone
+            self.pose_scale = pbone.matrix.to_scale()
 
         for child in self.children:
             child.update()
