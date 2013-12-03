@@ -4677,13 +4677,10 @@ class Skeleton(object):
 
         arm = self.arm
         # remember some things so we can put them back later                    
-        savedUseNla = arm.animation_data.use_nla
         savedFrame = bpy.context.scene.frame_current
-        savedAction = arm.animation_data.action
         # save the current pose
         for b in self.bones:
             b.save_pose_transform()
-        arm.animation_data.use_nla = False
 
         anims = doc.createElement('animations')
         root.appendChild( anims )
@@ -4692,6 +4689,9 @@ class Skeleton(object):
             self.write_animation( arm, 'my_animation', bpy.context.scene.frame_start, bpy.context.scene.frame_end, doc, anims )
 
         elif arm.animation_data:
+            savedUseNla = arm.animation_data.use_nla
+            savedAction = arm.animation_data.action
+            arm.animation_data.use_nla = False
             if not len( arm.animation_data.nla_tracks ):
                 Report.warnings.append('you must assign an NLA strip to armature (%s) that defines the start and end frames' %arm.name)
 
@@ -4712,10 +4712,11 @@ class Skeleton(object):
                 action = actions[ actionName ]
                 arm.animation_data.action = action  # set as the current action
                 self.write_animation( arm, actionName, action.frame_range[0], action.frame_range[1], doc, anims )
+            # restore these to what they originally were
+            arm.animation_data.action = savedAction
+            arm.animation_data.use_nla = savedUseNla
 
-        # restore these to what they originally were
-        arm.animation_data.action = savedAction
-        arm.animation_data.use_nla = savedUseNla
+        # restore
         bpy.context.scene.frame_set( savedFrame )
         # restore the current pose
         for b in self.bones:
