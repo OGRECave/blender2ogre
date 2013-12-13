@@ -5420,19 +5420,44 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     'name' : '%s.skeleton' % name
             })
             doc.start_tag('boneassignments', {})
+            boneOutputEnableFromName = {}
+            boneIndexFromName = {}
+            for bone in arm.pose.bones:
+                boneOutputEnableFromName[ bone.name ] = True
+                if CONFIG['ONLY_DEFORMABLE_BONES']:
+                    # if we found a deformable bone,
+                    if bone.bone.use_deform:
+                        # visit all ancestor bones and mark them "output enabled"
+                        parBone = bone.parent
+                        while parBone:
+                            boneOutputEnableFromName[ parBone.name ] = True
+                            parBone = parBone.parent
+                    else:
+                        # non-deformable bone, no output
+                        boneOutputEnableFromName[ bone.name ] = False
+            boneIndex = 0
+            for bone in arm.pose.bones:
+                boneIndexFromName[ bone.name ] = boneIndex
+                if boneOutputEnableFromName[ bone.name ]:
+                    boneIndex += 1
             badverts = 0
             for vidx, v in enumerate(_remap_verts_):
                 check = 0
                 for vgroup in v.groups:
                     if vgroup.weight > CONFIG['TRIM_BONE_WEIGHTS']:
-                        bnidx = find_bone_index(copy,arm,vgroup.group)
-                        if bnidx is not None:        # allows other vertex groups, not just armature vertex groups
-                            doc.leaf_tag('vertexboneassignment', {
-                                    'vertexindex' : str(vidx),
-                                    'boneindex' : str(bnidx),
-                                    'weight' : '%6f' % vgroup.weight
-                            })
-                            check += 1
+                        groupIndex = vgroup.group
+                        if groupIndex < len(copy.vertex_groups):
+                            vg = copy.vertex_groups[ groupIndex ]
+                            if vg.name in boneIndexFromName: # allows other vertex groups, not just armature vertex groups
+                                bnidx = boneIndexFromName[ vg.name ] # find_bone_index(copy,arm,vgroup.group)
+                                doc.leaf_tag('vertexboneassignment', {
+                                        'vertexindex' : str(vidx),
+                                        'boneindex' : str(bnidx),
+                                        'weight' : '%6f' % vgroup.weight
+                                })
+                                check += 1
+                        else:
+                            print('WARNING: object vertex groups not in sync with armature', copy, arm, groupIndex)
                 if check > 4:
                     badverts += 1
                     print('WARNING: vertex %s is in more than 4 vertex groups (bone weights)\n(this maybe Ogre incompatible)' %vidx)
