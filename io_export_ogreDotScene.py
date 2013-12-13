@@ -4380,8 +4380,9 @@ class Bone(object):
         #self.matrix_local = rbone.matrix.copy() # space?
 
         self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
-        if pbone.parent and not pbone.parent.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']:
-            print('warning: bone <%s> has non-deformable parent.' %self.name)
+        self.shouldOutput = True
+        if CONFIG['ONLY_DEFORMABLE_BONES'] and not pbone.bone.use_deform:
+            self.shouldOutput = False
 
         # todo: Test -> #if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
         self.parent = pbone.parent
@@ -4431,8 +4432,15 @@ class Bone(object):
                     self.pose_scale = mathutils.Vector((1.0/scl[0], 1.0/scl[1], 1.0/scl[2]))
                     self.ogreDerivedScale = mathutils.Vector((1.0, 1.0, 1.0))
         else:
-            # if Ogre is not inheriting the scale, then we should output the cumulative scale from Blender for each bone
-            self.pose_scale = pbone.matrix.to_scale()
+            # if Ogre is not inheriting the scale,
+            # just output the scale directly
+            self.pose_scale = pbone.scale.copy()
+            # however, if Blender is inheriting the scale,
+            if self.parent and self.bone.bone.use_inherit_scale:
+                # apply parent's scale (only works for uniform scaling)
+                self.pose_scale[0] *= self.parent.pose_scale[0]
+                self.pose_scale[1] *= self.parent.pose_scale[1]
+                self.pose_scale[2] *= self.parent.pose_scale[2]
 
         for child in self.children:
             child.update()
@@ -4462,6 +4470,12 @@ class Bone(object):
         if self.parent:
             self.parent = self.skeleton.get_bone( self.parent.name )
             self.parent.children.append( self )
+            if self.shouldOutput and not self.parent.shouldOutput:
+                # mark all ancestor bones as shouldOutput
+                parent = self.parent
+                while parent:
+                    parent.shouldOutput = True
+                    parent = parent.parent
 
     def compute_rest( self ):    # called after rebuild_tree, recursive roots to leaves
         if self.parent:
@@ -4490,7 +4504,21 @@ class Keyframe:
         self.rot = rot.copy()
         self.scale = scale.copy()
 
-    
+    def isTransIdentity( self ):
+        return self.pos.length < 0.0001
+
+    def isRotIdentity( self ):
+        # if the angle is very close to zero, or the axis is not unit length,
+        if abs(self.rot.angle) < 0.0001 or abs(self.rot.axis.length - 1.0) > 0.001:
+            # treat it as a zero rotation
+            return True
+        return False
+
+    def isScaleIdentity( self ):
+        scaleDiff = mathutils.Vector((1,1,1)) - self.scale
+        return scaleDiff.length < 0.0001
+
+        
 # Bone_Track
 # Encapsulates all of the key information for an individual bone within a single animation,
 # and srores that information as XML.
@@ -4502,22 +4530,21 @@ class Bone_Track:
     def is_pos_animated( self ):
         # take note if any keyframe is anything other than the IDENTITY transform
         for kf in self.keyframes:
-            if kf.pos.length > 0.0001:
+            if not kf.isTransIdentity():
                 return True
         return False
     
     def is_rot_animated( self ):
         # take note if any keyframe is anything other than the IDENTITY transform
         for kf in self.keyframes:
-            if kf.rot.angle > 0.0001:
+            if not kf.isRotIdentity():
                 return True
         return False
 
     def is_scale_animated( self ):
         # take note if any keyframe is anything other than the IDENTITY transform
         for kf in self.keyframes:
-            scaleDiff = mathutils.Vector((1,1,1)) - kf.scale
-            if scaleDiff.length > 0.0001:
+            if not kf.isScaleIdentity():
                 return True
         return False
 
@@ -4547,15 +4574,20 @@ class Bone_Track:
                 trans.setAttribute('z', '%6f' % kf.pos.z)
 
             if isRotAnimated:
-                rot =  doc.createElement( 'rotate' )
-                keyframe.appendChild( rot )
-                q = kf.rot
-                rot.setAttribute('angle', '%6f' %q.angle )
-                axis = doc.createElement('axis'); rot.appendChild( axis )
-                x,y,z = q.axis
-                axis.setAttribute('x', '%6f' %x )
-                axis.setAttribute('y', '%6f' %y )
-                axis.setAttribute('z', '%6f' %z )
+                rotElement =  doc.createElement( 'rotate' )
+                keyframe.appendChild( rotElement )
+                angle = kf.rot.angle
+                axis = kf.rot.axis
+                # if angle is near zero or axis is not unit magnitude,
+                if kf.isRotIdentity():
+                    angle = 0.0  # avoid outputs like "-0.00000"
+                    axis = mathutils.Vector((0,0,0))
+                rotElement.setAttribute('angle', '%6f' %angle )
+                axisElement = doc.createElement('axis')
+                rotElement.appendChild( axisElement )
+                axisElement.setAttribute('x', '%6f' %axis[0])
+                axisElement.setAttribute('y', '%6f' %axis[1])
+                axisElement.setAttribute('z', '%6f' %axis[2])
 
             if isScaleAnimated:
                 scale = doc.createElement('scale')
@@ -4601,9 +4633,8 @@ class Skeleton(object):
         #arm.layers = [True]*20      # can not have anything hidden - REQUIRED?
 
         for pbone in arm.pose.bones:
-            if pbone.bone.use_deform or not CONFIG['ONLY_DEFORMABLE_BONES']:
-                mybone = Bone( arm.data.bones[pbone.name], pbone, self )
-                self.bones.append( mybone )
+            mybone = Bone( arm.data.bones[pbone.name], pbone, self )
+            self.bones.append( mybone )
 
         if arm.name not in Report.armatures:
             Report.armatures.append( arm.name )
@@ -4635,6 +4666,27 @@ class Skeleton(object):
 
     def write_animation( self, arm, actionName, frameBegin, frameEnd, doc, parentElement ):
         _fps = float( bpy.context.scene.render.fps )
+        #boneNames = sorted( [bone.name for bone in arm.pose.bones] )
+        bone_tracks = []
+        for bone in self.bones:
+            #bone = self.get_bone(boneName)
+            if bone.shouldOutput:
+                bone_tracks.append( Bone_Track(bone) )
+            bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
+        for frame in range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step):#thanks to Vesa
+            bpy.context.scene.frame_set(frame)
+            for bone in self.roots:
+                bone.update()
+            for track in bone_tracks:
+                track.add_keyframe((frame - frameBegin) / _fps)
+        # check to see if any animation tracks would be output
+        animationFound = False
+        for track in bone_tracks:
+            if track.is_pos_animated() or track.is_rot_animated() or track.is_scale_animated():
+                animationFound = True
+                break
+        if not animationFound:
+            return
         anim = doc.createElement('animation')
         parentElement.appendChild( anim )
         tracks = doc.createElement('tracks')
@@ -4644,18 +4696,6 @@ class Skeleton(object):
         anim.setAttribute('name', actionName)                       # USE the action name
         anim.setAttribute('length', '%6f' %( (frameEnd - frameBegin)/_fps ) )
 
-        boneNames = sorted( [bone.name for bone in arm.pose.bones] )
-        bone_tracks = []
-        for boneName in boneNames:
-            bone = self.get_bone(boneName)
-            bone_tracks.append( Bone_Track(bone) )
-            bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
-        for frame in range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step):#thanks to Vesa
-            bpy.context.scene.frame_set(frame)
-            for bone in self.roots:
-                bone.update()
-            for track in bone_tracks:
-                track.add_keyframe((frame - frameBegin) / _fps)
         for track in bone_tracks:
             # will only write a track if there is some kind of animation there
             track.write_track( doc, tracks )
@@ -4665,10 +4705,14 @@ class Skeleton(object):
         root = doc.createElement('skeleton'); doc.appendChild( root )
         bones = doc.createElement('bones'); root.appendChild( bones )
         bh = doc.createElement('bonehierarchy'); root.appendChild( bh )
-        for i,bone in enumerate(self.bones):
+        boneId = 0
+        for bone in self.bones:
+            if not bone.shouldOutput:
+                continue
             b = doc.createElement('bone')
             b.setAttribute('name', bone.name)
-            b.setAttribute('id', str(i) )
+            b.setAttribute('id', str(boneId) )
+            boneId = boneId + 1
             bones.appendChild( b )
             mat = bone.ogre_rest_matrix.copy()
             if bone.parent:
@@ -4693,15 +4737,7 @@ class Skeleton(object):
             axis.setAttribute('y', '%6f' %y )
             axis.setAttribute('z', '%6f' %z )
 
-            # Ogre bones do not have initial scaling? ##
-            # note: Ogre bones by default do not pass down their scaling in animation,
-            # so in blender all bones are like 'do-not-inherit-scaling'
-            if 0:
-                scale = doc.createElement('scale'); b.appendChild( scale )
-                x,y,z = swap( mat.to_scale() )
-                scale.setAttribute('x', str(x))
-                scale.setAttribute('y', str(y))
-                scale.setAttribute('z', str(z))
+            # Ogre bones do not have initial scaling
 
         arm = self.arm
         # remember some things so we can put them back later                    
