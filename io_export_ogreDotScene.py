@@ -754,6 +754,7 @@ _CONFIG_DEFAULTS_ALL = {
     'SEP_MATS' : True,
     'SCENE' : True,
     'SELONLY' : True,
+    'EXPORT_HIDDEN' : True,
     'FORCE_CAMERA' : True,
     'FORCE_LAMPS' : True,
     'MESH' : True,
@@ -3178,6 +3179,7 @@ class _OgreCommonExport_(_TXML_):
         self.EX_ONLY_KEYFRAMED_BONES = CONFIG['ONLY_KEYFRAMED_BONES']
         self.EX_OGRE_INHERIT_SCALE = CONFIG['OGRE_INHERIT_SCALE']
         self.EX_SCENE = CONFIG['SCENE']
+        self.EX_EXPORT_HIDDEN = CONFIG['EXPORT_HIDDEN']
         self.EX_SELONLY = CONFIG['SELONLY']
         self.EX_FORCE_CAMERA = CONFIG['FORCE_CAMERA']
         self.EX_FORCE_LAMPS = CONFIG['FORCE_LAMPS']
@@ -3234,6 +3236,10 @@ class _OgreCommonExport_(_TXML_):
         name="Export Selected Only",
         description="export selected",
         default=CONFIG['SELONLY'])
+    EX_EXPORT_HIDDEN = BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        default=CONFIG['EXPORT_HIDDEN'])
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
@@ -3422,6 +3428,8 @@ class _OgreCommonExport_(_TXML_):
         invalidnamewarnings = []
         for ob in bpy.context.scene.objects:
             if ob.subcollision:
+                continue
+            if not self.EX_EXPORT_HIDDEN and ob.hide:
                 continue
             if self.EX_SELONLY and not ob.select:
                 if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA:
@@ -3933,6 +3941,10 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         name="Export Selected Only",
         description="export selected",
         default=CONFIG['SELONLY'])
+    EX_EXPORT_HIDDEN = BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        default=CONFIG['EXPORT_HIDDEN'])
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
@@ -4085,6 +4097,10 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         name="Export Selected Only",
         description="export selected",
         default=CONFIG['SELONLY'])
+    EX_EXPORT_HIDDEN = BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        default=CONFIG['EXPORT_HIDDEN'])
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
