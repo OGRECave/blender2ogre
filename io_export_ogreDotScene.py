@@ -747,6 +747,7 @@ _CONFIG_DEFAULTS_ALL = {
     'MAX_TEXTURE_SIZE' : 4096,
     'SWAP_AXIS' : 'xz-y', # ogre standard
     'ONLY_DEFORMABLE_BONES' : False,
+    'ONLY_KEYFRAMED_BONES' : False,
     'OGRE_INHERIT_SCALE' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : True,
@@ -3174,6 +3175,7 @@ class _OgreCommonExport_(_TXML_):
         self.EX_SWAP_AXIS = CONFIG['SWAP_AXIS']
         self.EX_SEP_MATS = CONFIG['SEP_MATS']
         self.EX_ONLY_DEFORMABLE_BONES = CONFIG['ONLY_DEFORMABLE_BONES']
+        self.EX_ONLY_KEYFRAMED_BONES = CONFIG['ONLY_KEYFRAMED_BONES']
         self.EX_OGRE_INHERIT_SCALE = CONFIG['OGRE_INHERIT_SCALE']
         self.EX_SCENE = CONFIG['SCENE']
         self.EX_SELONLY = CONFIG['SELONLY']
@@ -3214,8 +3216,12 @@ class _OgreCommonExport_(_TXML_):
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
+        name="Only Keyframed Bones",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        default=CONFIG['ONLY_KEYFRAMED_BONES'])
     EX_OGRE_INHERIT_SCALE = BoolProperty(
         name="OGRE inherit scale",
         description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
@@ -3909,8 +3915,12 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
+        name="Only Keyframed Bones",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        default=CONFIG['ONLY_KEYFRAMED_BONES'])
     EX_OGRE_INHERIT_SCALE = BoolProperty(
         name="OGRE inherit scale",
         description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
@@ -4057,8 +4067,12 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
+        name="Only Keyframed Bones",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        default=CONFIG['ONLY_KEYFRAMED_BONES'])
     EX_OGRE_INHERIT_SCALE = BoolProperty(
         name="OGRE inherit scale",
         description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
@@ -4775,7 +4789,21 @@ class Skeleton(object):
             for actionName in actionNames:
                 action = actions[ actionName ]
                 arm.animation_data.action = action  # set as the current action
+                suppressedBones = []
+                if CONFIG['ONLY_KEYFRAMED_BONES']:
+                    keyframedBones = {}
+                    for group in action.groups:
+                        keyframedBones[ group.name ] = True
+                    for b in self.bones:
+                        if (not b.name in keyframedBones) and b.shouldOutput:
+                            # suppress this bone's output
+                            b.shouldOutput = False
+                            suppressedBones.append( b.name )
                 self.write_animation( arm, actionName, action.frame_range[0], action.frame_range[1], doc, anims )
+                # restore suppressed bones
+                for boneName in suppressedBones:
+                    bone = self.get_bone( boneName )
+                    bone.shouldOutput = True
             # restore these to what they originally were
             arm.animation_data.action = savedAction
             arm.animation_data.use_nla = savedUseNla
