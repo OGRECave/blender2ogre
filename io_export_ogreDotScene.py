@@ -26,15 +26,15 @@ CHANGELOG
     0.5.8
     * Clean all names that will be used as filenames on disk. Adjust all places
       that use these names for refs instead of ob.name/ob.data.name. Replaced chars
-      are \, /, :, *, ?, ", <, >, | and spaces. Tested on work with ogre 
+      are \, /, :, *, ?, ", <, >, | and spaces. Tested on work with ogre
       material, mesh and skeleton writing/refs inside the files and txml refs.
-      Shows warning at final report if we had to resort to the renaming so user 
+      Shows warning at final report if we had to resort to the renaming so user
       can possibly rename the object.
     * Added silent auto update checks if blender2ogre was installed using
       the .exe installer. This will keep people up to date when new versions are out.
-    * Fix tracker issue 48: Needs to check if outputting to /tmp or 
+    * Fix tracker issue 48: Needs to check if outputting to /tmp or
       ~/.wine/drive_c/tmp on Linux. Thanks to vax456 for providing the patch,
-      added him to contributors. Preview mesh's are now placed under /tmp 
+      added him to contributors. Preview mesh's are now placed under /tmp
       on Linux systems if the OgreMeshy executable ends with .exe
     * Fix tracker issue 46: add operationtype to <submesh>
     * Implement a modal dialog that reports if material names have invalid
@@ -69,7 +69,7 @@ CHANGELOG
     0.5.7
     * Update to Blender 2.6.3.
     * Fixed xz-y Skeleton rotation (again)
-    * Added additional Keyframe at the end of each animation to prevent 
+    * Added additional Keyframe at the end of each animation to prevent
       ogre from interpolating back to the start
     * Added option to ignore non-deformable bones
     * Added option to export nla-strips independently from each other
@@ -867,9 +867,9 @@ def load_config():
                     subprocess.Popen([exe_install_dir + "check-for-updates.exe", "/silent"])
     except Exception as e:
         print("Exception while reading windows registry:", e)
-        
+
     # Setup temp hidden RNA to expose the file paths
-    for tag in _CONFIG_TAGS_: 
+    for tag in _CONFIG_TAGS_:
         default = CONFIG[ tag ]
         func = eval( 'lambda self,con: CONFIG.update( {"%s" : self.%s} )' %(tag,tag) )
         if type(default) is bool:
@@ -1173,13 +1173,13 @@ class RElement(object):
             lines.append(('  '*indent) + '</%s>' % self.tagName )
 
 class RDocument(object):
-    def __init__(self): 
+    def __init__(self):
         self.documentElement = None
 
-    def appendChild(self, root): 
+    def appendChild(self, root):
         self.documentElement = root
 
-    def createElement(self, tag): 
+    def createElement(self, tag):
         e = RElement(tag)
         e.document = self
         return e
@@ -1218,7 +1218,7 @@ class SimpleSaxWriter():
 
     def start_tag(self, name, attrs):
         self._out_tag(name, attrs, False)
-    
+
     def end_tag(self, name):
         self.indent -= 4
         self.output.write(" " * self.indent)
@@ -1720,20 +1720,20 @@ class PANEL_Configure(bpy.types.Panel):
 
 popup_message = ""
 
-class PopUpDialogOperator(bpy.types.Operator): 
-    bl_idname = "object.popup_dialog_operator" 
-    bl_label = "blender2ogre" 
+class PopUpDialogOperator(bpy.types.Operator):
+    bl_idname = "object.popup_dialog_operator"
+    bl_label = "blender2ogre"
 
     def __init__(self):
         print("dialog Start")
 
     def __del__(self):
         print("dialog End")
-        
-    def execute(self, context): 
+
+    def execute(self, context):
         print ("execute")
         return {'RUNNING_MODAL'}
-        
+
     def draw(self, context):
         # todo: Make this bigger and center on screen.
         # Blender UI stuff seems quite complex, would
@@ -1744,8 +1744,8 @@ class PopUpDialogOperator(bpy.types.Operator):
         col = layout.column()
         col.label(popup_message, 'ERROR')
 
-    def invoke(self, context, event):        
-        wm = context.window_manager 
+    def invoke(self, context, event):
+        wm = context.window_manager
         wm.invoke_popup(self)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
@@ -2407,7 +2407,7 @@ class _TXML_(object):
         # to be an empty string, it will operate best for local preview
         # and importing the scene content to existing scenes with relative refs.
         proto = ''
-        
+
         doc = RDocument()
         scn = doc.createElement('scene')
         doc.appendChild( scn )
@@ -2566,19 +2566,19 @@ class _TXML_(object):
         # to be an empty string, it will operate best for local preview
         # and importing the scene content to existing scenes with relative refs.
         proto = ''
-        
+
         # Entity
         entityid = uid(ob)
         objectname = clean_object_name(ob.name)
         print("  Creating Tundra Enitity with ID", entityid)
-        
+
         e = doc.createElement( 'entity' )
         doc.documentElement.appendChild( e )
         e.setAttribute('id', entityid)
 
         # EC_Name
         print ("    - EC_Name with", objectname)
-        
+
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Name")
         c.setAttribute('sync', '1')
@@ -2591,7 +2591,7 @@ class _TXML_(object):
 
         # EC_Placeable
         print ("    - EC_Placeable ")
-        
+
         c = doc.createElement('component'); e.appendChild( c )
         c.setAttribute('type', "EC_Placeable")
         c.setAttribute('sync', '1')
@@ -2630,7 +2630,7 @@ class _TXML_(object):
         a.setAttribute('name', "Selection layer" )
         a.setAttribute('value', 1)
 
-        # Tundra parenting to EC_Placeable. 
+        # Tundra parenting to EC_Placeable.
         # todo: Verify this inserts correct ent name or id here.
         #   <attribute value="" name="Parent entity ref"/>
         #   <attribute value="" name="Parent bone name"/>
@@ -2762,7 +2762,7 @@ class _TXML_(object):
             a.setAttribute('value', TundraTypes[ ob.game.collision_bounds_type ] )
 
             print ("    - EC_RigidBody with shape type", TundraTypes[ob.game.collision_bounds_type])
-            
+
             M = ob.game.collision_margin
             a = doc.createElement('attribute'); com.appendChild( a )
             a.setAttribute('name', 'Size')
@@ -2842,7 +2842,7 @@ class _TXML_(object):
             a.setAttribute('name', 'Draw Debug')
             a.setAttribute('value', 'false' )
 
-            # Never mark rigids to have draw debug, it can 
+            # Never mark rigids to have draw debug, it can
             # be toggled in tundra for visual debugging.
             #if ob.collision_mode == 'NONE':
             #    a.setAttribute('value', 'false' )
@@ -2870,7 +2870,7 @@ class _TXML_(object):
             xp = NTF['xpatches']
             yp = NTF['ypatches']
             depth = NTF['depth']
-            
+
             print ("    - EC_Terrain")
             com = doc.createElement('component'); e.appendChild( com )
             com.setAttribute('type', 'EC_Terrain')
@@ -2935,14 +2935,14 @@ class _TXML_(object):
         # to be an empty string, it will operate best for local preview
         # and importing the scene content to existing scenes with relative refs.
         proto = ''
-        
+
         objectname = clean_object_name(ob.data.name)
         meshname = "%s.mesh" % objectname
         meshref = "%s%s.mesh" % (proto, objectname)
-        
+
         print ("    - EC_Mesh")
         print ("      - Mesh ref:", meshref)
-        
+
         if self.EX_MESH:
             murl = os.path.join( os.path.split(url)[0], meshname )
             exists = os.path.isfile( murl )
@@ -2952,7 +2952,7 @@ class _TXML_(object):
                     self.dot_mesh( ob, os.path.split(url)[0] )
 
         doc = e.document
-        
+
         if ob.find_armature():
             print ("    - EC_AnimationController")
             c = doc.createElement('component'); e.appendChild( c )
@@ -2978,7 +2978,7 @@ class _TXML_(object):
             for mymat in mymaterials:
                 if mymat is None:
                     continue
-                
+
                 mymatstring += proto + material_name(mymat, True) + '.material;'
             mymatstring = mymatstring[:-1]  # strip ending ;
             a.setAttribute('value', mymatstring )
@@ -3111,7 +3111,7 @@ def clean_object_name(value):
         value = value.replace(invalid_char, '_')
     value = value.replace(' ', '_')
     return value;
-    
+
 def clean_object_name_with_spaces(value):
     global invalid_chars
     for invalid_char in invalid_chars:
@@ -3152,10 +3152,10 @@ class _OgreCommonExport_(_TXML_):
             self.filepath = self.filepath.replace(".txml", ".scene")
         elif self.EXPORT_TYPE == "REX":
             self.filepath = self.filepath.replace(".scene", ".txml")
-        
+
         # Update ui setting from the last export, or file config.
         self.update_ui()
-        
+
         wm = context.window_manager
         fs = wm.fileselect_add(self) # writes to filepath
         return {'RUNNING_MODAL'}
@@ -3334,7 +3334,7 @@ class _OgreCommonExport_(_TXML_):
         description="Filepath used for exporting file",
         maxlen=1024, default="",
         subtype='FILE_PATH')
-    
+
     def dot_material( self, meshes, path='/tmp', mat_file_name='SceneMaterial'):
         material_files = []
         mats = []
@@ -3362,7 +3362,7 @@ class _OgreCommonExport_(_TXML_):
             if self.EX_SEP_MATS:
                 url = self.dot_material_write_separate( mat, data, path )
                 material_files.append(url)
-        
+
         # Write one .material file for everything
         if not self.EX_SEP_MATS:
             try:
@@ -3421,7 +3421,7 @@ class _OgreCommonExport_(_TXML_):
             if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP':
                 linkedgroups.append(ob)
             else:
-                # Gather data of invalid names. Don't bother user with warnings on names 
+                # Gather data of invalid names. Don't bother user with warnings on names
                 # that only get spaces converted to _, just do that automatically.
                 cleanname = clean_object_name(ob.name)
                 cleannamespaces = clean_object_name_with_spaces(ob.name)
@@ -3429,7 +3429,7 @@ class _OgreCommonExport_(_TXML_):
                     if cleannamespaces != ob.name:
                         invalidnamewarnings.append(ob.name + " -> " + cleanname)
                 objects.append(ob)
-        
+
         # Print invalid obj names so user can go and fix them.
         if len(invalidnamewarnings) > 0:
             print ("[Warning]: Following object names have invalid characters for creating files. They will be automatically converted.")
@@ -3522,13 +3522,13 @@ class _OgreCommonExport_(_TXML_):
             proxies = []
             for ob in objects:
                 print("  Processing %s [%s]" % (ob.name, ob.type))
-                
+
                 # This seemingly needs to be done as its done in .scene
                 # export. Fixed a bug that no .meshes were exported when doing
                 # a Tundra export.
                 if ob.type == 'MESH':
                     ob.data.update(calc_tessface=True)
-                    
+
                 # EC_Light
                 if ob.type == 'LAMP':
                     TE = self.tundra_entity(rex, ob, path=path, collision_proxies=proxies)
@@ -3572,7 +3572,7 @@ class _OgreCommonExport_(_TXML_):
                 )
 
             if self.EX_SCENE:
-                if not url.endswith('.txml'): 
+                if not url.endswith('.txml'):
                     url += '.txml'
                 data = rex.toprettyxml()
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
@@ -3598,7 +3598,7 @@ class _OgreCommonExport_(_TXML_):
                 )
 
             if self.EX_SCENE:
-                if not url.endswith('.scene'): 
+                if not url.endswith('.scene'):
                     url += '.scene'
                 data = doc.toprettyxml()
                 f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
@@ -4307,8 +4307,10 @@ def OgreXMLConverter( infile, has_uvs=False ):
 
     basicArguments = ''
 
-    if CONFIG['lodLevels']:
-        basicArguments += ' -l %s -v %s -p %s' %(CONFIG['lodLevels'], CONFIG['lodDistance'], CONFIG['lodPercent'])
+    # LOD generation with OgreXMLConverter tool does not work. Currently the mesh files are generated
+    # manually and referenced in the main mesh file.
+    #if CONFIG['lodLevels']:
+    #    basicArguments += ' -l %s -v %s -p %s' %(CONFIG['lodLevels'], CONFIG['lodDistance'], CONFIG['lodPercent'])
 
     if CONFIG['nuextremityPoints'] > 0:
         basicArguments += ' -x %s' %CONFIG['nuextremityPoints']
@@ -4331,7 +4333,7 @@ def OgreXMLConverter( infile, has_uvs=False ):
         basicArguments += ' -r'
     if not CONFIG['optimiseAnimations']:
         basicArguments += ' -o'
-        
+
     # Make xml converter print less stuff, comment this if you want more debug info out
     basicArguments += ' -q'
 
@@ -4462,7 +4464,7 @@ class Keyframe:
         self.rot = rot.copy()
         self.scale = scale.copy()
 
-    
+
 # Bone_Track
 # Encapsulates all of the key information for an individual bone within a single animation,
 # and srores that information as XML.
@@ -4477,7 +4479,7 @@ class Bone_Track:
             if kf.pos.length > 0.0001:
                 return True
         return False
-    
+
     def is_rot_animated( self ):
         # take note if any keyframe is anything other than the IDENTITY transform
         for kf in self.keyframes:
@@ -4497,7 +4499,7 @@ class Bone_Track:
         bone = self.bone
         kf = Keyframe(time, bone.pose_location, bone.pose_rotation, bone.pose_scale)
         self.keyframes.append( kf )
-        
+
     def write_track( self, doc, tracks_element ):
         isPosAnimated = self.is_pos_animated()
         isRotAnimated = self.is_rot_animated()
@@ -4538,7 +4540,7 @@ class Bone_Track:
                 scale.setAttribute('z', '%6f' %z)
             keyframes_element.appendChild( keyframe )
         tracks_element.appendChild( track )
-    
+
 # Skeleton
 def findArmature( ob ):
     arm = ob.find_armature()
@@ -4550,11 +4552,11 @@ def findArmature( ob ):
                 print( "proxy armature %s found" % ob2.name )
                 return ob2
     return arm
-     
+
 class Skeleton(object):
     def get_bone( self, name ):
         for b in self.bones:
-            if b.name == name: 
+            if b.name == name:
                 return b
         return None
 
@@ -4631,7 +4633,7 @@ class Skeleton(object):
         for track in bone_tracks:
             # will only write a track if there is some kind of animation there
             track.write_track( doc, tracks )
-    
+
     def to_xml( self ):
         doc = RDocument()
         root = doc.createElement('skeleton'); doc.appendChild( root )
@@ -4676,7 +4678,7 @@ class Skeleton(object):
                 scale.setAttribute('z', str(z))
 
         arm = self.arm
-        # remember some things so we can put them back later                    
+        # remember some things so we can put them back later
         savedUseNla = arm.animation_data.use_nla
         savedFrame = bpy.context.scene.frame_current
         savedAction = arm.animation_data.action
@@ -5060,13 +5062,15 @@ class VertexNoPos(object):
 
 ## Creating .mesh
 
-def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True ):
+def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True, isLOD=False):
     start = time.time()
-    
+
+    logging = not isLOD
+
     if not os.path.isdir( path ):
         print('>> Creating working directory', path )
         os.makedirs( path )
-   
+
     Report.meshes.append( ob.data.name )
     Report.faces += len( ob.data.tessfaces )
     Report.orig_vertices += len( ob.data.vertices )
@@ -5090,8 +5094,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     name = clean_object_name(name)
     xmlfile = os.path.join(path, '%s.mesh.xml' % name )
 
-    print('      - Generating:', '%s.mesh.xml' % name)
-    
+    if logging:
+        print('      - Generating:', '%s.mesh.xml' % name)
+
     if _USE_RPYTHON_ and False:
         Rmesh.save( ob, xmlfile )
     else:
@@ -5107,7 +5112,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         # Very ugly, have to replace number of vertices later
         doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
 
-        print('      - Writing shared geometry')
+        if logging:
+            print('      - Writing shared geometry')
+
         doc.start_tag('vertexbuffer', {
                 'positions':'true',
                 'normals':'true',
@@ -5158,7 +5165,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             # Ogre only supports triangles
             tris = []
             tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
-            if len(F.vertices) >= 4: tris.append( (F.vertices[0], F.vertices[2], F.vertices[3]) )
+            if len(F.vertices) >= 4:
+                tris.append( (F.vertices[0], F.vertices[2], F.vertices[3]) )
             if dotextures:
                 a = []; b = []
                 uvtris = [ a, b ]
@@ -5256,28 +5264,32 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
                 faces.append( (face[0], face[1], face[2]) )
 
-        del(_sm_vertices_)
         Report.vertices += numverts
 
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
-        print('        Done at', timer_diff_str(start), "seconds")
-        
-        print('      - Writing submeshes')
+
+        if logging:
+            print('        Done at', timer_diff_str(start), "seconds")
+            print('      - Writing submeshes')
+
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
             if not len(_sm_faces_[matidx]):
                 Report.warnings.append( 'BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (ob.name, mat.name) )
                 continue # fixes corrupt unused materials
 
-            doc.start_tag('submesh', {
-                    'usesharedvertices' : 'true',
-                    'material' : material_name(mat, False),
-                    # Maybe better look at index of all faces, if one over 65535 set to true;
-                    # Problem: we know it too late, postprocessing of file needed
-                    "use32bitindexes" : str(bool(numverts > 65535)),
-                    "operationtype" : "triangle_list"
-            })
+            submesh_attributes = {
+                'usesharedvertices' : 'true',
+                # Maybe better look at index of all faces, if one over 65535 set to true;
+                # Problem: we know it too late, postprocessing of file needed
+                "use32bitindexes" : str(bool(numverts > 65535)),
+                "operationtype" : "triangle_list"
+            }
+            if material_name(mat, False) != "_missing_material_":
+                submesh_attributes['material'] = material_name(mat, False)
+
+            doc.start_tag('submesh', submesh_attributes)
             doc.start_tag('faces', {
                     'count' : str(len(_sm_faces_[matidx]))
             })
@@ -5290,21 +5302,163 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             doc.end_tag('faces')
             doc.end_tag('submesh')
             Report.triangles += len(_sm_faces_[matidx])
+
         del(_sm_faces_)
+        del(_sm_vertices_)
         doc.end_tag('submeshes')
 
-        ## by MrMagne
+        ## submesh names
+        # todo: why is the submesh name taken from the material
+        # when we have the blender object name available?
         doc.start_tag('submeshnames', {})
         for matidx, mat in enumerate( materials ):
-            doc.start_tag('submesh', {
+            doc.leaf_tag('submesh', {
                     'name' : material_name(mat, False),
                     'index' : str(matidx)
             })
-            doc.end_tag('submesh')
         doc.end_tag('submeshnames')
-        # -- end of MrMagne's patch
-        print('        Done at', timer_diff_str(start), "seconds")
-        
+
+        if logging:
+            print('        Done at', timer_diff_str(start), "seconds")
+
+        ## Generate lod levels (jonnenauha)
+        if isLOD == False and ob.type == 'MESH' and CONFIG['lodLevels'] > 0:
+            lod_levels = CONFIG['lodLevels']
+            lod_distance = CONFIG['lodDistance']
+            lod_ratio = CONFIG['lodPercent'] / 100.0
+            lod_pre_mesh_count = len(bpy.data.meshes)
+
+            # Cap lod levels to something sensible (what is it?)
+            if lod_levels > 10:
+                lod_levels = 10
+
+            def activate_object(obj):
+                bpy.ops.object.select_all(action = 'DESELECT')
+                bpy.context.scene.objects.active = obj
+                obj.select = True
+
+            def duplicate_object(scene, name, copyobj):
+
+                # Create new mesh
+                mesh = bpy.data.meshes.new(name)
+
+                # Create new object associated with the mesh
+                ob_new = bpy.data.objects.new(name, mesh)
+
+                # Copy data block from the old object into the new object
+                ob_new.data = copyobj.data.copy()
+                ob_new.location = copyobj.location
+                # hack hack
+                ob_new.location.z += 3
+                ob_new.rotation_euler = copyobj.rotation_euler
+                ob_new.scale = copyobj.scale
+
+                # Link new object to the given scene and select it
+                scene.objects.link(ob_new)
+                ob_new.select = True
+
+                return ob_new, mesh
+
+            def delete_object(obj):
+                activate_object(obj)
+                bpy.ops.object.delete()
+
+            # todo: Potential infinite recursion creation fails?
+            def get_or_create_modifier(obj, modifier_name):
+                if obj.type != 'MESH':
+                    return None
+                # Find modifier
+                for mod_iter in obj.modifiers:
+                    if mod_iter.type == modifier_name:
+                        return mod_iter
+                # Not found? Create it and call recurse
+                activate_object(obj)
+                bpy.ops.object.modifier_add(type=modifier_name)
+                return get_or_create_modifier(obj, modifier_name)
+
+            # Create a temporary duplicate
+            ob_copy, ob_copy_mesh = duplicate_object(bpy.context.scene, ob.name + "_LOD_TEMP_COPY", ob)
+            ob_copy_meshes = [ ob_copy.data, ob_copy_mesh ]
+
+            # Activate clone for modifier manipulation
+            decimate = get_or_create_modifier(ob_copy, 'DECIMATE')
+            if decimate is not None:
+                decimate.decimate_type = 'UNSUBDIV'
+                decimate.show_viewport = True
+                decimate.show_render = True
+
+                lod_generated = []
+                lod_current_distance = lod_distance
+                lod_current_vertice_count = len(mesh.vertices)
+                lod_min_vertice_count = 12
+
+                for level in range(lod_levels+1)[1:]:
+                    decimate.iterations = level
+                    lod_mesh = ob_copy.to_mesh(scene = bpy.context.scene, apply_modifiers = True, settings = 'PREVIEW')
+                    ob_copy_meshes.append(lod_mesh)
+
+                    # Check min vertice count and that the vertice count got reduced from last iteration
+                    lod_mesh_vertices = len(lod_mesh.vertices)
+                    if lod_mesh_vertices < lod_min_vertice_count:
+                        print('        - LOD', level, 'vertice count', lod_mesh_vertices, 'too small. Ignoring LOD.')
+                        decimate.iterations -= 1
+                        break
+                    if lod_mesh_vertices >= lod_current_vertice_count:
+                        print('        - LOD', level, 'vertice count', lod_mesh_vertices, 'cannot be unsubdivided any longer. Ignoring LOD.')
+                        decimate.iterations -= 1
+                        break
+
+                    lod_generated.append({ 'level': level, 'distance': lod_current_distance, 'mesh': lod_mesh})
+                    lod_current_distance += lod_distance
+                    lod_current_vertice_count = lod_mesh_vertices
+
+                # Create lod .mesh files and generate LOD XML to the original .mesh.xml
+                if len(lod_generated) > 0:
+                    # 'manual' means if the geometry gets loaded from a
+                    # different file that this LOD list references
+                    # NOTE: This is the approach at the moment. Another option would be to
+                    # references to the same vertex indexes in the shared geometry. But the
+                    # decimate approach wont work with this as it generates a fresh geometry.
+                    doc.start_tag('levelofdetail', {
+                        'strategy'  : 'Distance',
+                        'numlevels' : str(len(lod_generated) + 1), # The main mesh is + 1 (kind of weird Ogre logic)
+                        'manual'    : "true"
+                    })
+
+                    for lod in lod_generated:
+                        print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
+                        lod_ob_temp = bpy.data.objects.new(name, lod['mesh'])
+                        lod_ob_temp.data.name = name + '_LOD_' + str(lod['level'])
+                        dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, isLOD=True)
+
+                        # 'value' is the distance this LOD kicks in for the 'Distance' strategy.
+                        doc.leaf_tag('lodmanual', {
+                            'value'    : str(lod['distance']),
+                            'meshname' : lod_ob_temp.data.name + ".mesh"
+                        })
+
+                        # Delete temporary LOD object.
+                        # The clone meshes will be deleted later.
+                        lod_ob_temp.user_clear()
+                        delete_object(lod_ob_temp)
+                        del lod_ob_temp
+
+                    doc.end_tag('levelofdetail')
+
+            # Delete temporary LOD object
+            delete_object(ob_copy)
+            del ob_copy
+
+            # Delete temporary data/mesh objects
+            for mesh_iter in ob_copy_meshes:
+                mesh_iter.user_clear()
+                bpy.data.meshes.remove(mesh_iter)
+                del mesh_iter
+            ob_copy_meshes = []
+
+            if lod_pre_mesh_count != len(bpy.data.meshes):
+                print('        - WARNING: After LOD generation, cleanup failed to erase all temporary data!')
+
         arm = ob.find_armature()
         if arm:
             doc.leaf_tag('skeletonlink', {
@@ -5368,8 +5522,11 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     })
                 doc.end_tag('pose')
             doc.end_tag('poses')
-            print('        Done at', timer_diff_str(start), "seconds")
-            
+
+
+            if logging:
+                print('        Done at', timer_diff_str(start), "seconds")
+
             if ob.data.shape_keys.animation_data and len(ob.data.shape_keys.animation_data.nla_tracks):
                 print('      - Writing shape animations')
                 doc.start_tag('animations', {})
@@ -5422,8 +5579,9 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         del uvcache
         doc.close() # reported by Reyn
         f.close()
-        
-        print('      - Created .mesh.xml at', timer_diff_str(start), "seconds")
+
+        if logging:
+            print('      - Created .mesh.xml at', timer_diff_str(start), "seconds")
 
     # todo: Very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
@@ -5453,9 +5611,11 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
 
     mats = []
     for mat in materials:
-        if mat != '_missing_material_': mats.append( mat )
+        if mat != '_missing_material_':
+            mats.append(mat)
 
-    print('      - Created .mesh in total time', timer_diff_str(start), 'seconds')
+    if logging:
+        print('      - Created .mesh in total time', timer_diff_str(start), 'seconds')
     return mats
 
 ## Jmonkey preview
@@ -6096,7 +6256,7 @@ class INFO_HT_myheader(bpy.types.Header):
 
 def export_menu_func_ogre(self, context):
     op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene and .mesh)")
-    
+
 def export_menu_func_realxtend(self, context):
     op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="realXtend Tundra (.txml and .mesh)")
 
@@ -6202,7 +6362,7 @@ def unregister():
     print('Unloading blender2ogre', VERSION)
     header = _header_
     bpy.utils.unregister_module(__name__)
-    if header: 
+    if header:
         bpy.utils.register_class(header)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
@@ -6995,9 +7155,9 @@ class PANEL_MultiResLOD(bpy.types.Panel):
 ## Public API (continued)
 
 def material_name( mat, clean = False ):
-    if type(mat) is str: 
+    if type(mat) is str:
         return mat
-    elif not mat.library: 
+    elif not mat.library:
         return mat.name
     else:
         if clean:
