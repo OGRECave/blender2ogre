@@ -5307,7 +5307,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         del(_sm_vertices_)
         doc.end_tag('submeshes')
 
-        ## submesh names
+        # Submesh names
         # todo: why is the submesh name taken from the material
         # when we have the blender object name available?
         doc.start_tag('submeshnames', {})
@@ -5321,7 +5321,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         if logging:
             print('        Done at', timer_diff_str(start), "seconds")
 
-        ## Generate lod levels (jonnenauha)
+        # Generate lod levels
         if isLOD == False and ob.type == 'MESH' and CONFIG['lodLevels'] > 0:
             lod_levels = CONFIG['lodLevels']
             lod_distance = CONFIG['lodDistance']
@@ -5348,8 +5348,6 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                 # Copy data block from the old object into the new object
                 ob_new.data = copyobj.data.copy()
                 ob_new.location = copyobj.location
-                # hack hack
-                ob_new.location.z += 3
                 ob_new.rotation_euler = copyobj.rotation_euler
                 ob_new.scale = copyobj.scale
 
