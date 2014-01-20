@@ -5276,7 +5276,11 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
             if not len(_sm_faces_[matidx]):
-                Report.warnings.append( 'BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (ob.name, mat.name) )
+                if not isinstance(mat, str):
+                    mat_name = mat.name
+                else:
+                    mat_name = mat
+                Report.warnings.append( 'BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (ob.name, mat_name) )
                 continue # fixes corrupt unused materials
 
             submesh_attributes = {
@@ -5381,17 +5385,19 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
             # Activate clone for modifier manipulation
             decimate = get_or_create_modifier(ob_copy, 'DECIMATE')
             if decimate is not None:
-                decimate.decimate_type = 'UNSUBDIV'
+                decimate.decimate_type = 'COLLAPSE'
                 decimate.show_viewport = True
                 decimate.show_render = True
 
                 lod_generated = []
+                lod_ratio_multiplier = 1.0 - lod_ratio
+                lod_current_ratio = 1.0 * lod_ratio_multiplier
                 lod_current_distance = lod_distance
                 lod_current_vertice_count = len(mesh.vertices)
                 lod_min_vertice_count = 12
 
                 for level in range(lod_levels+1)[1:]:
-                    decimate.iterations = level
+                    decimate.ratio = lod_current_ratio
                     lod_mesh = ob_copy.to_mesh(scene = bpy.context.scene, apply_modifiers = True, settings = 'PREVIEW')
                     ob_copy_meshes.append(lod_mesh)
 
@@ -5399,16 +5405,16 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     lod_mesh_vertices = len(lod_mesh.vertices)
                     if lod_mesh_vertices < lod_min_vertice_count:
                         print('        - LOD', level, 'vertice count', lod_mesh_vertices, 'too small. Ignoring LOD.')
-                        decimate.iterations -= 1
                         break
                     if lod_mesh_vertices >= lod_current_vertice_count:
-                        print('        - LOD', level, 'vertice count', lod_mesh_vertices, 'cannot be unsubdivided any longer. Ignoring LOD.')
-                        decimate.iterations -= 1
+                        print('        - LOD', level-1, 'vertice count', lod_mesh_vertices, 'cannot be decimated any longer. Ignoring LOD.')
                         break
+                    # todo: should we check if the ratio gets too small? although its up to the user to configure from the export panel
 
-                    lod_generated.append({ 'level': level, 'distance': lod_current_distance, 'mesh': lod_mesh})
+                    lod_generated.append({ 'level': level, 'distance': lod_current_distance, 'ratio': lod_current_ratio, 'mesh': lod_mesh })
                     lod_current_distance += lod_distance
                     lod_current_vertice_count = lod_mesh_vertices
+                    lod_current_ratio *= lod_ratio_multiplier
 
                 # Create lod .mesh files and generate LOD XML to the original .mesh.xml
                 if len(lod_generated) > 0:
@@ -5423,8 +5429,10 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                         'manual'    : "true"
                     })
 
+                    print('        - Generating', len(lod_generated), 'LOD meshes. Original: vertices', len(mesh.vertices), "faces", len(mesh.tessfaces))
                     for lod in lod_generated:
-                        print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
+                        ratio_percent = round(lod['ratio'] * 100.0, 0)
+                        print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
                         lod_ob_temp = bpy.data.objects.new(name, lod['mesh'])
                         lod_ob_temp.data.name = name + '_LOD_' + str(lod['level'])
                         dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, isLOD=True)
