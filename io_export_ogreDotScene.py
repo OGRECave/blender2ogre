@@ -6330,7 +6330,7 @@ def register():
         for prog in progs:
             print('Ogre shader program', prog.name)
     else:
-        print('[WARNING]: Invalid my-shaders path' )
+        print('[WARNING]: Invalid my-shaders path %s' % CONFIG['USER_MATERIALS'])
 
 def unregister():
     print('Unloading blender2ogre', VERSION)
@@ -6426,7 +6426,6 @@ class OgreProgram(object):
             f.close()
 
     PROGRAMS = {}
-    SOURCES = {}
 
     def reload(self): # only one directory is allowed to hold shader programs
         if self.source not in os.listdir( CONFIG['SHADER_PROGRAMS'] ):
@@ -7159,7 +7158,10 @@ def generate_material(mat, path='/tmp', copy_programs=False, touch_textures=Fals
     if copy_programs:
         progs = w.get_active_programs()
         for prog in progs:
-            prog.save(path)
+            if prog.source:
+                prog.save(path)
+            else:
+                print( '[WARNING}: material %s uses program %s which has no source' % (mat.name, prog.name) )
 
     header = w.get_header()
     passes = w.get_passes()
