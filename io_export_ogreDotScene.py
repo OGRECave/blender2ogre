@@ -6334,13 +6334,18 @@ def register():
 
 def unregister():
     print('Unloading blender2ogre', VERSION)
-    header = _header_
     bpy.utils.unregister_module(__name__)
-    if header: 
-        bpy.utils.register_class(header)
+    
+    try: bpy.utils.register_class(_header_)
+    except: pass
+    
+    # If the addon is disabled while the UI is toggled, reset it for next time.
+    # "Untoggling" it by setting the value to True seems a bit counter-intuitive.
+    OgreToggleInterfaceOp.TOGGLE = True
     bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
     bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
-    bpy.utils.unregister_class(PopUpDialogOperator)
+    # This seems to be not registered by the time this function is called.
+    #bpy.utils.unregister_class(PopUpDialogOperator)
 
 ## Blender world panel options for EC_SkyX creation
 ## todo: EC_SkyX has changes a bit lately, see that
