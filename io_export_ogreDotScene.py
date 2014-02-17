@@ -26,15 +26,15 @@ CHANGELOG
     0.5.8
     * Clean all names that will be used as filenames on disk. Adjust all places
       that use these names for refs instead of ob.name/ob.data.name. Replaced chars
-      are \, /, :, *, ?, ", <, >, | and spaces. Tested on work with ogre
+      are \, /, :, *, ?, ", <, >, | and spaces. Tested on work with ogre 
       material, mesh and skeleton writing/refs inside the files and txml refs.
-      Shows warning at final report if we had to resort to the renaming so user
+      Shows warning at final report if we had to resort to the renaming so user 
       can possibly rename the object.
     * Added silent auto update checks if blender2ogre was installed using
       the .exe installer. This will keep people up to date when new versions are out.
-    * Fix tracker issue 48: Needs to check if outputting to /tmp or
+    * Fix tracker issue 48: Needs to check if outputting to /tmp or 
       ~/.wine/drive_c/tmp on Linux. Thanks to vax456 for providing the patch,
-      added him to contributors. Preview mesh's are now placed under /tmp
+      added him to contributors. Preview mesh's are now placed under /tmp 
       on Linux systems if the OgreMeshy executable ends with .exe
     * Fix tracker issue 46: add operationtype to <submesh>
     * Implement a modal dialog that reports if material names have invalid
