@@ -5423,7 +5423,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     # references to the same vertex indexes in the shared geometry. But the
                     # decimate approach wont work with this as it generates a fresh geometry.
                     doc.start_tag('levelofdetail', {
-                        'strategy'  : 'Distance',
+                        'strategy'  : 'distance_sphere',
                         'numlevels' : str(len(lod_generated) + 1), # The main mesh is + 1 (kind of weird Ogre logic)
                         'manual'    : "true"
                     })
