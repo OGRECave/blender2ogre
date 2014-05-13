@@ -746,11 +746,14 @@ _CONFIG_DEFAULTS_ALL = {
     'MAX_TEXTURE_SIZE' : 4096,
     'SWAP_AXIS' : 'xz-y', # ogre standard
     'ONLY_DEFORMABLE_BONES' : False,
+    'ONLY_KEYFRAMED_BONES' : False,
+    'OGRE_INHERIT_SCALE' : False,
     'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : True,
     'SEP_MATS' : True,
     'SCENE' : True,
     'SELONLY' : True,
+    'EXPORT_HIDDEN' : True,
     'FORCE_CAMERA' : True,
     'FORCE_LAMPS' : True,
     'MESH' : True,
@@ -3172,7 +3175,10 @@ class _OgreCommonExport_(_TXML_):
         self.EX_SWAP_AXIS = CONFIG['SWAP_AXIS']
         self.EX_SEP_MATS = CONFIG['SEP_MATS']
         self.EX_ONLY_DEFORMABLE_BONES = CONFIG['ONLY_DEFORMABLE_BONES']
+        self.EX_ONLY_KEYFRAMED_BONES = CONFIG['ONLY_KEYFRAMED_BONES']
+        self.EX_OGRE_INHERIT_SCALE = CONFIG['OGRE_INHERIT_SCALE']
         self.EX_SCENE = CONFIG['SCENE']
+        self.EX_EXPORT_HIDDEN = CONFIG['EXPORT_HIDDEN']
         self.EX_SELONLY = CONFIG['SELONLY']
         self.EX_FORCE_CAMERA = CONFIG['FORCE_CAMERA']
         self.EX_FORCE_LAMPS = CONFIG['FORCE_LAMPS']
@@ -3211,8 +3217,16 @@ class _OgreCommonExport_(_TXML_):
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
+        name="Only Keyframed Bones",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        default=CONFIG['ONLY_KEYFRAMED_BONES'])
+    EX_OGRE_INHERIT_SCALE = BoolProperty(
+        name="OGRE inherit scale",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        default=CONFIG['OGRE_INHERIT_SCALE'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -3221,6 +3235,10 @@ class _OgreCommonExport_(_TXML_):
         name="Export Selected Only",
         description="export selected",
         default=CONFIG['SELONLY'])
+    EX_EXPORT_HIDDEN = BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        default=CONFIG['EXPORT_HIDDEN'])
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
@@ -3409,6 +3427,8 @@ class _OgreCommonExport_(_TXML_):
         invalidnamewarnings = []
         for ob in bpy.context.scene.objects:
             if ob.subcollision:
+                continue
+            if not self.EX_EXPORT_HIDDEN and ob.hide:
                 continue
             if self.EX_SELONLY and not ob.select:
                 if ob.type == 'CAMERA' and self.EX_FORCE_CAMERA:
@@ -3902,8 +3922,16 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
+        name="Only Keyframed Bones",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        default=CONFIG['ONLY_KEYFRAMED_BONES'])
+    EX_OGRE_INHERIT_SCALE = BoolProperty(
+        name="OGRE inherit scale",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        default=CONFIG['OGRE_INHERIT_SCALE'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -3912,6 +3940,10 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
         name="Export Selected Only",
         description="export selected",
         default=CONFIG['SELONLY'])
+    EX_EXPORT_HIDDEN = BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        default=CONFIG['EXPORT_HIDDEN'])
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
@@ -4046,8 +4078,16 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         default=CONFIG['SEP_MATS'])
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Warning: Will cause trouble if a deformable bone has a non-deformable parent",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
         default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
+        name="Only Keyframed Bones",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        default=CONFIG['ONLY_KEYFRAMED_BONES'])
+    EX_OGRE_INHERIT_SCALE = BoolProperty(
+        name="OGRE inherit scale",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        default=CONFIG['OGRE_INHERIT_SCALE'])
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
@@ -4056,6 +4096,10 @@ class INFO_OT_createRealxtendExport( bpy.types.Operator, _OgreCommonExport_):
         name="Export Selected Only",
         description="export selected",
         default=CONFIG['SELONLY'])
+    EX_EXPORT_HIDDEN = BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        default=CONFIG['EXPORT_HIDDEN'])
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
@@ -4367,15 +4411,17 @@ class Bone(object):
         #self.matrix_local = rbone.matrix.copy() # space?
 
         self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
-        if pbone.parent and not pbone.parent.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']:
-            print('warning: bone <%s> has non-deformable parent.' %self.name)
+        self.shouldOutput = True
+        if CONFIG['ONLY_DEFORMABLE_BONES'] and not pbone.bone.use_deform:
+            self.shouldOutput = False
 
         # todo: Test -> #if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
         self.parent = pbone.parent
         self.children = []
 
     def update(self):        # called on frame update
-        pose =  self.bone.matrix.copy()
+        pbone = self.bone
+        pose =  pbone.matrix.copy()
         self._inverse_total_trans_pose = pose.inverted()
         # calculate difference to parent bone
         if self.parent:
@@ -4388,24 +4434,44 @@ class Bone(object):
         self.pose_location =  pose.to_translation() - self.ogre_rest_matrix.to_translation()
         pose = self.inverse_ogre_rest_matrix * pose
         self.pose_rotation = pose.to_quaternion()
-        self.pose_scale = pose.to_scale()
-        # special case workaround for broken Ogre nonuniform scaling:
-        # Ogre can't deal with arbitrary nonuniform scaling, but it can handle certain special cases
-        # The special case we are trying to handle here is when a bone has a nonuniform scale and it's
-        # child bones are not inheriting the scale.  We should be able to do this without having to
-        # do any extra setup in Ogre (like turning off "inherit scale" on the Ogre bones)
-        self.ogreDerivedScale = self.pose_scale.copy()
-        if self.parent:
-            # this is how Ogre handles inheritance of scale
-            self.ogreDerivedScale[0] *= self.parent.ogreDerivedScale[0]
-            self.ogreDerivedScale[1] *= self.parent.ogreDerivedScale[1]
-            self.ogreDerivedScale[2] *= self.parent.ogreDerivedScale[2]
-            # if we don't want inherited scale,
-            if not self.bone.bone.use_inherit_scale:
-                # cancel out the scale that Ogre will calculate
-                scl = self.parent.ogreDerivedScale
-                self.pose_scale = mathutils.Vector((1.0/scl[0], 1.0/scl[1], 1.0/scl[2]))
-                self.ogreDerivedScale = mathutils.Vector((1.0, 1.0, 1.0))
+
+        #self.pose_location = pbone.location.copy()
+        #self.pose_scale = pbone.scale.copy()
+        #if pbone.rotation_mode == 'QUATERNION':
+        #    self.pose_rotation = pbone.rotation_quaternion.copy()
+        #else:
+        #    self.pose_rotation = pbone.rotation_euler.to_quaternion()
+            
+        if CONFIG['OGRE_INHERIT_SCALE']:
+            # special case workaround for broken Ogre nonuniform scaling:
+            # Ogre can't deal with arbitrary nonuniform scaling, but it can handle certain special cases
+            # The special case we are trying to handle here is when a bone has a nonuniform scale and it's
+            # child bones are not inheriting the scale.  We should be able to do this without having to
+            # do any extra setup in Ogre (like turning off "inherit scale" on the Ogre bones)
+            # if Ogre is inheriting scale, we just output the scale relative to the parent
+            self.pose_scale = pose.to_scale()
+            self.ogreDerivedScale = self.pose_scale.copy()
+            if self.parent:
+                # this is how Ogre handles inheritance of scale
+                self.ogreDerivedScale[0] *= self.parent.ogreDerivedScale[0]
+                self.ogreDerivedScale[1] *= self.parent.ogreDerivedScale[1]
+                self.ogreDerivedScale[2] *= self.parent.ogreDerivedScale[2]
+                # if we don't want inherited scale,
+                if not self.bone.bone.use_inherit_scale:
+                    # cancel out the scale that Ogre will calculate
+                    scl = self.parent.ogreDerivedScale
+                    self.pose_scale = mathutils.Vector((1.0/scl[0], 1.0/scl[1], 1.0/scl[2]))
+                    self.ogreDerivedScale = mathutils.Vector((1.0, 1.0, 1.0))
+        else:
+            # if Ogre is not inheriting the scale,
+            # just output the scale directly
+            self.pose_scale = pbone.scale.copy()
+            # however, if Blender is inheriting the scale,
+            if self.parent and self.bone.bone.use_inherit_scale:
+                # apply parent's scale (only works for uniform scaling)
+                self.pose_scale[0] *= self.parent.pose_scale[0]
+                self.pose_scale[1] *= self.parent.pose_scale[1]
+                self.pose_scale[2] *= self.parent.pose_scale[2]
 
         for child in self.children:
             child.update()
@@ -4435,6 +4501,12 @@ class Bone(object):
         if self.parent:
             self.parent = self.skeleton.get_bone( self.parent.name )
             self.parent.children.append( self )
+            if self.shouldOutput and not self.parent.shouldOutput:
+                # mark all ancestor bones as shouldOutput
+                parent = self.parent
+                while parent:
+                    parent.shouldOutput = True
+                    parent = parent.parent
 
     def compute_rest( self ):    # called after rebuild_tree, recursive roots to leaves
         if self.parent:
@@ -4463,7 +4535,21 @@ class Keyframe:
         self.rot = rot.copy()
         self.scale = scale.copy()
 
+    def isTransIdentity( self ):
+        return self.pos.length < 0.0001
 
+    def isRotIdentity( self ):
+        # if the angle is very close to zero, or the axis is not unit length,
+        if abs(self.rot.angle) < 0.0001 or abs(self.rot.axis.length - 1.0) > 0.001:
+            # treat it as a zero rotation
+            return True
+        return False
+
+    def isScaleIdentity( self ):
+        scaleDiff = mathutils.Vector((1,1,1)) - self.scale
+        return scaleDiff.length < 0.0001
+
+        
 # Bone_Track
 # Encapsulates all of the key information for an individual bone within a single animation,
 # and srores that information as XML.
@@ -4475,22 +4561,21 @@ class Bone_Track:
     def is_pos_animated( self ):
         # take note if any keyframe is anything other than the IDENTITY transform
         for kf in self.keyframes:
-            if kf.pos.length > 0.0001:
+            if not kf.isTransIdentity():
                 return True
         return False
 
     def is_rot_animated( self ):
         # take note if any keyframe is anything other than the IDENTITY transform
         for kf in self.keyframes:
-            if kf.rot.angle > 0.0001:
+            if not kf.isRotIdentity():
                 return True
         return False
 
     def is_scale_animated( self ):
         # take note if any keyframe is anything other than the IDENTITY transform
         for kf in self.keyframes:
-            scaleDiff = mathutils.Vector((1,1,1)) - kf.scale
-            if scaleDiff.length > 0.0001:
+            if not kf.isScaleIdentity():
                 return True
         return False
 
@@ -4520,15 +4605,20 @@ class Bone_Track:
                 trans.setAttribute('z', '%6f' % kf.pos.z)
 
             if isRotAnimated:
-                rot =  doc.createElement( 'rotate' )
-                keyframe.appendChild( rot )
-                q = kf.rot
-                rot.setAttribute('angle', '%6f' %q.angle )
-                axis = doc.createElement('axis'); rot.appendChild( axis )
-                x,y,z = q.axis
-                axis.setAttribute('x', '%6f' %x )
-                axis.setAttribute('y', '%6f' %y )
-                axis.setAttribute('z', '%6f' %z )
+                rotElement =  doc.createElement( 'rotate' )
+                keyframe.appendChild( rotElement )
+                angle = kf.rot.angle
+                axis = kf.rot.axis
+                # if angle is near zero or axis is not unit magnitude,
+                if kf.isRotIdentity():
+                    angle = 0.0  # avoid outputs like "-0.00000"
+                    axis = mathutils.Vector((0,0,0))
+                rotElement.setAttribute('angle', '%6f' %angle )
+                axisElement = doc.createElement('axis')
+                rotElement.appendChild( axisElement )
+                axisElement.setAttribute('x', '%6f' %axis[0])
+                axisElement.setAttribute('y', '%6f' %axis[1])
+                axisElement.setAttribute('z', '%6f' %axis[2])
 
             if isScaleAnimated:
                 scale = doc.createElement('scale')
@@ -4574,9 +4664,8 @@ class Skeleton(object):
         #arm.layers = [True]*20      # can not have anything hidden - REQUIRED?
 
         for pbone in arm.pose.bones:
-            if pbone.bone.use_deform or not CONFIG['ONLY_DEFORMABLE_BONES']:
-                mybone = Bone( arm.data.bones[pbone.name], pbone, self )
-                self.bones.append( mybone )
+            mybone = Bone( arm.data.bones[pbone.name], pbone, self )
+            self.bones.append( mybone )
 
         if arm.name not in Report.armatures:
             Report.armatures.append( arm.name )
@@ -4608,6 +4697,27 @@ class Skeleton(object):
 
     def write_animation( self, arm, actionName, frameBegin, frameEnd, doc, parentElement ):
         _fps = float( bpy.context.scene.render.fps )
+        #boneNames = sorted( [bone.name for bone in arm.pose.bones] )
+        bone_tracks = []
+        for bone in self.bones:
+            #bone = self.get_bone(boneName)
+            if bone.shouldOutput:
+                bone_tracks.append( Bone_Track(bone) )
+            bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
+        for frame in range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step):#thanks to Vesa
+            bpy.context.scene.frame_set(frame)
+            for bone in self.roots:
+                bone.update()
+            for track in bone_tracks:
+                track.add_keyframe((frame - frameBegin) / _fps)
+        # check to see if any animation tracks would be output
+        animationFound = False
+        for track in bone_tracks:
+            if track.is_pos_animated() or track.is_rot_animated() or track.is_scale_animated():
+                animationFound = True
+                break
+        if not animationFound:
+            return
         anim = doc.createElement('animation')
         parentElement.appendChild( anim )
         tracks = doc.createElement('tracks')
@@ -4617,18 +4727,6 @@ class Skeleton(object):
         anim.setAttribute('name', actionName)                       # USE the action name
         anim.setAttribute('length', '%6f' %( (frameEnd - frameBegin)/_fps ) )
 
-        boneNames = sorted( [bone.name for bone in arm.pose.bones] )
-        bone_tracks = []
-        for boneName in boneNames:
-            bone = self.get_bone(boneName)
-            bone_tracks.append( Bone_Track(bone) )
-            bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
-        for frame in range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step):#thanks to Vesa
-            bpy.context.scene.frame_set(frame)
-            for bone in self.roots:
-                bone.update()
-            for track in bone_tracks:
-                track.add_keyframe((frame - frameBegin) / _fps)
         for track in bone_tracks:
             # will only write a track if there is some kind of animation there
             track.write_track( doc, tracks )
@@ -4638,10 +4736,14 @@ class Skeleton(object):
         root = doc.createElement('skeleton'); doc.appendChild( root )
         bones = doc.createElement('bones'); root.appendChild( bones )
         bh = doc.createElement('bonehierarchy'); root.appendChild( bh )
-        for i,bone in enumerate(self.bones):
+        boneId = 0
+        for bone in self.bones:
+            if not bone.shouldOutput:
+                continue
             b = doc.createElement('bone')
             b.setAttribute('name', bone.name)
-            b.setAttribute('id', str(i) )
+            b.setAttribute('id', str(boneId) )
+            boneId = boneId + 1
             bones.appendChild( b )
             mat = bone.ogre_rest_matrix.copy()
             if bone.parent:
@@ -4666,25 +4768,14 @@ class Skeleton(object):
             axis.setAttribute('y', '%6f' %y )
             axis.setAttribute('z', '%6f' %z )
 
-            # Ogre bones do not have initial scaling? ##
-            # note: Ogre bones by default do not pass down their scaling in animation,
-            # so in blender all bones are like 'do-not-inherit-scaling'
-            if 0:
-                scale = doc.createElement('scale'); b.appendChild( scale )
-                x,y,z = swap( mat.to_scale() )
-                scale.setAttribute('x', str(x))
-                scale.setAttribute('y', str(y))
-                scale.setAttribute('z', str(z))
+            # Ogre bones do not have initial scaling
 
         arm = self.arm
         # remember some things so we can put them back later
-        savedUseNla = arm.animation_data.use_nla
         savedFrame = bpy.context.scene.frame_current
-        savedAction = arm.animation_data.action
         # save the current pose
         for b in self.bones:
             b.save_pose_transform()
-        arm.animation_data.use_nla = False
 
         anims = doc.createElement('animations')
         root.appendChild( anims )
@@ -4693,6 +4784,9 @@ class Skeleton(object):
             self.write_animation( arm, 'my_animation', bpy.context.scene.frame_start, bpy.context.scene.frame_end, doc, anims )
 
         elif arm.animation_data:
+            savedUseNla = arm.animation_data.use_nla
+            savedAction = arm.animation_data.action
+            arm.animation_data.use_nla = False
             if not len( arm.animation_data.nla_tracks ):
                 Report.warnings.append('you must assign an NLA strip to armature (%s) that defines the start and end frames' %arm.name)
 
@@ -4712,11 +4806,26 @@ class Skeleton(object):
             for actionName in actionNames:
                 action = actions[ actionName ]
                 arm.animation_data.action = action  # set as the current action
+                suppressedBones = []
+                if CONFIG['ONLY_KEYFRAMED_BONES']:
+                    keyframedBones = {}
+                    for group in action.groups:
+                        keyframedBones[ group.name ] = True
+                    for b in self.bones:
+                        if (not b.name in keyframedBones) and b.shouldOutput:
+                            # suppress this bone's output
+                            b.shouldOutput = False
+                            suppressedBones.append( b.name )
                 self.write_animation( arm, actionName, action.frame_range[0], action.frame_range[1], doc, anims )
+                # restore suppressed bones
+                for boneName in suppressedBones:
+                    bone = self.get_bone( boneName )
+                    bone.shouldOutput = True
+            # restore these to what they originally were
+            arm.animation_data.action = savedAction
+            arm.animation_data.use_nla = savedUseNla
 
-        # restore these to what they originally were
-        arm.animation_data.action = savedAction
-        arm.animation_data.use_nla = savedUseNla
+        # restore
         bpy.context.scene.frame_set( savedFrame )
         # restore the current pose
         for b in self.bones:
@@ -5470,19 +5579,44 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                     'name' : '%s.skeleton' % name
             })
             doc.start_tag('boneassignments', {})
+            boneOutputEnableFromName = {}
+            boneIndexFromName = {}
+            for bone in arm.pose.bones:
+                boneOutputEnableFromName[ bone.name ] = True
+                if CONFIG['ONLY_DEFORMABLE_BONES']:
+                    # if we found a deformable bone,
+                    if bone.bone.use_deform:
+                        # visit all ancestor bones and mark them "output enabled"
+                        parBone = bone.parent
+                        while parBone:
+                            boneOutputEnableFromName[ parBone.name ] = True
+                            parBone = parBone.parent
+                    else:
+                        # non-deformable bone, no output
+                        boneOutputEnableFromName[ bone.name ] = False
+            boneIndex = 0
+            for bone in arm.pose.bones:
+                boneIndexFromName[ bone.name ] = boneIndex
+                if boneOutputEnableFromName[ bone.name ]:
+                    boneIndex += 1
             badverts = 0
             for vidx, v in enumerate(_remap_verts_):
                 check = 0
                 for vgroup in v.groups:
                     if vgroup.weight > CONFIG['TRIM_BONE_WEIGHTS']:
-                        bnidx = find_bone_index(copy,arm,vgroup.group)
-                        if bnidx is not None:        # allows other vertex groups, not just armature vertex groups
-                            doc.leaf_tag('vertexboneassignment', {
-                                    'vertexindex' : str(vidx),
-                                    'boneindex' : str(bnidx),
-                                    'weight' : '%6f' % vgroup.weight
-                            })
-                            check += 1
+                        groupIndex = vgroup.group
+                        if groupIndex < len(copy.vertex_groups):
+                            vg = copy.vertex_groups[ groupIndex ]
+                            if vg.name in boneIndexFromName: # allows other vertex groups, not just armature vertex groups
+                                bnidx = boneIndexFromName[ vg.name ] # find_bone_index(copy,arm,vgroup.group)
+                                doc.leaf_tag('vertexboneassignment', {
+                                        'vertexindex' : str(vidx),
+                                        'boneindex' : str(bnidx),
+                                        'weight' : '%6f' % vgroup.weight
+                                })
+                                check += 1
+                        else:
+                            print('WARNING: object vertex groups not in sync with armature', copy, arm, groupIndex)
                 if check > 4:
                     badverts += 1
                     print('WARNING: vertex %s is in more than 4 vertex groups (bone weights)\n(this maybe Ogre incompatible)' %vidx)
@@ -6361,7 +6495,7 @@ def register():
         for prog in progs:
             print('Ogre shader program', prog.name)
     else:
-        print('[WARNING]: Invalid my-shaders path' )
+        print('[WARNING]: Invalid my-shaders path %s' % CONFIG['USER_MATERIALS'])
 
 def unregister():
     print('Unloading blender2ogre', VERSION)
@@ -6462,7 +6596,6 @@ class OgreProgram(object):
             f.close()
 
     PROGRAMS = {}
-    SOURCES = {}
 
     def reload(self): # only one directory is allowed to hold shader programs
         if self.source not in os.listdir( CONFIG['SHADER_PROGRAMS'] ):
@@ -7195,7 +7328,10 @@ def generate_material(mat, path='/tmp', copy_programs=False, touch_textures=Fals
     if copy_programs:
         progs = w.get_active_programs()
         for prog in progs:
-            prog.save(path)
+            if prog.source:
+                prog.save(path)
+            else:
+                print( '[WARNING}: material %s uses program %s which has no source' % (mat.name, prog.name) )
 
     header = w.get_header()
     passes = w.get_passes()
