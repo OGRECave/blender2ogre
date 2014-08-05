@@ -1,11 +1,21 @@
 
 The new structure:
 
-+- plugin.py                                       # changelog and importing the rest of the plugin
++- plugin.py                                       # changelog, blender registration and importing the rest of the plugin
  += blender2ogre/                                  # python source code
   += ogre/                                         # code specific to ogre, export formats, xml, materials, ...
-  += tundra/                                       # real extend
+   +- converter.py                                 # OgreXmlConverter wrapper
+   +- export.py                                    # general exporting api
+   +- material.py
+   +- mesh.py
+   +- program.py
+   +- skeleton.py
+  += tundra/                                       # real extend plugin (not working yet)
   +- config.py                                     # configuration loading, saving
+  +- util.py                                       # general purpose functions used in many places
+  +- report.py                                     # the reporting as a module rather than inlined
+  +- xml.py                                        # xml utility
+  +- ...
  += launch/                                        # several launch scripts (windows bat, linux sh, ...)
 
 
@@ -18,8 +28,8 @@ What I have done:
 * CMesh is not used in the source code. moved to unused.py
 * JMonkey moved to unused. There was a comment saying 'todo: remove...'
 * The setup of _TXML_ -> _OgreCommonExport_ +-> OgrePlugin
-                                          |
-                                          +-> realXtend Plugin
+                                            |
+                                            +-> realXtend Plugin
 
 is a bit weired, I don't see why there should be a dependency on _TXML_, since it is only used
 for realXtend... now it is the following way:
@@ -29,7 +39,6 @@ _OgreCommonExport_ +-> OgrePlugin
                    +-> _TXML_ -> realXtend Plugin
 
 OgrePlugin does not redefine properties of _OgreCommonExport_ (EX_* = TypeProperty(...) )
-* moved VERSION into version.py
 * different parts of ogre export (image,material,mesh,program,skeleton) got their own modules
 * moved the rpython code to the rogre folder
 * moved NVIDIA texture tool doc into unused.py
