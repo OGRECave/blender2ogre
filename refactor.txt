@@ -27,7 +27,12 @@ for realXtend... now it is the following way:
 _OgreCommonExport_ +-> OgrePlugin
                    |
                    +-> _TXML_ -> realXtend Plugin
+
+OgrePlugin does not redefine properties of _OgreCommonExport_ (EX_* = TypeProperty(...) )
 * moved VERSION into version.py
 * different parts of ogre export (image,material,mesh,program,skeleton) got their own modules
 * moved the rpython code to the rogre folder
 * moved NVIDIA texture tool doc into unused.py
+
+This resulted in about ~2200 loc in blender2ogre/__init__.py (from 7730).
+I even further reduced it to 2000 loc, and removed some duplicate code.

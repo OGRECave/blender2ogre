@@ -81,19 +81,81 @@ TODO
     * Set description field for all pyRNA
 '''
 
-import blender2ogre.version as v
+import os, sys, logging, bpy
+
+# On startup blender may be able to read this file, but does not find
+# any other file, since the curent directory is not in the module search
+# path. Fix this by adding it.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.append( SCRIPT_DIR )
+
+VERSION = (0,6,1)
 
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456",
-    "version": v.version(),
+    "version": VERSION,
     "blender": (2, 6, 6),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
-    "wiki_url": "http://code.google.com/p/blender2ogre/w/list",
-    "tracker_url": "http://code.google.com/p/blender2ogre/issues/list",
+    "wiki_url": "https://bitbucket.org/MindCalamity/blender2ogre/overview",
+    "tracker_url": "https://bitbucket.org/MindCalamity/blender2ogre/issues?status=new&status=open",
     "category": "Import-Export"
 }
 
 # import the plugin directory and setup the plugin
 import blender2ogre
+from blender2ogre.config import CONFIG
+
+#_USE_TUNDRA_ = False
+
+MyShaders = None
+
+def register():
+    logging.info('Starting blender2ogre %s', VERSION)
+    global MyShaders, _header_ #, _USE_TUNDRA_
+
+    blender2ogre.restore_minimal_interface()
+
+    # only test for Tundra2 once - do not do this every panel redraw ##
+    #if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
+    #else: _USE_TUNDRA_ = False
+
+    bpy.types.INFO_MT_file_export.append(blender2ogre.export_menu_func_ogre)
+    # TODO bpy.types.INFO_MT_file_export.append(blender2ogre.export_menu_func_realxtend)
+
+    bpy.utils.register_class(blender2ogre.PopUpDialogOperator)
+
+    if os.path.isdir( CONFIG['USER_MATERIALS'] ):
+        scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
+        for prog in progs:
+            print('Ogre shader program', prog.name)
+    else:
+        logging.warn('Invalid my-shaders path %s' % CONFIG['USER_MATERIALS'])
+
+def unregister():
+    logging.info('Unloading blender2ogre %s', VERSION)
+    bpy.utils.unregister_module(__name__)
+    try: bpy.utils.register_class(_header_)
+    except: pass
+    
+    # If the addon is disabled while the UI is toggled, reset it for next time.
+    # "Untoggling" it by setting the value to True seems a bit counter-intuitive.
+    blender2ogre.OgreToggleInterfaceOp.TOGGLE = True
+    bpy.types.INFO_MT_file_export.remove(blender2ogre.export_menu_func_ogre)
+    #TODO bpy.types.INFO_MT_file_export.remove(blender2ogre.export_menu_func_realxtend)
+    # This seems to be not registered by the time this function is called.
+    #bpy.utils.unregister_class(PopUpDialogOperator)
+
+## Blender addon main entry point.
+## Allows directly running by "blender --python blender2ogre.py"
+if __name__ == "__main__":
+    register()
+
+    try:
+        index = sys.argv.index("--")
+        from blender2ogre import auto
+        auto.export(sys.argv[index+1:])
+    except ValueError:
+        pass

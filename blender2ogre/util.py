@@ -1,9 +1,8 @@
 
-from .oge.util import *
 import mathutils
-# TODO config
-from .. import CONFIG
 import logging
+import time
+from .config import CONFIG
 
 def swap(vec):
     if CONFIG['SWAP_AXIS'] == 'xyz': return vec

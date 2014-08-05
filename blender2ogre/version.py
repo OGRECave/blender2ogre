@@ -6,4 +6,3 @@ def version():
 
 def version_str():
     return '.'.join(VERSION)
-

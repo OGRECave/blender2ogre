@@ -18,15 +18,14 @@ import os, sys, time, array, ctypes, math
 import bpy, mathutils
 from bpy.props import *
 import hashlib, getpass, tempfile, configparser, subprocess, pickle
-from xml.sax.saxutils import XMLGenerator, quoteattr
-from . import version as v
+from . import config
+from .util import *
+from .xml import *
+from .report import *
+from .ogre.export import INFO_OT_createOgreExport
+from .ogre.material import IMAGE_FORMATS
+from .report import Report
 
-## Make sure we can import from same directory
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.append( SCRIPT_DIR )
-
-# TODO move this around
 UI_CLASSES = []
 def UI(cls):
     ''' Toggles the Ogre interface panels '''
@@ -48,7 +47,6 @@ bpy.types.Object.avatar_reference = StringProperty(
     description='sets avatar reference URL',
     maxlen=128,
     default='')
-BoolProperty( name='enable avatar', description='enables EC_Avatar', default=False) # todo: is this used?
 
 # Tundra IDs
 
@@ -139,18 +137,6 @@ bpy.types.Speaker.use_spatial = BoolProperty(
     name='3D spatial sound',
     default=True)
 
-## ImageMagick
-
-_IMAGE_FORMATS =  [
-    ('NONE','NONE', 'do not convert image'),
-    ('bmp', 'bmp', 'bitmap format'),
-    ('jpg', 'jpg', 'jpeg format'),
-    ('gif', 'gif', 'gif format'),
-    ('png', 'png', 'png format'),
-    ('tga', 'tga', 'targa format'),
-    ('dds', 'dds', 'nvidia dds format'),
-]
-
 bpy.types.Image.use_convert_format = BoolProperty(
     name='use convert format',
     default=False
@@ -158,7 +144,7 @@ bpy.types.Image.use_convert_format = BoolProperty(
 bpy.types.Image.convert_format = EnumProperty(
     name='convert to format',
     description='converts to image format using imagemagick',
-    items=_IMAGE_FORMATS,
+    items=IMAGE_FORMATS,
     default='NONE')
 bpy.types.Image.jpeg_quality = IntProperty(
     name="jpeg quality",
@@ -416,41 +402,6 @@ Installing:
 '''
 
 ## Options
-
-AXIS_MODES =  [
-    ('xyz', 'xyz', 'no swapping'),
-    ('xz-y', 'xz-y', 'ogre standard'),
-    ('-xzy', '-xzy', 'non standard'),
-]
-
-from . import config
-
-# Make default material for missing materials:
-# * Red flags for users so they can quickly see what they forgot to assign a material to.
-# * Do not crash if no material on object - thats annoying for the user.
-
-MISSING_MATERIAL = '''
-material _missing_material_
-{
-    receive_shadows off
-    technique
-    {
-        pass
-        {
-            ambient 0.1 0.1 0.1 1.0
-            diffuse 0.8 0.0 0.0 1.0
-            specular 0.5 0.5 0.5 1.0 12.5
-            emissive 0.3 0.3 0.3 1.0
-        }
-    }
-}
-'''
-
-from .util import *
-from .xml import *
-from .report import *
-
-Report = ReportSingleton()
 
 class MiniReport(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
@@ -1265,45 +1216,6 @@ Tundra Streaming:
     . animation playback is broken if you rename your NLA strips after opening Tundra
 '''
 
-# Ogre v1.7 Doc
-
-def _mesh_entity_helper( doc, ob, o ):
-    ## extended format - BGE Physics ##
-    o.setAttribute('mass', str(ob.game.mass))
-    o.setAttribute('mass_radius', str(ob.game.radius))
-    o.setAttribute('physics_type', ob.game.physics_type)
-    o.setAttribute('actor', str(ob.game.use_actor))
-    o.setAttribute('ghost', str(ob.game.use_ghost))
-    o.setAttribute('velocity_min', str(ob.game.velocity_min))
-    o.setAttribute('velocity_max', str(ob.game.velocity_max))
-    o.setAttribute('lock_trans_x', str(ob.game.lock_location_x))
-    o.setAttribute('lock_trans_y', str(ob.game.lock_location_y))
-    o.setAttribute('lock_trans_z', str(ob.game.lock_location_z))
-    o.setAttribute('lock_rot_x', str(ob.game.lock_rotation_x))
-    o.setAttribute('lock_rot_y', str(ob.game.lock_rotation_y))
-    o.setAttribute('lock_rot_z', str(ob.game.lock_rotation_z))
-    o.setAttribute('anisotropic_friction', str(ob.game.use_anisotropic_friction))
-    x,y,z = ob.game.friction_coefficients
-    o.setAttribute('friction_x', str(x))
-    o.setAttribute('friction_y', str(y))
-    o.setAttribute('friction_z', str(z))
-    o.setAttribute('damping_trans', str(ob.game.damping))
-    o.setAttribute('damping_rot', str(ob.game.rotation_damping))
-    o.setAttribute('inertia_tensor', str(ob.game.form_factor))
-
-    mesh = ob.data
-    # custom user props
-    for prop in mesh.items():
-        propname, propvalue = prop
-        if not propname.startswith('_'):
-            user = doc.createElement('user_data')
-            o.appendChild( user )
-            user.setAttribute( 'name', propname )
-            user.setAttribute( 'value', str(propvalue) )
-            user.setAttribute( 'type', type(propvalue).__name__ )
-
-## MeshMagick
-
 class MeshMagick(object):
     ''' Usage: MeshMagick [global_options] toolname [tool_options] infile(s) -- [outfile(s)]
     Available Tools
@@ -1344,92 +1256,6 @@ class MeshMagick(object):
         subprocess.call( cmd )
         print(' mesh magick - complete ')
         print('-'*80)
-
-## Ogre Command Line Tools Documentation
-
-_ogre_command_line_tools_doc = '''
-Usage: OgreXMLConverter [options] sourcefile [destfile]
-
-Available options:
--i             = interactive mode - prompt for options
-(The next 4 options are only applicable when converting XML to Mesh)
--l lodlevels   = number of LOD levels
--v lodvalue     = value increment to reduce LOD
--s lodstrategy = LOD strategy to use for this mesh
--p lodpercent  = Percentage triangle reduction amount per LOD
--f lodnumtris  = Fixed vertex reduction per LOD
--e             = DON'T generate edge lists (for stencil shadows)
--r             = DON'T reorganise vertex buffers to OGRE recommended format.
--t             = Generate tangents (for normal mapping)
--td [uvw|tangent]
-           = Tangent vertex semantic destination (default tangent)
--ts [3|4]      = Tangent size (3 or 4 components, 4 includes parity, default 3)
--tm            = Split tangent vertices at UV mirror points
--tr            = Split tangent vertices where basis is rotated > 90 degrees
--o             = DON'T optimise out redundant tracks & keyframes
--d3d           = Prefer D3D packed colour formats (default on Windows)
--gl            = Prefer GL packed colour formats (default on non-Windows)
--E endian      = Set endian mode 'big' 'little' or 'native' (default)
--x num         = Generate no more than num eXtremes for every submesh (default 0)
--q             = Quiet mode, less output
--log filename  = name of the log file (default: 'OgreXMLConverter.log')
-sourcefile     = name of file to convert
-destfile       = optional name of file to write to. If you don't
-                 specify this OGRE works it out through the extension
-                 and the XML contents if the source is XML. For example
-                 test.mesh becomes test.xml, test.xml becomes test.mesh
-                 if the XML document root is <mesh> etc.
-'''
-
-## Ogre Command Line Tools
-
-def OgreXMLConverter( infile, has_uvs=False ):
-    # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
-    # We should show how to configure the converter location in config panel or tell the default path.
-    exe = CONFIG['OGRETOOLS_XML_CONVERTER']
-    if not os.path.isfile( exe ):
-        print( 'WARNING: can not find OgreXMLConverter (can not convert XXX.mesh.xml to XXX.mesh' )
-        return
-
-    basicArguments = ''
-
-    # LOD generation with OgreXMLConverter tool does not work. Currently the mesh files are generated
-    # manually and referenced in the main mesh file.
-    #if CONFIG['lodLevels']:
-    #    basicArguments += ' -l %s -v %s -p %s' %(CONFIG['lodLevels'], CONFIG['lodDistance'], CONFIG['lodPercent'])
-
-    if CONFIG['nuextremityPoints'] > 0:
-        basicArguments += ' -x %s' %CONFIG['nuextremityPoints']
-
-    if not CONFIG['generateEdgeLists']:
-        basicArguments += ' -e'
-
-    # note: OgreXmlConverter fails to convert meshes without UVs
-    if CONFIG['generateTangents'] and has_uvs:
-        basicArguments += ' -t'
-        if CONFIG['tangentSemantic']:
-            basicArguments += ' -td %s' %CONFIG['tangentSemantic']
-        if CONFIG['tangentUseParity']:
-            basicArguments += ' -ts %s' %CONFIG['tangentUseParity']
-        if CONFIG['tangentSplitMirrored']:
-            basicArguments += ' -tm'
-        if CONFIG['tangentSplitRotated']:
-            basicArguments += ' -tr'
-    if not CONFIG['reorganiseBuffers']:
-        basicArguments += ' -r'
-    if not CONFIG['optimiseAnimations']:
-        basicArguments += ' -o'
-
-    # Make xml converter print less stuff, comment this if you want more debug info out
-    basicArguments += ' -q'
-
-    opts = '-log _ogre_debug.txt %s' %basicArguments
-    path,name = os.path.split( infile )
-
-    cmd = '%s %s' %(exe, opts)
-    cmd = cmd.split() + [infile]
-    subprocess.call( cmd )
-
 
 ## Selector extras
 
@@ -1486,29 +1312,6 @@ class INFO_MT_group(bpy.types.Operator):
         select_group( context, self.mystring )
         return {'FINISHED'}
 
-class VertexNoPos(object):
-    def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
-        self.ogre_vidx = ogre_vidx
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-        self.r = r
-        self.g = g
-        self.b = b
-        self.ra = ra
-        self.vert_uvs = vert_uvs
-
-    '''does not compare ogre_vidx (and position at the moment) [ no need to compare position ]'''
-    def __eq__(self, o):
-        if self.nx != o.nx or self.ny != o.ny or self.nz != o.nz: return False
-        elif self.r != o.r or self.g != o.g or self.b != o.b or self.ra != o.ra: return False
-        elif len(self.vert_uvs) != len(o.vert_uvs): return False
-        elif self.vert_uvs:
-            for i, uv1 in enumerate( self.vert_uvs ):
-                uv2 = o.vert_uvs[ i ]
-                if uv1 != uv2: return False
-        return True
-
 ## More UI
 
 class MENU_preview_material_text(bpy.types.Menu):
@@ -1548,18 +1351,19 @@ class INFO_HT_myheader(bpy.types.Header):
         #    row = layout.row(align=True)
         #    op = row.operator( 'jmonkey.preview', text='', icon='MONKEY' )
 
-        if _USE_TUNDRA_:
-            row = layout.row(align=True)
-            op = row.operator( 'tundra.preview', text='', icon='WORLD' )
-            if TundraSingleton:
-                op = row.operator( 'tundra.preview', text='', icon='META_CUBE' )
-                op.EX_SCENE = False
-                if not TundraSingleton.physics:
-                    op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
-                else:
-                    op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
-                op = row.operator( 'tundra.toggle_physics_debug', text='', icon='MOD_PHYSICS' )
-                op = row.operator( 'tundra.exit', text='', icon='CANCEL' )
+        # TODO
+        #if _USE_TUNDRA_:
+        #    row = layout.row(align=True)
+        #    op = row.operator( 'tundra.preview', text='', icon='WORLD' )
+        #    if TundraSingleton:
+        #        op = row.operator( 'tundra.preview', text='', icon='META_CUBE' )
+        #        op.EX_SCENE = False
+        #        if not TundraSingleton.physics:
+        #            op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
+        #        else:
+        #            op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
+        #        op = row.operator( 'tundra.toggle_physics_debug', text='', icon='MOD_PHYSICS' )
+        #        op = row.operator( 'tundra.exit', text='', icon='CANCEL' )
 
         op = layout.operator( 'ogremeshy.preview', text='', icon='PLUGIN' ); op.mesh = True
 
@@ -1615,8 +1419,8 @@ class INFO_HT_myheader(bpy.types.Header):
 def export_menu_func_ogre(self, context):
     op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene and .mesh)")
 
-def export_menu_func_realxtend(self, context):
-    op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="realXtend Tundra (.txml and .mesh)")
+#def export_menu_func_realxtend(self, context):
+#    op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="realXtend Tundra (.txml and .mesh)")
 
 try:
     _header_ = bpy.types.INFO_HT_header
@@ -1630,7 +1434,7 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
     bl_idname = "ogre.toggle_interface"
     bl_label = "Ogre UI"
     bl_options = {'REGISTER'}
-    TOGGLE = True  #restore_minimal_interface()
+    TOGGLE = True
     BLENDER_DEFAULT_HEADER = _header_
 
     @classmethod
@@ -1656,6 +1460,15 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
             OgreToggleInterfaceOp.TOGGLE = True
         return {'FINISHED'}
 
+def get_minimal_interface_classes():
+    # TODO , INFO_OT_createRealxtendExport
+    return INFO_OT_createOgreExport, OgreToggleInterfaceOp, MiniReport, INFO_HT_microheader
+
+def restore_minimal_interface():
+    for cls in get_minimal_interface_classes():
+        try: bpy.utils.register_class( cls )
+        except: pass
+
 class INFO_HT_microheader(bpy.types.Header):
     bl_space_type = 'INFO'
     def draw(self, context):
@@ -1666,67 +1479,6 @@ class INFO_HT_microheader(bpy.types.Header):
             else:
                 layout.operator('ogre.toggle_interface', text='Ogre', icon='CHECKBOX_HLT')
         except: pass    # STILL REQUIRED?
-
-def get_minimal_interface_classes():
-    return INFO_OT_createOgreExport, INFO_OT_createRealxtendExport, OgreToggleInterfaceOp, MiniReport, INFO_HT_microheader
-
-_USE_TUNDRA_ = False
-
-def restore_minimal_interface():
-    #if not hasattr( bpy.ops.ogre..   #always true
-    for cls in get_minimal_interface_classes():
-        try: bpy.utils.register_class( cls )
-        except: pass
-    return False
-
-    try:
-        bpy.utils.register_class( INFO_HT_microheader )
-        for op in get_minimal_interface_classes(): bpy.utils.register_class( op )
-        return False
-    except:
-        print( 'b2ogre minimal UI already setup' )
-        return True
-
-MyShaders = None
-
-def register():
-    print('Starting blender2ogre', v.version_str())
-    global MyShaders, _header_, _USE_TUNDRA_
-    #bpy.utils.register_module(__name__)    ## do not load all the ogre panels by default
-    #_header_ = bpy.types.INFO_HT_header
-    #bpy.utils.unregister_class(_header_)
-    restore_minimal_interface()
-
-    # only test for Tundra2 once - do not do this every panel redraw ##
-    if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
-    else: _USE_TUNDRA_ = False
-
-    bpy.types.INFO_MT_file_export.append(export_menu_func_ogre)
-    bpy.types.INFO_MT_file_export.append(export_menu_func_realxtend)
-
-    bpy.utils.register_class(PopUpDialogOperator)
-
-    if os.path.isdir( CONFIG['USER_MATERIALS'] ):
-        scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
-        for prog in progs:
-            print('Ogre shader program', prog.name)
-    else:
-        print('[WARNING]: Invalid my-shaders path %s' % CONFIG['USER_MATERIALS'])
-
-def unregister():
-    print('Unloading blender2ogre', v.version_str())
-    bpy.utils.unregister_module(__name__)
-    try: bpy.utils.register_class(_header_)
-    except: pass
-    
-    # If the addon is disabled while the UI is toggled, reset it for next time.
-    # "Untoggling" it by setting the value to True seems a bit counter-intuitive.
-    OgreToggleInterfaceOp.TOGGLE = True
-    bpy.types.INFO_MT_file_export.remove(export_menu_func_ogre)
-    bpy.types.INFO_MT_file_export.remove(export_menu_func_realxtend)
-    # This seems to be not registered by the time this function is called.
-    #bpy.utils.unregister_class(PopUpDialogOperator)
-
 
 ## Blender world panel options for EC_SkyX creation
 ## todo: EC_SkyX has changes a bit lately, see that
@@ -1824,6 +1576,7 @@ class PANEL_Object(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
+        _USE_TUNDRA_ = False # TODO
         if _USE_TUNDRA_ and context.active_object:
             return True
 
@@ -2212,8 +1965,3 @@ def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
                 for name in s.fragment_programs:
                     bx.label( text=name )
 
-## Blender addon main entry point.
-## Allows directly running by "blender --python blender2ogre.py"
-
-if __name__ == "__main__":
-    register()

@@ -67,3 +67,4 @@ class ReportSingleton(object):
         print('_'*80)
         return txt
 
+Report = ReportSingleton()

@@ -2,6 +2,12 @@
 import bpy, os, sys, logging, pickle, mathutils
 from bpy.props import *
 
+AXIS_MODES =  [
+    ('xyz', 'xyz', 'no swapping'),
+    ('xz-y', 'xz-y', 'ogre standard'),
+    ('-xzy', '-xzy', 'non standard'),
+]
+
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'blender2ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)

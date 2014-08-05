@@ -1,4 +1,40 @@
 
+## Ogre Command Line Tools Documentation
+
+_ogre_command_line_tools_doc = '''
+Usage: OgreXMLConverter [options] sourcefile [destfile]
+
+Available options:
+-i             = interactive mode - prompt for options
+(The next 4 options are only applicable when converting XML to Mesh)
+-l lodlevels   = number of LOD levels
+-v lodvalue     = value increment to reduce LOD
+-s lodstrategy = LOD strategy to use for this mesh
+-p lodpercent  = Percentage triangle reduction amount per LOD
+-f lodnumtris  = Fixed vertex reduction per LOD
+-e             = DON'T generate edge lists (for stencil shadows)
+-r             = DON'T reorganise vertex buffers to OGRE recommended format.
+-t             = Generate tangents (for normal mapping)
+-td [uvw|tangent]
+           = Tangent vertex semantic destination (default tangent)
+-ts [3|4]      = Tangent size (3 or 4 components, 4 includes parity, default 3)
+-tm            = Split tangent vertices at UV mirror points
+-tr            = Split tangent vertices where basis is rotated > 90 degrees
+-o             = DON'T optimise out redundant tracks & keyframes
+-d3d           = Prefer D3D packed colour formats (default on Windows)
+-gl            = Prefer GL packed colour formats (default on non-Windows)
+-E endian      = Set endian mode 'big' 'little' or 'native' (default)
+-x num         = Generate no more than num eXtremes for every submesh (default 0)
+-q             = Quiet mode, less output
+-log filename  = name of the log file (default: 'OgreXMLConverter.log')
+sourcefile     = name of file to convert
+destfile       = optional name of file to write to. If you don't
+                 specify this OGRE works it out through the extension
+                 and the XML contents if the source is XML. For example
+                 test.mesh becomes test.xml, test.xml becomes test.mesh
+                 if the XML document root is <mesh> etc.
+'''
+
 class CMesh(object):
 
     def __init__(self, data):

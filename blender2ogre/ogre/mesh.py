@@ -1,14 +1,15 @@
-def export_mesh(ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True):
-    ''' returns materials used by the mesh '''
-    return dot_mesh( ob, path, force_name, ignore_shape_animation, normals )
+import os, time, sys, logging
+from ..report import Report
+from ..util import *
+from ..xml import *
+from .material import *
+from .converter import OgreXMLConverter
 
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True, isLOD=False):
     start = time.time()
 
-    logging = not isLOD
-
     if not os.path.isdir( path ):
-        print('>> Creating working directory', path )
+        logging.info('>> Creating working directory %s', path )
         os.makedirs( path )
 
     Report.meshes.append( ob.data.name )
@@ -37,16 +38,14 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     if logging:
         print('      - Generating:', '%s.mesh.xml' % name)
 
-    if _USE_RPYTHON_ and False:
-        Rmesh.save( ob, xmlfile )
-    else:
-        f = None
-        try:
-            f = open( xmlfile, 'w' )
-        except Exception as e:
-            show_dialog("Invalid mesh object name: " + name)
-            return
+    try:
+        with open(xmlfile, 'w') as f:
+            f.flush()
+    except Exception as e:
+        show_dialog("Invalid mesh object name: " + name)
+        return
 
+    with open(xmlfile, 'w') as f:
         doc = SimpleSaxWriter(f, 'mesh', {})
 
         # Very ugly, have to replace number of vertices later
@@ -554,6 +553,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         if logging:
             print('      - Created .mesh.xml at', timer_diff_str(start), "seconds")
 
+
     # todo: Very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
             import fileinput
@@ -585,7 +585,30 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         if mat != '_missing_material_':
             mats.append(mat)
 
-    if logging:
-        print('      - Created .mesh in total time', timer_diff_str(start), 'seconds')
+    logging.info('      - Created .mesh in total time', timer_diff_str(start), 'seconds')
+
     return mats
+
+class VertexNoPos(object):
+    def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
+        self.ogre_vidx = ogre_vidx
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+        self.r = r
+        self.g = g
+        self.b = b
+        self.ra = ra
+        self.vert_uvs = vert_uvs
+
+    '''does not compare ogre_vidx (and position at the moment) [ no need to compare position ]'''
+    def __eq__(self, o):
+        if self.nx != o.nx or self.ny != o.ny or self.nz != o.nz: return False
+        elif self.r != o.r or self.g != o.g or self.b != o.b or self.ra != o.ra: return False
+        elif len(self.vert_uvs) != len(o.vert_uvs): return False
+        elif self.vert_uvs:
+            for i, uv1 in enumerate( self.vert_uvs ):
+                uv2 = o.vert_uvs[ i ]
+                if uv1 != uv2: return False
+        return True
 

@@ -1,3 +1,54 @@
+import bpy
+import os
+import getpass
+from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
+from .material import *
+from .. import config
+from ..config import CONFIG
+from ..report import Report
+from ..util import *
+from ..xml import *
+from .mesh import *
+
+def export_mesh(ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True):
+    ''' returns materials used by the mesh '''
+    return dot_mesh( ob, path, force_name, ignore_shape_animation, normals )
+
+def _mesh_entity_helper( doc, ob, o ):
+    ## extended format - BGE Physics ##
+    o.setAttribute('mass', str(ob.game.mass))
+    o.setAttribute('mass_radius', str(ob.game.radius))
+    o.setAttribute('physics_type', ob.game.physics_type)
+    o.setAttribute('actor', str(ob.game.use_actor))
+    o.setAttribute('ghost', str(ob.game.use_ghost))
+    o.setAttribute('velocity_min', str(ob.game.velocity_min))
+    o.setAttribute('velocity_max', str(ob.game.velocity_max))
+    o.setAttribute('lock_trans_x', str(ob.game.lock_location_x))
+    o.setAttribute('lock_trans_y', str(ob.game.lock_location_y))
+    o.setAttribute('lock_trans_z', str(ob.game.lock_location_z))
+    o.setAttribute('lock_rot_x', str(ob.game.lock_rotation_x))
+    o.setAttribute('lock_rot_y', str(ob.game.lock_rotation_y))
+    o.setAttribute('lock_rot_z', str(ob.game.lock_rotation_z))
+    o.setAttribute('anisotropic_friction', str(ob.game.use_anisotropic_friction))
+    x,y,z = ob.game.friction_coefficients
+    o.setAttribute('friction_x', str(x))
+    o.setAttribute('friction_y', str(y))
+    o.setAttribute('friction_z', str(z))
+    o.setAttribute('damping_trans', str(ob.game.damping))
+    o.setAttribute('damping_rot', str(ob.game.rotation_damping))
+    o.setAttribute('inertia_tensor', str(ob.game.form_factor))
+
+    mesh = ob.data
+    # custom user props
+    for prop in mesh.items():
+        propname, propvalue = prop
+        if not propname.startswith('_'):
+            user = doc.createElement('user_data')
+            o.appendChild( user )
+            user.setAttribute( 'name', propname )
+            user.setAttribute( 'value', str(propvalue) )
+            user.setAttribute( 'type', type(propvalue).__name__ )
+
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
     # shouldn't this be matrix_local?
@@ -131,7 +182,7 @@ class _OgreCommonExport_(object):
 
     # Basic options
     EX_SWAP_AXIS = EnumProperty(
-        items=AXIS_MODES,
+        items=config.AXIS_MODES,
         name='swap axis',
         description='axis swapping mode',
         default= CONFIG['SWAP_AXIS'])
@@ -199,11 +250,6 @@ class _OgreCommonExport_(object):
         name="Export Materials",
         description="exports .material script",
         default=CONFIG['MATERIALS'])
-    EX_FORCE_IMAGE_FORMAT = EnumProperty(
-        items=_IMAGE_FORMATS,
-        name='Convert Images',
-        description='convert all textures to format',
-        default=CONFIG['FORCE_IMAGE_FORMAT'] )
     EX_DDS_MIPS = IntProperty(
         name="DDS Mips",
         description="number of mip maps (DDS)",
@@ -274,6 +320,144 @@ class _OgreCommonExport_(object):
         name="File Path",
         description="Filepath used for exporting file",
         maxlen=1024, default="",
+        subtype='FILE_PATH')
+
+    EX_SEP_MATS = BoolProperty(
+        name="Separate Materials",
+        description="exports a .material for each material (rather than putting all materials in a single .material file)",
+        default=CONFIG['SEP_MATS'])
+    EX_ONLY_DEFORMABLE_BONES = BoolProperty(
+        name="Only Deformable Bones",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
+        default=CONFIG['ONLY_DEFORMABLE_BONES'])
+    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
+        name="Only Keyframed Bones",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        default=CONFIG['ONLY_KEYFRAMED_BONES'])
+    EX_OGRE_INHERIT_SCALE = BoolProperty(
+        name="OGRE inherit scale",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        default=CONFIG['OGRE_INHERIT_SCALE'])
+    EX_SCENE = BoolProperty(
+        name="Export Scene",
+        description="export current scene (OgreDotScene xml)",
+        default=CONFIG['SCENE'])
+    EX_SELONLY = BoolProperty(
+        name="Export Selected Only",
+        description="export selected",
+        default=CONFIG['SELONLY'])
+    EX_EXPORT_HIDDEN = BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        default=CONFIG['EXPORT_HIDDEN'])
+    EX_FORCE_CAMERA = BoolProperty(
+        name="Force Camera",
+        description="export active camera",
+        default=CONFIG['FORCE_CAMERA'])
+    EX_FORCE_LAMPS = BoolProperty(
+        name="Force Lamps",
+        description="export all lamps",
+        default=CONFIG['FORCE_LAMPS'])
+    EX_MESH = BoolProperty(
+        name="Export Meshes",
+        description="export meshes",
+        default=CONFIG['MESH'])
+    EX_MESH_OVERWRITE = BoolProperty(
+        name="Export Meshes (overwrite)",
+        description="export meshes (overwrite existing files)",
+        default=CONFIG['MESH_OVERWRITE'])
+    EX_ARM_ANIM = BoolProperty(
+        name="Armature Animation",
+        description="export armature animations - updates the .skeleton file",
+        default=CONFIG['ARM_ANIM'])
+    EX_SHAPE_ANIM = BoolProperty(
+        name="Shape Animation",
+        description="export shape animations - updates the .mesh file",
+        default=CONFIG['SHAPE_ANIM'])
+    EX_TRIM_BONE_WEIGHTS = FloatProperty(
+        name="Trim Weights",
+        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
+        min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+    EX_ARRAY = BoolProperty(
+        name="Optimize Arrays",
+        description="optimize array modifiers as instances (constant offset only)",
+        default=CONFIG['ARRAY'])
+    EX_MATERIALS = BoolProperty(
+        name="Export Materials",
+        description="exports .material script",
+        default=CONFIG['MATERIALS'])
+    EX_FORCE_IMAGE_FORMAT = EnumProperty(
+        items=IMAGE_FORMATS,
+        name='Convert Images',
+        description='convert all textures to format',
+        default=CONFIG['FORCE_IMAGE_FORMAT'] )
+    EX_DDS_MIPS = IntProperty(
+        name="DDS Mips",
+        description="number of mip maps (DDS)",
+        min=0, max=16,
+        default=CONFIG['DDS_MIPS'])
+
+    # Mesh options
+    EX_lodLevels = IntProperty(
+        name="LOD Levels",
+        description="MESH number of LOD levels",
+        min=0, max=32,
+        default=CONFIG['lodLevels'])
+    EX_lodDistance = IntProperty(
+        name="LOD Distance",
+        description="MESH distance increment to reduce LOD",
+        min=0, max=2000,
+        default=CONFIG['lodDistance'])
+    EX_lodPercent = IntProperty(
+        name="LOD Percentage",
+        description="LOD percentage reduction",
+        min=0, max=99,
+        default=CONFIG['lodPercent'])
+    EX_nuextremityPoints = IntProperty(
+        name="Extremity Points",
+        description="MESH Extremity Points",
+        min=0, max=65536,
+        default=CONFIG['nuextremityPoints'])
+    EX_generateEdgeLists = BoolProperty(
+        name="Edge Lists",
+        description="MESH generate edge lists (for stencil shadows)",
+        default=CONFIG['generateEdgeLists'])
+    EX_generateTangents = BoolProperty(
+        name="Tangents",
+        description="MESH generate tangents",
+        default=CONFIG['generateTangents'])
+    EX_tangentSemantic = StringProperty(
+        name="Tangent Semantic",
+        description="MESH tangent semantic",
+        maxlen=16,
+        default=CONFIG['tangentSemantic'])
+    EX_tangentUseParity = IntProperty(
+        name="Tangent Parity",
+        description="MESH tangent use parity",
+        min=0, max=16,
+        default=CONFIG['tangentUseParity'])
+    EX_tangentSplitMirrored = BoolProperty(
+        name="Tangent Split Mirrored",
+        description="MESH split mirrored tangents",
+        default=CONFIG['tangentSplitMirrored'])
+    EX_tangentSplitRotated = BoolProperty(
+        name="Tangent Split Rotated",
+        description="MESH split rotated tangents",
+        default=CONFIG['tangentSplitRotated'])
+    EX_reorganiseBuffers = BoolProperty(
+        name="Reorganise Buffers",
+        description="MESH reorganise vertex buffers",
+        default=CONFIG['reorganiseBuffers'])
+    EX_optimiseAnimations = BoolProperty(
+        name="Optimize Animations",
+        description="MESH optimize animations",
+        default=CONFIG['optimiseAnimations'])
+
+    filepath= StringProperty(
+        name="File Path",
+        description="Filepath used for exporting Ogre .scene file",
+        maxlen=1024,
+        default="",
         subtype='FILE_PATH')
 
     def dot_material( self, meshes, path='/tmp', mat_file_name='SceneMaterial'):
@@ -555,7 +739,7 @@ class _OgreCommonExport_(object):
         # Always save?
         # todo: This does not seem to stick! It might save to disk
         # but the old config defaults are read when this panel is opened!
-        save_config()
+        config.save_config()
 
     def create_ogre_document(self, context, material_files=[] ):
         now = time.time()
@@ -834,147 +1018,4 @@ class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
     bl_options = {'REGISTER'}
 
     # Basic options
-    EX_SWAP_AXIS = EnumProperty(
-        items=AXIS_MODES,
-        name='swap axis',
-        description='axis swapping mode',
-        default= CONFIG['SWAP_AXIS'])
-    EX_SEP_MATS = BoolProperty(
-        name="Separate Materials",
-        description="exports a .material for each material (rather than putting all materials in a single .material file)",
-        default=CONFIG['SEP_MATS'])
-    EX_ONLY_DEFORMABLE_BONES = BoolProperty(
-        name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
-        default=CONFIG['ONLY_DEFORMABLE_BONES'])
-    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
-        name="Only Keyframed Bones",
-        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
-        default=CONFIG['ONLY_KEYFRAMED_BONES'])
-    EX_OGRE_INHERIT_SCALE = BoolProperty(
-        name="OGRE inherit scale",
-        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
-        default=CONFIG['OGRE_INHERIT_SCALE'])
-    EX_SCENE = BoolProperty(
-        name="Export Scene",
-        description="export current scene (OgreDotScene xml)",
-        default=CONFIG['SCENE'])
-    EX_SELONLY = BoolProperty(
-        name="Export Selected Only",
-        description="export selected",
-        default=CONFIG['SELONLY'])
-    EX_EXPORT_HIDDEN = BoolProperty(
-        name="Export Hidden Also",
-        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
-        default=CONFIG['EXPORT_HIDDEN'])
-    EX_FORCE_CAMERA = BoolProperty(
-        name="Force Camera",
-        description="export active camera",
-        default=CONFIG['FORCE_CAMERA'])
-    EX_FORCE_LAMPS = BoolProperty(
-        name="Force Lamps",
-        description="export all lamps",
-        default=CONFIG['FORCE_LAMPS'])
-    EX_MESH = BoolProperty(
-        name="Export Meshes",
-        description="export meshes",
-        default=CONFIG['MESH'])
-    EX_MESH_OVERWRITE = BoolProperty(
-        name="Export Meshes (overwrite)",
-        description="export meshes (overwrite existing files)",
-        default=CONFIG['MESH_OVERWRITE'])
-    EX_ARM_ANIM = BoolProperty(
-        name="Armature Animation",
-        description="export armature animations - updates the .skeleton file",
-        default=CONFIG['ARM_ANIM'])
-    EX_SHAPE_ANIM = BoolProperty(
-        name="Shape Animation",
-        description="export shape animations - updates the .mesh file",
-        default=CONFIG['SHAPE_ANIM'])
-    EX_TRIM_BONE_WEIGHTS = FloatProperty(
-        name="Trim Weights",
-        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
-        min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
-    EX_ARRAY = BoolProperty(
-        name="Optimize Arrays",
-        description="optimize array modifiers as instances (constant offset only)",
-        default=CONFIG['ARRAY'])
-    EX_MATERIALS = BoolProperty(
-        name="Export Materials",
-        description="exports .material script",
-        default=CONFIG['MATERIALS'])
-    EX_FORCE_IMAGE_FORMAT = EnumProperty(
-        items=_IMAGE_FORMATS,
-        name='Convert Images',
-        description='convert all textures to format',
-        default=CONFIG['FORCE_IMAGE_FORMAT'] )
-    EX_DDS_MIPS = IntProperty(
-        name="DDS Mips",
-        description="number of mip maps (DDS)",
-        min=0, max=16,
-        default=CONFIG['DDS_MIPS'])
-
-    # Mesh options
-    EX_lodLevels = IntProperty(
-        name="LOD Levels",
-        description="MESH number of LOD levels",
-        min=0, max=32,
-        default=CONFIG['lodLevels'])
-    EX_lodDistance = IntProperty(
-        name="LOD Distance",
-        description="MESH distance increment to reduce LOD",
-        min=0, max=2000,
-        default=CONFIG['lodDistance'])
-    EX_lodPercent = IntProperty(
-        name="LOD Percentage",
-        description="LOD percentage reduction",
-        min=0, max=99,
-        default=CONFIG['lodPercent'])
-    EX_nuextremityPoints = IntProperty(
-        name="Extremity Points",
-        description="MESH Extremity Points",
-        min=0, max=65536,
-        default=CONFIG['nuextremityPoints'])
-    EX_generateEdgeLists = BoolProperty(
-        name="Edge Lists",
-        description="MESH generate edge lists (for stencil shadows)",
-        default=CONFIG['generateEdgeLists'])
-    EX_generateTangents = BoolProperty(
-        name="Tangents",
-        description="MESH generate tangents",
-        default=CONFIG['generateTangents'])
-    EX_tangentSemantic = StringProperty(
-        name="Tangent Semantic",
-        description="MESH tangent semantic",
-        maxlen=16,
-        default=CONFIG['tangentSemantic'])
-    EX_tangentUseParity = IntProperty(
-        name="Tangent Parity",
-        description="MESH tangent use parity",
-        min=0, max=16,
-        default=CONFIG['tangentUseParity'])
-    EX_tangentSplitMirrored = BoolProperty(
-        name="Tangent Split Mirrored",
-        description="MESH split mirrored tangents",
-        default=CONFIG['tangentSplitMirrored'])
-    EX_tangentSplitRotated = BoolProperty(
-        name="Tangent Split Rotated",
-        description="MESH split rotated tangents",
-        default=CONFIG['tangentSplitRotated'])
-    EX_reorganiseBuffers = BoolProperty(
-        name="Reorganise Buffers",
-        description="MESH reorganise vertex buffers",
-        default=CONFIG['reorganiseBuffers'])
-    EX_optimiseAnimations = BoolProperty(
-        name="Optimize Animations",
-        description="MESH optimize animations",
-        default=CONFIG['optimiseAnimations'])
-
-    filepath= StringProperty(
-        name="File Path",
-        description="Filepath used for exporting Ogre .scene file",
-        maxlen=1024,
-        default="",
-        subtype='FILE_PATH')
-
     EXPORT_TYPE = 'OGRE'
