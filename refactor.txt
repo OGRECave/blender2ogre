@@ -1,0 +1,33 @@
+
+The new structure:
+
++- plugin.py                                       # changelog and importing the rest of the plugin
+ += blender2ogre/                                  # python source code
+  += ogre/                                         # code specific to ogre, export formats, xml, materials, ...
+  += tundra/                                       # real extend
+  +- config.py                                     # configuration loading, saving
+ += launch/                                        # several launch scripts (windows bat, linux sh, ...)
+
+
+A more clear separation between realXtend, Jmoneky, ... has been made. As I see this now this plugin
+is mainly for exporting to ogre file format, thus all other code should be moved out...
+
+What I have done:
+
+* moved 'general purpuse' code into util.py
+* CMesh is not used in the source code. moved to unused.py
+* JMonkey moved to unused. There was a comment saying 'todo: remove...'
+* The setup of _TXML_ -> _OgreCommonExport_ +-> OgrePlugin
+                                          |
+                                          +-> realXtend Plugin
+
+is a bit weired, I don't see why there should be a dependency on _TXML_, since it is only used
+for realXtend... now it is the following way:
+
+_OgreCommonExport_ +-> OgrePlugin
+                   |
+                   +-> _TXML_ -> realXtend Plugin
+* moved VERSION into version.py
+* different parts of ogre export (image,material,mesh,program,skeleton) got their own modules
+* moved the rpython code to the rogre folder
+* moved NVIDIA texture tool doc into unused.py
