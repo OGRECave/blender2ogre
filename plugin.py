@@ -17,7 +17,7 @@
 '''
 CHANGELOG
     0.6.1
-    * code refactored
+    * code refactored, tested to work with 2.71
     0.6.0
     * patched to work with 2.66.
     0.5.9
@@ -96,7 +96,7 @@ bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456",
     "version": VERSION,
-    "blender": (2, 6, 6),
+    "blender": (2, 7, 1),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
     "wiki_url": "https://bitbucket.org/MindCalamity/blender2ogre/overview",
@@ -123,14 +123,14 @@ def register():
     #else: _USE_TUNDRA_ = False
 
     bpy.types.INFO_MT_file_export.append(blender2ogre.export_menu_func_ogre)
-    # TODO bpy.types.INFO_MT_file_export.append(blender2ogre.export_menu_func_realxtend)
+    # TODO TUNDRA bpy.types.INFO_MT_file_export.append(blender2ogre.export_menu_func_realxtend)
 
     bpy.utils.register_class(blender2ogre.PopUpDialogOperator)
 
     if os.path.isdir( CONFIG['USER_MATERIALS'] ):
         scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
         for prog in progs:
-            print('Ogre shader program', prog.name)
+            logging.info('Ogre shader program', prog.name)
     else:
         logging.warn('Invalid my-shaders path %s' % CONFIG['USER_MATERIALS'])
 
