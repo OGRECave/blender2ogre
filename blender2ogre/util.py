@@ -1,7 +1,7 @@
-
 import mathutils
 import logging
 import time
+import bpy
 from .config import CONFIG
 
 def swap(vec):
@@ -254,3 +254,25 @@ def clean_object_name_with_spaces(value):
         value = value.replace(invalid_char, '_')
     return value;
 
+def get_subcollision_meshes():
+    ''' returns all collision meshes found in the scene '''
+    r = []
+    for ob in bpy.context.scene.objects:
+        if ob.type=='MESH' and ob.subcollision: r.append( ob )
+    return r
+
+def get_objects_with_subcollision():
+    ''' returns objects that have active sub-collisions '''
+    r = []
+    for ob in bpy.context.scene.objects:
+        if ob.type=='MESH' and ob.collision_mode not in ('NONE', 'PRIMITIVE'):
+            r.append( ob )
+    return r
+
+def get_subcollisions(ob):
+    prefix = '%s.' %ob.collision_mode
+    r = []
+    for child in ob.children:
+        if child.subcollision and child.name.startswith( prefix ):
+            r.append( child )
+    return r

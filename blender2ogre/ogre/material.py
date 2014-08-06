@@ -678,3 +678,20 @@ class OgreMaterialGenerator( _image_processing_ ):
 
         return M
 
+def update_parent_material_path( path ):
+    ''' updates RNA '''
+    print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
+    scripts = []
+    progs = []
+    missing = []
+    parse_material_and_program_scripts( path, scripts, progs, missing )
+
+    if missing:
+        print('WARNING: missing shader programs:')
+        for p in missing: print(p.name)
+    if missing and not progs:
+        print('WARNING: no shader programs were found - set "SHADER_PROGRAMS" to your path')
+
+    MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
+    return scripts, progs
+

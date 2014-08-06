@@ -23,8 +23,12 @@ from .util import *
 from .xml import *
 from .report import *
 from .ogre.export import INFO_OT_createOgreExport
-from .ogre.material import IMAGE_FORMATS
+from .ogre.material import IMAGE_FORMATS, update_parent_material_path, generate_material
 from .report import Report
+from .ogre.meshy import OgreMeshyPreviewOp
+from . import help
+from .tundra.properties import *
+from .properties import *
 
 UI_CLASSES = []
 def UI(cls):
@@ -36,370 +40,9 @@ def hide_user_interface():
     for cls in UI_CLASSES:
         bpy.utils.unregister_class( cls )
 
-## Avatar
-
-bpy.types.Object.use_avatar = BoolProperty(
-    name='enable avatar',
-    description='enables EC_Avatar',
-    default=False)
-bpy.types.Object.avatar_reference = StringProperty(
-    name='avatar reference',
-    description='sets avatar reference URL',
-    maxlen=128,
-    default='')
-
-# Tundra IDs
-
-bpy.types.Object.uid = IntProperty(
-    name="unique ID",
-    description="unique ID for Tundra",
-    default=0, min=0, max=2**14)
-
-# Rendering
-
-bpy.types.Object.use_draw_distance = BoolProperty(
-    name='enable draw distance',
-    description='use LOD draw distance',
-    default=False)
-bpy.types.Object.draw_distance = FloatProperty(
-    name='draw distance',
-    description='distance at which to begin drawing object',
-    default=0.0, min=0.0, max=10000.0)
-bpy.types.Object.cast_shadows = BoolProperty(
-    name='cast shadows',
-    description='cast shadows',
-    default=False)
-bpy.types.Object.use_multires_lod = BoolProperty(
-    name='Enable Multires LOD',
-    description='enables multires LOD',
-    default=False)
-bpy.types.Object.multires_lod_range = FloatProperty(
-    name='multires LOD range',
-    description='far distance at which multires is set to base level',
-    default=30.0, min=0.0, max=10000.0)
-
-## Physics
-
-_physics_modes =  [
-    ('NONE', 'NONE', 'no physics'),
-    ('RIGID_BODY', 'RIGID_BODY', 'rigid body'),
-    ('SOFT_BODY', 'SOFT_BODY', 'soft body'),
-]
-_collision_modes =  [
-    ('NONE', 'NONE', 'no collision'),
-    ('PRIMITIVE', 'PRIMITIVE', 'primitive collision type'),
-    ('MESH', 'MESH', 'triangle-mesh or convex-hull collision type'),
-    ('DECIMATED', 'DECIMATED', 'auto-decimated collision type'),
-    ('COMPOUND', 'COMPOUND', 'children primitive compound collision type'),
-    ('TERRAIN', 'TERRAIN', 'terrain (height map) collision type'),
-]
-
-bpy.types.Object.physics_mode = EnumProperty(
-    items = _physics_modes,
-    name = 'physics mode',
-    description='physics mode',
-    default='NONE')
-bpy.types.Object.physics_friction = FloatProperty(
-    name='Simple Friction',
-    description='physics friction',
-    default=0.1, min=0.0, max=1.0)
-bpy.types.Object.physics_bounce = FloatProperty(
-    name='Simple Bounce',
-    description='physics bounce',
-    default=0.01, min=0.0, max=1.0)
-bpy.types.Object.collision_terrain_x_steps = IntProperty(
-    name="Ogre Terrain: x samples",
-    description="resolution in X of height map",
-    default=64, min=4, max=8192)
-bpy.types.Object.collision_terrain_y_steps = IntProperty(
-    name="Ogre Terrain: y samples",
-    description="resolution in Y of height map",
-    default=64, min=4, max=8192)
-bpy.types.Object.collision_mode = EnumProperty(
-    items = _collision_modes,
-    name = 'primary collision mode',
-    description='collision mode',
-    default='NONE')
-bpy.types.Object.subcollision = BoolProperty(
-    name="collision compound",
-    description="member of a collision compound",
-    default=False)
-
-## Sound
-
-bpy.types.Speaker.play_on_load = BoolProperty(
-    name='play on load',
-    default=False)
-bpy.types.Speaker.loop = BoolProperty(
-    name='loop sound',
-    default=False)
-bpy.types.Speaker.use_spatial = BoolProperty(
-    name='3D spatial sound',
-    default=True)
-
-bpy.types.Image.use_convert_format = BoolProperty(
-    name='use convert format',
-    default=False
-)
-bpy.types.Image.convert_format = EnumProperty(
-    name='convert to format',
-    description='converts to image format using imagemagick',
-    items=IMAGE_FORMATS,
-    default='NONE')
-bpy.types.Image.jpeg_quality = IntProperty(
-    name="jpeg quality",
-    description="quality of jpeg",
-    default=80, min=0, max=100)
-bpy.types.Image.use_color_quantize = BoolProperty(
-    name='use color quantize',
-    default=False)
-bpy.types.Image.use_color_quantize_dither = BoolProperty(
-    name='use color quantize dither',
-    default=True)
-bpy.types.Image.color_quantize = IntProperty(
-    name="color quantize",
-    description="reduce to N colors (requires ImageMagick)",
-    default=32, min=2, max=256)
-bpy.types.Image.use_resize_half = BoolProperty(
-    name='resize by 1/2',
-    default=False)
-bpy.types.Image.use_resize_absolute = BoolProperty(
-    name='force image resize',
-    default=False)
-bpy.types.Image.resize_x = IntProperty(
-    name='resize X',
-    description='only if image is larger than defined, use ImageMagick to resize it down',
-    default=256, min=2, max=4096)
-bpy.types.Image.resize_y = IntProperty(
-    name='resize Y',
-    description='only if image is larger than defined, use ImageMagick to resize it down',
-    default=256, min=2, max=4096)
-
-# Materials
-
-bpy.types.Material.ogre_depth_write = BoolProperty(
-    # Material.ogre_depth_write = AUTO|ON|OFF
-    name='depth write',
-    default=True)
-bpy.types.Material.ogre_depth_check = BoolProperty(
-    # If depth-buffer checking is on, whenever a pixel is about to be written to
-    # the frame buffer the depth buffer is checked to see if the pixel is in front
-    # of all other pixels written at that point. If not, the pixel is not written.
-    # If depth checking is off, pixels are written no matter what has been rendered before.
-    name='depth check',
-    default=True)
-bpy.types.Material.ogre_alpha_to_coverage = BoolProperty(
-    # Sets whether this pass will use 'alpha to coverage', a way to multisample alpha
-    # texture edges so they blend more seamlessly with the background. This facility
-    # is typically only available on cards from around 2006 onwards, but it is safe to
-    # enable it anyway - Ogre will just ignore it if the hardware does not support it.
-    # The common use for alpha to coverage is foliage rendering and chain-link fence style textures.
-    name='multisample alpha edges',
-    default=False)
-bpy.types.Material.ogre_light_scissor = BoolProperty(
-    # This option is usually only useful if this pass is an additive lighting pass, and is
-    # at least the second one in the technique. Ie areas which are not affected by the current
-    # light(s) will never need to be rendered. If there is more than one light being passed to
-    # the pass, then the scissor is defined to be the rectangle which covers all lights in screen-space.
-    # Directional lights are ignored since they are infinite. This option does not need to be specified
-    # if you are using a standard additive shadow mode, i.e. SHADOWTYPE_STENCIL_ADDITIVE or
-    # SHADOWTYPE_TEXTURE_ADDITIVE, since it is the default behaviour to use a scissor for each additive
-    # shadow pass. However, if you're not using shadows, or you're using Integrated Texture Shadows
-    # where passes are specified in a custom manner, then this could be of use to you.
-    name='light scissor',
-    default=False)
-bpy.types.Material.ogre_light_clip_planes = BoolProperty(
-    name='light clip planes',
-    default=False)
-bpy.types.Material.ogre_normalise_normals = BoolProperty(
-    name='normalise normals',
-    default=False,
-    description="Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.")
-bpy.types.Material.ogre_lighting = BoolProperty(
-    # Sets whether or not dynamic lighting is turned on for this pass or not. If lighting is turned off,
-    # all objects rendered using the pass will be fully lit. This attribute has no effect if a vertex program is used.
-    name='dynamic lighting',
-    default=True)
-bpy.types.Material.ogre_colour_write = BoolProperty(
-    # If colour writing is off no visible pixels are written to the screen during this pass. You might think
-    # this is useless, but if you render with colour writing off, and with very minimal other settings,
-    # you can use this pass to initialise the depth buffer before subsequently rendering other passes which
-    # fill in the colour data. This can give you significant performance boosts on some newer cards, especially
-    # when using complex fragment programs, because if the depth check fails then the fragment program is never run.
-    name='color-write',
-    default=True)
-bpy.types.Material.use_fixed_pipeline = BoolProperty(
-    # Fixed pipeline is oldschool
-    # todo: whats the meaning of this?
-    name='fixed pipeline',
-    default=True)
-bpy.types.Material.use_material_passes = BoolProperty(
-    # hidden option - gets turned on by operator
-    # todo: What is a hidden option, is this needed?
-    name='use ogre extra material passes (layers)',
-    default=False)
-bpy.types.Material.use_in_ogre_material_pass = BoolProperty(
-    name='Layer Toggle',
-    default=True)
-bpy.types.Material.use_ogre_advanced_options = BoolProperty(
-    name='Show Advanced Options',
-    default=False)
-bpy.types.Material.use_ogre_parent_material = BoolProperty(
-    name='Use Script Inheritance',
-    default=False)
-bpy.types.Material.ogre_parent_material = EnumProperty(
-    name="Script Inheritence",
-    description='ogre parent material class', #default='NONE',
-    items=[])
-bpy.types.Material.ogre_polygon_mode = EnumProperty(
-    name='faces draw type',
-    description="ogre face draw mode",
-    items=[ ('solid', 'solid', 'SOLID'),
-            ('wireframe', 'wireframe', 'WIREFRAME'),
-            ('points', 'points', 'POINTS') ],
-    default='solid')
-bpy.types.Material.ogre_shading = EnumProperty(
-    name='hardware shading',
-    description="Sets the kind of shading which should be used for representing dynamic lighting for this pass.",
-    items=[ ('flat', 'flat', 'FLAT'),
-            ('gouraud', 'gouraud', 'GOURAUD'),
-            ('phong', 'phong', 'PHONG') ],
-    default='gouraud')
-bpy.types.Material.ogre_cull_hardware = EnumProperty(
-    name='hardware culling',
-    description="If the option 'cull_hardware clockwise' is set, all triangles whose vertices are viewed in clockwise order from the camera will be culled by the hardware.",
-    items=[ ('clockwise', 'clockwise', 'CLOCKWISE'),
-            ('anticlockwise', 'anticlockwise', 'COUNTER CLOCKWISE'),
-            ('none', 'none', 'NONE') ],
-    default='clockwise')
-bpy.types.Material.ogre_transparent_sorting = EnumProperty(
-    name='transparent sorting',
-    description="By default all transparent materials are sorted such that renderables furthest away from the camera are rendered first. This is usually the desired behaviour but in certain cases this depth sorting may be unnecessary and undesirable. If for example it is necessary to ensure the rendering order does not change from one frame to the next. In this case you could set the value to 'off' to prevent sorting.",
-    items=[ ('on', 'on', 'ON'),
-            ('off', 'off', 'OFF'),
-            ('force', 'force', 'FORCE ON') ],
-    default='on')
-bpy.types.Material.ogre_illumination_stage = EnumProperty(
-    name='illumination stage',
-    description='When using an additive lighting mode (SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE), the scene is rendered in 3 discrete stages, ambient (or pre-lighting), per-light (once per light, with shadowing) and decal (or post-lighting). Usually OGRE figures out how to categorise your passes automatically, but there are some effects you cannot achieve without manually controlling the illumination.',
-    items=[ ('', '', 'autodetect'),
-            ('ambient', 'ambient', 'ambient'),
-            ('per_light', 'per_light', 'lights'),
-            ('decal', 'decal', 'decal') ],
-    default=''
-)
-
-_ogre_depth_func =  [
-    ('less_equal', 'less_equal', '<='),
-    ('less', 'less', '<'),
-    ('equal', 'equal', '=='),
-    ('not_equal', 'not_equal', '!='),
-    ('greater_equal', 'greater_equal', '>='),
-    ('greater', 'greater', '>'),
-    ('always_fail', 'always_fail', 'false'),
-    ('always_pass', 'always_pass', 'true'),
-]
-
-bpy.types.Material.ogre_depth_func = EnumProperty(
-    items=_ogre_depth_func,
-    name='depth buffer function',
-    description='If depth checking is enabled (see depth_check) a comparison occurs between the depth value of the pixel to be written and the current contents of the buffer. This comparison is normally less_equal, i.e. the pixel is written if it is closer (or at the same distance) than the current contents',
-    default='less_equal')
-
-_ogre_scene_blend_ops =  [
-    ('add', 'add', 'DEFAULT'),
-    ('subtract', 'subtract', 'SUBTRACT'),
-    ('reverse_subtract', 'reverse_subtract', 'REVERSE SUBTRACT'),
-    ('min', 'min', 'MIN'),
-    ('max', 'max', 'MAX'),
-]
-
-bpy.types.Material.ogre_scene_blend_op = EnumProperty(
-    items=_ogre_scene_blend_ops,
-    name='scene blending operation',
-    description='This directive changes the operation which is applied between the two components of the scene blending equation',
-    default='add')
-
-_ogre_scene_blend_types =  [
-    ('one zero', 'one zero', 'DEFAULT'),
-    ('alpha_blend', 'alpha_blend', "The alpha value of the rendering output is used as a mask. Equivalent to 'scene_blend src_alpha one_minus_src_alpha'"),
-    ('add', 'add', "The colour of the rendering output is added to the scene. Good for explosions, flares, lights, ghosts etc. Equivalent to 'scene_blend one one'."),
-    ('modulate', 'modulate', "The colour of the rendering output is multiplied with the scene contents. Generally colours and darkens the scene, good for smoked glass, semi-transparent objects etc. Equivalent to 'scene_blend dest_colour zero'"),
-    ('colour_blend', 'colour_blend', 'Colour the scene based on the brightness of the input colours, but dont darken. Equivalent to "scene_blend src_colour one_minus_src_colour"'),
-]
-for mode in 'dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split():
-    _ogre_scene_blend_types.append( ('one %s'%mode, 'one %s'%mode, '') )
-del mode
-
-bpy.types.Material.ogre_scene_blend = EnumProperty(
-    items=_ogre_scene_blend_types,
-    name='scene blend',
-    description='blending operation of material to scene',
-    default='one zero')
-
-## FAQ
-
-_faq_ = '''
-
-Q: I have hundres of objects, is there a way i can merge them on export only?
-A: Yes, just add them to a group named starting with "merge", or link the group.
-
-Q: Can i use subsurf or multi-res on a mesh with an armature?
-A: Yes.
-
-Q: Can i use subsurf or multi-res on a mesh with shape animation?
-A: No.
-
-Q: I don't see any objects when i export?
-A: You must select the objects you wish to export.
-
-Q: I don't see my animations when exported?
-A: Make sure you created an NLA strip on the armature.
-
-Q: Do i need to bake my IK and other constraints into FK on my armature before export?
-A: No.
-
-'''
-
-## DOCUMENTATION
 ''' todo: Update the nonsense C:\Tundra2 paths from defaul config and fix this doc.
     Additionally point to some doc how to build opengl only version on windows if that really is needed and
     remove the old Tundra 7z link. '''
-
-_doc_installing_ = '''
-Installing:
-    Installing the Addon:
-        You can simply copy io_export_ogreDotScene.py to your blender installation under blender/2.6x/scripts/addons/
-        and enable it in the user-prefs interface (CTRL+ALT+U)
-        Or you can use blenders interface, under user-prefs, click addons, and click 'install-addon'
-        (its a good idea to delete the old version first)
-
-    Required:
-        1. Blender 2.63
-
-        2. Install Ogre Command Line tools to the default path: C:\\OgreCommandLineTools from http://www.ogre3d.org/download/tools
-            * These tools are used to create the binary Mesh from the .xml mesh generated by this plugin.
-            * Linux users may use above and Wine, or install from source, or install via apt-get install ogre-tools.
-
-    Optional:
-        3. Install NVIDIA DDS Legacy Utilities - Install them to default path.
-            * http://developer.nvidia.com/object/dds_utilities_legacy.html
-            * Linux users will need to use Wine.
-
-        4. Install Image Magick
-            * http://www.imagemagick.org
-
-        5. Copy OgreMeshy to C:\\OgreMeshy
-            * If your using 64bit Windows, you may need to download a 64bit OgreMeshy
-            * Linux copy to your home folder.
-
-        6. realXtend Tundra
-            * For latest Tundra releases see http://code.google.com/p/realxtend-naali/downloads/list
-              - You may need to tweak the config to tell your Tundra path or install to C:\Tundra2
-            * Old OpenGL only build can be found from http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
-              - Windows: extract to C:\Tundra2
-              - Linux: extract to ~/Tundra2
-'''
 
 ## Options
 
@@ -644,39 +287,6 @@ def show_dialog(message):
 
 ## Game Logic Documentation
 
-_game_logic_intro_doc_ = '''
-Hijacking the BGE
-
-Blender contains a fully functional game engine (BGE) that is highly useful for learning the concepts of game programming by breaking it down into three simple parts: Sensor, Controller, and Actuator.  An Ogre based game engine will likely have similar concepts in its internal API and game logic scripting.  Without a custom interface to define game logic, very often game designers may have to resort to having programmers implement their ideas in purely handwritten script.  This is prone to breakage because object names then end up being hard-coded.  Not only does this lead to non-reusable code, its also a slow process.  Why should we have to resort to this when Blender already contains a very rich interface for game logic?  By hijacking a subset of the BGE interface we can make this workflow between game designer and game programmer much better.
-
-The OgreDocScene format can easily be extened to include extra game logic data.  While the BGE contains some features that can not be easily mapped to other game engines, there are many are highly useful generic features we can exploit, including many of the Sensors and Actuators.  Blender uses the paradigm of: 1. Sensor -> 2. Controller -> 3. Actuator.  In pseudo-code, this can be thought of as: 1. on-event -> 2. conditional logic -> 3. do-action.  The designer is most often concerned with the on-events (the Sensors), and the do-actions (the Actuators); and the BGE interface provides a clear way for defining and editing those.  Its a harder task to provide a good interface for the conditional logic (Controller), that is flexible enough to fit everyones different Ogre engine and requirements, so that is outside the scope of this exporter at this time.  A programmer will still be required to fill the gap between Sensor and Actuator, but hopefully his work is greatly reduced and can write more generic/reuseable code.
-
-The rules for which Sensors trigger which Actuators is left undefined, as explained above we are hijacking the BGE interface not trying to export and reimplement everything.  BGE Controllers and all links are ignored by the exporter, so whats the best way to define Sensor/Actuator relationships?  One convention that seems logical is to group Sensors and Actuators by name.  More complex syntax could be used in Sensor/Actuators names, or they could be completely ignored and instead all the mapping is done by the game programmer using other rules.  This issue is not easily solved so designers and the engine programmers will have to decide upon their own conventions, there is no one size fits all solution.
-'''
-
-_ogre_logic_types_doc_ = '''
-Supported Sensors:
-    . Collision
-    . Near
-    . Radar
-    . Touching
-    . Raycast
-    . Message
-
-Supported Actuators:
-    . Shape Action*
-    . Edit Object
-    . Camera
-    . Constraint
-    . Message
-    . Motion
-    . Sound
-    . Visibility
-
-*note: Shape Action
-The most common thing a designer will want to do is have an event trigger an animation.  The BGE contains an Actuator called "Shape Action", with useful properties like: start/end frame, and blending.  It also contains a property called "Action" but this is hidden because the exporter ignores action names and instead uses the names of NLA strips when exporting Ogre animation tracks.  The current workaround is to hijack the "Frame Property" attribute and change its name to "animation".  The designer can then simply type the name of the animation track (NLA strip).  Any custom syntax could actually be implemented here for calling animations, its up to the engine programmer to define how this field will be used.  For example: "*.explode" could be implemented to mean "on all objects" play the "explode" animation.
-'''
-
 class _WrapLogic(object):
     SwapName = { 'frame_property' : 'animation' } # custom name hacks
 
@@ -784,6 +394,23 @@ class _OgreMatPass( object ):
                 ogre_material_panel( dbb, node.material, parent=mat )
                 ogre_material_panel_extra( dbb, node.material )
 
+@UI
+class MatPass1( _OgreMatPass, bpy.types.Panel ): INDEX = 0; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
+class MatPass2( _OgreMatPass, bpy.types.Panel ): INDEX = 1; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
+class MatPass3( _OgreMatPass, bpy.types.Panel ): INDEX = 2; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
+class MatPass4( _OgreMatPass, bpy.types.Panel ): INDEX = 3; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
+class MatPass5( _OgreMatPass, bpy.types.Panel ): INDEX = 4; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
+class MatPass6( _OgreMatPass, bpy.types.Panel ): INDEX = 5; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
+class MatPass7( _OgreMatPass, bpy.types.Panel ): INDEX = 6; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+@UI
+class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
+
 class _create_new_material_layer_helper(bpy.types.Operator):
     '''helper to create new material layer'''
     bl_idname = "ogre.helper_create_attach_material_layer"
@@ -832,23 +459,6 @@ class PANEL_properties_window_ogre_material( bpy.types.Panel ):
 
         ogre_material_panel( layout, mat )
         ogre_material_panel_extra( layout, mat )
-
-@UI
-class MatPass1( _OgreMatPass, bpy.types.Panel ): INDEX = 0; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@UI
-class MatPass2( _OgreMatPass, bpy.types.Panel ): INDEX = 1; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@UI
-class MatPass3( _OgreMatPass, bpy.types.Panel ): INDEX = 2; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@UI
-class MatPass4( _OgreMatPass, bpy.types.Panel ): INDEX = 3; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@UI
-class MatPass5( _OgreMatPass, bpy.types.Panel ): INDEX = 4; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@UI
-class MatPass6( _OgreMatPass, bpy.types.Panel ): INDEX = 5; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@UI
-class MatPass7( _OgreMatPass, bpy.types.Panel ): INDEX = 6; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@UI
-class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
 
 @UI
 class PANEL_Textures(bpy.types.Panel):
@@ -979,153 +589,7 @@ class PANEL_Textures(bpy.types.Panel):
                     row.prop( img, 'resize_x' )
                     row.prop( img, 'resize_y' )
 
-## OgreMeshy
-
-class OgreMeshyPreviewOp(bpy.types.Operator):
-    '''helper to open ogremeshy'''
-    bl_idname = 'ogremeshy.preview'
-    bl_label = "opens ogremeshy in a subprocess"
-    bl_options = {'REGISTER'}
-    preview = BoolProperty(name="preview", description="fast preview", default=True)
-    groups = BoolProperty(name="preview merge groups", description="use merge groups", default=False)
-    mesh = BoolProperty(name="update mesh", description="update mesh (disable for fast material preview", default=True)
-
-    @classmethod
-    def poll(cls, context):
-        if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
-            if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP':
-                return False
-            else:
-                return True
-
-    def execute(self, context):
-        Report.reset()
-        Report.messages.append('running %s' %CONFIG['OGRE_MESHY'])
-
-        if sys.platform.startswith('linux'):
-            # If OgreMeshy ends with .exe, set the path for preview meshes to
-            # the user's wine directory, otherwise to /tmp.
-            if CONFIG['OGRE_MESHY'].endswith('.exe'):
-                path = '%s/.wine/drive_c/tmp' % os.environ['HOME']
-            else:
-                path = '/tmp'
-        elif sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
-            path = '/tmp'
-        else:
-            path = 'C:\\tmp'
-
-        mat = None
-        mgroup = merged = None
-        umaterials = []
-
-        if context.active_object.type == 'MESH':
-            mat = context.active_object.active_material
-        elif context.active_object.type == 'EMPTY': # assume group
-            obs = []
-            for e in context.selected_objects:
-                if e.type != 'EMPTY' and e.dupli_group: continue
-                grp = e.dupli_group
-                subs = []
-                for o in grp.objects:
-                    if o.type=='MESH': subs.append( o )
-                if subs:
-                    m = merge_objects( subs, transform=e.matrix_world )
-                    obs.append( m )
-            if obs:
-                merged = merge_objects( obs )
-                umaterials = dot_mesh( merged, path=path, force_name='preview' )
-                for o in obs: context.scene.objects.unlink(o)
-
-        if not self.mesh:
-            for ob in context.selected_objects:
-                if ob.type == 'MESH':
-                    for mat in ob.data.materials:
-                        if mat and mat not in umaterials: umaterials.append( mat )
-
-        if not merged:
-            mgroup = MeshMagick.get_merge_group( context.active_object )
-            if not mgroup and self.groups:
-                group = get_merge_group( context.active_object )
-                if group:
-                    print('--------------- has merge group ---------------' )
-                    merged = merge_group( group )
-                else:
-                    print('--------------- NO merge group ---------------' )
-            elif len(context.selected_objects)>1 and context.selected_objects:
-                merged = merge_objects( context.selected_objects )
-
-            if mgroup:
-                for ob in mgroup.objects:
-                    nmats = dot_mesh( ob, path=path )
-                    for m in nmats:
-                        if m not in umaterials: umaterials.append( m )
-                MeshMagick.merge( mgroup, path=path, force_name='preview' )
-            elif merged:
-                umaterials = dot_mesh( merged, path=path, force_name='preview' )
-            else:
-                umaterials = dot_mesh( context.active_object, path=path, force_name='preview' )
-
-        if mat or umaterials:
-            #CONFIG['TOUCH_TEXTURES'] = True
-            #CONFIG['PATH'] = path   # TODO deprecate
-            data = ''
-            for umat in umaterials:
-                data += generate_material( umat, path=path, copy_programs=True, touch_textures=True ) # copies shader programs to path
-            f=open( os.path.join( path, 'preview.material' ), 'wb' )
-            f.write( bytes(data,'utf-8') ); f.close()
-
-        if merged: context.scene.objects.unlink( merged )
-
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
-            if CONFIG['OGRE_MESHY'].endswith('.exe'):
-                cmd = ['wine', CONFIG['OGRE_MESHY'], 'c:\\tmp\\preview.mesh' ]
-            else:
-                cmd = [CONFIG['OGRE_MESHY'], '/tmp/preview.mesh']
-            print( cmd )
-            #subprocess.call(cmd)
-            subprocess.Popen(cmd)
-        else:
-            #subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
-            subprocess.Popen( [CONFIG['OGRE_MESHY'], 'C:\\tmp\\preview.mesh'] )
-
-        Report.show()
-        return {'FINISHED'}
-
 ## Ogre Documentation to UI
-
-_OGRE_DOCS_ = []
-def ogredoc( cls ):
-    tag = cls.__name__.split('_ogredoc_')[-1]
-    cls.bl_label = tag.replace('_', ' ')
-    _OGRE_DOCS_.append( cls )
-    return cls
-
-class INFO_MT_ogre_helper(bpy.types.Menu):
-    bl_label = '_overloaded_'
-
-    def draw(self, context):
-        layout = self.layout
-        #row = self.layout.box().split(percentage=0.05)
-        #col = row.column(align=False)
-        #print(dir(col))
-        #row.scale_x = 0.1
-        #row.alignment = 'RIGHT'
-
-        for line in self.mydoc.splitlines():
-            if line.strip():
-                for ww in wordwrap( line ): layout.label(text=ww)
-        layout.separator()
-
-class INFO_MT_ogre_docs(bpy.types.Menu):
-    bl_label = "Ogre Help"
-
-    def draw(self, context):
-        layout = self.layout
-        for cls in _OGRE_DOCS_:
-            layout.menu( cls.__name__ )
-            layout.separator()
-        layout.separator()
-        layout.label(text='bug reports to: bhartsho@yahoo.com')
 
 class INFO_MT_ogre_shader_pass_attributes(bpy.types.Menu):
     bl_label = "Shader-Pass"
@@ -1142,79 +606,6 @@ class INFO_MT_ogre_shader_texture_attributes(bpy.types.Menu):
         layout = self.layout
         for cls in _OGRE_SHADER_REF_TEX_:
             layout.menu( cls.__name__ )
-
-@ogredoc
-class _ogredoc_Installing( INFO_MT_ogre_helper ):
-    mydoc = _doc_installing_
-
-@ogredoc
-class _ogredoc_FAQ( INFO_MT_ogre_helper ):
-    mydoc = _faq_
-
-@ogredoc
-class _ogredoc_Animation_System( INFO_MT_ogre_helper ):
-    mydoc = '''
-Armature Animation System | OgreDotSkeleton
-    Quick Start:
-        1. select your armature and set a single keyframe on the object (loc,rot, or scl)
-            . note, this step is just a hack for creating an action so you can then create an NLA track.
-            . do not key in pose mode, unless you want to only export animation on the keyed bones.
-        2. open the NLA, and convert the action into an NLA strip
-        3. name the NLA strip(s)
-        4. set the in and out frames for each strip ( the strip name becomes the Ogre track name )
-
-    How it Works:
-        The NLA strips can be blank, they are only used to define Ogre track names, and in and out frame ranges.  You are free to animate the armature with constraints (no baking required), or you can used baked animation and motion capture.  Blending that is driven by the NLA is also supported, if you don't want blending, put space between each strip.
-
-    The OgreDotSkeleton (.skeleton) format supports multiple named tracks that can contain some or all of the bones of an armature.  This feature can be exploited by a game engine for segmenting and animation blending.  For example: lets say we want to animate the upper torso independently of the lower body while still using a single armature.  This can be done by hijacking the NLA of the armature.
-
-    Advanced NLA Hijacking (selected-bones-animation):
-        . define an action and keyframe only the bones you want to 'group', ie. key all the upper torso bones
-        . import the action into the NLA
-        . name the strip (this becomes the track name in Ogre)
-        . adjust the start and end frames of each strip
-        ( you may use multiple NLA tracks, multiple strips per-track is ok, and strips may overlap in time )
-
-'''
-
-@ogredoc
-class _ogredoc_Physics( INFO_MT_ogre_helper ):
-    mydoc = '''
-Ogre Dot Scene + BGE Physics
-    extended format including external collision mesh, and BGE physics settings
-<node name="...">
-    <entity name="..." meshFile="..." collisionFile="..." collisionPrim="..." [and all BGE physics attributes] />
-</node>
-
-collisionFile : sets path to .mesh that is used for collision (ignored if collisionPrim is set)
-collisionPrim : sets optimal collision type [ cube, sphere, capsule, cylinder ]
-*these collisions are static meshes, animated deforming meshes should give the user a warning that they have chosen a static mesh collision type with an object that has an armature
-
-Blender Collision Setup:
-    1. If a mesh object has a child mesh with a name starting with 'collision', then the child becomes the collision mesh for the parent mesh.
-
-    2. If 'Collision Bounds' game option is checked, the bounds type [box, sphere, etc] is used. This will override above rule.
-
-    3. Instances (and instances generated by optimal array modifier) will share the same collision type of the first instance, you DO NOT need to set the collision type for each instance.
-
-'''
-
-@ogredoc
-class _ogredoc_Bugs( INFO_MT_ogre_helper ):
-    mydoc = '''
-Known Issues:
-    . shape animation breaks when using modifiers that change the vertex count
-        (Any modifier that changes the vertex count is bad with shape anim or armature anim)
-    . never rename the nodes created by enabling Ogre-Material-Layers
-    . never rename collision proxy meshes created by the Collision Panel
-    . lighting in Tundra is not excatly the same as in Blender
-Tundra Streaming:
-    . only supports streaming transform of up to 10 objects selected objects
-    . the 3D view must be shown at the time you open Tundra
-    . the same 3D view must be visible to stream data to Tundra
-    . only position and scale are updated, a bug on the Tundra side prevents rotation update
-    . animation playback is broken if you rename your NLA strips after opening Tundra
-'''
 
 class MeshMagick(object):
     ''' Usage: MeshMagick [global_options] toolname [tool_options] infile(s) -- [outfile(s)]
@@ -1419,7 +810,7 @@ class INFO_HT_myheader(bpy.types.Header):
 def export_menu_func_ogre(self, context):
     op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene and .mesh)")
 
-#def export_menu_func_realxtend(self, context):
+# TODO TUNDRA def export_menu_func_realxtend(self, context):
 #    op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="realXtend Tundra (.txml and .mesh)")
 
 try:
@@ -1461,7 +852,7 @@ class OgreToggleInterfaceOp(bpy.types.Operator):
         return {'FINISHED'}
 
 def get_minimal_interface_classes():
-    # TODO , INFO_OT_createRealxtendExport
+    # TODO TUNDRA , INFO_OT_createRealxtendExport
     return INFO_OT_createOgreExport, OgreToggleInterfaceOp, MiniReport, INFO_HT_microheader
 
 def restore_minimal_interface():
@@ -1484,41 +875,6 @@ class INFO_HT_microheader(bpy.types.Header):
 ## todo: EC_SkyX has changes a bit lately, see that
 ## all these options are still correct and valid
 ## old todo (?): Move to tundra.py
-
-bpy.types.World.ogre_skyX = BoolProperty(
-    name="enable sky", description="ogre sky",
-    default=False
-)
-bpy.types.World.ogre_skyX_time = FloatProperty(
-    name="Time Multiplier",
-    description="change speed of day/night cycle",
-    default=0.3,
-    min=0.0, max=5.0
-)
-bpy.types.World.ogre_skyX_wind = FloatProperty(
-    name="Wind Direction",
-    description="change direction of wind",
-    default=33.0,
-    min=0.0, max=360.0
-)
-bpy.types.World.ogre_skyX_volumetric_clouds = BoolProperty(
-    name="volumetric clouds", description="toggle ogre volumetric clouds",
-    default=True
-)
-bpy.types.World.ogre_skyX_cloud_density_x = FloatProperty(
-    name="Cloud Density X",
-    description="change density of volumetric clouds on X",
-    default=0.1,
-    min=0.0, max=5.0
-)
-bpy.types.World.ogre_skyX_cloud_density_y = FloatProperty(
-    name="Cloud Density Y",
-    description="change density of volumetric clouds on Y",
-    default=1.0,
-    min=0.0, max=5.0
-)
-
-## Sky UI panel
 
 @UI
 class OgreSkyPanel(bpy.types.Panel):
@@ -1629,48 +985,6 @@ class PANEL_MultiResLOD(bpy.types.Panel):
         box.prop( ob, 'use_multires_lod' )
         if ob.use_multires_lod:
             box.prop( ob, 'multires_lod_range' )
-
-## Public API (continued)
-
-def update_parent_material_path( path ):
-    ''' updates RNA '''
-    print( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
-    scripts = []
-    progs = []
-    missing = []
-    parse_material_and_program_scripts( path, scripts, progs, missing )
-
-    if missing:
-        print('WARNING: missing shader programs:')
-        for p in missing: print(p.name)
-    if missing and not progs:
-        print('WARNING: no shader programs were found - set "SHADER_PROGRAMS" to your path')
-
-    MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
-    return scripts, progs
-
-def get_subcollision_meshes():
-    ''' returns all collision meshes found in the scene '''
-    r = []
-    for ob in bpy.context.scene.objects:
-        if ob.type=='MESH' and ob.subcollision: r.append( ob )
-    return r
-
-def get_objects_with_subcollision():
-    ''' returns objects that have active sub-collisions '''
-    r = []
-    for ob in bpy.context.scene.objects:
-        if ob.type=='MESH' and ob.collision_mode not in ('NONE', 'PRIMITIVE'):
-            r.append( ob )
-    return r
-
-def get_subcollisions(ob):
-    prefix = '%s.' %ob.collision_mode
-    r = []
-    for child in ob.children:
-        if child.subcollision and child.name.startswith( prefix ):
-            r.append( child )
-    return r
 
 class bpyShaders(bpy.types.Operator):
     '''operator: enables material nodes (workaround for not having IDPointers in pyRNA)'''
