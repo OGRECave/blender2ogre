@@ -4,6 +4,7 @@ from ..ogre.export import _OgreCommonExport_
 from bpy.props import BoolProperty, StringProperty, FloatProperty, IntProperty, EnumProperty
 from .. import config
 from ..config import CONFIG
+from . import xml
 
 class _TXML_(_OgreCommonExport_):
     '''
@@ -24,7 +25,7 @@ class _TXML_(_OgreCommonExport_):
         # and importing the scene content to existing scenes with relative refs.
         proto = ''
 
-        doc = RDocument()
+        doc = xml.RDocument()
         scn = doc.createElement('scene')
         doc.appendChild( scn )
 
