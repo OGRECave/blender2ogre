@@ -4,7 +4,7 @@ from ..ogre.export import _OgreCommonExport_
 from bpy.props import BoolProperty, StringProperty, FloatProperty, IntProperty, EnumProperty
 from .. import config
 from ..config import CONFIG
-from . import xml
+from .. import xml
 
 class _TXML_(_OgreCommonExport_):
     '''

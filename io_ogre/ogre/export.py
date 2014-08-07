@@ -1,6 +1,8 @@
 import bpy
 import os
 import getpass
+import math
+import mathutils
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
 from .material import *
 from .. import config
@@ -48,6 +50,75 @@ def _mesh_entity_helper( doc, ob, o ):
             user.setAttribute( 'name', propname )
             user.setAttribute( 'value', str(propvalue) )
             user.setAttribute( 'type', type(propvalue).__name__ )
+
+class _WrapLogic(object):
+    SwapName = { 'frame_property' : 'animation' } # custom name hacks
+
+    def __init__(self, node):
+        self.node = node
+        self.name = node.name
+        self.type = node.type
+
+    def widget(self, layout):
+        box = layout.box()
+        row = box.row()
+        row.label( text=self.type )
+        row.separator()
+        row.prop( self.node, 'name', text='' )
+        if self.type in self.TYPES:
+            for name in self.TYPES[ self.type ]:
+                if name in self.SwapName:
+                    box.prop( self.node, name, text=self.SwapName[name] )
+                else:
+                    box.prop( self.node, name )
+
+    def xml( self, doc ):
+        g = doc.createElement( self.LogicType )
+        g.setAttribute('name', self.name)
+        g.setAttribute('type', self.type)
+        if self.type in self.TYPES:
+            for name in self.TYPES[ self.type ]:
+                attr = getattr( self.node, name )
+                if name in self.SwapName: name = self.SwapName[name]
+                a = doc.createElement( 'component' )
+                g.appendChild(a)
+                a.setAttribute('name', name)
+                if attr is None: a.setAttribute('type', 'POINTER' )
+                else: a.setAttribute('type', type(attr).__name__)
+
+                if type(attr) in (float, int, str, bool): a.setAttribute('value', str(attr))
+                elif not attr: a.setAttribute('value', '')        # None case
+                elif hasattr(attr,'filepath'): a.setAttribute('value', attr.filepath)
+                elif hasattr(attr,'name'): a.setAttribute('value', attr.name)
+                elif hasattr(attr,'x') and hasattr(attr,'y') and hasattr(attr,'z'):
+                    a.setAttribute('value', '%s %s %s' %(attr.x, attr.y, attr.z))
+                else:
+                    print('ERROR: unknown type', attr)
+        return g
+
+class WrapSensor( _WrapLogic ):
+    LogicType = 'sensor'
+    TYPES = {
+        'COLLISION': ['property'],
+        'MESSAGE' : ['subject'],
+        'NEAR' : ['property', 'distance', 'reset_distance'],
+        'RADAR'  :  ['property', 'axis', 'angle', 'distance' ],
+        'RAY'  :  ['ray_type', 'property', 'material', 'axis', 'range', 'use_x_ray'],
+        'TOUCH'  :  ['material'],
+    }
+
+class WrapActuator( _WrapLogic ):
+    LogicType = 'actuator'
+    TYPES = {
+        'CAMERA'  :  ['object', 'height', 'min', 'max', 'axis'],
+        'CONSTRAINT'  :  ['mode', 'limit', 'limit_min', 'limit_max', 'damping'],
+        'MESSAGE' : ['to_property', 'subject', 'body_message'],        #skipping body_type
+        'OBJECT'  :  'damping derivate_coefficient force force_max_x force_max_y force_max_z force_min_x force_min_y force_min_z integral_coefficient linear_velocity mode offset_location offset_rotation proportional_coefficient reference_object torque use_local_location use_local_rotation use_local_torque use_servo_limit_x use_servo_limit_y use_servo_limit_z'.split(),
+        'SOUND'  :  'cone_inner_angle_3d cone_outer_angle_3d cone_outer_gain_3d distance_3d_max distance_3d_reference gain_3d_max gain_3d_min mode pitch rolloff_factor_3d sound use_sound_3d volume'.split(),        # note .sound contains .filepath
+        'VISIBILITY'  :  'apply_to_children use_occlusion use_visible'.split(),
+        'SHAPE_ACTION'  :  'frame_blend_in frame_end frame_property frame_start mode property use_continue_last_frame'.split(),
+        'EDIT_OBJECT'  :  'dynamic_operation linear_velocity mass mesh mode object time track_object use_3d_tracking use_local_angular_velocity use_local_linear_velocity use_replace_display_mesh use_replace_physics_mesh'.split(),
+    }
 
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
@@ -734,7 +805,7 @@ class _OgreCommonExport_(object):
 
         for ob in temps:
             context.scene.objects.unlink( ob )
-        bpy.ops.wm.call_menu(name='MiniReport')
+        Report.show()
 
         # Always save?
         # todo: This does not seem to stick! It might save to disk
@@ -1011,11 +1082,3 @@ class _OgreCommonExport_(object):
                 xmlparent=o
             )
 
-class INFO_OT_createOgreExport(bpy.types.Operator, _OgreCommonExport_):
-    '''Export Ogre Scene'''
-    bl_idname = "ogre.export"
-    bl_label = "Export Ogre"
-    bl_options = {'REGISTER'}
-
-    # Basic options
-    EXPORT_TYPE = 'OGRE'

@@ -81,21 +81,19 @@ TODO
     * Set description field for all pyRNA
 '''
 
-import os, sys, logging, bpy
+import os, sys, logging
 
 # On startup blender may be able to read this file, but does not find
 # any other file, since the curent directory is not in the module search
 # path. Fix this by adding it.
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.append( SCRIPT_DIR )
-
-VERSION = (0,6,1)
+#SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+#if SCRIPT_DIR not in sys.path:
+#    sys.path.append( SCRIPT_DIR )
 
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456",
-    "version": VERSION,
+    "version": (0, 6, 1),
     "blender": (2, 7, 1),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
@@ -105,57 +103,49 @@ bl_info = {
 }
 
 # import the plugin directory and setup the plugin
-import blender2ogre
-from blender2ogre.config import CONFIG
-
-#_USE_TUNDRA_ = False
-
-MyShaders = None
+import bpy
+from . import config
+from . import properties
+from . import ui
 
 def register():
-    logging.info('Starting blender2ogre %s', VERSION)
-    global MyShaders, _header_ #, _USE_TUNDRA_
+    logging.info('Starting io_ogre %s', bl_info["version"])
 
-    blender2ogre.restore_minimal_interface()
+    bpy.utils.register_class(ui.OP_interface_toggle)
+    bpy.utils.register_class(ui.HT_toggle_ogre)
+    bpy.utils.register_class(ui.MT_mini_report)
+    bpy.utils.register_class(ui.export.OP_ogre_export)
+    ui.helper.register()
 
-    # only test for Tundra2 once - do not do this every panel redraw ##
-    #if os.path.isdir( CONFIG['TUNDRA_ROOT'] ): _USE_TUNDRA_ = True
-    #else: _USE_TUNDRA_ = False
+    # export drop down add ogre export function
+    bpy.types.INFO_MT_file_export.append(ui.export.menu_func)
 
-    bpy.types.INFO_MT_file_export.append(blender2ogre.export_menu_func_ogre)
-    # TODO TUNDRA bpy.types.INFO_MT_file_export.append(blender2ogre.export_menu_func_realxtend)
-
-    bpy.utils.register_class(blender2ogre.PopUpDialogOperator)
-
-    if os.path.isdir( CONFIG['USER_MATERIALS'] ):
-        scripts,progs = update_parent_material_path( CONFIG['USER_MATERIALS'] )
+    if os.path.isdir( config.get('USER_MATERIALS') ):
+        scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
         for prog in progs:
             logging.info('Ogre shader program', prog.name)
     else:
-        logging.warn('Invalid my-shaders path %s' % CONFIG['USER_MATERIALS'])
+        logging.warn('Invalid my-shaders path %s' % config.get('USER_MATERIALS'))
 
 def unregister():
-    logging.info('Unloading blender2ogre %s', VERSION)
-    bpy.utils.unregister_module(__name__)
-    try: bpy.utils.register_class(_header_)
-    except: pass
-    
-    # If the addon is disabled while the UI is toggled, reset it for next time.
-    # "Untoggling" it by setting the value to True seems a bit counter-intuitive.
-    blender2ogre.OgreToggleInterfaceOp.TOGGLE = True
-    bpy.types.INFO_MT_file_export.remove(blender2ogre.export_menu_func_ogre)
-    #TODO bpy.types.INFO_MT_file_export.remove(blender2ogre.export_menu_func_realxtend)
-    # This seems to be not registered by the time this function is called.
-    #bpy.utils.unregister_class(PopUpDialogOperator)
+    logging.info('Unloading io_ogre %s', bl_info["version"])
+    # remove the drop down
+    bpy.types.INFO_MT_file_export.remove(ui.export.menu_func)
 
-## Blender addon main entry point.
-## Allows directly running by "blender --python blender2ogre.py"
+    # remove the interface toggle checkbox
+    bpy.utils.unregister_class(ui.OP_interface_toggle)
+    bpy.utils.unregister_class(ui.HT_toggle_ogre)
+    bpy.utils.unregister_class(ui.MT_mini_report)
+    bpy.utils.unregister_class(ui.export.OP_ogre_export)
+    bpy.utils.unregister_class(ui.helper.MT_ogre_docs)
+    ui.helper.unregister()
+
 if __name__ == "__main__":
     register()
 
     try:
         index = sys.argv.index("--")
-        from blender2ogre import auto
+        from . import auto
         auto.export(sys.argv[index+1:])
     except ValueError:
         pass

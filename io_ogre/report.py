@@ -1,9 +1,11 @@
+import bpy
+
 class ReportSingleton(object):
     def __init__(self):
         self.reset()
 
     def show(self):
-        bpy.ops.wm.call_menu( name='MiniReport' )
+        bpy.ops.wm.call_menu( name='MENU_mini_report' )
 
     def reset(self):
         self.materials = []

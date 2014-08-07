@@ -1,7 +1,34 @@
 import bpy
-from .util import wordwrap
+from ..util import wordwrap
 
-class INFO_MT_ogre_helper(bpy.types.Menu):
+_OGRE_DOCS_ = []
+def ogredoc( cls ):
+    tag = cls.__name__.split('_ogredoc_')[-1]
+    cls.bl_label = tag.replace('_', ' ')
+    _OGRE_DOCS_.append( cls )
+    return cls
+
+def register():
+    bpy.utils.register_class(MT_ogre_docs)
+    for clazz in _OGRE_DOCS_:
+        bpy.utils.register_class(clazz)
+
+def unregister():
+    bpy.utils.unregister_class(MT_ogre_docs)
+    for clazz in _OGRE_DOCS_:
+        bpy.utils.unregister_class(clazz)
+
+class MT_ogre_docs(bpy.types.Menu):
+    bl_label = "Ogre Help"
+
+    def draw(self, context):
+        layout = self.layout
+        for cls in _OGRE_DOCS_:
+            layout.menu( cls.__name__ )
+            layout.separator()
+        layout.label(text='bug reports to: https://bitbucket.org/MindCalamity/blender2ogre/issues')
+
+class MT_ogre_helper(bpy.types.Menu):
     bl_label = '_overloaded_'
 
     def draw(self, context):
@@ -17,25 +44,8 @@ class INFO_MT_ogre_helper(bpy.types.Menu):
                 for ww in wordwrap( line ): layout.label(text=ww)
         layout.separator()
 
-_OGRE_DOCS_ = []
-def ogredoc( cls ):
-    tag = cls.__name__.split('_ogredoc_')[-1]
-    cls.bl_label = tag.replace('_', ' ')
-    _OGRE_DOCS_.append( cls )
-    return cls
-
-class INFO_MT_ogre_docs(bpy.types.Menu):
-    bl_label = "Ogre Help"
-
-    def draw(self, context):
-        layout = self.layout
-        for cls in _OGRE_DOCS_:
-            layout.menu( cls.__name__ )
-            layout.separator()
-        layout.label(text='bug reports to: https://bitbucket.org/MindCalamity/blender2ogre/issues')
-
 @ogredoc
-class _ogredoc_Installing( INFO_MT_ogre_helper ):
+class _ogredoc_Installing( MT_ogre_helper ):
     mydoc = """
 Installing:
     Installing the Addon:
@@ -72,7 +82,7 @@ Installing:
 """
 
 @ogredoc
-class _ogredoc_FAQ( INFO_MT_ogre_helper ):
+class _ogredoc_FAQ( MT_ogre_helper ):
     mydoc = """
 
 Q: I have hundres of objects, is there a way i can merge them on export only?
@@ -96,7 +106,7 @@ A: No.
 """
 
 @ogredoc
-class _ogredoc_Animation_System( INFO_MT_ogre_helper ):
+class _ogredoc_Animation_System( MT_ogre_helper ):
     mydoc = '''
 Armature Animation System | OgreDotSkeleton
     Quick Start:
@@ -122,7 +132,7 @@ Armature Animation System | OgreDotSkeleton
 '''
 
 @ogredoc
-class _ogredoc_Physics( INFO_MT_ogre_helper ):
+class _ogredoc_Physics( MT_ogre_helper ):
     mydoc = '''
 Ogre Dot Scene + BGE Physics
     extended format including external collision mesh, and BGE physics settings
@@ -144,7 +154,7 @@ Blender Collision Setup:
 '''
 
 @ogredoc
-class _ogredoc_Bugs( INFO_MT_ogre_helper ):
+class _ogredoc_Bugs( MT_ogre_helper ):
     mydoc = '''
 Known Issues:
     . shape animation breaks when using modifiers that change the vertex count

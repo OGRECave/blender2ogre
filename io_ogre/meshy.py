@@ -1,6 +1,6 @@
 import bpy, sys, os, subprocess
 from bpy.props import BoolProperty
-from ..report import Report
+from .report import Report
 
 ## OgreMeshy
 

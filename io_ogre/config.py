@@ -48,6 +48,7 @@ _CONFIG_DEFAULTS_ALL = {
     'tangentSplitRotated' : False,
     'reorganiseBuffers' : True,
     'optimiseAnimations' : True,
+    'interface_toggle': False,
 }
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVCOMPRESS NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
@@ -159,6 +160,19 @@ def load_config():
     return CONFIG
 
 CONFIG = load_config()
+
+def get(name, default=None):
+    global CONFIG
+    if name in CONFIG:
+        return CONFIG[name]
+    return default
+
+def update(**kwargs):
+    for k,v in kwargs.items():
+        if k not in _CONFIG_DEFAULTS_ALL:
+            print("trying to set CONFIG['%s']=%s, but is not a known config setting" % (k,v))
+        CONFIG[k] = v
+    save_config()
 
 def save_config():
     global CONFIG

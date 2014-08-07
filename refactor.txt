@@ -44,7 +44,9 @@ OgrePlugin does not redefine properties of _OgreCommonExport_ (EX_* = TypeProper
 * different parts of ogre export (image,material,mesh,program,skeleton) got their own modules
 * moved the rpython code to the rogre folder
 * moved NVIDIA texture tool doc into unused.py
+* usage of CONFIG is discouraged and you should use config.get('setting') and config.update(key=value, key1=value2, ...)
 
 This resulted in about ~2200 loc in blender2ogre/__init__.py (from 7730).
 I even further reduced it to 2000 loc, and removed some duplicate code.
 6.8.14: further stripped down to 1310 loc
+

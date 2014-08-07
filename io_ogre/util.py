@@ -4,6 +4,13 @@ import time
 import bpy
 from .config import CONFIG
 
+def ui_register(list_dest):
+    """ this is for the purpose of collecting classes into a list """
+    def ui(cls):
+        list_dest.append(cls)
+
+    return ui
+
 def swap(vec):
     if CONFIG['SWAP_AXIS'] == 'xyz': return vec
     elif CONFIG['SWAP_AXIS'] == 'xzy':

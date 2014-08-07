@@ -1,5 +1,57 @@
 
 ## Ogre Command Line Tools Documentation
+## Pop up dialog for various info/error messages
+
+popup_message = ""
+
+class PopUpDialogOperator(bpy.types.Operator):
+    bl_idname = "object.popup_dialog_operator"
+    bl_label = "blender2ogre"
+
+    def __init__(self):
+        print("dialog Start")
+
+    def __del__(self):
+        print("dialog End")
+
+    def execute(self, context):
+        print ("execute")
+        return {'RUNNING_MODAL'}
+
+    def draw(self, context):
+        # todo: Make this bigger and center on screen.
+        # Blender UI stuff seems quite complex, would
+        # think that showing a dialog with a message thath
+        # does not hide when mouse is moved would be simpler!
+        global popup_message
+        layout = self.layout
+        col = layout.column()
+        col.label(popup_message, 'ERROR')
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        wm.invoke_popup(self)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        # Close
+        if event.type == 'LEFTMOUSE':
+            print ("Left mouse")
+            return {'FINISHED'}
+        # Close
+        elif event.type in ('RIGHTMOUSE', 'ESC'):
+            print ("right mouse")
+            return {'FINISHED'}
+
+        print("running modal")
+        return {'RUNNING_MODAL'}
+
+def show_dialog(message):
+    global popup_message
+    popup_message = message
+    bpy.ops.object.popup_dialog_operator('INVOKE_DEFAULT')
+
 
 _ogre_command_line_tools_doc = '''
 Usage: OgreXMLConverter [options] sourcefile [destfile]
