@@ -1,11 +1,11 @@
 
 The new structure:
 
-+- plugin.py                                       # changelog, blender registration and importing the rest of the plugin
- += blender2ogre/                                  # python source code
-  += ogre/                                         # code specific to ogre, export formats, xml, materials, ...
-   +- converter.py                                 # OgreXmlConverter wrapper
-   +- export.py                                    # general exporting api
++= io_ogre/                                       # python source code
+  +- __init__.py                                  # changelog, blender registration and importing
+  += ogre/                                        # code specific to ogre, export formats, xml, materials, ...
+   +- converter.py                                # OgreXmlConverter wrapper
+   +- export.py                                   # general exporting api
    +- material.py
    +- mesh.py
    +- program.py
@@ -15,9 +15,13 @@ The new structure:
   +- util.py                                       # general purpose functions used in many places
   +- report.py                                     # the reporting as a module rather than inlined
   +- xml.py                                        # xml utility
-  +- help.py                                       # includes text and logic to display the help in the blender interface
   +- properties.py                                 # add custom types to objects, materials, ...
   +- ...
+  += ui/
+   +- __init__.py                                  # general purpose ui elements
+   +- export.py                                    # export panel to export scene/mesh
+   +- helper.py                                    # help/api docu for the plugin
+   +- material.py                                  # material specific additions
  += launch/                                        # several launch scripts (windows bat, linux sh, ...)
 
 
@@ -50,3 +54,11 @@ This resulted in about ~2200 loc in blender2ogre/__init__.py (from 7730).
 I even further reduced it to 2000 loc, and removed some duplicate code.
 6.8.14: further stripped down to 1310 loc
 
+
+Second refactoring round
+===
+
+* for all usable ui features the classes has been renamed.
+  OP_name - an operator
+  MT_name - a menu
+  HT_name - a header
