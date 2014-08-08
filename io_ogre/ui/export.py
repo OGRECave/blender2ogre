@@ -16,5 +16,6 @@ class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
 
 def menu_func(self, context):
     """ invoked when export in drop down menu is clicked """
-    op = self.layout.operator(INFO_OT_createOgreExport.bl_idname, text="Ogre3D (.scene and .mesh)")
+    op = self.layout.operator(OP_ogre_export.bl_idname, text="Ogre3D (.scene and .mesh)")
+    return op
 

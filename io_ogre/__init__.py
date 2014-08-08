@@ -110,13 +110,11 @@ from . import ui
 
 def register():
     logging.info('Starting io_ogre %s', bl_info["version"])
-
     bpy.utils.register_class(ui.OP_interface_toggle)
     bpy.utils.register_class(ui.HT_toggle_ogre)
     bpy.utils.register_class(ui.MT_mini_report)
     bpy.utils.register_class(ui.export.OP_ogre_export)
     ui.helper.register()
-
     # export drop down add ogre export function
     bpy.types.INFO_MT_file_export.append(ui.export.menu_func)
 
@@ -124,7 +122,6 @@ def unregister():
     logging.info('Unloading io_ogre %s', bl_info["version"])
     # remove the drop down
     bpy.types.INFO_MT_file_export.remove(ui.export.menu_func)
-
     # remove the interface toggle checkbox
     bpy.utils.unregister_class(ui.OP_interface_toggle)
     bpy.utils.unregister_class(ui.HT_toggle_ogre)
