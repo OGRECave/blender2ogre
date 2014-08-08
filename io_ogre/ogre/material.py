@@ -1,5 +1,7 @@
 from datetime import datetime
+import os
 from ..util import *
+from .. import config
 
 # Make default material for missing materials:
 # * Red flags for users so they can quickly see what they forgot to assign a material to.
@@ -21,6 +23,17 @@ material _missing_material_
     }
 }
 '''
+
+def load_user_materials():
+    # I think this is soley used for realxtend... the config of USER_MATERIAL
+    # points to a subdirectory of tundra by default. In this case all parsing
+    # can be moved to the tundra subfolder
+    if os.path.isdir( config.get('USER_MATERIALS') ):
+        scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
+        for prog in progs:
+            logging.info('Ogre shader program', prog.name)
+    else:
+        logging.warn('Invalid my-shaders path %s' % config.get('USER_MATERIALS'))
 
 
 def material_name( mat, clean = False ):

@@ -25,16 +25,17 @@ Additionally the following companies have supportted/sponsored the development e
 
 ## Repository notes ##
 
-This is a fork of the [original version](https://code.google.com/p/blender2ogre/) which is no longer actively maintained. This fork is to continue mainaining support for new Blender releases and to develop the code base further with bug fixes and new functionality. 
+This is a fork of the [original version](https://code.google.com/p/blender2ogre/) which is no longer actively maintained. This fork is to continue mainaining support for new Blender releases and to develop the code base further with bug fixes and new functionality.
 
 ----------
 
-## Download ##
+## Download (Linux, Windows, OS X) ##
 
-* Supports Blender 2.66 and various older versions 
-* For Linux, Windows and OSX
-* [Download official releases](https://code.google.com/p/blender2ogre/downloads)
-* [Get latest sources](https://bitbucket.org/MindCalamity/blender2ogre)
+* [Download official releases](https://bitbucket.org/MindCalamity/blender2ogre/downloads)
+* [Get latest sources](https://bitbucket.org/MindCalamity/blender2ogre/sources)
+* Blender 2.71
+* Blender 2.66
+* Might also work with older versions of Blender
 
 ## Updating to new versions ##
 
@@ -43,33 +44,18 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 ----------
 
 ## Installing ##
-    
-### Using Windows .msi installer ###
 
-**Note:** The Windows MSI installer is not available for all releases!
+Please refer to the download section and download the desired plugin version. This zip file
+should be extracted into the blender scripts/addons folder.
+You can find instructions on how to find this folder [here](http://wiki.blender.org/index.php/Doc:2.6/Manual/Extensions/Python/Add-Ons#Installation_of_an_Add-On).
+After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export`. Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.
+Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
 
-The addon script `io_export_ogreDotScene.py` has automatically been copied to the correct place by the installer. 
-        
-If the installer fails to detect a valid Blender installation for the automatic copying, it will show a dialog for the user and instructions how/where to copy it manually. The uninstall step also tries to automatically clean the script file from Blender.
-        
-Mandatory dependencies are installed to the blender2ogre install directory. The script should automatically try to find them from there and set them correctly to the addon config.
-
-### Using an .zip archive release (or raw io_export_ogreDotScene.py file) ###
-
-If you are using a .zip arhive release. Extract it to disk, you will find `io_export_ogreDotScene.py` inside of it.
-
-Use Blenders interface, under user-preferences, click addons, click `install-addon`, and select `io_export_ogreDotScene.py`. 
-
-Or you can simply copy `io_export_ogreDotScene.py` to your blender installation under `blender/2.6x/scripts/addons/`
+## Pre 0.6.1 ##
 
 ### 3rd party tutorials ###
 
 * Meshmoon: Video and text instructions how to install and use blender2ogre addon. See [http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
-
-## Enabling the blender2ogre addon ##
-
-* After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export`. Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.
-* Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
 
 ----------
 

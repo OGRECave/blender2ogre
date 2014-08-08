@@ -1,7 +1,8 @@
 import bpy
 from bpy.props import BoolProperty, StringProperty, FloatProperty, IntProperty, EnumProperty
-from .ogre.material import IMAGE_FORMATS
+from .ogre.material import IMAGE_FORMATS, load_user_materials
 
+load_user_materials()
 # Rendering
 
 bpy.types.Object.use_draw_distance = BoolProperty(

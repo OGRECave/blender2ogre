@@ -120,13 +120,6 @@ def register():
     # export drop down add ogre export function
     bpy.types.INFO_MT_file_export.append(ui.export.menu_func)
 
-    if os.path.isdir( config.get('USER_MATERIALS') ):
-        scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
-        for prog in progs:
-            logging.info('Ogre shader program', prog.name)
-    else:
-        logging.warn('Invalid my-shaders path %s' % config.get('USER_MATERIALS'))
-
 def unregister():
     logging.info('Unloading io_ogre %s', bl_info["version"])
     # remove the drop down
