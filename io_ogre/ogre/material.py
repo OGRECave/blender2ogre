@@ -2,10 +2,34 @@ from datetime import datetime
 import os
 from ..util import *
 from .. import config
+from .. import shader
 
 # Make default material for missing materials:
 # * Red flags for users so they can quickly see what they forgot to assign a material to.
 # * Do not crash if no material on object - thats annoying for the user.
+TEXTURE_COLOUR_OP = {
+    'MIX'       :   'modulate',        # Ogre Default - was "replace" but that kills lighting
+    'ADD'     :   'add',
+    'MULTIPLY' : 'modulate',
+    #'alpha_blend' : '',
+}
+TEXTURE_COLOUR_OP_EX = {
+    'MIX'       :    'blend_manual',
+    'SCREEN': 'modulate_x2',
+    'LIGHTEN': 'modulate_x4',
+    'SUBTRACT': 'subtract',
+    'OVERLAY':    'add_signed',
+    'DIFFERENCE': 'dotproduct',        # best match?
+    'VALUE': 'blend_diffuse_colour',
+}
+
+TEXTURE_ADDRESS_MODE = {
+    'REPEAT': 'wrap',
+    'EXTEND': 'clamp',
+    'CLIP'  : 'border',
+    'CHECKER' : 'mirror'
+}
+
 
 MISSING_MATERIAL = '''
 material _missing_material_
@@ -442,7 +466,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         self.passes = []
         self.touch_textures = touch_textures
         if material.node_tree:
-            nodes = bpyShaders.get_subnodes( self.material.node_tree, type='MATERIAL_EXT' )
+            nodes = shader.get_subnodes( self.material.node_tree, type='MATERIAL_EXT' )
             for node in nodes:
                 if node.material:
                     self.passes.append( node.material )
@@ -479,7 +503,7 @@ class OgreMaterialGenerator( _image_processing_ ):
         usermat = texnodes = None
         if mat.use_ogre_parent_material and mat.ogre_parent_material:
             usermat = get_ogre_user_material( mat.ogre_parent_material )
-            texnodes = bpyShaders.get_texture_subnodes( self.material, mat )
+            texnodes = shader.get_texture_subnodes( self.material, mat )
 
         M = ''
         if not pass_name: pass_name = mat.name
@@ -547,7 +571,7 @@ class OgreMaterialGenerator( _image_processing_ ):
                 if i<len(texnodes):
                     node = texnodes[i]
                     if node.texture:
-                        geo = bpyShaders.get_connected_input_nodes( self.material, node )[0]
+                        geo = shader.get_connected_input_nodes( self.material, node )[0]
                         M += self.generate_texture_unit( node.texture, name=name, uv_layer=geo.uv_layer )
         elif slots:
             for slot in slots:
@@ -605,8 +629,8 @@ class OgreMaterialGenerator( _image_processing_ ):
         M += indent(4, 'texture %s' %postname )
 
         exmode = texture.extension
-        if exmode in TextureUnit.tex_address_mode:
-            M += indent(4, 'tex_address_mode %s' %TextureUnit.tex_address_mode[exmode] )
+        if exmode in TEXTURE_ADDRESS_MODE:
+            M += indent(4, 'tex_address_mode %s' % TEXTURE_ADDRESS_MODE[exmode] )
 
 
         # TODO - hijack nodes for better control?
@@ -640,20 +664,20 @@ class OgreMaterialGenerator( _image_processing_ ):
             if texture.image.depth == 32: rgba = True
             btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
             ex = False; texop = None
-            if btype in TextureUnit.colour_op:
+            if btype in TEXTURE_COLOUR_OP:
                 if btype=='MIX' and slot.use_map_alpha and not slot.use_stencil:
                     if slot.diffuse_color_factor >= 1.0: texop = 'alpha_blend'
                     else:
-                        texop = TextureUnit.colour_op[ btype ]
+                        texop = TEXTURE_COLOUR_OP[ btype ]
                         ex = True
                 elif btype=='MIX' and slot.use_map_alpha and slot.use_stencil:
                     texop = 'blend_current_alpha'; ex=True
                 elif btype=='MIX' and not slot.use_map_alpha and slot.use_stencil:
                     texop = 'blend_texture_alpha'; ex=True
                 else:
-                    texop = TextureUnit.colour_op[ btype ]
-            elif btype in TextureUnit.colour_op_ex:
-                    texop = TextureUnit.colour_op_ex[ btype ]
+                    texop = TEXTURE_COLOUR_OP[ btype ]
+            elif btype in TEXTURE_COLOUR_OP_EXcolour_op_ex:
+                    texop = TEXTURE_COLOUR_OP_EX[ btype ]
                     ex = True
 
             if texop and ex:
@@ -663,7 +687,7 @@ class OgreMaterialGenerator( _image_processing_ ):
                 else:
                     M += indent(4, 'colour_op_ex %s src_texture src_current' %texop )
             elif texop:
-                    M += indent(4, 'colour_op %s' %texop )
+                    M += indent(4, 'colour_op %s' % texop )
 
         else:
             if uv_layer:
@@ -705,6 +729,6 @@ def update_parent_material_path( path ):
     if missing and not progs:
         print('WARNING: no shader programs were found - set "SHADER_PROGRAMS" to your path')
 
-    MaterialScripts.reset_rna( callback=bpyShaders.on_change_parent_material )
+    MaterialScripts.reset_rna( callback=shader.on_change_parent_material )
     return scripts, progs
 

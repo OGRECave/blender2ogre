@@ -4,6 +4,19 @@ from ..report import Report
 from . import material
 from . import export
 from . import helper
+from . import auto_save
+
+def auto_register(register):
+    yield HT_toggle_ogre
+    yield OP_interface_toggle
+    yield MT_mini_report
+
+    yield from export.auto_register(register)
+    yield from helper.auto_register(register)
+    yield from auto_save.auto_register(register)
+
+    if register and config.get('interface_toggle'):
+        OP_interface_toggle.toggle(True)
 
 """
 General purpose ui elements
@@ -21,12 +34,14 @@ class OP_interface_toggle(bpy.types.Operator):
         return True
 
     def invoke(self, context, event):
-        show = not config.get('interface_toggle')
-        print("show it?", show)
-        self.toggle(show)
-        config.update(interface_toggle=show)
+        show = config.get('interface_toggle')
+        print("toggle invoked:", show)
+        print(dir(event))
+        self.toggle(not show)
+        config.update(interface_toggle=not show)
         return {'FINISHED'}
 
+    @classmethod
     def toggle(self, show):
         class_func = bpy.utils.register_class
         if not show:
@@ -34,18 +49,19 @@ class OP_interface_toggle(bpy.types.Operator):
 
         class_func(HT_info_header)
 
-        for clazz in material.__registerables__:
+        for clazz in material.ogre_register(show):
             class_func(clazz)
 
 class HT_toggle_ogre(bpy.types.Header):
     bl_space_type = 'INFO'
+
     def draw(self, context):
         layout = self.layout
         show = config.get('interface_toggle')
         icon = 'CHECKBOX_DEHLT'
         if show:
             icon = 'CHECKBOX_HLT'
-        layout.operator('ogre.toggle_interface', text='Ogre', icon=icon)
+        op = layout.operator('ogre.toggle_interface', text='Ogre', icon=icon)
 
 class MT_mini_report(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
@@ -134,7 +150,7 @@ class HT_info_header(bpy.types.Header):
             row.prop(scene.game_settings, 'material_mode', text='')
             row.prop(scene, 'camera', text='')
 
-            layout.menu( 'MENU_preview_material_text', icon='TEXT', text='' )
+            layout.menu( 'MT_preview_material_text', icon='TEXT', text='' )
 
             layout.menu( "MT_ogre_docs" )
             layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")

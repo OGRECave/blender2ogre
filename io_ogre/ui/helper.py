@@ -1,22 +1,17 @@
 import bpy
 from ..util import wordwrap
 
+def auto_register(register):
+    yield MT_ogre_docs
+    for clazz in _OGRE_DOCS_:
+        yield clazz
+
 _OGRE_DOCS_ = []
 def ogredoc( cls ):
     tag = cls.__name__.split('_ogredoc_')[-1]
     cls.bl_label = tag.replace('_', ' ')
     _OGRE_DOCS_.append( cls )
     return cls
-
-def register():
-    bpy.utils.register_class(MT_ogre_docs)
-    for clazz in _OGRE_DOCS_:
-        bpy.utils.register_class(clazz)
-
-def unregister():
-    bpy.utils.unregister_class(MT_ogre_docs)
-    for clazz in _OGRE_DOCS_:
-        bpy.utils.unregister_class(clazz)
 
 class MT_ogre_docs(bpy.types.Menu):
     bl_label = "Ogre Help"

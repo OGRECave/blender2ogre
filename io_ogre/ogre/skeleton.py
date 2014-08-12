@@ -1,13 +1,19 @@
+import bpy
+import mathutils
+from .. import config
+from ..report import Report
+from ..xml import RDocument
+
 class Bone(object):
 
     def __init__(self, rbone, pbone, skeleton):
-        if CONFIG['SWAP_AXIS'] == 'xyz':
+        if config.get('SWAP_AXIS') == 'xyz':
             self.fixUpAxis = False
         else:
             self.fixUpAxis = True
-            if CONFIG['SWAP_AXIS'] == '-xzy':      # Tundra 1.x
+            if config.get('SWAP_AXIS') == '-xzy':      # Tundra 1.x
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
-            elif CONFIG['SWAP_AXIS'] == 'xz-y':    # Tundra 2.x current generation
+            elif config.get('SWAP_AXIS') == 'xz-y':    # Tundra 2.x current generation
                 #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1))) # thanks to Waruck
             else:
@@ -21,7 +27,7 @@ class Bone(object):
 
         self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
         self.shouldOutput = True
-        if CONFIG['ONLY_DEFORMABLE_BONES'] and not pbone.bone.use_deform:
+        if config.get('ONLY_DEFORMABLE_BONES') and not pbone.bone.use_deform:
             self.shouldOutput = False
 
         # todo: Test -> #if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
@@ -51,7 +57,7 @@ class Bone(object):
         #else:
         #    self.pose_rotation = pbone.rotation_euler.to_quaternion()
             
-        if CONFIG['OGRE_INHERIT_SCALE']:
+        if config.get('OGRE_INHERIT_SCALE'):
             # special case workaround for broken Ogre nonuniform scaling:
             # Ogre can't deal with arbitrary nonuniform scaling, but it can handle certain special cases
             # The special case we are trying to handle here is when a bone has a nonuniform scale and it's
@@ -416,7 +422,7 @@ class Skeleton(object):
                 action = actions[ actionName ]
                 arm.animation_data.action = action  # set as the current action
                 suppressedBones = []
-                if CONFIG['ONLY_KEYFRAMED_BONES']:
+                if config.get('ONLY_KEYFRAMED_BONES'):
                     keyframedBones = {}
                     for group in action.groups:
                         keyframedBones[ group.name ] = True

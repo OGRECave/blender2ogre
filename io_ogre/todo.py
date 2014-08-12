@@ -30,30 +30,6 @@ class OgreSkyPanel(bpy.types.Panel):
                 box.prop( context.world, 'ogre_skyX_cloud_density_x' )
                 box.prop( context.world, 'ogre_skyX_cloud_density_y' )
 
-class TextureUnit(object):
-    colour_op = {
-        'MIX'       :   'modulate',        # Ogre Default - was "replace" but that kills lighting
-        'ADD'     :   'add',
-        'MULTIPLY' : 'modulate',
-        #'alpha_blend' : '',
-    }
-    colour_op_ex = {
-        'MIX'       :    'blend_manual',
-        'SCREEN': 'modulate_x2',
-        'LIGHTEN': 'modulate_x4',
-        'SUBTRACT': 'subtract',
-        'OVERLAY':    'add_signed',
-        'DIFFERENCE': 'dotproduct',        # best match?
-        'VALUE': 'blend_diffuse_colour',
-    }
-
-    tex_address_mode = {
-        'REPEAT': 'wrap',
-        'EXTEND': 'clamp',
-        'CLIP'       : 'border',
-        'CHECKER' : 'mirror'
-    }
-
 #@UI
 class PANEL_Object(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
@@ -426,23 +402,4 @@ class INFO_MT_group(bpy.types.Operator):
         return {'FINISHED'}
 
 ## More UI
-
-class MENU_preview_material_text(bpy.types.Menu):
-    bl_label = 'preview'
-
-    @classmethod
-    def poll(self,context):
-        if context.active_object and context.active_object.active_material:
-            return True
-
-    def draw(self, context):
-        layout = self.layout
-        mat = context.active_object.active_material
-        if mat:
-            #CONFIG['TOUCH_TEXTURES'] = False
-            preview = generate_material( mat )
-            for line in preview.splitlines():
-                if line.strip():
-                    for ww in wordwrap( line ):
-                        layout.label(text=ww)
 

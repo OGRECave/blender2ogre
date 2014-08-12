@@ -4,6 +4,7 @@ from ..util import *
 from ..xml import *
 from .material import *
 from .converter import OgreXMLConverter
+from .skeleton import Skeleton
 
 def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True, isLOD=False):
     start = time.time()

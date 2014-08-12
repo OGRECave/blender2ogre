@@ -9,7 +9,7 @@ AXIS_MODES =  [
 ]
 
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
-CONFIG_FILENAME = 'blender2ogre.pickle'
+CONFIG_FILENAME = 'io_ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 
 _CONFIG_DEFAULTS_ALL = {
@@ -98,25 +98,25 @@ if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.
 ## PUBLIC API continues
 
 def load_config():
-    CONFIG = {}
+    config_dict = {}
 
     if os.path.isfile( CONFIG_FILEPATH ):
         try:
             with open( CONFIG_FILEPATH, 'rb' ) as f:
-                CONFIG = pickle.load( f )
+                config_dict = pickle.load( f )
         except:
             print('[ERROR]: Can not read config from %s' %CONFIG_FILEPATH)
 
     for tag in _CONFIG_DEFAULTS_ALL:
-        if tag not in CONFIG:
-            CONFIG[ tag ] = _CONFIG_DEFAULTS_ALL[ tag ]
+        if tag not in config_dict:
+            config_dict[ tag ] = _CONFIG_DEFAULTS_ALL[ tag ]
 
     for tag in _CONFIG_TAGS_:
-        if tag not in CONFIG:
+        if tag not in config_dict:
             if sys.platform.startswith('win'):
-                CONFIG[ tag ] = _CONFIG_DEFAULTS_WINDOWS[ tag ]
+                config_dict[ tag ] = _CONFIG_DEFAULTS_WINDOWS[ tag ]
             elif sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
-                CONFIG[ tag ] = _CONFIG_DEFAULTS_UNIX[ tag ]
+                config_dict[ tag ] = _CONFIG_DEFAULTS_UNIX[ tag ]
             else:
                 print( 'ERROR: unknown platform' )
                 assert 0
@@ -131,7 +131,7 @@ def load_config():
                 # OgreXmlConverter
                 if os.path.isfile(exe_install_dir + "OgreXmlConverter.exe"):
                     print ("Using OgreXmlConverter from install path:", exe_install_dir + "OgreXmlConverter.exe")
-                    CONFIG['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXmlConverter.exe"
+                    config_dict['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXmlConverter.exe"
                 # Run auto updater as silent. Notifies user if there is a new version out.
                 # This will not show any UI if there are no update and will go to network
                 # only once per 2 days so it wont be spending much resources either.
@@ -143,21 +143,25 @@ def load_config():
 
     # Setup temp hidden RNA to expose the file paths
     for tag in _CONFIG_TAGS_:
-        default = CONFIG[ tag ]
-        func = eval( 'lambda self,con: CONFIG.update( {"%s" : self.%s} )' %(tag,tag) )
+        default = config_dict[ tag ]
+        #func = eval( 'lambda self,con: config_dict.update( {"%s" : self.%s} )' %(tag,tag) )
+        func = lambda self,con: config_dict.update( {tag : getattr(self,tag,default)} )
         if type(default) is bool:
-            prop = BoolProperty(
-                name=tag, description='updates bool setting', default=default,
-                options={'SKIP_SAVE'}, update=func
-            )
+            prop = BoolProperty( name=tag,
+                                 description='updates bool setting',
+                                 default=default,
+                                 options={'SKIP_SAVE'},
+                                 update=func)
         else:
-            prop = StringProperty(
-                name=tag, description='updates path setting', maxlen=128, default=default,
-                options={'SKIP_SAVE'}, update=func
-            )
+            prop = StringProperty( name=tag,
+                    description='updates path setting',
+                    maxlen=128,
+                    default=default,
+                    options={'SKIP_SAVE'},
+                    update=func)
         setattr( bpy.types.WindowManager, tag, prop )
 
-    return CONFIG
+    return config_dict
 
 CONFIG = load_config()
 
@@ -185,22 +189,3 @@ def save_config():
             print('[ERROR]: Can not write to %s' %CONFIG_FILEPATH)
     else:
         print('[ERROR:] Config directory does not exist %s' %CONFIG_PATH)
-
-
-class Blender2Ogre_ConfigOp(bpy.types.Operator):
-    '''operator: saves current b2ogre configuration'''
-    bl_idname = "ogre.save_config"
-    bl_label = "save config file"
-    bl_options = {'REGISTER'}
-
-    @classmethod
-    def poll(cls, context):
-        return True
-    def invoke(self, context, event):
-        config.save_config()
-        Report.reset()
-        Report.messages.append('SAVED %s' %CONFIG_FILEPATH)
-        Report.show()
-        return {'FINISHED'}
-
-

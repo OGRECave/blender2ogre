@@ -2,9 +2,42 @@ import bpy
 from .. import shader
 from ..util import ui_register
 from bpy.props import IntProperty
+from ..ogre.material import generate_material
+from ..util import wordwrap
 
-__registerables__ = []
-ui = ui_register(__registerables__)
+def ogre_register(register):
+    yield PANEL_properties_window_ogre_material
+    yield MatPass1
+    yield MatPass2
+    yield MatPass3
+    yield MatPass4
+    yield MatPass5
+    yield MatPass6
+    yield MatPass7
+    yield MatPass8
+    yield MT_preview_material_text
+    yield CreateMaterialLayerOperator
+    yield SetupMaterialPassesOperator
+
+class MT_preview_material_text(bpy.types.Menu):
+    """ Preview the outputted material in a menu in the top header """
+    bl_label = 'preview'
+
+    @classmethod
+    def poll(self,context):
+        if context.active_object and context.active_object.active_material:
+            return True
+
+    def draw(self, context):
+        layout = self.layout
+        mat = context.active_object.active_material
+        if mat:
+            preview = generate_material( mat )
+            for line in preview.splitlines():
+                if line.strip():
+                    for ww in wordwrap( line ):
+                        layout.label(text=ww)
+
 
 class CreateMaterialLayerOperator(bpy.types.Operator):
     '''helper to create new material layer'''
@@ -44,7 +77,6 @@ class SetupMaterialPassesOperator(bpy.types.Operator):
         shader.create_material_passes( mat )
         return {'FINISHED'}
 
-@ui
 class PANEL_properties_window_ogre_material( bpy.types.Panel ):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -109,21 +141,13 @@ class _OgreMatPass( object ):
                 ogre_material_panel_extra( dbb, node.material )
 
 # is there a better way to do this?
-@ui
 class MatPass1( _OgreMatPass, bpy.types.Panel ): INDEX = 0; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@ui
 class MatPass2( _OgreMatPass, bpy.types.Panel ): INDEX = 1; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@ui
 class MatPass3( _OgreMatPass, bpy.types.Panel ): INDEX = 2; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@ui
 class MatPass4( _OgreMatPass, bpy.types.Panel ): INDEX = 3; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@ui
 class MatPass5( _OgreMatPass, bpy.types.Panel ): INDEX = 4; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@ui
 class MatPass6( _OgreMatPass, bpy.types.Panel ): INDEX = 5; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@ui
 class MatPass7( _OgreMatPass, bpy.types.Panel ): INDEX = 6; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
-@ui
 class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Material (pass%s)"%str(INDEX+1)
 
 def ogre_material_panel_extra( parent, mat ):

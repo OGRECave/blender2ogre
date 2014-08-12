@@ -53,7 +53,6 @@ def get_or_create_material_passes( mat, n=8 ):
     return r
 
 def get_or_create_texture_nodes( mat, n=6 ):    # currently not used
-    #print('bpyShaders.get_or_create_texture_nodes( %s, %s )' %(mat,n))
     assert mat.node_tree    # must call create_material_passes first
     m = []
     for node in mat.node_tree.nodes:
