@@ -118,4 +118,3 @@ def create_texture_nodes( mat, n=6, geoms=True ):
                 r['geoms'].append( geo )
         x += 220
     return r
-

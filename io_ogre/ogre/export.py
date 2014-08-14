@@ -6,11 +6,12 @@ import mathutils
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
 from .material import *
 from .. import config
-from ..config import CONFIG
 from ..report import Report
 from ..util import *
 from ..xml import *
 from .mesh import *
+from . import mesh
+from . import skeleton
 
 def export_mesh(ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True):
     ''' returns materials used by the mesh '''
@@ -218,173 +219,173 @@ class _OgreCommonExport_(object):
         return {'FINISHED'}
 
     def update_ui(self):
-        self.EX_SWAP_AXIS = CONFIG['SWAP_AXIS']
-        self.EX_SEP_MATS = CONFIG['SEP_MATS']
-        self.EX_ONLY_DEFORMABLE_BONES = CONFIG['ONLY_DEFORMABLE_BONES']
-        self.EX_ONLY_KEYFRAMED_BONES = CONFIG['ONLY_KEYFRAMED_BONES']
-        self.EX_OGRE_INHERIT_SCALE = CONFIG['OGRE_INHERIT_SCALE']
-        self.EX_SCENE = CONFIG['SCENE']
-        self.EX_EXPORT_HIDDEN = CONFIG['EXPORT_HIDDEN']
-        self.EX_SELONLY = CONFIG['SELONLY']
-        self.EX_FORCE_CAMERA = CONFIG['FORCE_CAMERA']
-        self.EX_FORCE_LAMPS = CONFIG['FORCE_LAMPS']
-        self.EX_MESH = CONFIG['MESH']
-        self.EX_MESH_OVERWRITE = CONFIG['MESH_OVERWRITE']
-        self.EX_ARM_ANIM = CONFIG['ARM_ANIM']
-        self.EX_SHAPE_ANIM = CONFIG['SHAPE_ANIM']
-        self.EX_TRIM_BONE_WEIGHTS = CONFIG['TRIM_BONE_WEIGHTS']
-        self.EX_ARRAY = CONFIG['ARRAY']
-        self.EX_MATERIALS = CONFIG['MATERIALS']
-        self.EX_FORCE_IMAGE_FORMAT = CONFIG['FORCE_IMAGE_FORMAT']
-        self.EX_DDS_MIPS = CONFIG['DDS_MIPS']
-        self.EX_COPY_SHADER_PROGRAMS = CONFIG['COPY_SHADER_PROGRAMS']
-        self.EX_lodLevels = CONFIG['lodLevels']
-        self.EX_lodDistance = CONFIG['lodDistance']
-        self.EX_lodPercent = CONFIG['lodPercent']
-        self.EX_nuextremityPoints = CONFIG['nuextremityPoints']
-        self.EX_generateEdgeLists = CONFIG['generateEdgeLists']
-        self.EX_generateTangents = CONFIG['generateTangents']
-        self.EX_tangentSemantic = CONFIG['tangentSemantic']
-        self.EX_tangentUseParity = CONFIG['tangentUseParity']
-        self.EX_tangentSplitMirrored = CONFIG['tangentSplitMirrored']
-        self.EX_tangentSplitRotated = CONFIG['tangentSplitRotated']
-        self.EX_reorganiseBuffers = CONFIG['reorganiseBuffers']
-        self.EX_optimiseAnimations = CONFIG['optimiseAnimations']
+        self.EX_SWAP_AXIS = config.get('SWAP_AXIS')
+        self.EX_SEP_MATS = config.get('SEP_MATS')
+        self.EX_ONLY_DEFORMABLE_BONES = config.get('ONLY_DEFORMABLE_BONES')
+        self.EX_ONLY_KEYFRAMED_BONES = config.get('ONLY_KEYFRAMED_BONES')
+        self.EX_OGRE_INHERIT_SCALE = config.get('OGRE_INHERIT_SCALE')
+        self.EX_SCENE = config.get('SCENE')
+        self.EX_EXPORT_HIDDEN = config.get('EXPORT_HIDDEN')
+        self.EX_SELONLY = config.get('SELONLY')
+        self.EX_FORCE_CAMERA = config.get('FORCE_CAMERA')
+        self.EX_FORCE_LAMPS = config.get('FORCE_LAMPS')
+        self.EX_MESH = config.get('MESH')
+        self.EX_MESH_OVERWRITE = config.get('MESH_OVERWRITE')
+        self.EX_ARM_ANIM = config.get('ARM_ANIM')
+        self.EX_SHAPE_ANIM = config.get('SHAPE_ANIM')
+        self.EX_TRIM_BONE_WEIGHTS = config.get('TRIM_BONE_WEIGHTS')
+        self.EX_ARRAY = config.get('ARRAY')
+        self.EX_MATERIALS = config.get('MATERIALS')
+        self.EX_FORCE_IMAGE_FORMAT = config.get('FORCE_IMAGE_FORMAT')
+        self.EX_DDS_MIPS = config.get('DDS_MIPS')
+        self.EX_COPY_SHADER_PROGRAMS = config.get('COPY_SHADER_PROGRAMS')
+        self.EX_lodLevels = config.get('lodLevels')
+        self.EX_lodDistance = config.get('lodDistance')
+        self.EX_lodPercent = config.get('lodPercent')
+        self.EX_nuextremityPoints = config.get('nuextremityPoints')
+        self.EX_generateEdgeLists = config.get('generateEdgeLists')
+        self.EX_generateTangents = config.get('generateTangents')
+        self.EX_tangentSemantic = config.get('tangentSemantic')
+        self.EX_tangentUseParity = config.get('tangentUseParity')
+        self.EX_tangentSplitMirrored = config.get('tangentSplitMirrored')
+        self.EX_tangentSplitRotated = config.get('tangentSplitRotated')
+        self.EX_reorganiseBuffers = config.get('reorganiseBuffers')
+        self.EX_optimiseAnimations = config.get('optimiseAnimations')
 
     # Basic options
     EX_SWAP_AXIS = EnumProperty(
         items=config.AXIS_MODES,
         name='swap axis',
         description='axis swapping mode',
-        default= CONFIG['SWAP_AXIS'])
+        default= config.get('SWAP_AXIS'))
     EX_SEP_MATS = BoolProperty(
         name="Separate Materials",
         description="exports a .material for each material (rather than putting all materials in a single .material file)",
-        default=CONFIG['SEP_MATS'])
+        default=config.get('SEP_MATS'))
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
-        default=CONFIG['ONLY_DEFORMABLE_BONES'])
+        default=config.get('ONLY_DEFORMABLE_BONES'))
     EX_ONLY_KEYFRAMED_BONES = BoolProperty(
         name="Only Keyframed Bones",
         description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
-        default=CONFIG['ONLY_KEYFRAMED_BONES'])
+        default=config.get('ONLY_KEYFRAMED_BONES'))
     EX_OGRE_INHERIT_SCALE = BoolProperty(
         name="OGRE inherit scale",
         description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
-        default=CONFIG['OGRE_INHERIT_SCALE'])
+        default=config.get('OGRE_INHERIT_SCALE'))
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
-        default=CONFIG['SCENE'])
+        default=config.get('SCENE'))
     EX_SELONLY = BoolProperty(
         name="Export Selected Only",
         description="export selected",
-        default=CONFIG['SELONLY'])
+        default=config.get('SELONLY'))
     EX_EXPORT_HIDDEN = BoolProperty(
         name="Export Hidden Also",
         description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
-        default=CONFIG['EXPORT_HIDDEN'])
+        default=config.get('EXPORT_HIDDEN'))
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
-        default=CONFIG['FORCE_CAMERA'])
+        default=config.get('FORCE_CAMERA'))
     EX_FORCE_LAMPS = BoolProperty(
         name="Force Lamps",
         description="export all lamps",
-        default=CONFIG['FORCE_LAMPS'])
+        default=config.get('FORCE_LAMPS'))
     EX_MESH = BoolProperty(
         name="Export Meshes",
         description="export meshes",
-        default=CONFIG['MESH'])
+        default=config.get('MESH'))
     EX_MESH_OVERWRITE = BoolProperty(
         name="Export Meshes (overwrite)",
         description="export meshes (overwrite existing files)",
-        default=CONFIG['MESH_OVERWRITE'])
+        default=config.get('MESH_OVERWRITE'))
     EX_ARM_ANIM = BoolProperty(
         name="Armature Animation",
         description="export armature animations - updates the .skeleton file",
-        default=CONFIG['ARM_ANIM'])
+        default=config.get('ARM_ANIM'))
     EX_SHAPE_ANIM = BoolProperty(
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
-        default=CONFIG['SHAPE_ANIM'])
+        default=config.get('SHAPE_ANIM'))
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
-        min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+        min=0.0, max=0.5, default=config.get('TRIM_BONE_WEIGHTS') )
     EX_ARRAY = BoolProperty(
         name="Optimize Arrays",
         description="optimize array modifiers as instances (constant offset only)",
-        default=CONFIG['ARRAY'])
+        default=config.get('ARRAY'))
     EX_MATERIALS = BoolProperty(
         name="Export Materials",
         description="exports .material script",
-        default=CONFIG['MATERIALS'])
+        default=config.get('MATERIALS'))
     EX_DDS_MIPS = IntProperty(
         name="DDS Mips",
         description="number of mip maps (DDS)",
         min=0, max=16,
-        default=CONFIG['DDS_MIPS'])
+        default=config.get('DDS_MIPS'))
 
     # Mesh options
     EX_lodLevels = IntProperty(
         name="LOD Levels",
         description="MESH number of LOD levels",
         min=0, max=32,
-        default=CONFIG['lodLevels'])
+        default=config.get('lodLevels'))
     EX_lodDistance = IntProperty(
         name="LOD Distance",
         description="MESH distance increment to reduce LOD",
-        min=0, max=2000, default=CONFIG['lodDistance'])
+        min=0, max=2000, default=config.get('lodDistance'))
     EX_lodPercent = IntProperty(
         name="LOD Percentage",
         description="LOD percentage reduction",
         min=0, max=99,
-        default=CONFIG['lodPercent'])
+        default=config.get('lodPercent'))
     EX_nuextremityPoints = IntProperty(
         name="Extremity Points",
         description="MESH Extremity Points",
         min=0, max=65536,
-        default=CONFIG['nuextremityPoints'])
+        default=config.get('nuextremityPoints'))
     EX_generateEdgeLists = BoolProperty(
         name="Edge Lists",
         description="MESH generate edge lists (for stencil shadows)",
-        default=CONFIG['generateEdgeLists'])
+        default=config.get('generateEdgeLists'))
     EX_generateTangents = BoolProperty(
         name="Tangents",
         description="MESH generate tangents",
-        default=CONFIG['generateTangents'])
+        default=config.get('generateTangents'))
     EX_tangentSemantic = StringProperty(
         name="Tangent Semantic",
         description="MESH tangent semantic - can be 'uvw' or 'tangent'",
         maxlen=16,
-        default=CONFIG['tangentSemantic'])
+        default=config.get('tangentSemantic'))
     EX_tangentUseParity = IntProperty(
         name="Tangent Parity",
         description="MESH tangent use parity",
         min=0, max=16,
-        default=CONFIG['tangentUseParity'])
+        default=config.get('tangentUseParity'))
     EX_tangentSplitMirrored = BoolProperty(
         name="Tangent Split Mirrored",
         description="MESH split mirrored tangents",
-        default=CONFIG['tangentSplitMirrored'])
+        default=config.get('tangentSplitMirrored'))
     EX_tangentSplitRotated = BoolProperty(
         name="Tangent Split Rotated",
         description="MESH split rotated tangents",
-        default=CONFIG['tangentSplitRotated'])
+        default=config.get('tangentSplitRotated'))
     EX_reorganiseBuffers = BoolProperty(
         name="Reorganise Buffers",
         description="MESH reorganise vertex buffers",
-        default=CONFIG['reorganiseBuffers'])
+        default=config.get('reorganiseBuffers'))
     EX_optimiseAnimations = BoolProperty(
         name="Optimize Animations",
         description="MESH optimize animations",
-        default=CONFIG['optimiseAnimations'])
+        default=config.get('optimiseAnimations'))
     EX_COPY_SHADER_PROGRAMS = BoolProperty(
         name="copy shader programs",
         description="when using script inheritance copy the source shader programs to the output path",
-        default=CONFIG['COPY_SHADER_PROGRAMS'])
+        default=config.get('COPY_SHADER_PROGRAMS'))
 
     filepath_last = ""
     filepath = StringProperty(
@@ -396,133 +397,133 @@ class _OgreCommonExport_(object):
     EX_SEP_MATS = BoolProperty(
         name="Separate Materials",
         description="exports a .material for each material (rather than putting all materials in a single .material file)",
-        default=CONFIG['SEP_MATS'])
+        default=config.get('SEP_MATS'))
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
         description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
-        default=CONFIG['ONLY_DEFORMABLE_BONES'])
+        default=config.get('ONLY_DEFORMABLE_BONES'))
     EX_ONLY_KEYFRAMED_BONES = BoolProperty(
         name="Only Keyframed Bones",
         description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
-        default=CONFIG['ONLY_KEYFRAMED_BONES'])
+        default=config.get('ONLY_KEYFRAMED_BONES'))
     EX_OGRE_INHERIT_SCALE = BoolProperty(
         name="OGRE inherit scale",
         description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
-        default=CONFIG['OGRE_INHERIT_SCALE'])
+        default=config.get('OGRE_INHERIT_SCALE'))
     EX_SCENE = BoolProperty(
         name="Export Scene",
         description="export current scene (OgreDotScene xml)",
-        default=CONFIG['SCENE'])
+        default=config.get('SCENE'))
     EX_SELONLY = BoolProperty(
         name="Export Selected Only",
         description="export selected",
-        default=CONFIG['SELONLY'])
+        default=config.get('SELONLY'))
     EX_EXPORT_HIDDEN = BoolProperty(
         name="Export Hidden Also",
         description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
-        default=CONFIG['EXPORT_HIDDEN'])
+        default=config.get('EXPORT_HIDDEN'))
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
-        default=CONFIG['FORCE_CAMERA'])
+        default=config.get('FORCE_CAMERA'))
     EX_FORCE_LAMPS = BoolProperty(
         name="Force Lamps",
         description="export all lamps",
-        default=CONFIG['FORCE_LAMPS'])
+        default=config.get('FORCE_LAMPS'))
     EX_MESH = BoolProperty(
         name="Export Meshes",
         description="export meshes",
-        default=CONFIG['MESH'])
+        default=config.get('MESH'))
     EX_MESH_OVERWRITE = BoolProperty(
         name="Export Meshes (overwrite)",
         description="export meshes (overwrite existing files)",
-        default=CONFIG['MESH_OVERWRITE'])
+        default=config.get('MESH_OVERWRITE'))
     EX_ARM_ANIM = BoolProperty(
         name="Armature Animation",
         description="export armature animations - updates the .skeleton file",
-        default=CONFIG['ARM_ANIM'])
+        default=config.get('ARM_ANIM'))
     EX_SHAPE_ANIM = BoolProperty(
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
-        default=CONFIG['SHAPE_ANIM'])
+        default=config.get('SHAPE_ANIM'))
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
-        min=0.0, max=0.5, default=CONFIG['TRIM_BONE_WEIGHTS'] )
+        min=0.0, max=0.5, default=config.get('TRIM_BONE_WEIGHTS') )
     EX_ARRAY = BoolProperty(
         name="Optimize Arrays",
         description="optimize array modifiers as instances (constant offset only)",
-        default=CONFIG['ARRAY'])
+        default=config.get('ARRAY'))
     EX_MATERIALS = BoolProperty(
         name="Export Materials",
         description="exports .material script",
-        default=CONFIG['MATERIALS'])
+        default=config.get('MATERIALS'))
     EX_FORCE_IMAGE_FORMAT = EnumProperty(
         items=IMAGE_FORMATS,
         name='Convert Images',
         description='convert all textures to format',
-        default=CONFIG['FORCE_IMAGE_FORMAT'] )
+        default=config.get('FORCE_IMAGE_FORMAT') )
     EX_DDS_MIPS = IntProperty(
         name="DDS Mips",
         description="number of mip maps (DDS)",
         min=0, max=16,
-        default=CONFIG['DDS_MIPS'])
+        default=config.get('DDS_MIPS'))
 
     # Mesh options
     EX_lodLevels = IntProperty(
         name="LOD Levels",
         description="MESH number of LOD levels",
         min=0, max=32,
-        default=CONFIG['lodLevels'])
+        default=config.get('lodLevels'))
     EX_lodDistance = IntProperty(
         name="LOD Distance",
         description="MESH distance increment to reduce LOD",
         min=0, max=2000,
-        default=CONFIG['lodDistance'])
+        default=config.get('lodDistance'))
     EX_lodPercent = IntProperty(
         name="LOD Percentage",
         description="LOD percentage reduction",
         min=0, max=99,
-        default=CONFIG['lodPercent'])
+        default=config.get('lodPercent'))
     EX_nuextremityPoints = IntProperty(
         name="Extremity Points",
         description="MESH Extremity Points",
         min=0, max=65536,
-        default=CONFIG['nuextremityPoints'])
+        default=config.get('nuextremityPoints'))
     EX_generateEdgeLists = BoolProperty(
         name="Edge Lists",
         description="MESH generate edge lists (for stencil shadows)",
-        default=CONFIG['generateEdgeLists'])
+        default=config.get('generateEdgeLists'))
     EX_generateTangents = BoolProperty(
         name="Tangents",
         description="MESH generate tangents",
-        default=CONFIG['generateTangents'])
+        default=config.get('generateTangents'))
     EX_tangentSemantic = StringProperty(
         name="Tangent Semantic",
         description="MESH tangent semantic",
         maxlen=16,
-        default=CONFIG['tangentSemantic'])
+        default=config.get('tangentSemantic'))
     EX_tangentUseParity = IntProperty(
         name="Tangent Parity",
         description="MESH tangent use parity",
         min=0, max=16,
-        default=CONFIG['tangentUseParity'])
+        default=config.get('tangentUseParity'))
     EX_tangentSplitMirrored = BoolProperty(
         name="Tangent Split Mirrored",
         description="MESH split mirrored tangents",
-        default=CONFIG['tangentSplitMirrored'])
+        default=config.get('tangentSplitMirrored'))
     EX_tangentSplitRotated = BoolProperty(
         name="Tangent Split Rotated",
         description="MESH split rotated tangents",
-        default=CONFIG['tangentSplitRotated'])
+        default=config.get('tangentSplitRotated'))
     EX_reorganiseBuffers = BoolProperty(
         name="Reorganise Buffers",
         description="MESH reorganise vertex buffers",
-        default=CONFIG['reorganiseBuffers'])
+        default=config.get('reorganiseBuffers'))
     EX_optimiseAnimations = BoolProperty(
         name="Optimize Animations",
         description="MESH optimize animations",
-        default=CONFIG['optimiseAnimations'])
+        default=config.get('optimiseAnimations'))
 
     filepath= StringProperty(
         name="File Path",
@@ -548,10 +549,10 @@ class _OgreCommonExport_(object):
             if mat is None:
                 continue
             Report.materials.append( material_name(mat) )
-            if CONFIG['COPY_SHADER_PROGRAMS']:
-                data = generate_material( mat, path=path, copy_programs=True, touch_textures=CONFIG['TOUCH_TEXTURES'] )
+            if config.get('COPY_SHADER_PROGRAMS'):
+                data = generate_material( mat, path=path, copy_programs=True, touch_textures=config.get('TOUCH_TEXTURES') )
             else:
-                data = generate_material( mat, path=path, touch_textures=CONFIG['TOUCH_TEXTURES'] )
+                data = generate_material( mat, path=path, touch_textures=config.get('TOUCH_TEXTURES') )
 
             M += data
             # Write own .material file per material
@@ -582,17 +583,17 @@ class _OgreCommonExport_(object):
             show_dialog("Invalid material object name: " + clean_filename)
             return ""
 
-    def dot_mesh( self, ob, path='/tmp', force_name=None, ignore_shape_animation=False ):
-        dot_mesh( ob, path, force_name, ignore_shape_animation=False )
-
     def ogre_export(self, url, context, force_material_update=[]):
         print ("_"*80)
 
+        target_path = os.path.split(url)[0]
+
         # Updating config to latest values?
-        global CONFIG
+        kw = {}
         for name in dir(self):
             if name.startswith('EX_'):
-                CONFIG[ name[3:] ] = getattr(self,name)
+                kw[ name[3:] ] = getattr(self,name)
+        config.update(**kw)
 
         Report.reset()
 
@@ -715,7 +716,7 @@ class _OgreCommonExport_(object):
             material_files = []
 
         # realXtend Tundra .txml scene description export
-        # TODO re enable this export type
+        # TUNDRA TODO re enable this export type
         #if self.EXPORT_TYPE == 'REX':
         #    rex = self.create_tundra_document(context)
         #    proxies = []
@@ -931,11 +932,8 @@ class _OgreCommonExport_(object):
                             break
                     if collisionFile:
                         mesh_collision_files[ ob.data.name ] = collisionFile
-                        self.dot_mesh(
-                            child,
-                            path=os.path.split(url)[0],
-                            force_name='_collision_%s' %ob.data.name
-                        )
+                        mesh.dot_mesh(child, target_path, force_name='_collision_%s' % ob.data.name )
+                        skeleton.dot_skeleton(child, target_path)
 
             if collisionPrim:
                 e.setAttribute('collisionPrim', collisionPrim )
@@ -950,7 +948,8 @@ class _OgreCommonExport_(object):
                 if not exists or (exists and self.EX_MESH_OVERWRITE):
                     if ob.data.name not in exported_meshes:
                         exported_meshes.append( ob.data.name )
-                        self.dot_mesh( ob, os.path.split(url)[0] )
+                        mesh.dot_mesh(ob, target_path)
+                        skeleton.dot_skeleton(ob, target_path)
 
             # Deal with Array modifier
             vecs = [ ob.matrix_world.to_translation() ]

@@ -283,3 +283,81 @@ def get_subcollisions(ob):
         if child.subcollision and child.name.startswith( prefix ):
             r.append( child )
     return r
+
+class IndentedWriter(object):
+    """
+    Can be used to write well formed documents.
+
+    w = IndentedWriter()
+    with w.word("hello").embed():
+        w.indent().word("world").string("!!!").nl()
+        with w.word("hello").embed():
+            w.iline("schnaps")
+
+    print(w.text)
+    > hello {
+        world "!!!"
+        hello {
+          schnaps
+        }
+      }
+
+
+
+    """
+
+    sym_stack = []
+    text = ""
+    embed_syms = None
+
+    def __init__(self, indent = 0):
+        for i in range(indent):
+            sym_stack.append(None)
+
+    def __enter__(self, **kwargs):
+        begin_sym, end_sym, nl = self.embed_syms
+        self.write(begin_sym)
+        if nl:
+            self.nl()
+        self.sym_stack.append(end_sym)
+
+    def __exit__(self, *kwargs):
+        sym = self.sym_stack.pop()
+        self.indent().write(sym).nl()
+
+    def embed(self, begin_sym="{", end_sym="}", nl=True):
+        self.embed_syms = (begin_sym, end_sym, nl)
+        return self
+
+    def string(self, text):
+        self.write("\"")
+        self.write(text)
+        self.write("\"")
+        return self
+
+    def indent(self, plus=0):
+        return self.write("    " * (len(self.sym_stack) + plus))
+
+    def nl(self):
+        self.write("\n")
+        return self
+
+    def write(self, text):
+        self.text += text
+        return self
+
+    def word(self, text):
+        return self.write(text).write(" ")
+
+    def iwrite(self, text):
+        return self.indent().write(text)
+
+    def iword(self, text):
+        return self.indent().word(text)
+
+    def iline(self, text):
+        return self.indent().line(text)
+
+    def line(self, text):
+        return self.write(text + "\n")
+

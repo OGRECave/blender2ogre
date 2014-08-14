@@ -6,9 +6,21 @@ from .material import *
 from .converter import OgreXMLConverter
 from .skeleton import Skeleton
 
-def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, normals=True, isLOD=False):
+def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
+    """
+    export the vertices of an object into a .mesh file
+
+    ob: the blender object
+    path: the path to save the .mesh file to. path MUST exist
+    force_name: force a different name for this .mesh
+    kwargs:
+      * material_prefix - string. (optional)
+    """
     start = time.time()
 
+    material_prefix = kwargs.get('material_prefix', '')
+
+    # TODO ensure that before every call the path exists. there are very view calls I believe
     if not os.path.isdir( path ):
         logging.info('>> Creating working directory %s', path )
         os.makedirs( path )
@@ -231,7 +243,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
                 "operationtype" : "triangle_list"
             }
             if material_name(mat, False) != "_missing_material_":
-                submesh_attributes['material'] = material_name(mat, False)
+                submesh_attributes['material'] = material_name(mat, False, prefix=material_prefix)
 
             doc.start_tag('submesh', submesh_attributes)
             doc.start_tag('faces', {
@@ -257,7 +269,7 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
         doc.start_tag('submeshnames', {})
         for matidx, mat in enumerate( materials ):
             doc.leaf_tag('submesh', {
-                    'name' : material_name(mat, False),
+                    'name' : material_name(mat, False, prefix=material_prefix),
                     'index' : str(matidx)
             })
         doc.end_tag('submeshnames')
@@ -570,16 +582,8 @@ def dot_mesh( ob, path='/tmp', force_name=None, ignore_shape_animation=False, no
     # Start .mesh.xml to .mesh convertion tool
     OgreXMLConverter(xmlfile, has_uvs=dotextures)
 
-    if arm and CONFIG['ARM_ANIM']:
-        skel = Skeleton( ob )
-        data = skel.to_xml()
-        name = force_name or ob.data.name
-        name = clean_object_name(name)
-        xmlfile = os.path.join(path, '%s.skeleton.xml' % name)
-        f = open( xmlfile, 'wb' )
-        f.write( bytes(data,'utf-8') )
-        f.close()
-        OgreXMLConverter( xmlfile )
+    # note that exporting the skeleton does not happen here anymore
+    # it moved to the function dot_skeleton in its own module
 
     mats = []
     for mat in materials:

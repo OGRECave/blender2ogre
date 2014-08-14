@@ -3,6 +3,38 @@ import mathutils
 from .. import config
 from ..report import Report
 from ..xml import RDocument
+from .. import util
+from os.path import join
+from .converter import OgreXMLConverter
+
+def dot_skeleton(obj, path, **kwargs):
+    """
+    create the .skeleton file for this object. This is only possible if the object
+    has an armature attached.
+
+    obj: the blender object
+    path: the path where to save this to. Never None and must exist.
+    kwargs:
+      * force_name - string: force another name. default None
+      * invoke_xml_converter - bool: invoke the xml to binary converter. default True
+
+    returns None if there is no skeleton exported, or the filename on success
+    """
+
+    arm = obj.find_armature()
+    if arm and config.get('ARM_ANIM'):
+        skel = Skeleton( obj )
+        name = kwargs.get('force_name') or obj.data.name
+        name = util.clean_object_name(name)
+        xmlfile = join(path, '%s.skeleton.xml' % name)
+        with open(xmlfile, 'wb') as fd:
+            fd.write( bytes(skel.to_xml(),'utf-8') )
+
+        if kwargs.get('invoke_xml_converter', True):
+            OgreXMLConverter( xmlfile )
+        return name + '.skeleton'
+
+    return None
 
 class Bone(object):
 
