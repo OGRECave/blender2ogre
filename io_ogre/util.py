@@ -3,6 +3,7 @@ import logging
 import time
 import bpy
 from .config import CONFIG
+from itertools import chain
 
 def ui_register(list_dest):
     """ this is for the purpose of collecting classes into a list """
@@ -96,6 +97,12 @@ def get_image_textures( mat ):
         if s and s.texture.type == 'IMAGE':
             r.append( s )
     return r
+
+def objects_merge_materials(objs):
+    """
+    return a list that contains unique material objects
+    """
+    return list(set(chain([obj.data.materials for obj in objs])))
 
 def indent( level, *args ):
     if not args:

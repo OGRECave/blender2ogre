@@ -21,3 +21,4 @@ syntax: glob
 
 __pycache__
 _ogre_debug.txt
+test/blender/

@@ -169,6 +169,73 @@ class _TXML_(_OgreCommonExport_):
 
         return doc
 
+    def export(self):
+        pass
+        # this was copied from the OgreCommonExport function ogre_export
+
+        # realXtend Tundra .txml scene description export
+        # TUNDRA TODO re enable this export type
+        #if self.EXPORT_TYPE == 'REX':
+        #    rex = self.create_tundra_document(context)
+        #    proxies = []
+        #    for ob in objects:
+        #        print("  Processing %s [%s]" % (ob.name, ob.type))
+
+        #        # This seemingly needs to be done as its done in .scene
+        #        # export. Fixed a bug that no .meshes were exported when doing
+        #        # a Tundra export.
+        #        if ob.type == 'MESH':
+        #            ob.data.update(calc_tessface=True)
+
+        #        # EC_Light
+        #        if ob.type == 'LAMP':
+        #            TE = self.tundra_entity(rex, ob, path=path, collision_proxies=proxies)
+        #            self.tundra_light( TE, ob )
+        #        # EC_Sound
+        #        elif ob.type == 'SPEAKER':
+        #            TE = self.tundra_entity(rex, ob, path=path, collision_proxies=proxies)
+        #        # EC_Mesh
+        #        elif ob.type == 'MESH' and len(ob.data.tessfaces):
+        #            if ob.modifiers and ob.modifiers[0].type=='MULTIRES' and ob.use_multires_lod:
+        #                mod = ob.modifiers[0]
+        #                basename = ob.name
+        #                dataname = ob.data.name
+        #                ID = uid( ob ) # ensure uid
+        #                TE = self.tundra_entity(rex, ob, path=path, collision_proxies=proxies)
+
+        #                for level in range( mod.total_levels+1 ):
+        #                    ob.uid += 1
+        #                    mod.levels = level
+        #                    ob.name = '%s.LOD%s' %(basename,level)
+        #                    ob.data.name = '%s.LOD%s' %(dataname,level)
+        #                    TE = self.tundra_entity(
+        #                        rex, ob, path=path, collision_proxies=proxies, parent=basename,
+        #                        matrix=mathutils.Matrix(), visible=False
+        #                    )
+        #                    self.tundra_mesh( TE, ob, url, exported_meshes )
+
+        #                ob.uid = ID
+        #                ob.name = basename
+        #                ob.data.name = dataname
+        #            else:
+        #                TE = self.tundra_entity( rex, ob, path=path, collision_proxies=proxies )
+        #                self.tundra_mesh( TE, ob, url, exported_meshes )
+
+        #    # EC_RigidBody separate collision meshes
+        #    for proxy in proxies:
+        #        self.dot_mesh(
+        #            proxy,
+        #            path=os.path.split(url)[0],
+        #            force_name='_collision_%s' %proxy.data.name
+        #        )
+
+        #    if self.EX_SCENE:
+        #        if not url.endswith('.txml'):
+        #            url += '.txml'
+        #        data = rex.toprettyxml()
+        #        f = open( url, 'wb' ); f.write( bytes(data,'utf-8') ); f.close()
+        #        print('  Exported Tundra Scene:', url)
+
     # Creates new Tundra entity
     def tundra_entity( self, doc, ob, path='/tmp', collision_proxies=[], parent=None, matrix=None,visible=True ):
         assert not ob.subcollision

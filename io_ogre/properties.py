@@ -72,7 +72,6 @@ bpy.types.Object.subcollision = BoolProperty(
     name="collision compound",
     description="member of a collision compound",
     default=False)
-
 ## Sound
 
 bpy.types.Speaker.play_on_load = BoolProperty(

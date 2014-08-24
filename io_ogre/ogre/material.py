@@ -9,8 +9,65 @@ from ..report import Report
 import tempfile
 import shutil
 
+def dot_materials(self, materials, path=None, separate_files=True):
+    """
+    generate material files, or copy them into a single file
+
+    path: string - or None if one must use a temp file
+    separate_files: bool - each material gets it's own filename
+
+    """
+    if not materials:
+        print('WARNING: no materials, not writting .material script')
+        return []
+
+    if not path:
+        path = tempfile.mkdtemp(prefix='ogre_io')
+
+    M = MISSING_MATERIAL + '\n'
+    for mat in materials:
+        if mat is None:
+            continue
+        Report.materials.append( material_name(mat) )
+        data = generate_material( mat, path=path,
+                copy_programs=config.get('COPY_SHADER_PROGRAMS'),
+                touch_textures=config.get('TOUCH_TEXTURES') )
+
+        M += data
+        # Write own .material file per material
+        if separate_files:
+            url = self.dot_material_write_separate( mat, data, path )
+            material_files.append(url)
+
+    # Write one .material file for everything
+    if not separate_files:
+        try:
+            url = os.path.join(path, '%s.material' % mat_file_name)
+            with open(url, 'wb') as fd: 
+                fd.write(bytes(M,'utf-8'))
+            print('    - Created material:', url)
+            material_files.append( url )
+        except Exception as e:
+            show_dialog("Invalid material object name: " + mat_file_name)
+
+    return material_files
+
+def dot_material_write_separate( self, mat, data, path = '/tmp' ):
+    try:
+        clean_filename = clean_object_name(mat.name);
+        url = os.path.join(path, '%s.material' % clean_filename)
+        f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
+        print('    - Exported Material:', url)
+        return url
+    except Exception as e:
+        show_dialog("Invalid material object name: " + clean_filename)
+        return ""
+
+
+
 def dot_material(obj, path, **kwargs):
     """
+    write the material file of a
     obj: a blender object that has a mesh
     path: target directory to save the file to
 
