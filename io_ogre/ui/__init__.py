@@ -4,7 +4,6 @@ from ..report import Report
 from . import material
 from . import export
 from . import helper
-from . import auto_save
 
 def auto_register(register):
     yield HT_toggle_ogre
@@ -13,7 +12,6 @@ def auto_register(register):
 
     yield from export.auto_register(register)
     yield from helper.auto_register(register)
-    yield from auto_save.auto_register(register)
 
     if register and config.get('interface_toggle'):
         OP_interface_toggle.toggle(True)

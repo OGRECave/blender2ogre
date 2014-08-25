@@ -1,6 +1,5 @@
 import bpy
 from .. import shader
-from ..util import ui_register
 from bpy.props import IntProperty
 from ..ogre.material import generate_material
 from ..util import wordwrap

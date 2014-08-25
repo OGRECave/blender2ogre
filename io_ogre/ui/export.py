@@ -5,17 +5,15 @@ import getpass
 import math
 import mathutils
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
-from .material import *
 from .. import config
 from ..report import Report
 from ..util import *
 from ..xml import *
 from .. import shader
-from ..util import ui_register
-from .mesh import *
-from . import mesh
-from . import skeleton
-from . import scene
+from ..ogre import mesh
+from ..ogre import skeleton
+from ..ogre import scene
+from ..ogre import material
 
 
 def auto_register(register):
@@ -26,17 +24,6 @@ def auto_register(register):
     else:
         bpy.types.INFO_MT_file_export.remove(menu_func)
 
-class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
-    '''Export Ogre Scene'''
-    bl_idname = "ogre.export"
-    bl_label = "Export Ogre"
-    bl_options = {'REGISTER'}
-
-    # export logic is contained in the subclass
-
-    # Basic options
-    EXPORT_TYPE = 'OGRE'
-
 def menu_func(self, context):
     """ invoked when export in drop down menu is clicked """
     op = self.layout.operator(OP_ogre_export.bl_idname, text="Ogre3D (.scene and .mesh)")
@@ -44,7 +31,7 @@ def menu_func(self, context):
 
 class _OgreCommonExport_(object):
 
-    last_export_filepath = None
+    last_export_path = None
 
     @classmethod
     def poll(cls, context):
@@ -59,7 +46,7 @@ class _OgreCommonExport_(object):
                 setattr(self,key,value)
 
         wm = context.window_manager
-        fs = wm.fileselect_add(self) # writes to filepath
+        fs = wm.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
@@ -73,10 +60,10 @@ class _OgreCommonExport_(object):
                 self.last_export_path = os.path.join(path, name.split('.')[0])
 
         if not self.last_export_path:
-            self.last_export_filepath = os.path.expanduser("~")
+            self.last_export_path = os.path.expanduser("~")
 
-        if self.filename == "" or not self.filename:
-            self.filename = "blender2ogre"
+        if self.filepath == "" or not self.filepath:
+            self.filepath = "blender2ogre"
 
         kw = {}
         for name in dir(self):
@@ -86,7 +73,7 @@ class _OgreCommonExport_(object):
 
         print ("_"*80)
         target_path = self.last_export_path
-        target_file_name = self.filename
+        target_file_name = self.filepath
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
         Report.reset()
         scene.dot_scene(target_path, target_file_name_no_ext)
@@ -94,6 +81,11 @@ class _OgreCommonExport_(object):
 
         return {'FINISHED'}
 
+    filepath = StringProperty(name="File Path",
+        description="Filepath used for exporting Ogre .scene file",
+        maxlen=1024,
+        default="",
+        subtype='FILE_PATH')
 
     # Basic options
     # NOTE config values are automatically propagated if you name it like: EX_<config-name>
@@ -231,13 +223,6 @@ class _OgreCommonExport_(object):
         description="when using script inheritance copy the source shader programs to the output path",
         default=config.get('COPY_SHADER_PROGRAMS'))
 
-    filepath_last = ""
-    filepath = StringProperty(
-        name="File Path",
-        description="Filepath used for exporting file",
-        maxlen=1024, default="",
-        subtype='FILE_PATH')
-
     EX_SEP_MATS = BoolProperty(
         name="Separate Materials",
         description="exports a .material for each material (rather than putting all materials in a single .material file)",
@@ -303,7 +288,7 @@ class _OgreCommonExport_(object):
         description="exports .material script",
         default=config.get('MATERIALS'))
     EX_FORCE_IMAGE_FORMAT = EnumProperty(
-        items=IMAGE_FORMATS,
+        items=material.IMAGE_FORMATS,
         name='Convert Images',
         description='convert all textures to format',
         default=config.get('FORCE_IMAGE_FORMAT') )
@@ -369,11 +354,11 @@ class _OgreCommonExport_(object):
         description="MESH optimize animations",
         default=config.get('optimiseAnimations'))
 
-    filepath= StringProperty(
-        name="File Path",
-        description="Filepath used for exporting Ogre .scene file",
-        maxlen=1024,
-        default="",
-        subtype='FILE_PATH')
+class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
+    '''Export Ogre Scene'''
+    bl_idname = "ogre.export"
+    bl_label = "Export Ogre"
+    bl_options = {'REGISTER'}
+    # export logic is contained in the subclass
 
 
