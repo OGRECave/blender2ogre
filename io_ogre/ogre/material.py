@@ -9,13 +9,12 @@ from ..report import Report
 import tempfile
 import shutil
 
-def dot_materials(self, materials, path=None, separate_files=True):
+def dot_materials(materials, path=None, separate_files=True):
     """
     generate material files, or copy them into a single file
 
     path: string - or None if one must use a temp file
     separate_files: bool - each material gets it's own filename
-
     """
     if not materials:
         print('WARNING: no materials, not writting .material script')
@@ -24,51 +23,26 @@ def dot_materials(self, materials, path=None, separate_files=True):
     if not path:
         path = tempfile.mkdtemp(prefix='ogre_io')
 
-    M = MISSING_MATERIAL + '\n'
-    for mat in materials:
-        if mat is None:
-            continue
-        Report.materials.append( material_name(mat) )
-        data = generate_material( mat, path=path,
-                copy_programs=config.get('COPY_SHADER_PROGRAMS'),
-                touch_textures=config.get('TOUCH_TEXTURES') )
+    if separate_files:
+        for mat in materials:
+            dot_material(mat, path, copy_programs=config.get('COPY_SHADER_PROGRAMS'),
+                touch_textures=config.get('TOUCH_TEXTURES'))
+    else:
+        target_file = os.path.join(path, '%s.material' % mat_file_name)
+        with open(target_file, 'wb') as fd:
+            fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
+            for mat in materials:
+                if mat is None:
+                    continue
+                Report.materials.append( material_name(mat) )
+                data = generate_material( mat, path=path, copy_programs=config.get('COPY_SHADER_PROGRAMS'),
+                        touch_textures=config.get('TOUCH_TEXTURES') )
+                fd.write(bytes(data+"\n",'utf-8'))
 
-        M += data
-        # Write own .material file per material
-        if separate_files:
-            url = self.dot_material_write_separate( mat, data, path )
-            material_files.append(url)
-
-    # Write one .material file for everything
-    if not separate_files:
-        try:
-            url = os.path.join(path, '%s.material' % mat_file_name)
-            with open(url, 'wb') as fd: 
-                fd.write(bytes(M,'utf-8'))
-            print('    - Created material:', url)
-            material_files.append( url )
-        except Exception as e:
-            show_dialog("Invalid material object name: " + mat_file_name)
-
-    return material_files
-
-def dot_material_write_separate( self, mat, data, path = '/tmp' ):
-    try:
-        clean_filename = clean_object_name(mat.name);
-        url = os.path.join(path, '%s.material' % clean_filename)
-        f = open(url, 'wb'); f.write( bytes(data,'utf-8') ); f.close()
-        print('    - Exported Material:', url)
-        return url
-    except Exception as e:
-        show_dialog("Invalid material object name: " + clean_filename)
-        return ""
-
-
-
-def dot_material(obj, path, **kwargs):
+def dot_material(material, path, **kwargs):
     """
     write the material file of a
-    obj: a blender object that has a mesh
+    material: a blender material
     path: target directory to save the file to
 
     kwargs: 
@@ -77,18 +51,12 @@ def dot_material(obj, path, **kwargs):
       * touch_textures - bool. Copy the images along to the material files.
     """
     prefix = kwargs.get('prefix', '')
-    for material in obj.data.materials:
-        material_text = generate_material(material, path, **kwargs)
-        mat_name = material_name(material, prefix=prefix) + '.material'
-        with open(join(path, mat_name), 'wb') as fd:
-            fd.write(bytes(material_text,'utf-8'))
-        yield mat_name
+    material_text = generate_material(material, path, **kwargs)
+    mat_name = material_name(material, prefix=prefix) + '.material'
+    with open(join(path, mat_name), 'wb') as fd:
+        fd.write(bytes(material_text,'utf-8'))
+    return mat_name
 
-    if kwargs.get('copy_materials', False):
-        _copy_materials(obj.data.materials, path)
-
-def _copy_materials(materials, path):
-    pass
 # Make default material for missing materials:
 # * Red flags for users so they can quickly see what they forgot to assign a material to.
 # * Do not crash if no material on object - thats annoying for the user.
@@ -141,8 +109,6 @@ def load_user_materials():
         scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
         for prog in progs:
             logging.info('Ogre shader program', prog.name)
-    #else:
-    #    logging.warn('Invalid my-shaders path %s' % config.get('USER_MATERIALS'))
 
 
 def material_name( mat, clean = False, prefix='' ):
@@ -156,10 +122,11 @@ def material_name( mat, clean = False, prefix='' ):
         else:
             return prefix + clean_object_name(mat.name)
 
-def generate_material(mat, path='/tmp', copy_programs=False, touch_textures=False, **kwargs):
+def generate_material(mat, path, **kwargs):
     ''' returns generated material string '''
-
     prefix = kwargs.get('prefix','')
+    copy_programs = kwargs.get('copy_programs', False)
+    touch_textures = kwargs.get('touch_textures', False)
     safename = material_name(mat,prefix=prefix) # supports blender library linking
     w = util.IndentedWriter()
     w.line('// %s generated by blender2ogre %s' % (mat.name, datetime.now())).nl()

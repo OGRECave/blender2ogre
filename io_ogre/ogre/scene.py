@@ -4,27 +4,25 @@ from .. import util
 from .. import config
 from . import mesh
 from . import skeleton
-from . import scene
 from ..report import Report
 from ..util import *
 from ..xml import *
 from .mesh import *
 from .material import *
+from . import material
 
 def dot_scene(path, scene_name=None):
     """
-    path: string - target scene file. might not end with .scene
+    path: string - target path to save the scene file and related files to
+    scene_name: string optional - the name of the scene file, defaults to the scene name of blender
     """
-
     if not scene_name:
         scene_name = bpy.context.scene.name
     scene_file = scene_name + '.scene'
     target_scene_file = join(path, scene_file)
 
-    Report.reset()
-
-    print("Processing Scene")
-    prefix = url.split('.')[0]
+    print("Processing Scene -", scene_name)
+    prefix = scene_name
 
     # Nodes (objects) - gather because macros will change selection state
     objects = []
@@ -33,12 +31,12 @@ def dot_scene(path, scene_name=None):
     for ob in bpy.context.scene.objects:
         if ob.subcollision:
             continue
-        if not config.get("EX_EXPORT_HIDDEN") and ob.hide:
+        if not config.get("EXPORT_HIDDEN") and ob.hide:
             continue
-        if config.get("EX_SELONLY") and not ob.select:
-            if ob.type == 'CAMERA' and config.get("EX_FORCE_CAMERA"):
+        if config.get("SELONLY") and not ob.select:
+            if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
                 pass
-            elif ob.type == 'LAMP' and config.get("EX_FORCE_LAMPS"):
+            elif ob.type == 'LAMP' and config.get("FORCE_LAMPS"):
                 pass
             else:
                 continue
@@ -127,13 +125,13 @@ def dot_scene(path, scene_name=None):
         if ob.type=='MESH':
             meshes.append(ob)
 
-    material_files = []
-    if config.get("EX_MATERIALS"):
+    materials = []
+    if config.get("MATERIALS"):
         print ("  Processing Materials")
-        materials = util.objects_merge_materials(meshes):
-        material_files = self.dot_materials(materials, path, target_file_name_no_ext, separate_files=config.get('EX_SEP_MATS'))
+        materials = util.objects_merge_materials(meshes)
+        dot_materials(materials, path, separate_files=config.get('SEP_MATS'))
 
-    doc = ogre_document(self, material_files )
+    doc = ogre_document(materials)
 
     mesh_collision_prims = {}
     mesh_collision_files = {}
@@ -142,7 +140,7 @@ def dot_scene(path, scene_name=None):
 
     for root in roots:
         print('      - Exporting root node:', root.name)
-        _node_export(root, url = url, doc = doc,
+        dot_scene_node_export(root, path = path, doc = doc,
             exported_meshes = exported_meshes,
             meshes = meshes,
             mesh_collision_prims = mesh_collision_prims,
@@ -152,21 +150,14 @@ def dot_scene(path, scene_name=None):
             xmlparent = doc._scene_nodes
         )
 
-    if config.get('EX_SCENE'):
+    if config.get('SCENE'):
         data = doc.toprettyxml()
-        with open(url, 'wb') as fd:
-            f.write(bytes(data,'utf-8'))
-        print('  Exported Ogre Scene:', url)
+        with open(target_scene_file, 'wb') as fd:
+            fd.write(bytes(data,'utf-8'))
+        print('  Exported Ogre Scene:', target_scene_file)
 
     for ob in temps:
         bpy.context.scene.objects.unlink( ob )
-    Report.show()
-
-    # Always save?
-    # todo: This does not seem to stick! It might save to disk
-    # but the old config defaults are read when this panel is opened!
-    config.save_config()
-
 
 class _WrapLogic(object):
     SwapName = { 'frame_property' : 'animation' } # custom name hacks
@@ -317,7 +308,7 @@ def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None
         s.setAttribute('z', '%6f'%z)
     return o
 
-def ogre_document(material_files=[] ):
+def ogre_document(materials):
     now = time.time()
     doc = RDocument()
     scn = doc.createElement('scene')
@@ -341,16 +332,21 @@ def ogre_document(material_files=[] ):
         scn.appendChild( n )
 
     # Extern files
-    for url in material_files:
-        item = doc.createElement('item'); extern.appendChild( item )
+    for mat in materials:
+        item = doc.createElement('item')
+        extern.appendChild( item )
         item.setAttribute('type','material')
-        a = doc.createElement('file'); item.appendChild( a )
-        a.setAttribute('name', url)
+        a = doc.createElement('file')
+        item.appendChild( a )
+        a.setAttribute('name', material.material_name(mat))
 
     # Environ settings
     world = bpy.context.scene.world
     if world: # multiple scenes - other scenes may not have a world
-        _c = {'colourAmbient':world.ambient_color, 'colourBackground':world.horizon_color, 'colourDiffuse':world.horizon_color}
+        _c = { 'colourAmbient': world.ambient_color,
+               'colourBackground': world.horizon_color,
+               'colourDiffuse': world.horizon_color,
+             }
         for ctag in _c:
             a = doc.createElement(ctag); environ.appendChild( a )
             color = _c[ctag]
@@ -375,7 +371,7 @@ def ogre_document(material_files=[] ):
     return doc
 
 # Recursive Node export
-def _node_export( ob, url='', doc=None, rex=None,
+def dot_scene_node_export( ob, path, doc=None, rex=None,
         exported_meshes=[], meshes=[], mesh_collision_prims={},
         mesh_collision_files={}, prefix='', objects=[], xmlparent=None ):
 
@@ -414,7 +410,10 @@ def _node_export( ob, url='', doc=None, rex=None,
         acts.appendChild( WrapActuator(act).xml(doc) )
 
     if ob.type == 'MESH':
+        # ob.data.tessfaces is empty. always until the following call
         ob.data.update(calc_tessface=True)
+        # if it has no faces at all, the object itself will not be exported, BUT 
+        # it might have children
 
     if ob.type == 'MESH' and len(ob.data.tessfaces):
         collisionFile = None
@@ -440,7 +439,7 @@ def _node_export( ob, url='', doc=None, rex=None,
                         break
                 if collisionFile:
                     mesh_collision_files[ ob.data.name ] = collisionFile
-                    mesh.dot_mesh(child, target_path, force_name='_collision_%s' % ob.data.name )
+                    mesh.dot_mesh(child, target_path, force_name='%s_collision_%s' % (prefix,ob.data.name) )
                     skeleton.dot_skeleton(child, target_path)
 
         if collisionPrim:
@@ -450,14 +449,14 @@ def _node_export( ob, url='', doc=None, rex=None,
 
         _mesh_entity_helper( doc, ob, e )
 
-        if config.get('EX_MESH'):
-            murl = os.path.join( os.path.split(url)[0], '%s.mesh'%ob.data.name )
-            exists = os.path.isfile( murl )
-            if not exists or (exists and config.get("EX_MESH_OVERWRITE")):
-                if ob.data.name not in exported_meshes:
-                    exported_meshes.append( ob.data.name )
-                    mesh.dot_mesh(ob, target_path)
-                    skeleton.dot_skeleton(ob, target_path)
+        # export mesh.xml file of this object
+        if config.get('MESH'):
+            exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
+            overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
+            mesh.dot_mesh(ob, path, overwrite=overwrite)
+            skeleton.dot_skeleton(ob, path, overwrite=overwrite)
+            if ob.data.name not in exported_meshes:
+                exported_meshes.append( ob.data.name )
 
         # Deal with Array modifier
         vecs = [ ob.matrix_world.to_translation() ]
@@ -481,8 +480,6 @@ def _node_export( ob, url='', doc=None, rex=None,
 
                             e = doc.createElement('entity')
                             ao.appendChild(e); e.setAttribute('name', ob.data.name)
-                            #if config.get("EX_MESH_SUBDIR"): e.setAttribute('meshFile', 'meshes/%s.mesh' %ob.data.name)
-                            #else:
                             e.setAttribute('meshFile', '%s.mesh' %ob.data.name)
 
                             if collisionPrim: e.setAttribute('collisionPrim', collisionPrim )
@@ -578,7 +575,7 @@ def _node_export( ob, url='', doc=None, rex=None,
                 l.setAttribute('shadow','true')
 
     for child in ob.children:
-        _node_export( child,
+        dot_scene_node_export( child,
             url = url, doc = doc, rex = rex,
             exported_meshes = exported_meshes,
             meshes = meshes,

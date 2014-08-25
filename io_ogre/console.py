@@ -1,10 +1,8 @@
 import bpy
 import sys
 import os
+import re
 from os.path import join, split
-
-#sys.path.append(split(os.getcwd())[0])
-#print(sys.path)
 
 def export(object_names):
     for name in object_names:
@@ -22,13 +20,14 @@ if __name__ == "__main__":
     io_ogre_path = sys.argv[idx+1]
 
     sys.path.append(io_ogre_path)
-    print(sys.path)
 
-    from ogre.scene import dot_scene
-    from ogre.mesh  import dot_mesh
-    from ogre.mesh  import dot_skeleton
+    from io_ogre import config
+    from io_ogre.ogre.scene import dot_scene
+    from io_ogre.ogre.mesh  import dot_mesh
+    from io_ogre.ogre.skeleton import dot_skeleton
 
-    if argv[0] == "scene":
-        scene_name = argv[1]
+    match = re.compile("scene (.*)").match(argv[0])
+    if match:
+        scene_name = match.group(1)
         dot_scene(path, scene_name=scene_name)
 

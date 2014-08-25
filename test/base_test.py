@@ -4,6 +4,7 @@ import unittest
 import subprocess
 import tempfile
 from os.path import join, isfile
+import xml.etree.ElementTree as xml
 
 SUPPORTED_VERSIONS = ['2.70', '2.71']
 
@@ -19,16 +20,18 @@ class BlenderTestCase(unittest.TestCase):
     def run_io_ogre(self, cmd, blend_file=''):
         script = join("io_ogre","console.py")
         self.last_path = tempfile.mkdtemp('io_ogre_test')
-        io_ogre_path = join(os.getcwd(),'io_ogre')
+        io_ogre_path = join(os.getcwd())
         proc = subprocess.Popen([self.blender_path, "-b", "--python", script, "--", io_ogre_path, self.last_path, cmd])
-        output, error = proc.communicate()
-        if error:
-            print(output, error)
+        self.output, self.error = proc.communicate()
 
     def assertCreatedFile(self, name):
         path = join(self.last_path, name)
-        if isfile(path):
-            assertFalse(True, "the file {} is not a regular file! export failed to create it".format(path))
+        if not isfile(path):
+            self.fail("the file {} is not a regular file! export failed to create it".format(path))
+
+    def load_xml(self, name):
+        path = join(self.last_path, name)
+        return xml.parse(path)
 
 
     def blender_exe(self):

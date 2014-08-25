@@ -102,7 +102,11 @@ def objects_merge_materials(objs):
     """
     return a list that contains unique material objects
     """
-    return list(set(chain([obj.data.materials for obj in objs])))
+    materials = set()
+    for obj in objs:
+        for mat in obj.data.materials:
+            materials.add(mat)
+    return materials
 
 def indent( level, *args ):
     if not args:

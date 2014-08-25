@@ -15,15 +15,26 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     force_name: force a different name for this .mesh
     kwargs:
       * material_prefix - string. (optional)
+      * overwrite - bool. (optional) default False
     """
-    start = time.time()
+    name = force_name or ob.data.name
+    name = clean_object_name(name)
+    target_file = os.path.join(path, '%s.mesh.xml' % name )
 
     material_prefix = kwargs.get('material_prefix', '')
+    overwrite = kwargs.get('overwrite', False)
 
-    # TODO ensure that before every call the path exists. there are very view calls I believe
+    if os.path.isfile(target_file) and not overwrite:
+        return []
+
     if not os.path.isdir( path ):
-        logging.info('>> Creating working directory %s', path )
         os.makedirs( path )
+
+    start = time.time()
+
+    # blender per default does not calculate these. when querying the quads/tris 
+    # of the object blender would crash if calc_tessface was not updated
+    ob.data.update(calc_tessface=True)
 
     Report.meshes.append( ob.data.name )
     Report.faces += len( ob.data.tessfaces )
@@ -44,21 +55,17 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         copy = ob
         mesh = ob.data
 
-    name = force_name or ob.data.name
-    name = clean_object_name(name)
-    xmlfile = os.path.join(path, '%s.mesh.xml' % name )
-
     if logging:
         print('      - Generating:', '%s.mesh.xml' % name)
 
     try:
-        with open(xmlfile, 'w') as f:
+        with open(target_file, 'w') as f:
             f.flush()
     except Exception as e:
         show_dialog("Invalid mesh object name: " + name)
         return
 
-    with open(xmlfile, 'w') as f:
+    with open(target_file, 'w') as f:
         doc = SimpleSaxWriter(f, 'mesh', {})
 
         # Very ugly, have to replace number of vertices later
@@ -576,11 +583,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 sys.stdout.write(line)
             fileinput.close() # reported by jakob
 
-    replaceInplace(xmlfile, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
+    replaceInplace(target_file, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
     del(replaceInplace)
 
     # Start .mesh.xml to .mesh convertion tool
-    OgreXMLConverter(xmlfile, has_uvs=dotextures)
+    OgreXMLConverter(target_file, has_uvs=dotextures)
 
     # note that exporting the skeleton does not happen here anymore
     # it moved to the function dot_skeleton in its own module

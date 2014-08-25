@@ -49,8 +49,10 @@ class _OgreCommonExport_(object):
         elif self.EXPORT_TYPE == "REX":
             self.filepath = self.filepath.replace(".scene", ".txml")
 
-        # Update ui setting from the last export, or file config.
-        self.update_ui()
+        # update the interface with the config values
+        for key, value in config.CONFIG.items():
+            if getattr(self,"EX_" + key,None):
+                setattr(self,key,value)
 
         wm = context.window_manager
         fs = wm.fileselect_add(self) # writes to filepath
@@ -64,40 +66,6 @@ class _OgreCommonExport_(object):
         # Run the .scene or .txml export
         self.ogre_export(self.filepath, context)
         return {'FINISHED'}
-
-    def update_ui(self):
-        self.EX_SWAP_AXIS = config.get('SWAP_AXIS')
-        self.EX_SEP_MATS = config.get('SEP_MATS')
-        self.EX_ONLY_DEFORMABLE_BONES = config.get('ONLY_DEFORMABLE_BONES')
-        self.EX_ONLY_KEYFRAMED_BONES = config.get('ONLY_KEYFRAMED_BONES')
-        self.EX_OGRE_INHERIT_SCALE = config.get('OGRE_INHERIT_SCALE')
-        self.EX_SCENE = config.get('SCENE')
-        self.EX_EXPORT_HIDDEN = config.get('EXPORT_HIDDEN')
-        self.EX_SELONLY = config.get('SELONLY')
-        self.EX_FORCE_CAMERA = config.get('FORCE_CAMERA')
-        self.EX_FORCE_LAMPS = config.get('FORCE_LAMPS')
-        self.EX_MESH = config.get('MESH')
-        self.EX_MESH_OVERWRITE = config.get('MESH_OVERWRITE')
-        self.EX_ARM_ANIM = config.get('ARM_ANIM')
-        self.EX_SHAPE_ANIM = config.get('SHAPE_ANIM')
-        self.EX_TRIM_BONE_WEIGHTS = config.get('TRIM_BONE_WEIGHTS')
-        self.EX_ARRAY = config.get('ARRAY')
-        self.EX_MATERIALS = config.get('MATERIALS')
-        self.EX_FORCE_IMAGE_FORMAT = config.get('FORCE_IMAGE_FORMAT')
-        self.EX_DDS_MIPS = config.get('DDS_MIPS')
-        self.EX_COPY_SHADER_PROGRAMS = config.get('COPY_SHADER_PROGRAMS')
-        self.EX_lodLevels = config.get('lodLevels')
-        self.EX_lodDistance = config.get('lodDistance')
-        self.EX_lodPercent = config.get('lodPercent')
-        self.EX_nuextremityPoints = config.get('nuextremityPoints')
-        self.EX_generateEdgeLists = config.get('generateEdgeLists')
-        self.EX_generateTangents = config.get('generateTangents')
-        self.EX_tangentSemantic = config.get('tangentSemantic')
-        self.EX_tangentUseParity = config.get('tangentUseParity')
-        self.EX_tangentSplitMirrored = config.get('tangentSplitMirrored')
-        self.EX_tangentSplitRotated = config.get('tangentSplitRotated')
-        self.EX_reorganiseBuffers = config.get('reorganiseBuffers')
-        self.EX_optimiseAnimations = config.get('optimiseAnimations')
 
     # Basic options
     EX_SWAP_AXIS = EnumProperty(
@@ -379,17 +347,19 @@ class _OgreCommonExport_(object):
         default="",
         subtype='FILE_PATH')
 
-    def ogre_export(self, url, context)
-        print ("_"*80)
-
-        target_path, target_file_name = os.path.split(url)
-        target_file_name_no_ext = os.path.splitext(target_file_name)[0]
-
+    def ogre_export(self, url, context):
         # Updating config to latest values?
         kw = {}
         for name in dir(self):
             if name.startswith('EX_'):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
+
+        print ("_"*80)
+        target_path, target_file_name = os.path.split(url)
+        target_file_name_no_ext = os.path.splitext(target_file_name)[0]
+        Report.reset()
+        scene.dot_scene(target_path, target_file_name_no_ext)
+        Report.show()
 
 

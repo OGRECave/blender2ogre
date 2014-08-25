@@ -48,10 +48,3 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-
-    try:
-        index = sys.argv.index("--")
-        from . import auto
-        auto.export(sys.argv[index+1:])
-    except ValueError:
-        pass
