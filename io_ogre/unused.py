@@ -2,6 +2,33 @@
 ## Ogre Command Line Tools Documentation
 ## Pop up dialog for various info/error messages
 
+_nvcompress_doc = '''
+usage: nvcompress [options] infile [outfile]
+
+Input options:
+  -color       The input image is a color map (default).
+  -alpha         The input image has an alpha channel used for transparency.
+  -normal      The input image is a normal map.
+  -tonormal    Convert input to normal map.
+  -clamp       Clamp wrapping mode (default).
+  -repeat      Repeat wrapping mode.
+  -nomips      Disable mipmap generation.
+
+Compression options:
+  -fast        Fast compression.
+  -nocuda      Do not use cuda compressor.
+  -rgb         RGBA format
+  -bc1         BC1 format (DXT1)
+  -bc1n        BC1 normal map format (DXT1nm)
+  -bc1a        BC1 format with binary alpha (DXT1a)
+  -bc2         BC2 format (DXT3)
+  -bc3         BC3 format (DXT5)
+  -bc3n        BC3 normal map format (DXT5nm)
+  -bc4         BC4 format (ATI1)
+  -bc5         BC5 format (3Dc/ATI2)
+'''
+
+
 popup_message = ""
 
 class PopUpDialogOperator(bpy.types.Operator):

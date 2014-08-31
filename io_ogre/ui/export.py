@@ -9,7 +9,6 @@ from .. import config
 from ..report import Report
 from ..util import *
 from ..xml import *
-from .. import shader
 from ..ogre import mesh
 from ..ogre import skeleton
 from ..ogre import scene

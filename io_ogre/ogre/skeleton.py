@@ -5,7 +5,6 @@ from ..report import Report
 from ..xml import RDocument
 from .. import util
 from os.path import join
-from .converter import OgreXMLConverter
 
 def dot_skeleton(obj, path, **kwargs):
     """
@@ -31,7 +30,7 @@ def dot_skeleton(obj, path, **kwargs):
             fd.write( bytes(skel.to_xml(),'utf-8') )
 
         if kwargs.get('invoke_xml_converter', True):
-            OgreXMLConverter( xmlfile )
+            util.xml_convert( xmlfile )
         return name + '.skeleton'
 
     return None

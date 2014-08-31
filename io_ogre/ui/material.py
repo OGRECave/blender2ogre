@@ -1,7 +1,7 @@
 import bpy
 from .. import shader
 from bpy.props import IntProperty
-from ..ogre.material import generate_material
+from ..ogre.material import OgreMaterialGenerator
 from ..util import wordwrap
 
 def ogre_register(register):
@@ -31,7 +31,7 @@ class MT_preview_material_text(bpy.types.Menu):
         layout = self.layout
         mat = context.active_object.active_material
         if mat:
-            preview = generate_material( mat )
+            preview = OgreMaterialGenerator( mat ).generate()
             for line in preview.splitlines():
                 if line.strip():
                     for ww in wordwrap( line ):

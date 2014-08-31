@@ -2,22 +2,143 @@ import mathutils
 import logging
 import time
 import bpy
-from .config import CONFIG
+from . import config
+import os
+from os.path import split, splitext
 from itertools import chain
+import logging
+import subprocess
+
+def xml_convert(infile, has_uvs=False):
+    # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
+    # We should show how to configure the converter location in config panel or tell the default path.
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+
+    basicArguments = ''
+
+    if config.get('nuextremityPoints') > 0:
+        basicArguments += ' -x %s' %config.get('nuextremityPoints')
+
+    if not config.get('generateEdgeLists'):
+        basicArguments += ' -e'
+
+    # note: OgreXmlConverter fails to convert meshes without UVs
+    if config.get('generateTangents') and has_uvs:
+        basicArguments += ' -t'
+        if config.get('tangentSemantic'):
+            basicArguments += ' -td %s' %config.get('tangentSemantic')
+        if config.get('tangentUseParity'):
+            basicArguments += ' -ts %s' %config.get('tangentUseParity')
+        if config.get('tangentSplitMirrored'):
+            basicArguments += ' -tm'
+        if config.get('tangentSplitRotated'):
+            basicArguments += ' -tr'
+    if not config.get('reorganiseBuffers'):
+        basicArguments += ' -r'
+    if not config.get('optimiseAnimations'):
+        basicArguments += ' -o'
+
+    # Make xml converter print less stuff, comment this if you want more debug info out
+    basicArguments += ' -q'
+
+    opts = '-log _ogre_debug.txt %s' %basicArguments
+    path,name = os.path.split( infile )
+
+    cmd = list(chain([exe], opts.split(), [infile]))
+    subprocess.call( cmd )
+
+def nvcompress(texture, infile, outfile=None, version=1, fast=False, blocking=True):
+    logging.debug('[NVCompress DDS Wrapper]', infile )
+    assert version in (1,2,3,4,5)
+    exe = config.get('NVCOMPRESS')
+    cmd = [ exe ]
+
+    if texture.image.use_alpha and texture.image.depth==32:
+        cmd.append( '-alpha' )
+    if not texture.use_mipmap:
+        cmd.append( '-nomips' )
+
+    if texture.use_normal_map:
+        cmd.append( '-normal' )
+        if version in (1,3):
+            cmd.append( '-bc%sn' %version )
+        else:
+            cmd.append( '-bc%s' %version )
+    else:
+        cmd.append( '-bc%s' %version )
+
+    if fast:
+        cmd.append( '-fast' )
+    cmd.append( infile )
+
+    if outfile: cmd.append( outfile )
+
+    logging.debug( cmd )
+    if blocking:
+        subprocess.call( cmd )
+    else:
+        subprocess.Popen( cmd )
+
+
+def image_magick( texture, origin_filepath, target_filepath ):
+    exe = config.get('IMAGE_MAGICK_CONVERT')
+    cmd = [ exe, origin_filepath ]
+
+    x,y = texture.image.size
+    ax = texture.image.resize_x
+    ay = texture.image.resize_y
+
+    if texture.image.use_convert_format and texture.image.convert_format == 'jpg':
+        cmd.append( '-quality' )
+        cmd.append( '%s' %texture.image.jpeg_quality )
+
+    if texture.image.use_resize_half:
+        cmd.append( '-resize' )
+        cmd.append( '%sx%s' %(x/2, y/2) )
+    elif texture.image.use_resize_absolute and (x>ax or y>ay):
+        cmd.append( '-resize' )
+        cmd.append( '%sx%s' %(ax,ay) )
+
+    elif x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
+        cmd.append( '-resize' )
+        cmd.append( str(config.get('MAX_TEXTURE_SIZE')) )
+
+    if texture.image.use_color_quantize:
+        if texture.image.use_color_quantize_dither:
+            cmd.append( '+dither' )
+        cmd.append('-colors')
+        cmd.append(str(texture.image.color_quantize))
+
+    cmd.append(target_filepath)
+    logging.debug('image magick: "%s"', ' '.join(cmd))
+    subprocess.call(cmd)
+
+    #path,name = os.path.split( origin_filepath )
+    ##target_filepath = os.path.join( path, self._reformat(name,texture.image) )
+    # this does not work. at all. i find now place where _temp_.png is generated,
+    # thus this file will never be found
+    #if target_filepath.endswith('.dds'):
+    #    temp = os.path.join( path, '_temp_.png' )
+    #    cmd.append( temp )
+    #    logging.debug( 'IMAGE MAGICK: %s' %cmd )
+    #    subprocess.call( cmd )
+    #    self.nvcompress( texture, temp, outfile=target_filepath )
+    #else:
+
 
 def swap(vec):
-    if CONFIG['SWAP_AXIS'] == 'xyz': return vec
-    elif CONFIG['SWAP_AXIS'] == 'xzy':
+    if config.get('SWAP_AXIS') == 'xyz': return vec
+    elif config.get('SWAP_AXIS') == 'xzy':
         if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, vec.y] )
         elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, vec.y] )
-    elif CONFIG['SWAP_AXIS'] == '-xzy':
+    elif config.get('SWAP_AXIS') == '-xzy':
         if len(vec) == 3: return mathutils.Vector( [-vec.x, vec.z, vec.y] )
         elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, -vec.x, vec.z, vec.y] )
-    elif CONFIG['SWAP_AXIS'] == 'xz-y':
+    elif config.get('SWAP_AXIS') == 'xz-y':
         if len(vec) == 3: return mathutils.Vector( [vec.x, vec.z, -vec.y] )
         elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
     else:
-        logging.warn( 'unknown swap axis mode %s', CONFIG['SWAP_AXIS'] )
+        logging.warn( 'unknown swap axis mode %s', config.get('SWAP_AXIS') )
         assert 0
 
 def uid(ob):
@@ -40,7 +161,7 @@ def find_bone_index( ob, arm, groupidx): # sometimes the groups are out of order
         vg = ob.vertex_groups[ groupidx ]
         j = 0
         for i,bone in enumerate(arm.pose.bones):
-            if not bone.bone.use_deform and CONFIG['ONLY_DEFORMABLE_BONES']:
+            if not bone.bone.use_deform and config.get('ONLY_DEFORMABLE_BONES'):
                 j+=1 # if we skip bones we need to adjust the id
             if bone.name == vg.name:
                 return i-j
@@ -90,6 +211,20 @@ def get_image_textures( mat ):
         if s and s.texture.type == 'IMAGE':
             r.append( s )
     return r
+
+def texture_image_path(tex):
+
+    if not tex.image:
+        return None
+
+    if tex.library: # support library linked textures
+        libpath = split(bpy.path.abspath(tex.library.filepath))[0]
+        image_filepath = bpy.path.abspath(tex.image.filepath, libpath)
+    else:
+        if tex.image.packed_file:
+            return '.'
+
+        return bpy.path.abspath( tex.image.filepath )
 
 def objects_merge_materials(objs):
     """
@@ -342,6 +477,12 @@ class IndentedWriter(object):
     def indent(self, plus=0):
         return self.write("    " * (len(self.sym_stack) + plus))
 
+    def real(self, f):
+        return self.word(str(f))
+
+    def integer(self, i):
+        return self.word(str(i))
+
     def nl(self):
         self.write("\n")
         return self
@@ -351,10 +492,10 @@ class IndentedWriter(object):
         return self
 
     def word(self, text):
-        return self.write(text).write(" ")
+        return self.write(str(text)).write(" ")
 
     def iwrite(self, text):
-        return self.indent().write(text)
+        return self.indent().write(str(text))
 
     def iword(self, text):
         return self.indent().word(text)

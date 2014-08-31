@@ -34,6 +34,11 @@ from . import config
 from . import properties
 from . import ui
 
+import logging
+import sys
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
 def register():
     logging.info('Starting io_ogre %s', bl_info["version"])
     # the ui modules define auto_register functions that

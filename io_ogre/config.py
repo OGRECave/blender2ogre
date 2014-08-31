@@ -70,17 +70,19 @@ _CONFIG_DEFAULTS_WINDOWS = {
 }
 
 _CONFIG_DEFAULTS_UNIX = {
-    'OGRETOOLS_XML_CONVERTER' : '/usr/local/bin/OgreXMLConverter', # source build is better
+    # do not use absolute paths like /usr/bin/exe_name. some distris install to /usr/local/bin ...
+    # just trust the env PATH variable
+    'IMAGE_MAGICK_CONVERT' : 'convert',
+    'NVCOMPRESS' : 'nvcompress',
+    'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
     'OGRE_MESHY' : '~/OgreMeshy/Ogre Meshy.exe',
-    'IMAGE_MAGICK_CONVERT' : '/usr/bin/convert',
     'NVIDIATOOLS_EXE' : '~/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities',
     'USER_MATERIALS' : '~/Tundra2/media/materials',
     'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
     #'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
     #'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
-    'NVCOMPRESS' : '/usr/local/bin/nvcompress'
 }
 
 # Unix: Replace ~ with absolute home dir path

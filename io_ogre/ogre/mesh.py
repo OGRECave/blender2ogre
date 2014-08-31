@@ -2,8 +2,8 @@ import os, time, sys, logging
 from ..report import Report
 from ..util import *
 from ..xml import *
+from .. import util
 from .material import *
-from .converter import OgreXMLConverter
 from .skeleton import Skeleton
 
 def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
@@ -250,7 +250,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 "operationtype" : "triangle_list"
             }
             if material_name(mat, False) != "_missing_material_":
-                submesh_attributes['material'] = material_name(mat, False, prefix=material_prefix)
+                submesh_attributes['material'] = material_name(mat, prefix=material_prefix)
 
             doc.start_tag('submesh', submesh_attributes)
             doc.start_tag('faces', {
@@ -285,10 +285,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             print('        Done at', timer_diff_str(start), "seconds")
 
         # Generate lod levels
-        if isLOD == False and ob.type == 'MESH' and CONFIG['lodLevels'] > 0:
-            lod_levels = CONFIG['lodLevels']
-            lod_distance = CONFIG['lodDistance']
-            lod_ratio = CONFIG['lodPercent'] / 100.0
+        if isLOD == False and ob.type == 'MESH' and config.get('lodLevels') > 0:
+            lod_levels = config.get('lodLevels')
+            lod_distance = config.get('lodDistance')
+            lod_ratio = config.get('lodPercent') / 100.0
             lod_pre_mesh_count = len(bpy.data.meshes)
 
             # Cap lod levels to something sensible (what is it?)
@@ -434,7 +434,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             boneIndexFromName = {}
             for bone in arm.pose.bones:
                 boneOutputEnableFromName[ bone.name ] = True
-                if CONFIG['ONLY_DEFORMABLE_BONES']:
+                if config.get('ONLY_DEFORMABLE_BONES'):
                     # if we found a deformable bone,
                     if bone.bone.use_deform:
                         # visit all ancestor bones and mark them "output enabled"
@@ -454,7 +454,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             for vidx, v in enumerate(_remap_verts_):
                 check = 0
                 for vgroup in v.groups:
-                    if vgroup.weight > CONFIG['TRIM_BONE_WEIGHTS']:
+                    if vgroup.weight > config.get('TRIM_BONE_WEIGHTS'):
                         groupIndex = vgroup.group
                         if groupIndex < len(copy.vertex_groups):
                             vg = copy.vertex_groups[ groupIndex ]
@@ -476,7 +476,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             doc.end_tag('boneassignments')
 
         # Updated June3 2011 - shape animation works
-        if CONFIG['SHAPE_ANIM'] and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
+        if config.get('SHAPE_ANIM') and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
             print('      - Writing shape keys')
 
             doc.start_tag('poses', {})
@@ -587,7 +587,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     del(replaceInplace)
 
     # Start .mesh.xml to .mesh convertion tool
-    OgreXMLConverter(target_file, has_uvs=dotextures)
+    util.xml_convert(target_file, has_uvs=dotextures)
 
     # note that exporting the skeleton does not happen here anymore
     # it moved to the function dot_skeleton in its own module
@@ -597,7 +597,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if mat != '_missing_material_':
             mats.append(mat)
 
-    logging.info('      - Created .mesh in total time', timer_diff_str(start), 'seconds')
+    logging.info('      - Created .mesh in total time %s seconds', timer_diff_str(start))
 
     return mats
 
