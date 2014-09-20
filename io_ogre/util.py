@@ -8,23 +8,48 @@ from os.path import split, splitext
 from itertools import chain
 import logging
 import subprocess
+import re
+
+def xml_converter_parameters():
+    """
+    Return the name of the ogre converter
+    """
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+    proc = subprocess.Popen([exe,'-v'],stdout=subprocess.PIPE)
+    output, _ = proc.communicate()
+
+    pattern = re.compile("OgreXMLConverter ([^ ]+) \((\d+)\.(\d+).(\d+)\) ([^ ]+)")
+
+    match = pattern.match(output.decode('utf-8'))
+
+    if match:
+        version = (int(match.group(2)),int(match.group(3)),int(match.group(4)))
+        return (match.group(1), version, match.group(5))
+
+    return ("unknown", (1,9,0),"unknown") # means pre 1.10
+
+def xml_converter_version():
+    return xml_converter_parameters()[1]
 
 def xml_convert(infile, has_uvs=False):
     # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
     # We should show how to configure the converter location in config panel or tell the default path.
     exe = config.get('OGRETOOLS_XML_CONVERTER')
+    version = xml_converter_version()
 
     basicArguments = ''
 
     if config.get('nuextremityPoints') > 0:
         basicArguments += ' -x %s' %config.get('nuextremityPoints')
 
-    if not config.get('generateEdgeLists'):
-        basicArguments += ' -e'
+    if version < (1,10,0):
+        if not config.get('generateEdgeLists'):
+            basicArguments += ' -e'
 
     # note: OgreXmlConverter fails to convert meshes without UVs
     if config.get('generateTangents') and has_uvs:
-        basicArguments += ' -t'
+        if version < (1,10,0):
+            basicArguments += ' -t'
         if config.get('tangentSemantic'):
             basicArguments += ' -td %s' %config.get('tangentSemantic')
         if config.get('tangentUseParity'):
