@@ -185,8 +185,8 @@ class Keyframe:
         return self.pos.length < 0.0001
 
     def isRotIdentity( self ):
-        # if the angle is very close to zero, or the axis is not unit length,
-        if abs(self.rot.angle) < 0.0001 or abs(self.rot.axis.length - 1.0) > 0.001:
+        # if the angle is very close to zero
+        if abs(self.rot.angle) < 0.0001:
             # treat it as a zero rotation
             return True
         return False
