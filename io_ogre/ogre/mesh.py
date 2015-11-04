@@ -222,7 +222,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                     doc.end_tag('vertex')
 
-                append_triangle_in_vertex_group(ob, vertex_groups, face, tris[0])
+                append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
                 faces.append( (face[0], face[1], face[2]) )
 
         Report.vertices += numverts
@@ -642,8 +642,8 @@ def triangle_list_in_group(mesh, shared_vertices, group_index):
         faces.append(tuple(entry))
     return faces
 
-def append_triangle_in_vertex_group(obj, vertex_groups, ogre_indices, blender_indices):
-    vertices = [obj.data.vertices[i] for i in blender_indices]
+def append_triangle_in_vertex_group(mesh, obj, vertex_groups, ogre_indices, blender_indices):
+    vertices = [mesh.vertices[i] for i in blender_indices]
     names = set()
     for v in vertices:
         for g in v.groups:
