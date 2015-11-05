@@ -426,7 +426,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         e = doc.createElement('entity')
         o.appendChild(e); e.setAttribute('name', ob.data.name)
         prefix = ''
-        e.setAttribute('meshFile', '%s%s.mesh' %(prefix,ob.data.name) )
+        e.setAttribute('meshFile', '%s%s.mesh' %(prefix,clean_object_name(ob.data.name)) )
 
         if not collisionPrim and not collisionFile:
             if ob.game.use_collision_bounds:
@@ -480,7 +480,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
                             e = doc.createElement('entity')
                             ao.appendChild(e); e.setAttribute('name', ob.data.name)
-                            e.setAttribute('meshFile', '%s.mesh' %ob.data.name)
+                            e.setAttribute('meshFile', '%s.mesh' % clean_object_name(ob.data.name))
 
                             if collisionPrim: e.setAttribute('collisionPrim', collisionPrim )
                             elif collisionFile: e.setAttribute('collisionFile', collisionFile )
