@@ -14,7 +14,7 @@ It has been well tested on linux 64-bit and should work with others.
 
 ## Additional Features ##
 
-Take a look at the [wiki](https://bitbucket.org/plan_richi/blender2ogre/wiki/Home) for some advanced features.
+Take a look at the [wiki](https://bitbucket.org/plan_rich/blender2ogre/wiki/Home) for some advanced features.
 
 * Export SubEntity for a vertex group
 * Console Export
