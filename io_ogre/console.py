@@ -15,11 +15,17 @@ def export(object_names):
 
 if __name__ == "__main__":
     idx = sys.argv.index('--')
-    argv = sys.argv[idx+3:]
-    path = sys.argv[idx+2]
-    io_ogre_path = sys.argv[idx+1]
+    argv = sys.argv[idx+2:]
+    path = sys.argv[idx+1]
 
-    sys.path.append(io_ogre_path)
+    # cut off file name
+    io_ogre = os.path.split(__file__)[0]
+    # cut off io_ogre dir
+    io_ogre = os.path.split(io_ogre)[0]
+    sys.path.append(io_ogre)
+    print(sys.path)
+
+    os.makedirs(path, exist_ok=True, mode=0o775)
 
     from io_ogre import config
     from io_ogre.ogre.scene import dot_scene
