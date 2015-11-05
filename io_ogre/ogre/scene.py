@@ -494,15 +494,19 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         aspy = bpy.context.scene.render.pixel_aspect_y
         sx = bpy.context.scene.render.resolution_x
         sy = bpy.context.scene.render.resolution_y
-        fovY = 0.0
-        if (sx*aspx > sy*aspy):
-            fovY = 2*math.atan(sy*aspy*16.0/(ob.data.lens*sx*aspx))
-        else:
-            fovY = 2*math.atan(16.0/ob.data.lens)
-        # fov in radians - like OgreMax - requested by cyrfer
-        fov = math.radians( fovY*180.0/math.pi )
-        c.setAttribute('fov', '%s'%fov)
-        c.setAttribute('projectionType', "perspective")
+        if ob.data.type == "PERSP":
+            fovY = 0.0
+            if (sx*aspx > sy*aspy):
+                fovY = 2*math.atan(sy*aspy*16.0/(ob.data.lens*sx*aspx))
+            else:
+                fovY = 2*math.atan(16.0/ob.data.lens)
+            # fov in radians - like OgreMax - requested by cyrfer
+            fov = math.radians( fovY*180.0/math.pi )
+            c.setAttribute('projectionType', "perspective")
+            c.setAttribute('fov', '%s'%fov)
+        else: # ob.data.type == "ORTHO":
+            c.setAttribute('projectionType', "orthographic")
+            c.setAttribute('orthoScale', '%s'%ob.data.ortho_scale)
         a = doc.createElement('clipping'); c.appendChild( a )
         a.setAttribute('nearPlaneDist', '%s' %ob.data.clip_start)
         a.setAttribute('farPlaneDist', '%s' %ob.data.clip_end)
