@@ -233,7 +233,7 @@ def is_strictly_simple_terrain( ob ):
 def get_image_textures( mat ):
     r = []
     for s in mat.texture_slots:
-        if s and s.texture.type == 'IMAGE':
+        if s and s.texture != None and s.texture.type == 'IMAGE':
             r.append( s )
     return r
 

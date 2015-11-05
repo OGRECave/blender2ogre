@@ -23,7 +23,6 @@ if __name__ == "__main__":
     # cut off io_ogre dir
     io_ogre = os.path.split(io_ogre)[0]
     sys.path.append(io_ogre)
-    print(sys.path)
 
     os.makedirs(path, exist_ok=True, mode=0o775)
 
