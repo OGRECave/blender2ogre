@@ -100,9 +100,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 materials.append( '_missing_material_' ) # fixed dec22, keep proper index
         if not materials:
             materials.append( '_missing_material_' )
-        _sm_faces_ = []
+        vertex_groups = {}
+        material_faces = []
         for matidx, mat in enumerate( materials ):
-            _sm_faces_.append([])
+            material_faces.append([])
 
         # Textures
         dotextures = False
@@ -114,13 +115,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 for uvface in layer.data:
                     uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
 
-        _sm_vertices_ = {}
+        shared_vertices = {}
         _remap_verts_ = []
         numverts = 0
 
         for F in mesh.tessfaces:
             smooth = F.use_smooth
-            faces = _sm_faces_[ F.material_index ]
+            faces = material_faces[ F.material_index ]
             # Ogre only supports triangles
             tris = []
             tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
@@ -170,8 +171,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     '''
                     vert = VertexNoPos(numverts, nx, ny, nz, r, g, b, ra, vert_uvs)
                     alreadyExported = False
-                    if idx in _sm_vertices_:
-                        for vert2 in _sm_vertices_[idx]:
+                    if idx in shared_vertices:
+                        for vert2 in shared_vertices[idx]:
                             #does not compare ogre_vidx (and position at the moment)
                             if vert == vert2:
                                 face.append(vert2.ogre_vidx)
@@ -180,11 +181,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                                 break
                         if not alreadyExported:
                             face.append(vert.ogre_vidx)
-                            _sm_vertices_[idx].append(vert)
+                            shared_vertices[idx].append(vert)
                             #print(numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "appended")
                     else:
                         face.append(vert.ogre_vidx)
-                        _sm_vertices_[idx] = [vert]
+                        shared_vertices[idx] = [vert]
                         #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "created")
 
                     if alreadyExported:
@@ -221,6 +222,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                     doc.end_tag('vertex')
 
+                append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
                 faces.append( (face[0], face[1], face[2]) )
 
         Report.vertices += numverts
@@ -234,7 +236,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         doc.start_tag('submeshes', {})
         for matidx, mat in enumerate( materials ):
-            if not len(_sm_faces_[matidx]):
+            if not len(material_faces[matidx]):
                 if not isinstance(mat, str):
                     mat_name = mat.name
                 else:
@@ -254,9 +256,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
             doc.start_tag('submesh', submesh_attributes)
             doc.start_tag('faces', {
-                    'count' : str(len(_sm_faces_[matidx]))
+                    'count' : str(len(material_faces[matidx]))
             })
-            for fidx, (v1, v2, v3) in enumerate(_sm_faces_[matidx]):
+            for fidx, (v1, v2, v3) in enumerate(material_faces[matidx]):
                 doc.leaf_tag('face', {
                     'v1' : str(v1),
                     'v2' : str(v2),
@@ -264,10 +266,31 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 })
             doc.end_tag('faces')
             doc.end_tag('submesh')
-            Report.triangles += len(_sm_faces_[matidx])
+            Report.triangles += len(material_faces[matidx])
 
-        del(_sm_faces_)
-        del(_sm_vertices_)
+        for name, ogre_indices in vertex_groups.items():
+            if len(ogre_indices) <= 0:
+                continue
+            submesh_attributes = {
+                'usesharedvertices' : 'true',
+                "use32bitindexes" : str(bool(numverts > 65535)),
+                "operationtype" : "triangle_list"
+            }
+            doc.start_tag('submesh', submesh_attributes)
+            doc.start_tag('faces', {
+                'count' : len(ogre_indices)
+            })
+            for (v1, v2, v3) in ogre_indices:
+                doc.leaf_tag('face', {
+                    'v1' : str(v1),
+                    'v2' : str(v2),
+                    'v3' : str(v3)
+                })
+            doc.end_tag('faces')
+            doc.end_tag('submesh')
+
+        del material_faces
+        del shared_vertices
         doc.end_tag('submeshes')
 
         # Submesh names
@@ -279,6 +302,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     'name' : material_name(mat, False, prefix=material_prefix),
                     'index' : str(matidx)
             })
+        idx = len(materials)
+        for name in vertex_groups.keys():
+            name = name[len('ogre.vertex.group.'):]
+            doc.leaf_tag('submesh', {'name': name, 'index': idx})
+            idx += 1
         doc.end_tag('submeshnames')
 
         if logging:
@@ -601,6 +629,104 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     return mats
 
+def triangle_list_in_group(mesh, shared_vertices, group_index):
+    faces = []
+    for face in mesh.data.tessfaces: 
+        vertices = [mesh.data.vertices[v] for v in face.vertices]
+        match_group = lambda g, v: g in [x.group for x in v.groups]
+        all_in_group = all([match_group(group_index, v) for v in vertices])
+        if not all_in_group:
+            continue
+        assert len(face.vertices) == 3
+        entry = [shared_vertices[v][0].ogre_vidx for v in face.vertices]
+        faces.append(tuple(entry))
+    return faces
+
+def append_triangle_in_vertex_group(mesh, obj, vertex_groups, ogre_indices, blender_indices):
+    vertices = [mesh.vertices[i] for i in blender_indices]
+    names = set()
+    for v in vertices:
+        for g in v.groups:
+            group = obj.vertex_groups[g.group]
+            if not group.name.startswith("ogre.vertex.group."):
+                return
+            names.add(group.name)
+    match_group = lambda name, v: name in [obj.vertex_groups[x.group].name for x in v.groups]
+    for name in names:
+        all_in_group = all([match_group(name, v) for v in vertices])
+        if not all_in_group:
+            continue
+        if name not in vertex_groups:
+            vertex_groups[name] = []
+        vertex_groups[name].append(ogre_indices)
+
+import cmath
+def isclose(a,
+            b,
+            rel_tol=1e-9,
+            abs_tol=0.0,
+            method='weak'):
+    ### copied from PEP 485. when blender switches to python 3.5 use math.isclose(...)
+    """
+    returns True if a is close in value to b. False otherwise
+    :param a: one of the values to be tested
+    :param b: the other value to be tested
+    :param rel_tol=1e-8: The relative tolerance -- the amount of error
+                         allowed, relative to the magnitude of the input
+                         values.
+    :param abs_tol=0.0: The minimum absolute tolerance level -- useful for
+                        comparisons to zero.
+    :param method: The method to use. options are:
+                  "asymmetric" : the b value is used for scaling the tolerance
+                  "strong" : The tolerance is scaled by the smaller of
+                             the two values
+                  "weak" : The tolerance is scaled by the larger of
+                           the two values
+                  "average" : The tolerance is scaled by the average of
+                              the two values.
+    NOTES:
+    -inf, inf and NaN behave similar to the IEEE 754 standard. That
+    -is, NaN is not close to anything, even itself. inf and -inf are
+    -only close to themselves.
+    Complex values are compared based on their absolute value.
+    The function can be used with Decimal types, if the tolerance(s) are
+    specified as Decimals::
+      isclose(a, b, rel_tol=Decimal('1e-9'))
+    See PEP-0485 for a detailed description
+    """
+    if method not in ("asymmetric", "strong", "weak", "average"):
+        raise ValueError('method must be one of: "asymmetric",'
+                         ' "strong", "weak", "average"')
+
+    if rel_tol < 0.0 or abs_tol < 0.0:
+        raise ValueError('error tolerances must be non-negative')
+
+    if a == b:  # short-circuit exact equality
+        return True
+    # use cmath so it will work with complex or float
+    if cmath.isinf(a) or cmath.isinf(b):
+        # This includes the case of two infinities of opposite sign, or
+        # one infinity and one finite number. Two infinities of opposite sign
+        # would otherwise have an infinite relative tolerance.
+        return False
+    diff = abs(b - a)
+    if method == "asymmetric":
+        return (diff <= abs(rel_tol * b)) or (diff <= abs_tol)
+    elif method == "strong":
+        return (((diff <= abs(rel_tol * b)) and
+                 (diff <= abs(rel_tol * a))) or
+                (diff <= abs_tol))
+    elif method == "weak":
+        return (((diff <= abs(rel_tol * b)) or
+                 (diff <= abs(rel_tol * a))) or
+                (diff <= abs_tol))
+    elif method == "average":
+        return ((diff <= abs(rel_tol * (a + b) / 2) or
+                (diff <= abs_tol)))
+    else:
+        raise ValueError('method must be one of:'
+                         ' "asymmetric", "strong", "weak", "average"')
+
 class VertexNoPos(object):
     def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
         self.ogre_vidx = ogre_vidx
@@ -615,12 +741,20 @@ class VertexNoPos(object):
 
     '''does not compare ogre_vidx (and position at the moment) [ no need to compare position ]'''
     def __eq__(self, o):
-        if self.nx != o.nx or self.ny != o.ny or self.nz != o.nz: return False
-        elif self.r != o.r or self.g != o.g or self.b != o.b or self.ra != o.ra: return False
-        elif len(self.vert_uvs) != len(o.vert_uvs): return False
-        elif self.vert_uvs:
+        if not isclose(self.nx, o.nx): return False
+        if not isclose(self.ny, o.ny): return False
+        if not isclose(self.nz, o.nz): return False
+        if not isclose(self.r, o.r): return False
+        if not isclose(self.g, o.g): return False
+        if not isclose(self.b, o.b): return False
+        if not isclose(self.ra, o.ra): return False
+        if len(self.vert_uvs) != len(o.vert_uvs): return False
+        if self.vert_uvs:
             for i, uv1 in enumerate( self.vert_uvs ):
                 uv2 = o.vert_uvs[ i ]
                 if uv1 != uv2: return False
         return True
+
+    def __repr__(self):
+        return 'vertex(%d)' % self.ogre_vidx
 
