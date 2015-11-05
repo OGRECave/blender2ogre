@@ -1,4 +1,8 @@
 CHANGELOG
+    0.6.2
+    * pulled fixed added to the monoltic python file
+    * added exporting of custom vertex groups
+    * console export documented
     0.6.1
     * code refactored, tested to work with 2.71
     0.6.0
