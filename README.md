@@ -18,6 +18,7 @@ Take a look at the [wiki](https://bitbucket.org/plan_rich/blender2ogre/wiki/Home
 
 * Export SubEntity for a vertex group
 * Console Export
+* Already defined materials in OGRE
 
 ## Download (Linux, Windows, OS X) ##
 
