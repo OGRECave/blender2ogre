@@ -91,18 +91,24 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     vcolors_alpha = bloc; break
 
         # Materials
+        # saves tuples of material name and material obj (or None)
         materials = []
         for mat in ob.data.materials:
+            name = material_name(mat.name, prefix=material_prefix)
+            extern = False
+            if name.startswith("extern."):
+                name = name[len("extern."):]
+                extern = True
             if mat:
-                materials.append( mat )
+                materials.append( (name, extern, mat) )
             else:
                 print('[WARNING:] Bad material data in', ob)
-                materials.append( '_missing_material_' ) # fixed dec22, keep proper index
+                materials.append( ('_missing_material_', True, None) ) # fixed dec22, keep proper index
         if not materials:
-            materials.append( '_missing_material_' )
+            materials.append( ('_missing_material_', True, None) )
         vertex_groups = {}
         material_faces = []
-        for matidx, mat in enumerate( materials ):
+        for matidx, mat in enumerate(materials):
             material_faces.append([])
 
         # Textures
@@ -235,13 +241,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             print('      - Writing submeshes')
 
         doc.start_tag('submeshes', {})
-        for matidx, mat in enumerate( materials ):
+        for matidx, (mat_name, extern, mat) in enumerate(materials):
             if not len(material_faces[matidx]):
-                if not isinstance(mat, str):
-                    mat_name = mat.name
-                else:
-                    mat_name = mat
-                Report.warnings.append( 'BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (ob.name, mat_name) )
+                Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (ob.name, mat_name) )
                 continue # fixes corrupt unused materials
 
             submesh_attributes = {
@@ -251,12 +253,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 "use32bitindexes" : str(bool(numverts > 65535)),
                 "operationtype" : "triangle_list"
             }
-            if material_name(mat, False) != "_missing_material_":
-                submesh_attributes['material'] = material_name(mat, prefix=material_prefix)
+            if mat_name != "_missing_material_":
+                submesh_attributes['material'] = mat_name
 
             doc.start_tag('submesh', submesh_attributes)
             doc.start_tag('faces', {
-                    'count' : str(len(material_faces[matidx]))
+                'count' : str(len(material_faces[matidx]))
             })
             for fidx, (v1, v2, v3) in enumerate(material_faces[matidx]):
                 doc.leaf_tag('face', {
@@ -274,7 +276,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             submesh_attributes = {
                 'usesharedvertices' : 'true',
                 "use32bitindexes" : str(bool(numverts > 65535)),
-                "operationtype" : "triangle_list"
+                "operationtype" : "triangle_list",
+                "material": "none",
             }
             doc.start_tag('submesh', submesh_attributes)
             doc.start_tag('faces', {
@@ -297,9 +300,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         # todo: why is the submesh name taken from the material
         # when we have the blender object name available?
         doc.start_tag('submeshnames', {})
-        for matidx, mat in enumerate( materials ):
+        for matidx, (mat_name, extern, mat) in enumerate(materials):
             doc.leaf_tag('submesh', {
-                    'name' : material_name(mat, False, prefix=material_prefix),
+                    'name' : mat_name,
                     'index' : str(matidx)
             })
         idx = len(materials)
@@ -621,9 +624,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     # it moved to the function dot_skeleton in its own module
 
     mats = []
-    for mat in materials:
-        if mat != '_missing_material_':
-            mats.append(mat)
+    for mat_name, extern, mat in materials:
+        # _missing_material_ is marked as extern
+        if not extern:
+            mats.append(mat_name)
 
     logging.info('      - Created .mesh in total time %s seconds', timer_diff_str(start))
 
