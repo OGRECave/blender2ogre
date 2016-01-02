@@ -768,6 +768,7 @@ def extract_vertex_color(vcolors, vcolors_alpha, face, index):
     g = 1.0
     b = 1.0
     ra = 1.0
+    export = False
     if vcolors:
         k = list(face.vertices).index(index)
         r,g,b = getattr( vcolors.data[face.index], 'color%s'%(k+1) )
