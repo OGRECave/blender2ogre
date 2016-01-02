@@ -101,11 +101,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             mat_name = "_missing_material_"
             if mat is not None:
                 mat_name = mat.name
-            if mat_name.startswith("vertex.color."):
-                vertex_color_materials.append(mat)
-                materials.append(('_vertex_color_', True, None))
-                continue
-            vertex_color_materials.append(None) # keep the index up to date
             mat_name = material_name(mat_name, prefix=material_prefix)
             extern = False
             if mat_name.startswith("extern."):
@@ -164,9 +159,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         nx,ny,nz = swap( F.normal )
 
                     export_vertex_color, color_tuple = \
-                            extract_vertex_color(
-                                    vcolors, vcolors_alpha, F, index,
-                                    vertex_color_materials)
+                            extract_vertex_color(vcolors, vcolors_alpha, F, idx)
                     r,g,b,ra = color_tuple
 
                     # Texture maps
@@ -770,20 +763,11 @@ class VertexNoPos(object):
     def __repr__(self):
         return 'vertex(%d)' % self.ogre_vidx
 
-def extract_vertex_color(vcolors, vcolors_alpha,
-        face, index, vertex_color_materials):
+def extract_vertex_color(vcolors, vcolors_alpha, face, index):
     r = 1.0
     g = 1.0
     b = 1.0
     ra = 1.0
-
-    export = False
-    mat = vertex_color_materials[face.material_index]
-    if mat is not None:
-        r,g,b = mat.diffuse_color[:]
-        ra = mat.alpha
-        export = True
-
     if vcolors:
         k = list(face.vertices).index(index)
         r,g,b = getattr( vcolors.data[face.index], 'color%s'%(k+1) )
@@ -792,6 +776,5 @@ def extract_vertex_color(vcolors, vcolors_alpha,
         else:
             ra = 1.0
         export = True
-
     return export, (r,g,b,ra)
 
