@@ -17,9 +17,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
       * material_prefix - string. (optional)
       * overwrite - bool. (optional) default False
     """
-    name = force_name or ob.data.name
-    name = clean_object_name(name)
-    target_file = os.path.join(path, '%s.mesh.xml' % name )
+    obj_name = force_name or ob.name
+    obj_name = clean_object_name(obj_name)
+    target_file = os.path.join(path, '%s.mesh.xml' % obj_name )
 
     material_prefix = kwargs.get('material_prefix', '')
     overwrite = kwargs.get('overwrite', False)
@@ -36,7 +36,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     # of the object blender would crash if calc_tessface was not updated
     ob.data.update(calc_tessface=True)
 
-    Report.meshes.append( ob.data.name )
+    Report.meshes.append( obj_name )
     Report.faces += len( ob.data.tessfaces )
     Report.orig_vertices += len( ob.data.vertices )
 
@@ -56,13 +56,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         mesh = ob.data
 
     if logging:
-        print('      - Generating:', '%s.mesh.xml' % name)
+        print('      - Generating:', '%s.mesh.xml' % obj_name)
 
     try:
         with open(target_file, 'w') as f:
             f.flush()
     except Exception as e:
-        show_dialog("Invalid mesh object name: " + name)
+        show_dialog("Invalid mesh object name: " + obj_name)
         return
 
     with open(target_file, 'w') as f:
@@ -81,7 +81,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
         })
 
-        # Vertex colors
+        # Vertex colors, note that you can define a vertex color
+        # material. see 'vertex_color_materials' below!
         vcolors = None
         vcolors_alpha = None
         if len( mesh.tessface_vertex_colors ):
@@ -93,14 +94,25 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         # Materials
         # saves tuples of material name and material obj (or None)
         materials = []
+        # a material named 'vertex.color.<yourname>' will overwrite
+        # the diffuse color in the mesh file!
+        vertex_color_materials = []
         for mat in ob.data.materials:
-            name = material_name(mat.name, prefix=material_prefix)
+            mat_name = "_missing_material_"
+            if mat is not None:
+                mat_name = mat.name
+            if mat_name.startswith("vertex.color."):
+                vertex_color_materials.append(mat)
+                materials.append(('_vertex_color_', True, None))
+                continue
+            vertex_color_materials.append(None) # keep the index up to date
+            mat_name = material_name(mat_name, prefix=material_prefix)
             extern = False
-            if name.startswith("extern."):
-                name = name[len("extern."):]
+            if mat_name.startswith("extern."):
+                mat_name = mat_name[len("extern."):]
                 extern = True
             if mat:
-                materials.append( (name, extern, mat) )
+                materials.append( (mat_name, extern, mat) )
             else:
                 print('[WARNING:] Bad material data in', ob)
                 materials.append( ('_missing_material_', True, None) ) # fixed dec22, keep proper index
@@ -151,17 +163,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     else:
                         nx,ny,nz = swap( F.normal )
 
-                    r = 1.0
-                    g = 1.0
-                    b = 1.0
-                    ra = 1.0
-                    if vcolors:
-                        k = list(F.vertices).index(idx)
-                        r,g,b = getattr( vcolors.data[ F.index ], 'color%s'%(k+1) )
-                        if vcolors_alpha:
-                            ra,ga,ba = getattr( vcolors_alpha.data[ F.index ], 'color%s'%(k+1) )
-                        else:
-                            ra = 1.0
+                    export_vertex_color, color_tuple = \
+                            extract_vertex_color(
+                                    vcolors, vcolors_alpha, F, index,
+                                    vertex_color_materials)
+                    r,g,b,ra = color_tuple
 
                     # Texture maps
                     vert_uvs = []
@@ -215,7 +221,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             'z' : '%6f' % nz
                     })
 
-                    if vcolors:
+                    if export_vertex_color:
                         doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
 
                     # Texture maps
@@ -243,7 +249,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.start_tag('submeshes', {})
         for matidx, (mat_name, extern, mat) in enumerate(materials):
             if not len(material_faces[matidx]):
-                Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (ob.name, mat_name) )
+                Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (obj_name, mat_name) )
                 continue # fixes corrupt unused materials
 
             submesh_attributes = {
@@ -369,7 +375,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 return get_or_create_modifier(obj, modifier_name)
 
             # Create a temporary duplicate
-            ob_copy, ob_copy_mesh = duplicate_object(bpy.context.scene, ob.name + "_LOD_TEMP_COPY", ob)
+            ob_copy, ob_copy_mesh = duplicate_object(bpy.context.scene, obj_name + "_LOD_TEMP_COPY", ob)
             ob_copy_meshes = [ ob_copy.data, ob_copy_mesh ]
 
             # Activate clone for modifier manipulation
@@ -423,8 +429,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     for lod in lod_generated:
                         ratio_percent = round(lod['ratio'] * 100.0, 0)
                         print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
-                        lod_ob_temp = bpy.data.objects.new(name, lod['mesh'])
-                        lod_ob_temp.data.name = name + '_LOD_' + str(lod['level'])
+                        lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
+                        lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
                         dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, isLOD=True)
 
                         # 'value' is the distance this LOD kicks in for the 'Distance' strategy.
@@ -458,7 +464,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         arm = ob.find_armature()
         if arm:
             doc.leaf_tag('skeletonlink', {
-                    'name' : '%s.skeleton' % name
+                    'name' : '%s.skeleton' % obj_name
             })
             doc.start_tag('boneassignments', {})
             boneOutputEnableFromName = {}
@@ -628,6 +634,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         # _missing_material_ is marked as extern
         if not extern:
             mats.append(mat_name)
+        else:
+            print("extern material", mat_name)
 
     logging.info('      - Created .mesh in total time %s seconds', timer_diff_str(start))
 
@@ -761,4 +769,29 @@ class VertexNoPos(object):
 
     def __repr__(self):
         return 'vertex(%d)' % self.ogre_vidx
+
+def extract_vertex_color(vcolors, vcolors_alpha,
+        face, index, vertex_color_materials):
+    r = 1.0
+    g = 1.0
+    b = 1.0
+    ra = 1.0
+
+    export = False
+    mat = vertex_color_materials[face.material_index]
+    if mat is not None:
+        r,g,b = mat.diffuse_color[:]
+        ra = mat.alpha
+        export = True
+
+    if vcolors:
+        k = list(face.vertices).index(index)
+        r,g,b = getattr( vcolors.data[face.index], 'color%s'%(k+1) )
+        if vcolors_alpha:
+            ra,ga,ba = getattr( vcolors_alpha.data[face.index], 'color%s'%(k+1) )
+        else:
+            ra = 1.0
+        export = True
+
+    return export, (r,g,b,ra)
 
