@@ -4,9 +4,9 @@
 * [Ogre forum thread](http://ogre3d.org/forums/viewtopic.php?f=8&t=61485)
 
 ## Installing ##
-Copy the [io_ogre](io_ogre) folder into the blender scripts/addons folder.
-You can find instructions on how to find this folder [here](http://wiki.blender.org/index.php/Doc:2.6/Manual/Extensions/Python/Add-Ons#Installation_of_an_Add-On).
-After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export`. Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.
+Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/ja/dev/getting_started/installing/configuration/directories.html)`/scripts/addons` folder.
+Note on Windows: you have to set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) prior to the first run.  
+After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export`. Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.  
 Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
 
 The following versions of blender have been tested. It might also work with older versions of Blender.
@@ -18,7 +18,7 @@ The following versions of blender have been tested. It might also work with olde
 ## Updating to new versions ##
 
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
-`~/.blender/<version>/config/scripts/blender2ogre.pickle` and restart blender.
+[$BLENDER_DIR](https://docs.blender.org/manual/ja/dev/getting_started/installing/configuration/directories.html)`/config/scripts/blender2ogre.pickle` and restart blender.
 
 ## Video Tutorials
 
@@ -40,7 +40,7 @@ your OGRE project:
 ## Console Export
 
 You might have several blender files in your project you want to export to Ogre. Do this by hand? NO! You can do better! After all, you have build scripts to compile your source code? Why not export your files automated?
-Here is how you can export a scene with blender2ogre. Take a look at `io_ogre/console.py`. You might want to write your own script for your project to export individual objects.
+Here is how you can export a scene with blender2ogre. Take a look at [io_ogre/console.py](io_ogre/console.py). You might want to write your own script for your project to export individual objects.
 
 ```bash
 $ cd blender2ogre
