@@ -20,6 +20,11 @@ def dot_scene(path, scene_name=None):
         scene_name = bpy.context.scene.name
     scene_file = scene_name + '.scene'
     target_scene_file = join(path, scene_file)
+    
+    # Create target path if it does not exist
+    if not os.path.exists(path):
+        print("Creating Directory -", path)
+        os.mkdir(path)
 
     print("Processing Scene -", scene_name)
     prefix = scene_name
