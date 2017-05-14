@@ -580,7 +580,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
     for child in ob.children:
         dot_scene_node_export( child,
-            url = url, doc = doc, rex = rex,
+            path, doc = doc, rex = rex,
             exported_meshes = exported_meshes,
             meshes = meshes,
             mesh_collision_prims = mesh_collision_prims,
