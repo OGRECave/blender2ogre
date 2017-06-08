@@ -6,6 +6,8 @@ import math
 import mathutils
 import logging
 
+from pprint import pprint
+
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
 from .. import config
 from ..report import Report
@@ -25,6 +27,8 @@ def auto_register(register):
         bpy.types.INFO_MT_file_export.append(menu_func)
     else:
         bpy.types.INFO_MT_file_export.remove(menu_func)
+
+    
 
 def menu_func(self, context):
     """ invoked when export in drop down menu is clicked """
@@ -56,6 +60,11 @@ class _OgreCommonExport_(object):
         logger.info("context.scene.name %s"%context.scene.name)
         logger.info("self.filepath %s"%self.filepath)
         logger.info("self.last_export_path %s"%self.last_export_path)
+
+
+        #-- load addonPreferenc in CONFIG
+        config.update_from_addon_preference(context)
+        
         # Resolve path from opened .blend if available. It's not if
         # blender normally was opened with "last open scene".
         # After export is done once, remember that path when re-exporting.
