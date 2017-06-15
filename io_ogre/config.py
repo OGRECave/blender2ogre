@@ -1,5 +1,6 @@
 
 import bpy, os, sys, logging, pickle, mathutils
+from pprint import pprint
 from bpy.props import *
 
 AXIS_MODES =  [
@@ -168,6 +169,7 @@ def load_config():
 CONFIG = load_config()
 
 def get(name, default=None):
+    
     global CONFIG
     if name in CONFIG:
         return CONFIG[name]
@@ -191,3 +193,13 @@ def save_config():
             print('[ERROR]: Can not write to %s' %CONFIG_FILEPATH)
     else:
         print('[ERROR:] Config directory does not exist %s' %CONFIG_PATH)
+
+
+def update_from_addon_preference(context):
+
+    addon_preferences = context.user_preferences.addons["io_ogre"].preferences
+    
+    for key in _CONFIG_TAGS_:
+        addon_pref_value = getattr(addon_preferences,key,None)
+        if addon_pref_value is not None:
+            CONFIG[key] = addon_pref_value

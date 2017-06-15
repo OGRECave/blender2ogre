@@ -26,7 +26,7 @@ def dot_scene(path, scene_name=None):
         print("Creating Directory -", path)
         os.mkdir(path)
 
-    print("Processing Scene -", scene_name)
+    print("Processing Scene: name:%s, path: %s"%(scene_name, path))
     prefix = scene_name
 
     # Nodes (objects) - gather because macros will change selection state

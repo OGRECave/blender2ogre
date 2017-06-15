@@ -4,6 +4,10 @@ import os
 import getpass
 import math
 import mathutils
+import logging
+
+from pprint import pprint
+
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
 from .. import config
 from ..report import Report
@@ -14,6 +18,7 @@ from ..ogre import skeleton
 from ..ogre import scene
 from ..ogre import material
 
+logger = logging.getLogger('root')
 
 def auto_register(register):
     yield OP_ogre_export
@@ -22,6 +27,8 @@ def auto_register(register):
         bpy.types.INFO_MT_file_export.append(menu_func)
     else:
         bpy.types.INFO_MT_file_export.remove(menu_func)
+
+    
 
 def menu_func(self, context):
     """ invoked when export in drop down menu is clicked """
@@ -49,6 +56,15 @@ class _OgreCommonExport_(object):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
+        logger.info("context.blend_data %s"%context.blend_data.filepath)
+        logger.info("context.scene.name %s"%context.scene.name)
+        logger.info("self.filepath %s"%self.filepath)
+        logger.info("self.last_export_path %s"%self.last_export_path)
+
+
+        #-- load addonPreferenc in CONFIG
+        config.update_from_addon_preference(context)
+        
         # Resolve path from opened .blend if available. It's not if
         # blender normally was opened with "last open scene".
         # After export is done once, remember that path when re-exporting.
@@ -64,6 +80,8 @@ class _OgreCommonExport_(object):
         if self.filepath == "" or not self.filepath:
             self.filepath = "blender2ogre"
 
+        logger.info("self.filepath %s"%self.filepath)
+            
         kw = {}
         for name in dir(self):
             if name.startswith('EX_'):
@@ -71,9 +89,14 @@ class _OgreCommonExport_(object):
         config.update(**kw)
 
         print ("_"*80)
-        target_path = self.last_export_path
+        target_path = os.path.dirname(os.path.abspath(self.filepath))
         target_file_name = self.filepath
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
+
+        logger.info("target_path %s"%target_path)
+        logger.info("target_file_name %s"%target_file_name)
+        logger.info("target_file_name_no_ext %s"%target_file_name_no_ext)
+        
         Report.reset()
         scene.dot_scene(target_path, target_file_name_no_ext)
         Report.show()
