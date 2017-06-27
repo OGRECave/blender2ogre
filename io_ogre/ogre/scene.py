@@ -403,16 +403,17 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     # -- end of Mind Calamity patch
 
     # BGE subset
-    game = doc.createElement('game')
-    o.appendChild( game )
-    sens = doc.createElement('sensors')
-    game.appendChild( sens )
-    acts = doc.createElement('actuators')
-    game.appendChild( acts )
-    for sen in ob.game.sensors:
-        sens.appendChild( WrapSensor(sen).xml(doc) )
-    for act in ob.game.actuators:
-        acts.appendChild( WrapActuator(act).xml(doc) )
+    if len(ob.game.sensors) + len(ob.game.actuators) > 0:
+        game = doc.createElement('game')
+        o.appendChild( game )
+        sens = doc.createElement('sensors')
+        game.appendChild( sens )
+        acts = doc.createElement('actuators')
+        game.appendChild( acts )
+        for sen in ob.game.sensors:
+            sens.appendChild( WrapSensor(sen).xml(doc) )
+        for act in ob.game.actuators:
+            acts.appendChild( WrapActuator(act).xml(doc) )
 
     if ob.type == 'MESH':
         # ob.data.tessfaces is empty. always until the following call
