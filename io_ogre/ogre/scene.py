@@ -11,6 +11,8 @@ from .mesh import *
 from .material import *
 from . import material
 
+logger = logging.getLogger('root')
+
 def dot_scene(path, scene_name=None):
     """
     path: string - target path to save the scene file and related files to
@@ -522,7 +524,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         Report.lights.append( ob.name )
         l = doc.createElement('light')
         o.appendChild(l)
-
+        
         mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
 
         p = doc.createElement('position')   # just to make sure we conform with the DTD
@@ -549,12 +551,17 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         a.setAttribute('quadratic', '0.0')
 
         if ob.data.type in ('SPOT', 'SUN'):
-            vector = swap(mathutils.Euler.to_matrix(ob.rotation_euler)[2])
+            #-- 
+            rot_matrix = mathutils.Euler.to_matrix(ob.rotation_euler)
+            unswaped_vector = rot_matrix*mathutils.Vector((0,0,-1))
+            vector = swap(unswaped_vector)           
+            
             a = doc.createElement('direction')
             l.appendChild(a)
-            a.setAttribute('x',str(round(-vector[0],3)))
-            a.setAttribute('y',str(round(-vector[1],3)))
-            a.setAttribute('z',str(round(-vector[2],3)))
+            
+            a.setAttribute('x',str(round(vector[0],3)))
+            a.setAttribute('y',str(round(vector[1],3)))
+            a.setAttribute('z',str(round(vector[2],3)))
 
         if ob.data.type == 'SPOT':
             a = doc.createElement('spotLightRange')

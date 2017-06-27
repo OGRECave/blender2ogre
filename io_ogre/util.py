@@ -10,6 +10,8 @@ import logging
 import subprocess
 import re
 
+logger = logging.getLogger('root')
+
 def xml_converter_parameters():
     """
     Return the name of the ogre converter
@@ -30,6 +32,17 @@ def xml_converter_parameters():
 
 def xml_converter_version():
     return xml_converter_parameters()[1]
+
+def to_meshv2(input_file):
+    tool_dir = os.path.dirname(config.get("OGRE_MESH_TOOL"))
+    input_file_name = input_file.replace(".xml","")
+    
+    cmd = ['cd', '%s'%tool_dir,'&&',config.get("OGRE_MESH_TOOL"),'-v2',input_file_name,input_file_name]
+        
+    ret = subprocess.call( " ".join(cmd) ,shell=True)
+
+    if ret > 0:
+        raise Exception("Error while converting to v2 mesh, command: %s"%(" ".join(cmd)))
 
 def xml_convert(infile, has_uvs=False):
     # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
@@ -70,6 +83,8 @@ def xml_convert(infile, has_uvs=False):
     path,name = os.path.split( infile )
 
     cmd = list(chain([exe], opts.split(), [infile]))
+    logger.info("cmd call: '%s'"%(" ".join(cmd)))
+        
     subprocess.call( cmd )
 
 def nvcompress(texture, infile, outfile=None, version=1, fast=False, blocking=True):
@@ -251,6 +266,14 @@ def texture_image_path(tex):
 
         return bpy.path.abspath( tex.image.filepath )
 
+
+def is_image_postprocessed( image ):
+    if config.get('FORCE_IMAGE_FORMAT') != 'NONE' or image.use_resize_half or image.use_resize_absolute or image.use_color_quantize or image.use_convert_format:
+        return True
+    else:
+        return False
+
+    
 def objects_merge_materials(objs):
     """
     return a list that contains unique material objects
@@ -531,3 +554,24 @@ class IndentedWriter(object):
     def line(self, text):
         return self.write(text + "\n")
 
+def material_name( mat, clean = False, prefix='' ):
+    """
+    returns the material name.
+
+    materials from a library might be exported several times for multiple objects.
+    there is no need to have those textures + material scripts several times. thus
+    library materials are prefixed with the material filename. (e.g. test.blend + diffuse
+    should result in "test_diffuse". special chars are converted to underscore.
+
+    clean: deprecated. do not use!
+    """
+    if type(mat) is str:
+        return prefix + clean_object_name(mat)
+    name = clean_object_name(mat.name)
+    if mat.library:
+        _, filename = split(mat.library.filepath)
+        prefix, _ = splitext(filename)
+        return prefix + "_" + name
+    else:
+        return prefix + name
+ 

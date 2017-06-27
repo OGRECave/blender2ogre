@@ -90,9 +90,16 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         default=config.CONFIG['SHADER_PROGRAMS']
     )
 
+    OGRE_MESH_TOOL = bpy.props.StringProperty(
+        name="OGRE_MESH_TOOL",
+        subtype='FILE_PATH',
+        default=config.CONFIG['OGRE_MESH_TOOL']
+    )
+
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "OGRETOOLS_XML_CONVERTER")
+        layout.prop(self, "OGRE_MESH_TOOL")
         layout.prop(self, "OGRETOOLS_MESH_MAGICK")
         layout.prop(self, "TUNDRA_ROOT")
         layout.prop(self, "OGRE_MESHY")
@@ -100,7 +107,8 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "NVIDIATOOLS_EXE")
         layout.prop(self, "USER_MATERIALS")
         layout.prop(self, "SHADER_PROGRAMS")
-        layout.prop(self, "NVCOMPRESS")        
+        layout.prop(self, "NVCOMPRESS")
+        
 
 def register():
     logging.info('Starting io_ogre %s', bl_info["version"])
