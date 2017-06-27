@@ -535,7 +535,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
         if ob.data.type in ('SPOT', 'SUN'):
             vector = swap(mathutils.Euler.to_matrix(ob.rotation_euler)[2])
-            a = doc.createElement('direction')
+            a = doc.createElement('normal')
             l.appendChild(a)
             a.setAttribute('x',str(round(-vector[0],3)))
             a.setAttribute('y',str(round(-vector[1],3)))
