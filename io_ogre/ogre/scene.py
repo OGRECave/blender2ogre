@@ -513,8 +513,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             c.setAttribute('projectionType', "orthographic")
             c.setAttribute('orthoScale', '%s'%ob.data.ortho_scale)
         a = doc.createElement('clipping'); c.appendChild( a )
-        a.setAttribute('nearPlaneDist', '%s' %ob.data.clip_start)
-        a.setAttribute('farPlaneDist', '%s' %ob.data.clip_end)
         a.setAttribute('near', '%s' %ob.data.clip_start)    # requested by cyrfer
         a.setAttribute('far', '%s' %ob.data.clip_end)
 
