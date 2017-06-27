@@ -541,13 +541,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             a.setAttribute('y',str(round(-vector[1],3)))
             a.setAttribute('z',str(round(-vector[2],3)))
 
-        if ob.data.type == 'SPOT':
-            a = doc.createElement('spotLightRange')
-            l.appendChild(a)
-            a.setAttribute('inner',str( ob.data.spot_size*(1.0-ob.data.spot_blend) ))
-            a.setAttribute('outer',str(ob.data.spot_size))
-            a.setAttribute('falloff','1.0')
-
         if ob.data.use_diffuse:
             a = doc.createElement('colourDiffuse'); l.appendChild( a )
             a.setAttribute('r', '%s'%ob.data.color.r)
@@ -559,6 +552,13 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             a.setAttribute('r', '%s'%ob.data.color.r)
             a.setAttribute('g', '%s'%ob.data.color.g)
             a.setAttribute('b', '%s'%ob.data.color.b)
+
+        if ob.data.type == 'SPOT':
+            a = doc.createElement('lightRange')
+            l.appendChild(a)
+            a.setAttribute('inner',str( ob.data.spot_size*(1.0-ob.data.spot_blend) ))
+            a.setAttribute('outer',str(ob.data.spot_size))
+            a.setAttribute('falloff','1.0')
 
         a = doc.createElement('lightAttenuation'); l.appendChild( a )
         a.setAttribute('range', '5000' )            # is this an Ogre constant?
