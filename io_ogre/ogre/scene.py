@@ -350,7 +350,6 @@ def ogre_document(materials):
     if world: # multiple scenes - other scenes may not have a world
         _c = { 'colourAmbient': world.ambient_color,
                'colourBackground': world.horizon_color,
-               'colourDiffuse': world.horizon_color,
              }
         for ctag in _c:
             a = doc.createElement(ctag); environ.appendChild( a )
@@ -369,9 +368,11 @@ def ogre_document(materials):
         #a.setAttribute('mode', world.mist_settings.falloff.lower() )    # not on DTD spec
         a.setAttribute('linearEnd', '%s' %(world.mist_settings.start+world.mist_settings.depth))
         a.setAttribute('expDensity', world.mist_settings.intensity)
-        a.setAttribute('colourR', world.horizon_color.r)
-        a.setAttribute('colourG', world.horizon_color.g)
-        a.setAttribute('colourB', world.horizon_color.b)
+        
+        c = doc.createElement('colourDiffuse'); a.appendChild( c )
+        c.setAttribute('r', '%s'%color.r)
+        c.setAttribute('g', '%s'%color.g)
+        c.setAttribute('b', '%s'%color.b)
 
     return doc
 
