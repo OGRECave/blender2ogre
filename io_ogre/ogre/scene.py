@@ -525,15 +525,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         l = doc.createElement('light')
         o.appendChild(l)
 
-        mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
-
-        p = doc.createElement('position')   # just to make sure we conform with the DTD
-        l.appendChild(p)
-        v = swap( ob.matrix_world.to_translation() )
-        p.setAttribute('x', '%6f'%v.x)
-        p.setAttribute('y', '%6f'%v.y)
-        p.setAttribute('z', '%6f'%v.z)
-
         if ob.data.type == 'POINT':
             l.setAttribute('type', 'point')
         elif ob.data.type == 'SPOT':
