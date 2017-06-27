@@ -551,7 +551,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         a.setAttribute('quadratic', '0.0')
 
         if ob.data.type in ('SPOT', 'SUN'):
-            #-- retrive orientation from parent node
+            #-- 
             rot_matrix = mathutils.Euler.to_matrix(ob.rotation_euler)
             unswaped_vector = rot_matrix*mathutils.Vector((0,0,-1))
             vector = swap(unswaped_vector)           

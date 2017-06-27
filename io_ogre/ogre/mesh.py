@@ -6,6 +6,9 @@ from .. import util
 from .material import *
 from .skeleton import Skeleton
 
+logger = logging.getLogger('root')
+
+
 def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
@@ -619,6 +622,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     # Start .mesh.xml to .mesh convertion tool
     util.xml_convert(target_file, has_uvs=dotextures)
 
+
+    if config.get('MESH_V2'):
+        
+        logger.info("Converting to mesh V2: %s"%config.get('MESH_V2'))
+        util.to_meshv2(target_file)
+        
+    
     # note that exporting the skeleton does not happen here anymore
     # it moved to the function dot_skeleton in its own module
 

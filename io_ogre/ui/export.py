@@ -1,7 +1,6 @@
 
 import bpy
 import os
-import getpass
 import math
 import mathutils
 import logging
@@ -35,88 +34,16 @@ def menu_func(self, context):
     op = self.layout.operator(OP_ogre_export.bl_idname, text="Ogre3D (.scene and .mesh)")
     return op
 
-class _OgreCommonExport_(object):
-
-    last_export_path = None
-
-    @classmethod
-    def poll(cls, context):
-        if context.active_object and context.mode != 'EDIT_MESH':
-            return True
-
-    def invoke(self, context, event):
-
-        # update the interface with the config values
-        for key, value in config.CONFIG.items():
-            if getattr(self,"EX_" + key,None):
-                setattr(self,key,value)
-
-        wm = context.window_manager
-        fs = wm.fileselect_add(self)
-        return {'RUNNING_MODAL'}
-
-    def execute(self, context):
-        logger.info("context.blend_data %s"%context.blend_data.filepath)
-        logger.info("context.scene.name %s"%context.scene.name)
-        logger.info("self.filepath %s"%self.filepath)
-        logger.info("self.last_export_path %s"%self.last_export_path)
-
-
-        #-- load addonPreferenc in CONFIG
-        config.update_from_addon_preference(context)
-        
-        # Resolve path from opened .blend if available. It's not if
-        # blender normally was opened with "last open scene".
-        # After export is done once, remember that path when re-exporting.
-        if not self.last_export_path:
-            # First export during this blender run
-            if context.blend_data.filepath != "":
-                path, name = os.path.split(context.blend_data.filepath)
-                self.last_export_path = os.path.join(path, name.split('.')[0])
-
-        if not self.last_export_path:
-            self.last_export_path = os.path.expanduser("~")
-
-        if self.filepath == "" or not self.filepath:
-            self.filepath = "blender2ogre"
-
-        logger.info("self.filepath %s"%self.filepath)
-            
-        kw = {}
-        for name in dir(self):
-            if name.startswith('EX_'):
-                kw[ name[3:] ] = getattr(self,name)
-        config.update(**kw)
-
-        print ("_"*80)
-        target_path = os.path.dirname(os.path.abspath(self.filepath))
-        target_file_name = self.filepath
-        target_file_name_no_ext = os.path.splitext(target_file_name)[0]
-
-        logger.info("target_path %s"%target_path)
-        logger.info("target_file_name %s"%target_file_name)
-        logger.info("target_file_name_no_ext %s"%target_file_name_no_ext)
-        
-        Report.reset()
-        scene.dot_scene(target_path, target_file_name_no_ext)
-        Report.show()
-
-        return {'FINISHED'}
-
-    def draw(self, context):
-        layout = self.layout
-        col = layout.column()
-        #-- avoid option drawing order is not random
-        for key, value in sorted(config.CONFIG.items(), key=lambda elem:elem[0]):
-            if getattr(self,"EX_" + key,None):
-                col.prop(self, "EX_"+key)
-        
+class _OgreCommonExport_(object):        
+    
+    last_export_path = None        
 
     filepath = StringProperty(name="File Path",
         description="Filepath used for exporting Ogre .scene file",
         maxlen=1024,
         default="",
         subtype='FILE_PATH')
+
 
     # Basic options
     # NOTE config values are automatically propagated if you name it like: EX_<config-name>
@@ -262,6 +189,82 @@ class _OgreCommonExport_(object):
         name='Convert Images',
         description='convert all textures to format',
         default=config.get('FORCE_IMAGE_FORMAT') )
+
+
+    @classmethod
+    def poll(cls, context):
+        if context.active_object and context.mode != 'EDIT_MESH':
+            return True
+
+    def invoke(self, context, event):
+        
+        # update the interface with the config values
+        for key, value in config.CONFIG.items():
+            if hasattr(self,"EX_" + key):
+                setattr(self,"EX_"+key,value)
+
+        wm = context.window_manager
+        fs = wm.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        logger.info("context.blend_data %s"%context.blend_data.filepath)
+        logger.info("context.scene.name %s"%context.scene.name)
+        logger.info("self.filepath %s"%self.filepath)
+        logger.info("self.last_export_path %s"%self.last_export_path)
+
+
+        #-- load addonPreferenc in CONFIG
+        config.update_from_addon_preference(context)
+        
+        # Resolve path from opened .blend if available. It's not if
+        # blender normally was opened with "last open scene".
+        # After export is done once, remember that path when re-exporting.
+        if not self.last_export_path:
+            # First export during this blender run
+            if context.blend_data.filepath != "":
+                path, name = os.path.split(context.blend_data.filepath)
+                self.last_export_path = os.path.join(path, name.split('.')[0])
+
+        if not self.last_export_path:
+            self.last_export_path = os.path.expanduser("~")
+
+        if self.filepath == "" or not self.filepath:
+            self.filepath = "blender2ogre"
+
+        logger.info("self.filepath %s"%self.filepath)
+            
+        kw = {}
+
+        for key, value in sorted(config.CONFIG.items(), key=lambda elem:elem[0]):
+            if hasattr(self,"EX_" + key):
+                kw[key] = getattr(self,"EX_"+key)
+
+        config.update(**kw)
+
+        print ("_"*80)
+        target_path = os.path.dirname(os.path.abspath(self.filepath))
+        target_file_name = self.filepath
+        target_file_name_no_ext = os.path.splitext(target_file_name)[0]
+
+        logger.info("target_path %s"%target_path)
+        logger.info("target_file_name %s"%target_file_name)
+        logger.info("target_file_name_no_ext %s"%target_file_name_no_ext)
+        
+        Report.reset()
+        scene.dot_scene(target_path, target_file_name_no_ext)
+        Report.show()
+
+        return {'FINISHED'}
+
+    def draw(self, context):
+        layout = self.layout
+        col = layout.column()
+        #-- avoid option drawing order is not random
+        for key, value in sorted(config.CONFIG.items(), key=lambda elem:elem[0]):
+            if hasattr(self,"EX_" + key):
+                col.prop(self, "EX_"+key)
+    
 
 
 class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):

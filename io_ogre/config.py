@@ -15,7 +15,7 @@ CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 
 _CONFIG_DEFAULTS_ALL = {
     'MESH' : True,
-    'MESH_V2':True,
+    'MESH_V2': False,
     'SCENE' : True,
     'COPY_SHADER_PROGRAMS' : True,
     'MAX_TEXTURE_SIZE' : 4096,
@@ -180,6 +180,7 @@ def get(name, default=None):
 
 def update(**kwargs):
     for k,v in kwargs.items():
+        print("    conf update %s %s"%(k,v))
         if k not in _CONFIG_DEFAULTS_ALL:
             print("trying to set CONFIG['%s']=%s, but is not a known config setting" % (k,v))
         CONFIG[k] = v
