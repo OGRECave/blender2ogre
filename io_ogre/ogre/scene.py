@@ -348,12 +348,10 @@ def ogre_document(materials):
     # Environ settings
     world = bpy.context.scene.world
     if world: # multiple scenes - other scenes may not have a world
-        _c = { 'colourAmbient': world.ambient_color,
-               'colourBackground': world.horizon_color,
-             }
-        for ctag in _c:
+        _c = [ ('colourAmbient', world.ambient_color),
+               ('colourBackground', world.horizon_color)]
+        for ctag, color in _c:
             a = doc.createElement(ctag); environ.appendChild( a )
-            color = _c[ctag]
             a.setAttribute('r', '%s'%color.r)
             a.setAttribute('g', '%s'%color.g)
             a.setAttribute('b', '%s'%color.b)
