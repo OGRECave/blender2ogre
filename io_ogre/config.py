@@ -15,6 +15,7 @@ CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 
 _CONFIG_DEFAULTS_ALL = {
     'MESH' : True,
+    'MESH_V2':True,
     'SCENE' : True,
     'COPY_SHADER_PROGRAMS' : True,
     'MAX_TEXTURE_SIZE' : 4096,
@@ -52,7 +53,7 @@ _CONFIG_DEFAULTS_ALL = {
     'interface_toggle': False,
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVCOMPRESS NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVCOMPRESS NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING OGRE_MESH_TOOL'.split()
 
 ''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
     Ogre tools and Tundra from various default folders. Also consider making a installer that
@@ -60,6 +61,7 @@ _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_
 
 _CONFIG_DEFAULTS_WINDOWS = {
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
+    'OGRE_MESH_TOOL' : 'C:\\OgreCommandLineTools\\OgreMeshTool.exe',    
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
     'OGRE_MESHY' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
@@ -76,6 +78,7 @@ _CONFIG_DEFAULTS_UNIX = {
     'IMAGE_MAGICK_CONVERT' : 'convert',
     'NVCOMPRESS' : 'nvcompress',
     'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
+    'OGRE_MESH_TOOL' : 'OgreMeshTool',
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
     'OGRE_MESHY' : '~/OgreMeshy/Ogre Meshy.exe',
