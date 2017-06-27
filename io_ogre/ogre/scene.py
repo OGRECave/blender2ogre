@@ -327,7 +327,7 @@ def ogre_document(materials):
     else:
         scn.setAttribute('previous_export_time', '0')
     bscn[ '_previous_export_time_' ] = now
-    scn.setAttribute('exported_by', getpass.getuser())
+    scn.setAttribute('author', getpass.getuser())
 
     nodes = doc.createElement('nodes')
     doc._scene_nodes = nodes
