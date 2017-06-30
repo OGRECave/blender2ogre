@@ -565,14 +565,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         a.setAttribute('linear', '%s'%(1.0/ob.data.distance))
         a.setAttribute('quadratic', '0.0')
 
-        if ob.data.type != 'HEMI':  # colourShadow is extra, not part of Ogre DTD
-            if ob.data.shadow_method != 'NOSHADOW': # Hemi light has no shadow_method
-                a = doc.createElement('colourShadow');l.appendChild( a )
-                a.setAttribute('r', '%s'%ob.data.color.r)
-                a.setAttribute('g', '%s'%ob.data.color.g)
-                a.setAttribute('b', '%s'%ob.data.color.b)
-                l.setAttribute('shadow','true')
-
     for child in ob.children:
         dot_scene_node_export( child,
             path, doc = doc, rex = rex,
