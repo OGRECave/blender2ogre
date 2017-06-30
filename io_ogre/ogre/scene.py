@@ -233,40 +233,46 @@ class WrapActuator( _WrapLogic ):
         'EDIT_OBJECT'  :  'dynamic_operation linear_velocity mass mesh mode object time track_object use_3d_tracking use_local_angular_velocity use_local_linear_velocity use_replace_display_mesh use_replace_physics_mesh'.split(),
     }
 
-def _mesh_entity_helper( doc, ob, o ):
-    ## extended format - BGE Physics ##
-    o.setAttribute('mass', str(ob.game.mass))
-    o.setAttribute('mass_radius', str(ob.game.radius))
-    o.setAttribute('physics_type', ob.game.physics_type)
-    o.setAttribute('actor', str(ob.game.use_actor))
-    o.setAttribute('ghost', str(ob.game.use_ghost))
-    o.setAttribute('velocity_min', str(ob.game.velocity_min))
-    o.setAttribute('velocity_max', str(ob.game.velocity_max))
-    o.setAttribute('lock_trans_x', str(ob.game.lock_location_x))
-    o.setAttribute('lock_trans_y', str(ob.game.lock_location_y))
-    o.setAttribute('lock_trans_z', str(ob.game.lock_location_z))
-    o.setAttribute('lock_rot_x', str(ob.game.lock_rotation_x))
-    o.setAttribute('lock_rot_y', str(ob.game.lock_rotation_y))
-    o.setAttribute('lock_rot_z', str(ob.game.lock_rotation_z))
-    o.setAttribute('anisotropic_friction', str(ob.game.use_anisotropic_friction))
-    x,y,z = ob.game.friction_coefficients
-    o.setAttribute('friction_x', str(x))
-    o.setAttribute('friction_y', str(y))
-    o.setAttribute('friction_z', str(z))
-    o.setAttribute('damping_trans', str(ob.game.damping))
-    o.setAttribute('damping_rot', str(ob.game.rotation_damping))
-    o.setAttribute('inertia_tensor', str(ob.game.form_factor))
+def _property_helper(doc, user, propname, propvalue):
+    prop = doc.createElement('property')
+    user.appendChild(prop)
+    prop.setAttribute('name', propname)
+    prop.setAttribute('data', str(propvalue))
+    prop.setAttribute('type', type(propvalue).__name__)
+
+def _mesh_entity_helper(doc, ob, o):
+    user = doc.createElement('userData')
+    o.appendChild(user)
+
+    # # extended format - BGE Physics ##
+    _property_helper(doc, user, 'mass', ob.game.mass)
+    _property_helper(doc, user, 'mass_radius', ob.game.radius)
+    _property_helper(doc, user, 'physics_type', ob.game.physics_type)
+    _property_helper(doc, user, 'actor', ob.game.use_actor)
+    _property_helper(doc, user, 'ghost', ob.game.use_ghost)
+    _property_helper(doc, user, 'velocity_min', ob.game.velocity_min)
+    _property_helper(doc, user, 'velocity_max', ob.game.velocity_max)
+    _property_helper(doc, user, 'lock_trans_x', ob.game.lock_location_x)
+    _property_helper(doc, user, 'lock_trans_y', ob.game.lock_location_y)
+    _property_helper(doc, user, 'lock_trans_z', ob.game.lock_location_z)
+    _property_helper(doc, user, 'lock_rot_x', ob.game.lock_rotation_x)
+    _property_helper(doc, user, 'lock_rot_y', ob.game.lock_rotation_y)
+    _property_helper(doc, user, 'lock_rot_z', ob.game.lock_rotation_z)
+    _property_helper(doc, user, 'anisotropic_friction', ob.game.use_anisotropic_friction)
+    x, y, z = ob.game.friction_coefficients
+    _property_helper(doc, user, 'friction_x', x)
+    _property_helper(doc, user, 'friction_y', y)
+    _property_helper(doc, user, 'friction_z', z)
+    _property_helper(doc, user, 'damping_trans', ob.game.damping)
+    _property_helper(doc, user, 'damping_rot', ob.game.rotation_damping)
+    _property_helper(doc, user, 'inertia_tensor', ob.game.form_factor)
 
     mesh = ob.data
     # custom user props
     for prop in mesh.items():
         propname, propvalue = prop
         if not propname.startswith('_'):
-            user = doc.createElement('user_data')
-            o.appendChild( user )
-            user.setAttribute( 'name', propname )
-            user.setAttribute( 'value', str(propvalue) )
-            user.setAttribute( 'type', type(propvalue).__name__ )
+            _property_helper(doc, user, propname, propvalue)
 
 def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
     # shouldn't this be matrix_local?
@@ -383,23 +389,18 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     xmlparent.appendChild(o)
 
     # Custom user props
+    if len(ob.items()) + len(ob.game.properties) > 0:
+        user = doc.createElement('userData')
+        o.appendChild(user)
+
     for prop in ob.items():
         propname, propvalue = prop
         if not propname.startswith('_'):
-            user = doc.createElement('user_data')
-            o.appendChild( user )
-            user.setAttribute( 'name', propname )
-            user.setAttribute( 'value', str(propvalue) )
-            user.setAttribute( 'type', type(propvalue).__name__ )
+            _property_helper(doc, user, propname, propvalue)
 
     # Custom user props from BGE props by Mind Calamity
     for prop in ob.game.properties:
-        e = doc.createElement( 'user_data' )
-        o.appendChild( e )
-        e.setAttribute('name', prop.name)
-        e.setAttribute('value', str(prop.value))
-        e.setAttribute('type', type(prop.value).__name__)
-    # -- end of Mind Calamity patch
+        _property_helper(doc, user, prop.name, prop.value)
 
     # BGE subset
     if len(ob.game.sensors) + len(ob.game.actuators) > 0:
