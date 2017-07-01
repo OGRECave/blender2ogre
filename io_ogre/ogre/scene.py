@@ -10,6 +10,7 @@ from ..xml import *
 from .mesh import *
 from .material import *
 from . import material
+from .. import bl_info
 
 def dot_scene(path, scene_name=None):
     """
@@ -325,6 +326,7 @@ def ogre_document(materials):
     scn = doc.createElement('scene')
     doc.appendChild( scn )
     time_format = "%a, %d %b %Y %H:%M:%S +0000"
+    doc.addComment('exporter: blender2ogre ' + ".".join(str(i) for i in bl_info["version"]))
     doc.addComment('export_time: ' + time.strftime(time_format, time.gmtime(now)))
     scn.setAttribute('formatVersion', '1.1')
     bscn = bpy.context.scene
