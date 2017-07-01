@@ -73,10 +73,14 @@ class RElement(object):
 class RDocument(object):
     def __init__(self):
         self.documentElement = None
+        self.comments = []
 
     def appendChild(self, root):
         self.documentElement = root
-
+    
+    def addComment(self, text):
+        self.comments.append("<!-- {} -->".format(text))
+    
     def createElement(self, tag):
         e = RElement(tag)
         e.document = self
@@ -84,7 +88,8 @@ class RDocument(object):
 
     def toprettyxml(self):
         indent = 0
-        lines = []
+        lines = ['<?xml version="1.0" encoding="UTF-8"?>']
+        lines += self.comments
         self.documentElement.toprettyxml(lines, indent)
         return '\n'.join(lines)
 

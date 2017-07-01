@@ -324,14 +324,14 @@ def ogre_document(materials):
     doc = RDocument()
     scn = doc.createElement('scene')
     doc.appendChild( scn )
-    scn.setAttribute('export_time', str(now))
+    time_format = "%a, %d %b %Y %H:%M:%S +0000"
+    doc.addComment('export_time: ' + time.strftime(time_format, time.gmtime(now)))
     scn.setAttribute('formatVersion', '1.1')
     bscn = bpy.context.scene
 
     if '_previous_export_time_' in bscn.keys():
-        scn.setAttribute('previous_export_time', str(bscn['_previous_export_time_']))
-    else:
-        scn.setAttribute('previous_export_time', '0')
+        doc.addComment('previous_export_time: ' + time.strftime(time_format, time.gmtime(bscn['_previous_export_time_'])))
+
     bscn[ '_previous_export_time_' ] = now
     scn.setAttribute('author', getpass.getuser())
 
