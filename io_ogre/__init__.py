@@ -18,13 +18,13 @@ import os, sys, logging
 
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
-    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger",
-    "version": (0, 6, 2),
+    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg",
+    "version": (0, 7, 0),
     "blender": (2, 7, 5),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
-    "wiki_url": "https://bitbucket.org/plan_rich/blender2ogre/overview",
-    "tracker_url": "https://bitbucket.org/plan_rich/blender2ogre/issues?status=new&status=open",
+    "wiki_url": "https://github.com/OGRECave/blender2ogre",
+    "tracker_url": "https://github.com/OGRECave/blender2ogre/issues",
     "category": "Import-Export"
 }
 
