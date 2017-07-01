@@ -325,7 +325,7 @@ def ogre_document(materials):
     scn = doc.createElement('scene')
     doc.appendChild( scn )
     scn.setAttribute('export_time', str(now))
-    scn.setAttribute('formatVersion', '1.0.1')
+    scn.setAttribute('formatVersion', '1.1')
     bscn = bpy.context.scene
 
     if '_previous_export_time_' in bscn.keys():
