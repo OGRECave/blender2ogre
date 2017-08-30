@@ -534,14 +534,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         l.setAttribute('name', ob.name )
         l.setAttribute('powerScale', str(ob.data.energy))
 
-        if ob.data.type in ('SPOT', 'SUN'):
-            vector = swap(mathutils.Euler.to_matrix(ob.rotation_euler)[2])
-            a = doc.createElement('normal')
-            l.appendChild(a)
-            a.setAttribute('x',str(round(-vector[0],3)))
-            a.setAttribute('y',str(round(-vector[1],3)))
-            a.setAttribute('z',str(round(-vector[2],3)))
-
         if ob.data.use_diffuse:
             a = doc.createElement('colourDiffuse'); l.appendChild( a )
             a.setAttribute('r', '%s'%ob.data.color.r)
