@@ -275,9 +275,8 @@ def _mesh_entity_helper(doc, ob, o):
         if not propname.startswith('_'):
             _property_helper(doc, user, propname, propvalue)
 
-def _ogre_node_helper( doc, ob, objects, prefix='', pos=None, rot=None, scl=None ):
-    # shouldn't this be matrix_local?
-    mat = get_parent_matrix(ob, objects).inverted() * ob.matrix_world
+def _ogre_node_helper( doc, ob, prefix='', pos=None, rot=None, scl=None ):
+    mat = ob.matrix_local
 
     o = doc.createElement('node')
     o.setAttribute('name',prefix+ob.name)
@@ -387,7 +386,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         exported_meshes=[], meshes=[], mesh_collision_prims={},
         mesh_collision_files={}, prefix='', objects=[], xmlparent=None ):
 
-    o = _ogre_node_helper( doc, ob, objects )
+    o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
 
     # Custom user props
@@ -483,7 +482,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                         for i in range( mod.count-1 ):
                             v = prev + mod.constant_offset_displace
                             newvecs.append( v )
-                            ao = _ogre_node_helper( doc, ob, objects, prefix='_array_%s_'%len(vecs+newvecs), pos=v )
+                            ao = _ogre_node_helper( doc, ob, prefix='_array_%s_'%len(vecs+newvecs), pos=v )
                             xmlparent.appendChild(ao)
 
                             e = doc.createElement('entity')
