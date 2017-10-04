@@ -82,7 +82,7 @@ def create_material_passes( mat, n=8, textures=True ):
     r = []
     x = 680
     for i in range( n ):
-        node = tree.nodes.new( type='MATERIAL_EXT' )
+        node = tree.nodes.new( type='ShaderNodeExtendedMaterial' )
         node.name = 'GEN.%s' %i
         node.location.x = x; node.location.y = 640
         r.append( node )
@@ -100,10 +100,10 @@ def create_texture_nodes( mat, n=6, geoms=True ):
     for i,m in enumerate(mats):
         r['material'] = m; r['textures'] = []; r['geoms'] = []
         inputs = []     # other inputs mess up material preview #
-        for tag in ['Mirror', 'Ambient', 'Emit', 'SpecTra', 'Ray Mirror', 'Translucency']:
+        for tag in ['Mirror', 'Ambient', 'Emit', 'SpecTra', 'Reflectivity', 'Translucency']:
             inputs.append( m.inputs[ tag ] )
         for j in range(n):
-            tex = mat.node_tree.nodes.new( type='TEXTURE' )
+            tex = mat.node_tree.nodes.new( type='ShaderNodeTexture' )
             tex.name = 'TEX.%s.%s' %(j, m.name)
             tex.location.x = x - (j*16)
             tex.location.y = -(j*230)
@@ -111,7 +111,7 @@ def create_texture_nodes( mat, n=6, geoms=True ):
             link = mat.node_tree.links.new( input, output )
             r['textures'].append( tex )
             if geoms:
-                geo = mat.node_tree.nodes.new( type='GEOMETRY' )
+                geo = mat.node_tree.nodes.new( type='ShaderNodeGeometry' )
                 link = mat.node_tree.links.new( tex.inputs['Vector'], geo.outputs['UV'] )
                 geo.location.x = x - (j*16) - 250
                 geo.location.y = -(j*250) - 1500
