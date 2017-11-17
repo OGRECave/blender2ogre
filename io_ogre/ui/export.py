@@ -83,7 +83,7 @@ class _OgreCommonExport_(object):
         logger.info("self.filepath %s"%self.filepath)
             
         kw = {}
-        for name in dir(self):
+        for name in dir(_OgreCommonExport_):
             if name.startswith('EX_'):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
