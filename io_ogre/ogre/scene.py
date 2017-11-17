@@ -135,7 +135,7 @@ def dot_scene(path, scene_name=None):
     if config.get("MATERIALS"):
         print ("  Processing Materials")
         materials = util.objects_merge_materials(meshes)
-        dot_materials(materials, path, separate_files=config.get('SEP_MATS'))
+        dot_materials(materials, path, separate_files=config.get('SEP_MATS'), prefix=prefix)
 
     doc = ogre_document(materials)
 
