@@ -246,8 +246,11 @@ class OgreMaterialGenerator(object):
             btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
             ex = False; texop = None
             if btype in TEXTURE_COLOUR_OP:
-                if btype=='MIX' and slot.use_map_alpha and not slot.use_stencil:
-                    if slot.diffuse_color_factor >= 1.0: texop = 'alpha_blend'
+                if btype=='MIX' and \
+                    ((slot.use_map_alpha and not slot.use_stencil) or \
+                     (slot.texture.use_alpha and slot.texture.image.use_alpha and not slot.use_map_alpha)):
+                    if slot.diffuse_color_factor >= 1.0:
+                        texop = 'alpha_blend'
                     else:
                         texop = TEXTURE_COLOUR_OP[ btype ]
                         ex = True
