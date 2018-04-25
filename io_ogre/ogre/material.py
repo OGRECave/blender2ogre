@@ -289,25 +289,24 @@ class OgreMaterialGenerator(object):
 
         tmp_filepath = None
         updated_image = False
-        if origin_filepath == '.':
+        if slot.texture.image.packed_file:
             # a is a packed png
-            origin_filepath = slot.texture.image.filepath
-            _, ext = splitext(origin_filepath)
-            tmp_filepath = tempfile.mkstemp(suffix=ext)
+            ext = splitext(origin_filepath)[1]
+            tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
             slot.texture.image.filepath = tmp_filepath 
             slot.texture.image.save()
             slot.texture.image.filepath = origin_filepath
             updated_image = True
 
-        _, target_file_ext = split(origin_filepath)
-        target_file, ext = splitext(target_file_ext)
+        target_file_ext = split(origin_filepath)[1]
+        ext = splitext(target_file_ext)[1]
 
         if not tmp_filepath:
-            _, tmp_filepath = tempfile.mkstemp(suffix=ext)
+            tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
 
         target_file_ext = self.change_ext(target_file_ext, slot.texture.image)
         target_filepath = join(target_path, target_file_ext)
-        if not os.path.isfile(target_filepath):
+        if not os.path.isfile(target_filepath) and not updated_image:
             # or os.stat(target_filepath).st_mtime < os.stat( origin_filepath ).st_mtime:
             updated_image = True
             shutil.copyfile(origin_filepath, tmp_filepath)

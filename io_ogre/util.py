@@ -247,7 +247,7 @@ def texture_image_path(tex):
         image_filepath = bpy.path.abspath(tex.image.filepath, libpath)
     else:
         if tex.image.packed_file:
-            return '.'
+            return tex.image.name+".png"
 
         return bpy.path.abspath( tex.image.filepath )
 
