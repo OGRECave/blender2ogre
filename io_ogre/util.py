@@ -24,9 +24,6 @@ def xml_converter_parameters():
         import ctypes
         SEM_NOGPFAULTERRORBOX = 0x0002 # From MSDN
         ctypes.windll.kernel32.SetErrorMode(SEM_NOGPFAULTERRORBOX);
-        subprocess_flags = 0x8000000 #win32con.CREATE_NO_WINDOW?
-    else:
-        subprocess_flags = 0
     
     exe = config.get('OGRETOOLS_XML_CONVERTER')
     proc = subprocess.Popen([exe,'-v'],stdout=subprocess.PIPE)
