@@ -9,11 +9,22 @@ from itertools import chain
 import logging
 import subprocess
 import re
+import sys
 
 def xml_converter_parameters():
     """
     Return the name of the ogre converter
     """
+    if sys.platform.startswith("win"):
+        # Don't display the Windows GPF dialog if the invoked program dies.
+        # See comp.os.ms-windows.programmer.win32
+        # How to suppress crash notification dialog?, Jan 14,2004 -
+        # Raymond Chen's response [1]
+
+        import ctypes
+        SEM_NOGPFAULTERRORBOX = 0x0002 # From MSDN
+        ctypes.windll.kernel32.SetErrorMode(SEM_NOGPFAULTERRORBOX);
+    
     exe = config.get('OGRETOOLS_XML_CONVERTER')
     proc = subprocess.Popen([exe,'-v'],stdout=subprocess.PIPE)
     output, _ = proc.communicate()
