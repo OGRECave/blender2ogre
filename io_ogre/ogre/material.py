@@ -144,7 +144,9 @@ class OgreMaterialGenerator(object):
             ## force material alpha to 1.0 if textures use_alpha?
             #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
 
-            if mat.use_fixed_pipeline:
+            self.w.iline('lighting %s' % ('off' if mat.use_shadeless else 'on'))
+
+            if mat.use_fixed_pipeline and not mat.use_shadeless:
                 f = mat.ambient
                 if mat.use_vertex_color_paint:
                     self.w.iline('ambient vertexcolour' )

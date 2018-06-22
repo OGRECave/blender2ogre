@@ -184,7 +184,7 @@ def ogre_material_panel_extra( parent, mat ):
         box.prop(mat, 'offset_z')
         box.prop(mat, "use_shadows")
         box.prop(mat, 'ogre_depth_write' )
-        for tag in 'ogre_colour_write ogre_lighting ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
+        for tag in 'ogre_colour_write ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
             box.prop(mat, tag)
         for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
             box.prop(mat, tag)

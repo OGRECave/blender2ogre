@@ -160,11 +160,6 @@ bpy.types.Material.ogre_normalise_normals = BoolProperty(
     name='normalise normals',
     default=False,
     description="Scaling objects causes normals to also change magnitude, which can throw off your lighting calculations. By default, the SceneManager detects this and will automatically re-normalise normals for any scaled object, but this has a cost. If you'd prefer to control this manually, call SceneManager::setNormaliseNormalsOnScale(false) and then use this option on materials which are sensitive to normals being resized.")
-bpy.types.Material.ogre_lighting = BoolProperty(
-    # Sets whether or not dynamic lighting is turned on for this pass or not. If lighting is turned off,
-    # all objects rendered using the pass will be fully lit. This attribute has no effect if a vertex program is used.
-    name='dynamic lighting',
-    default=True)
 bpy.types.Material.ogre_colour_write = BoolProperty(
     # If colour writing is off no visible pixels are written to the screen during this pass. You might think
     # this is useless, but if you render with colour writing off, and with very minimal other settings,
