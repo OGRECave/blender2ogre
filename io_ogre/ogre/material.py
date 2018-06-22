@@ -32,9 +32,10 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
         mat_file_name = prefix
         target_file = os.path.join(path, '%s.material' % mat_file_name)
         with open(target_file, 'wb') as fd:
-            fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
+            include_missing = False
             for mat in materials:
                 if mat is None:
+                    include_missing = True
                     continue
                 Report.materials.append( material_name(mat) )
                 generator = OgreMaterialGenerator(mat)
@@ -44,6 +45,9 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
                     generator.copy_textures(path)
                 material_text = generator.generate()
                 fd.write(bytes(material_text+"\n",'utf-8'))
+            
+            if include_missing:
+                fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
 
 def dot_material(mat, path, **kwargs):
     """
