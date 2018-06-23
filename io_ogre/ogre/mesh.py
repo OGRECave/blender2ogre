@@ -654,7 +654,7 @@ def append_triangle_in_vertex_group(mesh, obj, vertex_groups, ogre_indices, blen
         for g in v.groups:
             if g.group >= len(obj.vertex_groups):
                 return
-            group = obj.vertex_groups.get(g.group)
+            group = obj.vertex_groups[g.group]
             if not group.name.startswith("ogre.vertex.group."):
                 return
             names.add(group.name)
