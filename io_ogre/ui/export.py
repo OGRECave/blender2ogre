@@ -89,8 +89,8 @@ class _OgreCommonExport_(object):
         config.update(**kw)
 
         print ("_"*80)
-        target_path = os.path.dirname(os.path.abspath(self.filepath))
-        target_file_name = self.filepath
+        target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
+        target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
         logger.info("target_path %s"%target_path)
