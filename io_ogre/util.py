@@ -347,19 +347,21 @@ def get_parent_matrix( ob, objects ):
             return get_parent_matrix(ob.parent, objects)
 
 def merge_group( group ):
-    print('--------------- merge group ->', group )
+    print('--------------- merge group ->', group.name )
     copies = []
     for ob in group.objects:
         if ob.type == 'MESH':
-            print( '\t group member', ob.name )
             o2 = ob.copy(); copies.append( o2 )
             o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             bpy.context.scene.objects.link( o2 ) #; o2.select = True
+    
+    name = group.name[len("merge."):] if group.name != "merge." else "mergeGroup"        
+    
     merged = merge( copies )
-    merged.name = group.name
-    merged.data.name = group.name
+    merged.name = name
+    merged.data.name = name
     return merged
 
 def merge_objects( objects, name='_temp_', transform=None ):
@@ -381,7 +383,6 @@ def merge_objects( objects, name='_temp_', transform=None ):
     return merged
 
 def merge( objects ):
-    print('MERGE', objects)
     for ob in bpy.context.selected_objects:
         ob.select = False
     for ob in objects:
@@ -392,7 +393,7 @@ def merge( objects ):
     bpy.ops.object.join()
     return bpy.context.active_object
 
-def get_merge_group( ob, prefix='merge' ):
+def get_merge_group( ob, prefix='merge.' ):
     m = []
     for grp in ob.users_group:
         if grp.name.lower().startswith(prefix): m.append( grp )

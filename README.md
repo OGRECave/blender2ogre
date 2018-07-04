@@ -6,7 +6,7 @@
 ## Installing ##
 Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/ja/dev/getting_started/installing/configuration/directories.html)`/scripts/addons` folder.
 Note on Windows: you have to set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) prior to the first run.  
-After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export`. Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.  
+After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.  
 Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
 
 The following versions of blender have been tested. It might also work with older versions of Blender.
@@ -28,10 +28,15 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 
 # Additional Features
 
+## Merge Objects on export
+
+You might have hundrets of objects, which you want to keep separate but have them in one `.mesh` on export.
+For this create a new group (Ctrl+G) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the group.
+
 ## External OGRE Materials
 
 You might already have some materials in OGRE that you do not want to export.
-Prefix them with 'extern.<yourname>' and the sub entity will have the material name set,
+Prefix them with `extern.<yourname>` and the sub entity will have the material name set,
 but the material is not exported. The following material 'vertexcolor' can be defined in
 your OGRE project:
 
