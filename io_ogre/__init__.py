@@ -49,11 +49,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         subtype='FILE_PATH',
         default=config.CONFIG['IMAGE_MAGICK_CONVERT']
     )
-    NVCOMPRESS = bpy.props.StringProperty(
-        name="NVCOMPRESS",
-        subtype='FILE_PATH',
-        default=config.CONFIG['NVCOMPRESS']
-    )
     OGRETOOLS_XML_CONVERTER = bpy.props.StringProperty(
         name="OGRETOOLS_XML_CONVERTER",
         subtype='FILE_PATH',
@@ -74,11 +69,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         subtype='FILE_PATH',
         default=config.CONFIG['OGRE_MESHY']
     )
-    NVIDIATOOLS_EXE = bpy.props.StringProperty(
-        name="NVIDIATOOLS_EXE",
-        subtype='FILE_PATH',
-        default=config.CONFIG['NVIDIATOOLS_EXE']
-    )
     USER_MATERIALS = bpy.props.StringProperty(
         name="USER_MATERIALS",
         subtype='FILE_PATH',
@@ -97,10 +87,8 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "TUNDRA_ROOT")
         layout.prop(self, "OGRE_MESHY")
         layout.prop(self, "IMAGE_MAGICK_CONVERT")
-        layout.prop(self, "NVIDIATOOLS_EXE")
         layout.prop(self, "USER_MATERIALS")
-        layout.prop(self, "SHADER_PROGRAMS")
-        layout.prop(self, "NVCOMPRESS")        
+        layout.prop(self, "SHADER_PROGRAMS")      
 
 def register():
     logging.info('Starting io_ogre %s', bl_info["version"])

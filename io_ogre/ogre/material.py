@@ -654,7 +654,7 @@ IMAGE_FORMATS =  [
     ('gif', 'gif', 'gif format'),
     ('png', 'png', 'png format'),
     ('tga', 'tga', 'targa format'),
-    ('dds', 'dds', 'nvidia dds format'),
+    ('dds', 'dds', 'dds format'),
 ]
 
 def is_image_postprocessed( image ):

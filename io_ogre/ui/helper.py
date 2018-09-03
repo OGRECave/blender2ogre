@@ -21,7 +21,7 @@ class MT_ogre_docs(bpy.types.Menu):
         for cls in _OGRE_DOCS_:
             layout.menu( cls.__name__ )
             layout.separator()
-        layout.label(text='bug reports to: https://bitbucket.org/MindCalamity/blender2ogre/issues')
+        layout.label(text='bug reports to: https://github.com/OGRECave/blender2ogre/issues')
 
 class MT_ogre_helper(bpy.types.Menu):
     bl_label = '_overloaded_'
@@ -57,18 +57,14 @@ Installing:
             * Linux users may use above and Wine, or install from source, or install via apt-get install ogre-tools.
 
     Optional:
-        3. Install NVIDIA DDS Legacy Utilities - Install them to default path.
-            * http://developer.nvidia.com/object/dds_utilities_legacy.html
-            * Linux users will need to use Wine.
-
-        4. Install Image Magick
+        3. Install Image Magick
             * http://www.imagemagick.org
 
-        5. Copy OgreMeshy to C:\\OgreMeshy
+        4. Copy OgreMeshy to C:\\OgreMeshy
             * If your using 64bit Windows, you may need to download a 64bit OgreMeshy
             * Linux copy to your home folder.
 
-        6. realXtend Tundra
+        5. realXtend Tundra
             * For latest Tundra releases see http://code.google.com/p/realxtend-naali/downloads/list
               - You may need to tweak the config to tell your Tundra path or install to C:\Tundra2
             * Old OpenGL only build can be found from http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
@@ -81,7 +77,7 @@ class _ogredoc_FAQ( MT_ogre_helper ):
     mydoc = """
 
 Q: I have hundres of objects, is there a way i can merge them on export only?
-A: Yes, just add them to a group named starting with "merge", or link the group.
+A: Yes, just add them to a group named starting with "merge.", or link the group.
 
 Q: Can i use subsurf or multi-res on a mesh with an armature?
 A: Yes.

@@ -83,39 +83,6 @@ def xml_convert(infile, has_uvs=False):
     cmd = list(chain([exe], opts.split(), [infile]))
     subprocess.call( cmd )
 
-def nvcompress(texture, infile, outfile=None, version=1, fast=False, blocking=True):
-    logging.debug('[NVCompress DDS Wrapper]', infile )
-    assert version in (1,2,3,4,5)
-    exe = config.get('NVCOMPRESS')
-    cmd = [ exe ]
-
-    if texture.image.use_alpha and texture.image.depth==32:
-        cmd.append( '-alpha' )
-    if not texture.use_mipmap:
-        cmd.append( '-nomips' )
-
-    if texture.use_normal_map:
-        cmd.append( '-normal' )
-        if version in (1,3):
-            cmd.append( '-bc%sn' %version )
-        else:
-            cmd.append( '-bc%s' %version )
-    else:
-        cmd.append( '-bc%s' %version )
-
-    if fast:
-        cmd.append( '-fast' )
-    cmd.append( infile )
-
-    if outfile: cmd.append( outfile )
-
-    logging.debug( cmd )
-    if blocking:
-        subprocess.call( cmd )
-    else:
-        subprocess.Popen( cmd )
-
-
 def image_magick( texture, origin_filepath, target_filepath ):
     exe = config.get('IMAGE_MAGICK_CONVERT')
     cmd = [ exe, origin_filepath ]
@@ -145,22 +112,13 @@ def image_magick( texture, origin_filepath, target_filepath ):
         cmd.append('-colors')
         cmd.append(str(texture.image.color_quantize))
 
+    if target_filepath.endswith('.dds'):
+        cmd.append('-define')
+        cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS') if texture.use_mipmap else 0))
+
     cmd.append(target_filepath)
     logging.debug('image magick: "%s"', ' '.join(cmd))
     subprocess.call(cmd)
-
-    #path,name = os.path.split( origin_filepath )
-    ##target_filepath = os.path.join( path, self._reformat(name,texture.image) )
-    # this does not work. at all. i find now place where _temp_.png is generated,
-    # thus this file will never be found
-    #if target_filepath.endswith('.dds'):
-    #    temp = os.path.join( path, '_temp_.png' )
-    #    cmd.append( temp )
-    #    logging.debug( 'IMAGE MAGICK: %s' %cmd )
-    #    subprocess.call( cmd )
-    #    self.nvcompress( texture, temp, outfile=target_filepath )
-    #else:
-
 
 def swap(vec):
     if config.get('SWAP_AXIS') == 'xyz': return vec
