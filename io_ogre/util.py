@@ -5,7 +5,6 @@ import bpy
 from . import config
 import os
 from os.path import split, splitext
-from itertools import chain
 import logging
 import subprocess
 import re
@@ -24,7 +23,7 @@ def xml_converter_parameters():
         import ctypes
         SEM_NOGPFAULTERRORBOX = 0x0002 # From MSDN
         ctypes.windll.kernel32.SetErrorMode(SEM_NOGPFAULTERRORBOX);
-    
+
     exe = config.get('OGRETOOLS_XML_CONVERTER')
     proc = subprocess.Popen([exe,'-v'],stdout=subprocess.PIPE)
     output, _ = proc.communicate()
@@ -77,11 +76,12 @@ def xml_convert(infile, has_uvs=False):
     # Make xml converter print less stuff, comment this if you want more debug info out
     basicArguments += ' -q'
 
-    opts = '-log _ogre_debug.txt %s' %basicArguments
     path,name = os.path.split( infile )
+    opts = '-log %s/OgreXMLConverter.log %s' % (path, basicArguments)
 
-    cmd = list(chain([exe], opts.split(), [infile]))
-    subprocess.call( cmd )
+    cmd = [exe] + opts.split() + [infile]
+    ret = subprocess.call( cmd )
+    assert ret == 0, "OgreXMLConverter failed"
 
 def image_magick( texture, origin_filepath, target_filepath ):
     exe = config.get('IMAGE_MAGICK_CONVERT')
@@ -314,9 +314,9 @@ def merge_group( group ):
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             bpy.context.scene.objects.link( o2 ) #; o2.select = True
-    
-    name = group.name[len("merge."):] if group.name != "merge." else "mergeGroup"        
-    
+
+    name = group.name[len("merge."):] if group.name != "merge." else "mergeGroup"
+
     merged = merge( copies )
     merged.name = name
     merged.data.name = name
