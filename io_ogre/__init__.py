@@ -64,10 +64,10 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         subtype='FILE_PATH',
         default=config.CONFIG['TUNDRA_ROOT']
     )
-    OGRE_MESHY = bpy.props.StringProperty(
-        name="OGRE_MESHY",
+    MESH_PREVIEWER = bpy.props.StringProperty(
+        name="MESH_PREVIEWER",
         subtype='FILE_PATH',
-        default=config.CONFIG['OGRE_MESHY']
+        default=config.CONFIG['MESH_PREVIEWER']
     )
     USER_MATERIALS = bpy.props.StringProperty(
         name="USER_MATERIALS",
@@ -85,7 +85,7 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "OGRETOOLS_XML_CONVERTER")
         layout.prop(self, "OGRETOOLS_MESH_MAGICK")
         layout.prop(self, "TUNDRA_ROOT")
-        layout.prop(self, "OGRE_MESHY")
+        layout.prop(self, "MESH_PREVIEWER")
         layout.prop(self, "IMAGE_MAGICK_CONVERT")
         layout.prop(self, "USER_MATERIALS")
         layout.prop(self, "SHADER_PROGRAMS")      

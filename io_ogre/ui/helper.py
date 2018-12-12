@@ -60,16 +60,12 @@ Installing:
         3. Install Image Magick
             * http://www.imagemagick.org
 
-        4. Copy OgreMeshy to C:\\OgreMeshy
-            * If your using 64bit Windows, you may need to download a 64bit OgreMeshy
-            * Linux copy to your home folder.
+        4. Install an mesh viewer (OgreMeshViewer or OgreMeshy)
+            * If your using 64bit Windows, put OgreMeshy to C:\\OgreMeshy
 
         5. realXtend Tundra
             * For latest Tundra releases see http://code.google.com/p/realxtend-naali/downloads/list
               - You may need to tweak the config to tell your Tundra path or install to C:\Tundra2
-            * Old OpenGL only build can be found from http://blender2ogre.googlecode.com/files/realxtend-Tundra-2.1.2-OpenGL.7z
-              - Windows: extract to C:\Tundra2
-              - Linux: extract to ~/Tundra2
 """
 
 @ogredoc

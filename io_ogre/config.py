@@ -52,7 +52,7 @@ _CONFIG_DEFAULTS_ALL = {
     'interface_toggle': False,
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
 
 ''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
     Ogre tools and Tundra from various default folders. Also consider making a installer that
@@ -62,7 +62,7 @@ _CONFIG_DEFAULTS_WINDOWS = {
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
-    'OGRE_MESHY' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
+    'MESH_PREVIEWER' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
     'USER_MATERIALS' : 'C:\\Tundra2\\media\\materials',
     'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs'
@@ -75,7 +75,7 @@ _CONFIG_DEFAULTS_UNIX = {
     'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
-    'OGRE_MESHY' : '~/OgreMeshy/Ogre Meshy.exe',
+    'MESH_PREVIEWER' : 'ogre-meshviewer',
     'USER_MATERIALS' : '~/Tundra2/media/materials',
     'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
     #'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
