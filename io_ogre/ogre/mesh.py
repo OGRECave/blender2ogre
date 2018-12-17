@@ -17,7 +17,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
       * material_prefix - string. (optional)
       * overwrite - bool. (optional) default False
     """
-    obj_name = force_name or ob.name
+    obj_name = force_name or ob.data.name
     obj_name = clean_object_name(obj_name)
     target_file = os.path.join(path, '%s.mesh.xml' % obj_name )
 
