@@ -434,7 +434,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             collisionFile = mesh_collision_files[ ob.data.name ]
 
         e = doc.createElement('entity')
-        o.appendChild(e); e.setAttribute('name', ob.data.name)
+        o.appendChild(e); e.setAttribute('name', ob.name)
         prefix = ''
         e.setAttribute('meshFile', '%s%s.mesh' %(prefix,clean_object_name(ob.data.name)) )
 
