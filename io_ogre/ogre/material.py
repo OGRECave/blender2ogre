@@ -11,6 +11,9 @@ import shutil
 import logging
 from itertools import chain
 
+from bpy.props import EnumProperty
+from .program import OgreProgram
+
 def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kwargs):
     """
     generate material files, or copy them into a single file
