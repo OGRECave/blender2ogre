@@ -404,7 +404,7 @@ def load_user_materials():
     if os.path.isdir( config.get('USER_MATERIALS') ):
         scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
         for prog in progs:
-            logging.info('Ogre shader program', prog.name)
+            logging.info('Ogre shader program ' + prog.name)
 
 
 def material_name( mat, clean = False, prefix='' ):
@@ -445,11 +445,11 @@ def parse_material_and_program_scripts( path, scripts, progs, missing ):   # rec
 
         elif os.path.isfile( url ):
             if name.endswith( '.material' ):
-                logging.debug( '<found material>', url )
+                logging.debug( '<found material> ' + url )
                 scripts.append( MaterialScripts( url ) )
 
             if name.endswith('.program'):
-                logging.debug( '<found program>', url )
+                logging.debug( '<found program> ' + url )
                 data = open( url, 'rb' ).read().decode('utf-8')
 
                 chk = []; chunks = [ chk ]
@@ -580,7 +580,7 @@ class OgreMaterialScript(object):
             if 'texture' not in tex['params']:
                 rem.append( tex )
         for tex in rem:
-            logging.debug('WARNING: not using texture_unit because it lacks a "texture" parameter', tex['name'])
+            logging.debug('WARNING: not using texture_unit because it lacks a "texture" parameter ' + tex['name'])
             self.texture_units.pop( tex['name'] )
 
         if len(self.techniques)>1:

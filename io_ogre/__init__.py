@@ -32,14 +32,14 @@ from pprint import pprint
 
 # import the plugin directory and setup the plugin
 import bpy
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
 from . import config
 from . import properties
 from . import ui
 
-import logging
 import sys
-
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
