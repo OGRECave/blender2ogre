@@ -149,7 +149,10 @@ class OgreMaterialGenerator(object):
 
             self.w.iline('lighting %s' % ('off' if mat.use_shadeless else 'on'))
 
-            if mat.use_fixed_pipeline and not mat.use_shadeless:
+            if mat.use_vertex_color_paint:
+                self.w.iline('diffuse vertexcolour' )
+
+            if not mat.use_shadeless:
                 f = mat.ambient
                 if mat.use_vertex_color_paint:
                     self.w.iline('ambient vertexcolour' )
@@ -157,9 +160,7 @@ class OgreMaterialGenerator(object):
                     self.w.iline('ambient %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
                 f = mat.diffuse_intensity
-                if mat.use_vertex_color_paint:
-                    self.w.iline('diffuse vertexcolour' )
-                else:        # fall back to basic material
+                if not mat.use_vertex_color_paint:
                     self.w.iline('diffuse %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
 
                 f = mat.specular_intensity
@@ -167,9 +168,7 @@ class OgreMaterialGenerator(object):
                 self.w.iline('specular %s %s %s %s %s' %(s.r*f, s.g*f, s.b*f, alpha, mat.specular_hardness/4.0) )
 
                 f = mat.emit
-                if mat.use_shadeless:     # requested by Borris
-                    self.w.iline('emissive %s %s %s 1.0' %(color.r, color.g, color.b) )
-                elif mat.use_vertex_color_light:
+                if mat.use_vertex_color_light:
                     self.w.iline('emissive vertexcolour' )
                 else:
                     self.w.iline('emissive %s %s %s %s' %(color.r*f, color.g*f, color.b*f, alpha) )
