@@ -155,9 +155,6 @@ def ogre_material_panel_extra( parent, mat ):
 
     if mat.use_fixed_pipeline:
         header.prop( mat, 'use_fixed_pipeline', text='Fixed Pipeline', icon='LAMP_SUN' )
-        row = box.row()
-        row.prop(mat, "use_vertex_color_paint", text="Vertex Colors")
-        row.prop(mat, "use_shadeless")
         if mat.use_shadeless and not mat.use_vertex_color_paint:
             row = box.row()
             row.prop(mat, "diffuse_color", text='')
@@ -182,7 +179,6 @@ def ogre_material_panel_extra( parent, mat ):
 
     if mat.use_ogre_advanced_options:
         box.prop(mat, 'offset_z')
-        box.prop(mat, "use_shadows")
         box.prop(mat, 'ogre_depth_write' )
         for tag in 'ogre_colour_write ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
             box.prop(mat, tag)
