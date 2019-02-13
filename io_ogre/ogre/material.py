@@ -120,17 +120,17 @@ class OgreMaterialGenerator(object):
             if mat.use_in_ogre_material_pass: # submaterials
                 self.generate_pass(mat)
 
-    def generate_pass( self, mat, pass_name=None ):
+    def generate_pass( self, mat, pass_name="" ):
         usermat = texnodes = None
         if mat.use_ogre_parent_material:
             usermat = get_ogre_user_material( mat.ogre_parent_material )
             texnodes = shader.get_texture_subnodes( self.material, mat )
 
-        if not pass_name: pass_name = mat.name
         if usermat:
             self.w.iword('pass %s : %s/PASS0' %(pass_name,usermat.name))
         else:
-            self.w.iword('pass').word(pass_name)
+            self.w.iword('pass')
+            if pass_name: self.w.word(pass_name)
 
         with self.w.embed():
             color = mat.diffuse_color
