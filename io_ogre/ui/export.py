@@ -250,6 +250,33 @@ class _OgreCommonExport_(object):
         description='convert all textures to format',
         default=config.get('FORCE_IMAGE_FORMAT') )
 
+    EX_EXPORT_ENABLE_LOGGING = BoolProperty(
+        name="Write Exporter Logs",
+        description="Log file will be created in the output directory",
+        default=config.get('EXPORT_ENABLE_LOGGING'))
+    EX_MESH_TOOL_EXPORT_VERSION = EnumProperty(
+        items=config.MESH_EXPORT_VERSIONS,
+        name='Mesh Export Version',
+        description='Requires OgreMeshTool.\nSpecify Ogre version format to write',
+        default=config.get('MESH_TOOL_EXPORT_VERSION') )
+
+    EX_optimiseVertexBuffersForShaders = BoolProperty(
+        name="Optimize Vertex Buffers For Shaders",
+        description="Requires OgreMeshTool.\nMESH optimize vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
+        default=config.get('optimizeVertexBuffersForShaders'))
+    EX_optimizeVertexBuffersForShadersOptions = StringProperty(
+        name="Vertex Buffers Options",
+        description="""Requires OgreMeshTool.
+Used when optimizing vertex buffers for shaders.
+Available flags are:
+p - converts POSITION to 16-bit floats.
+q - converts normal tangent and bitangent (28-36 bytes) to QTangents (8 bytes).
+u - converts UVs to 16-bit floats.
+s - make shadow mapping passes have their own optimized buffers. Overrides existing ones if any.
+S - strips the buffers for shadow mapping (consumes less space and memory)""",
+        maxlen=5,
+        default=config.get('optimizeVertexBuffersForShadersOptions'))
+
 class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
     bl_idname = "ogre.export"
