@@ -260,7 +260,7 @@ class _OgreCommonExport_(object):
         description='Requires OgreMeshTool.\nSpecify Ogre version format to write',
         default=config.get('MESH_TOOL_EXPORT_VERSION') )
 
-    EX_optimiseVertexBuffersForShaders = BoolProperty(
+    EX_optimizeVertexBuffersForShaders = BoolProperty(
         name="Optimize Vertex Buffers For Shaders",
         description="Requires OgreMeshTool.\nMESH optimize vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
         default=config.get('optimizeVertexBuffersForShaders'))
