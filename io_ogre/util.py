@@ -46,7 +46,8 @@ def mesh_tool_parameters():
     Extract OgreMeshTool version info and stuff
     """
     exe = config.get('OGRETOOLS_XML_CONVERTER')
-    proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
+    exe_path, name = os.path.split(exe)
+    proc = subprocess.Popen([exe], stdout=subprocess.PIPE, cwd=exe_path)
     output, _ = proc.communicate()
 
     pattern = re.compile("OgreMeshTool ([^ ]+) \((\d+)\.(\d+).(\d+)\) ([^ ]+)")
@@ -65,14 +66,15 @@ def detect_converter_type():
     # todo: executing the same exe twice might not be efficient but will do for now
     # (twice because version will be extracted later in xml_converter_parameters)
     exe = config.get('OGRETOOLS_XML_CONVERTER')
-    proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
+    exe_path, name = os.path.split(exe)
+    proc = subprocess.Popen([exe], stdout=subprocess.PIPE, cwd=exe_path)
     output, _ = proc.communicate()
 
     output = output.decode('utf-8')
 
-    if output.find("OgreXMLConverter"):
+    if output.find("OgreXMLConverter") != -1:
         return "OgreXMLConverter"
-    if output.find("OgreMeshTool"):
+    if output.find("OgreMeshTool") != -1:
         return "OgreMeshTool"
     return "unknown"
 
