@@ -56,6 +56,15 @@ class _OgreCommonExport_(object):
         return {'RUNNING_MODAL'}
 
     def execute(self, context):
+        # check that converter is setup
+        converter = detect_converter_type()
+        # abort with error otherwise
+        if converter == "unknown":
+            Report.reset()
+            Report.errors.append("No suitable converter found. Nothing has been exported.")
+            Report.show()
+            return {'FINISHED'}
+
         logger.info("context.blend_data %s"%context.blend_data.filepath)
         logger.info("context.scene.name %s"%context.scene.name)
         logger.info("self.filepath %s"%self.filepath)
