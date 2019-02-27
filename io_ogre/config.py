@@ -9,6 +9,11 @@ AXIS_MODES =  [
     ('-xzy', '-xzy', 'non standard'),
 ]
 
+MESH_EXPORT_VERSIONS = [
+    ('v1', 'v1', 'Export the mesh as a v1 object'),
+    ('v2', 'v2', 'Export the mesh as a v2 object')
+]
+
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'io_ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
@@ -50,6 +55,10 @@ _CONFIG_DEFAULTS_ALL = {
     'reorganiseBuffers' : True,
     'optimiseAnimations' : True,
     'interface_toggle': False,
+    'optimizeVertexBuffersForShaders' : True,
+    'optimizeVertexBuffersForShadersOptions' : 'puqs',
+    'EXPORT_ENABLE_LOGGING' : False,
+    'MESH_TOOL_EXPORT_VERSION' : 'v2'
 }
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
