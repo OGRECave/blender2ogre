@@ -97,7 +97,7 @@ def xml_convert(infile, has_uvs=False):
 
     basicArguments = ''
 
-    if config.get('nuextremityPoints') > 0:
+    if config.get('nuextremityPoints') > 0 and version < (2,1,0):
         basicArguments += ' -x %s' %config.get('nuextremityPoints')
 
     if version < (1,10,0) or version >= (2,1,0):

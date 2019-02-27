@@ -48,12 +48,34 @@ class _OgreCommonExport_(object):
 
         # update the interface with the config values
         for key, value in config.CONFIG.items():
-            if getattr(self,"EX_" + key,None):
+            if getattr(self, "EX_" + key, None) or getattr(self, "EX_V1_" + key, None) or getattr(self, "EX_V2_" + key, None):
+                # todo: isn't the key missing the "EX_" prefix?
                 setattr(self,key,value)
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        converter = detect_converter_type()
+
+        if converter == "unknown":
+            layout.label(text="No converter found! Please check your preferences.", icon='ERROR')
+            return
+
+        layout.label(text="Detected %s." %converter, icon='INFO')
+
+        for key in dir(_OgreCommonExport_):
+            if key.startswith('EX_V1_'):
+                if converter == "OgreXMLConverter":
+                    layout.prop(self, key)
+            elif key.startswith('EX_V2_'):
+                if converter == "OgreMeshTool":
+                    layout.prop(self, key)
+            elif key.startswith('EX_'):
+                layout.prop(self, key)
 
     def execute(self, context):
         # check that converter is setup
@@ -93,7 +115,11 @@ class _OgreCommonExport_(object):
             
         kw = {}
         for name in dir(_OgreCommonExport_):
-            if name.startswith('EX_'):
+            if name.startswith('EX_V1_'):
+                kw[ name[6:] ] = getattr(self,name)
+            elif name.startswith('EX_V2_'):
+                kw[ name[6:] ] = getattr(self,name)
+            elif name.startswith('EX_'):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
 
@@ -120,6 +146,9 @@ class _OgreCommonExport_(object):
 
     # Basic options
     # NOTE config values are automatically propagated if you name it like: EX_<config-name>
+    # Properties can also be enabled for a specific converter by adding V1 or V2 in the name:
+    # EX_V1_<config-name> for OgreXMLConverter
+    # EX_V2_<config-name> for OgreMeshTool
     EX_SWAP_AXIS = EnumProperty(
         items=config.AXIS_MODES,
         name='swap axis',
@@ -210,7 +239,7 @@ class _OgreCommonExport_(object):
         description="LOD percentage reduction",
         min=0, max=99,
         default=config.get('lodPercent'))
-    EX_nuextremityPoints = IntProperty(
+    EX_V1_nuextremityPoints = IntProperty(
         name="Extremity Points",
         description="MESH Extremity Points",
         min=0, max=65536,
@@ -263,20 +292,19 @@ class _OgreCommonExport_(object):
         name="Write Exporter Logs",
         description="Log file will be created in the output directory",
         default=config.get('EXPORT_ENABLE_LOGGING'))
-    EX_MESH_TOOL_EXPORT_VERSION = EnumProperty(
+    EX_V2_MESH_TOOL_EXPORT_VERSION = EnumProperty(
         items=config.MESH_EXPORT_VERSIONS,
         name='Mesh Export Version',
-        description='Requires OgreMeshTool.\nSpecify Ogre version format to write',
+        description='Specify Ogre version format to write',
         default=config.get('MESH_TOOL_EXPORT_VERSION') )
 
-    EX_optimizeVertexBuffersForShaders = BoolProperty(
+    EX_V2_optimizeVertexBuffersForShaders = BoolProperty(
         name="Optimize Vertex Buffers For Shaders",
-        description="Requires OgreMeshTool.\nMESH optimize vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
+        description="MESH optimize vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
         default=config.get('optimizeVertexBuffersForShaders'))
-    EX_optimizeVertexBuffersForShadersOptions = StringProperty(
+    EX_V2_optimizeVertexBuffersForShadersOptions = StringProperty(
         name="Vertex Buffers Options",
-        description="""Requires OgreMeshTool.
-Used when optimizing vertex buffers for shaders.
+        description="""Used when optimizing vertex buffers for shaders.
 Available flags are:
 p - converts POSITION to 16-bit floats.
 q - converts normal tangent and bitangent (28-36 bytes) to QTangents (8 bytes).
