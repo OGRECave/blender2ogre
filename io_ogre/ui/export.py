@@ -151,7 +151,7 @@ class _OgreCommonExport_(object):
     # EX_V2_<config-name> for OgreMeshTool
     EX_SWAP_AXIS = EnumProperty(
         items=config.AXIS_MODES,
-        name='swap axis',
+        name='Swap Axis',
         description='axis swapping mode',
         default= config.get('SWAP_AXIS'))
     EX_SEP_MATS = BoolProperty(
@@ -167,7 +167,7 @@ class _OgreCommonExport_(object):
         description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
         default=config.get('ONLY_KEYFRAMED_BONES'))
     EX_OGRE_INHERIT_SCALE = BoolProperty(
-        name="OGRE inherit scale",
+        name="OGRE Inherit Scale",
         description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
         default=config.get('OGRE_INHERIT_SCALE'))
     EX_SCENE = BoolProperty(
@@ -279,7 +279,7 @@ class _OgreCommonExport_(object):
         description="MESH optimize animations",
         default=config.get('optimiseAnimations'))
     EX_COPY_SHADER_PROGRAMS = BoolProperty(
-        name="copy shader programs",
+        name="Copy Shader Programs",
         description="when using script inheritance copy the source shader programs to the output path",
         default=config.get('COPY_SHADER_PROGRAMS'))
     EX_FORCE_IMAGE_FORMAT = EnumProperty(
