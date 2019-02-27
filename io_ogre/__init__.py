@@ -44,40 +44,50 @@ import sys
 class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
+    def apply_preferences_to_config(self, context):
+        config.update_from_addon_preference(context)
+
     IMAGE_MAGICK_CONVERT = bpy.props.StringProperty(
         name="IMAGE_MAGICK_CONVERT",
         subtype='FILE_PATH',
-        default=config.CONFIG['IMAGE_MAGICK_CONVERT']
+        default=config.CONFIG['IMAGE_MAGICK_CONVERT'],
+        update=apply_preferences_to_config
     )
     OGRETOOLS_XML_CONVERTER = bpy.props.StringProperty(
         name="OGRETOOLS_XML_CONVERTER",
         subtype='FILE_PATH',
-        default=config.CONFIG['OGRETOOLS_XML_CONVERTER']
+        default=config.CONFIG['OGRETOOLS_XML_CONVERTER'],
+        update=apply_preferences_to_config
     )
     OGRETOOLS_MESH_MAGICK = bpy.props.StringProperty(
         name="OGRETOOLS_MESH_MAGICK",
         subtype='FILE_PATH',
-        default=config.CONFIG['OGRETOOLS_MESH_MAGICK']
+        default=config.CONFIG['OGRETOOLS_MESH_MAGICK'],
+        update=apply_preferences_to_config
     )
     TUNDRA_ROOT = bpy.props.StringProperty(
         name="TUNDRA_ROOT",
         subtype='FILE_PATH',
-        default=config.CONFIG['TUNDRA_ROOT']
+        default=config.CONFIG['TUNDRA_ROOT'],
+        update=apply_preferences_to_config
     )
     MESH_PREVIEWER = bpy.props.StringProperty(
         name="MESH_PREVIEWER",
         subtype='FILE_PATH',
-        default=config.CONFIG['MESH_PREVIEWER']
+        default=config.CONFIG['MESH_PREVIEWER'],
+        update=apply_preferences_to_config
     )
     USER_MATERIALS = bpy.props.StringProperty(
         name="USER_MATERIALS",
         subtype='FILE_PATH',
-        default=config.CONFIG['USER_MATERIALS']
+        default=config.CONFIG['USER_MATERIALS'],
+        update=apply_preferences_to_config
     )
     SHADER_PROGRAMS = bpy.props.StringProperty(
         name="SHADER_PROGRAMS",
         subtype='FILE_PATH',
-        default=config.CONFIG['SHADER_PROGRAMS']
+        default=config.CONFIG['SHADER_PROGRAMS'],
+        update=apply_preferences_to_config
     )
 
     def draw(self, context):
@@ -98,6 +108,9 @@ def register():
         bpy.utils.register_class(clazz)
 
     bpy.utils.register_class(Blender2OgreAddonPreferences)
+
+    # read user preferences
+    config.update_from_addon_preference(bpy.context)
 
 def unregister():
     logging.info('Unloading io_ogre %s', bl_info["version"])
