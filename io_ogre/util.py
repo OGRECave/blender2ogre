@@ -66,12 +66,9 @@ def detect_converter_type():
     # todo: executing the same exe twice might not be efficient but will do for now
     # (twice because version will be extracted later in xml_converter_parameters)
     exe = config.get('OGRETOOLS_XML_CONVERTER')
-    # make sure the file we're trying to execute exists
-    if not os.path.isfile(exe):
-        return "unknown"
+
     # extract converter type from its output
-    exe_path, name = os.path.split(exe)
-    proc = subprocess.Popen([exe], stdout=subprocess.PIPE, cwd=exe_path)
+    proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
     output, _ = proc.communicate()
 
     output = output.decode('utf-8')
