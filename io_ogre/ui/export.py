@@ -54,34 +54,34 @@ class _OgreCommonExport_(object):
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
+
+        # check that converter is setup
+        self.converter = detect_converter_type()
+
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
         layout = self.layout
 
-        converter = detect_converter_type()
-
-        if converter == "unknown":
+        if self.converter == "unknown":
             layout.label(text="No converter found! Please check your preferences.", icon='ERROR')
             return
 
-        layout.label(text="Detected %s." %converter, icon='INFO')
+        layout.label(text="Using '%s'" % self.converter, icon='INFO')
 
         for key in dir(_OgreCommonExport_):
             if key.startswith('EX_V1_'):
-                if converter == "OgreXMLConverter":
+                if self.converter == "OgreXMLConverter":
                     layout.prop(self, key)
             elif key.startswith('EX_V2_'):
-                if converter == "OgreMeshTool":
+                if self.converter == "OgreMeshTool":
                     layout.prop(self, key)
             elif key.startswith('EX_'):
                 layout.prop(self, key)
 
     def execute(self, context):
-        # check that converter is setup
-        converter = detect_converter_type()
         # abort with error otherwise
-        if converter == "unknown":
+        if self.converter == "unknown":
             Report.reset()
             Report.errors.append("No suitable converter found. Nothing has been exported.")
             Report.show()
