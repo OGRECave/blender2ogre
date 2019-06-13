@@ -1,4 +1,6 @@
 import os, time, sys, logging
+import bmesh
+import mathutils
 from ..report import Report
 from ..util import *
 from ..xml import *
@@ -131,6 +133,14 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         shared_vertices = {}
         _remap_verts_ = []
         numverts = 0
+        bm = None
+
+        if mesh.has_custom_normals:
+            mesh.calc_normals_split()
+            # Create bmesh to help obtain custom vertex normals
+            bm = bmesh.new() 
+            bm.from_mesh(mesh)
+            bm.verts.ensure_lookup_table()
 
         for F in mesh.tessfaces:
             smooth = F.use_smooth
@@ -154,7 +164,14 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     v = mesh.vertices[ idx ]
 
                     if smooth:
-                        nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
+                        if mesh.has_custom_normals:
+                            n = mathutils.Vector()
+                            for loop in bm.verts[idx].link_loops:
+                                n += mesh.loops[loop.index].normal
+                            n.normalize()
+                            nx,ny,nz = swap( n )
+                        else:
+                            nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
                     else:
                         nx,ny,nz = swap( F.normal )
 
