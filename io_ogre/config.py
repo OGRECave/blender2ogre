@@ -37,6 +37,7 @@ _CONFIG_DEFAULTS_ALL = {
     'TOUCH_TEXTURES' : True,
     'ARM_ANIM' : True,
     'SHAPE_ANIM' : True,
+    'SHAPE_NORMALS' : True,
     'ARRAY' : True,
     'MATERIALS' : True,
     'DDS_MIPS' : 16,
