@@ -4,7 +4,7 @@ from .report import Report
 from .config import CONFIG
 from .ogre.mesh import dot_mesh
 from .ogre.material import dot_materials
-from .util import objects_merge_materials
+from .util import objects_merge_materials, merge_objects
 
 ## mesh previewer
 
