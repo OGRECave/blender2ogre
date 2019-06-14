@@ -206,6 +206,10 @@ class _OgreCommonExport_(object):
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
         default=config.get('SHAPE_ANIM'))
+    EX_SHAPE_NORMALS = BoolProperty(
+        name="Shape Normals",
+        description="export normals in shape animations - updates the .mesh file",
+        default=config.get('SHAPE_NORMALS'))
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
