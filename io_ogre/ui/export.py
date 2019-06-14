@@ -44,6 +44,10 @@ class _OgreCommonExport_(object):
         if context.active_object and context.mode != 'EDIT_MESH':
             return True
 
+    def __init__(self):
+        # check that converter is setup
+        self.converter = detect_converter_type()
+
     def invoke(self, context, event):
 
         # update the interface with the config values
@@ -54,9 +58,6 @@ class _OgreCommonExport_(object):
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
-
-        # check that converter is setup
-        self.converter = detect_converter_type()
 
         return {'RUNNING_MODAL'}
 
