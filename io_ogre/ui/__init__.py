@@ -4,11 +4,13 @@ from ..report import Report
 from . import material
 from . import export
 from . import helper
+from ..meshy import OGREMESH_OT_preview
 
 def auto_register(register):
     yield HT_toggle_ogre
     yield OP_interface_toggle
     yield MT_mini_report
+    yield OGREMESH_OT_preview
 
     yield from export.auto_register(register)
     yield from helper.auto_register(register)
@@ -100,9 +102,9 @@ class HT_info_header(bpy.types.Header):
         #        op = row.operator( 'tundra.toggle_physics_debug', text='', icon='MOD_PHYSICS' )
         #        op = row.operator( 'tundra.exit', text='', icon='CANCEL' )
 
-        #op = layout.operator( 'ogremeshy.preview', text='', icon='PLUGIN' )
-        #if op is not None:
-        #    op.mesh = True
+        op = layout.operator( 'ogremesh.preview', text='', icon='VIEWZOOM' )
+        if op is not None:
+            op.mesh = True
 
         #row = layout.row(align=True)
         #sub = row.row(align=True)

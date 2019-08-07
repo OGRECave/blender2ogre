@@ -44,18 +44,50 @@ class _OgreCommonExport_(object):
         if context.active_object and context.mode != 'EDIT_MESH':
             return True
 
+    def __init__(self):
+        # check that converter is setup
+        self.converter = detect_converter_type()
+
     def invoke(self, context, event):
 
         # update the interface with the config values
         for key, value in config.CONFIG.items():
-            if getattr(self,"EX_" + key,None):
+            if getattr(self, "EX_" + key, None) or getattr(self, "EX_V1_" + key, None) or getattr(self, "EX_V2_" + key, None):
+                # todo: isn't the key missing the "EX_" prefix?
                 setattr(self,key,value)
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
+
         return {'RUNNING_MODAL'}
 
+    def draw(self, context):
+        layout = self.layout
+
+        if self.converter == "unknown":
+            layout.label(text="No converter found! Please check your preferences.", icon='ERROR')
+            return
+
+        layout.label(text="Using '%s'" % self.converter, icon='INFO')
+
+        for key in dir(_OgreCommonExport_):
+            if key.startswith('EX_V1_'):
+                if self.converter == "OgreXMLConverter":
+                    layout.prop(self, key)
+            elif key.startswith('EX_V2_'):
+                if self.converter == "OgreMeshTool":
+                    layout.prop(self, key)
+            elif key.startswith('EX_'):
+                layout.prop(self, key)
+
     def execute(self, context):
+        # abort with error otherwise
+        if self.converter == "unknown":
+            Report.reset()
+            Report.errors.append("No suitable converter found. Nothing has been exported.")
+            Report.show()
+            return {'FINISHED'}
+
         logger.info("context.blend_data %s"%context.blend_data.filepath)
         logger.info("context.scene.name %s"%context.scene.name)
         logger.info("self.filepath %s"%self.filepath)
@@ -84,13 +116,17 @@ class _OgreCommonExport_(object):
             
         kw = {}
         for name in dir(_OgreCommonExport_):
-            if name.startswith('EX_'):
+            if name.startswith('EX_V1_'):
+                kw[ name[6:] ] = getattr(self,name)
+            elif name.startswith('EX_V2_'):
+                kw[ name[6:] ] = getattr(self,name)
+            elif name.startswith('EX_'):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
 
         print ("_"*80)
-        target_path = os.path.dirname(os.path.abspath(self.filepath))
-        target_file_name = self.filepath
+        target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
+        target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
         logger.info("target_path %s"%target_path)
@@ -111,9 +147,12 @@ class _OgreCommonExport_(object):
 
     # Basic options
     # NOTE config values are automatically propagated if you name it like: EX_<config-name>
+    # Properties can also be enabled for a specific converter by adding V1 or V2 in the name:
+    # EX_V1_<config-name> for OgreXMLConverter
+    # EX_V2_<config-name> for OgreMeshTool
     EX_SWAP_AXIS = EnumProperty(
         items=config.AXIS_MODES,
-        name='swap axis',
+        name='Swap Axis',
         description='axis swapping mode',
         default= config.get('SWAP_AXIS'))
     EX_SEP_MATS = BoolProperty(
@@ -129,7 +168,7 @@ class _OgreCommonExport_(object):
         description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
         default=config.get('ONLY_KEYFRAMED_BONES'))
     EX_OGRE_INHERIT_SCALE = BoolProperty(
-        name="OGRE inherit scale",
+        name="OGRE Inherit Scale",
         description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
         default=config.get('OGRE_INHERIT_SCALE'))
     EX_SCENE = BoolProperty(
@@ -168,6 +207,10 @@ class _OgreCommonExport_(object):
         name="Shape Animation",
         description="export shape animations - updates the .mesh file",
         default=config.get('SHAPE_ANIM'))
+    EX_SHAPE_NORMALS = BoolProperty(
+        name="Shape Normals",
+        description="export normals in shape animations - updates the .mesh file",
+        default=config.get('SHAPE_NORMALS'))
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
@@ -201,7 +244,7 @@ class _OgreCommonExport_(object):
         description="LOD percentage reduction",
         min=0, max=99,
         default=config.get('lodPercent'))
-    EX_nuextremityPoints = IntProperty(
+    EX_V1_nuextremityPoints = IntProperty(
         name="Extremity Points",
         description="MESH Extremity Points",
         min=0, max=65536,
@@ -241,7 +284,7 @@ class _OgreCommonExport_(object):
         description="MESH optimize animations",
         default=config.get('optimiseAnimations'))
     EX_COPY_SHADER_PROGRAMS = BoolProperty(
-        name="copy shader programs",
+        name="Copy Shader Programs",
         description="when using script inheritance copy the source shader programs to the output path",
         default=config.get('COPY_SHADER_PROGRAMS'))
     EX_FORCE_IMAGE_FORMAT = EnumProperty(
@@ -249,6 +292,32 @@ class _OgreCommonExport_(object):
         name='Convert Images',
         description='convert all textures to format',
         default=config.get('FORCE_IMAGE_FORMAT') )
+
+    EX_EXPORT_ENABLE_LOGGING = BoolProperty(
+        name="Write Exporter Logs",
+        description="Log file will be created in the output directory",
+        default=config.get('EXPORT_ENABLE_LOGGING'))
+    EX_V2_MESH_TOOL_EXPORT_VERSION = EnumProperty(
+        items=config.MESH_EXPORT_VERSIONS,
+        name='Mesh Export Version',
+        description='Specify Ogre version format to write',
+        default=config.get('MESH_TOOL_EXPORT_VERSION') )
+
+    EX_V2_optimizeVertexBuffersForShaders = BoolProperty(
+        name="Optimize Vertex Buffers For Shaders",
+        description="MESH optimize vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
+        default=config.get('optimizeVertexBuffersForShaders'))
+    EX_V2_optimizeVertexBuffersForShadersOptions = StringProperty(
+        name="Vertex Buffers Options",
+        description="""Used when optimizing vertex buffers for shaders.
+Available flags are:
+p - converts POSITION to 16-bit floats.
+q - converts normal tangent and bitangent (28-36 bytes) to QTangents (8 bytes).
+u - converts UVs to 16-bit floats.
+s - make shadow mapping passes have their own optimized buffers. Overrides existing ones if any.
+S - strips the buffers for shadow mapping (consumes less space and memory)""",
+        maxlen=5,
+        default=config.get('optimizeVertexBuffersForShadersOptions'))
 
 class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''

@@ -32,62 +32,62 @@ from pprint import pprint
 
 # import the plugin directory and setup the plugin
 import bpy
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
 from . import config
 from . import properties
 from . import ui
 
-import logging
 import sys
-
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
+    def apply_preferences_to_config(self, context):
+        config.update_from_addon_preference(context)
+
     IMAGE_MAGICK_CONVERT = bpy.props.StringProperty(
         name="IMAGE_MAGICK_CONVERT",
         subtype='FILE_PATH',
-        default=config.CONFIG['IMAGE_MAGICK_CONVERT']
-    )
-    NVCOMPRESS = bpy.props.StringProperty(
-        name="NVCOMPRESS",
-        subtype='FILE_PATH',
-        default=config.CONFIG['NVCOMPRESS']
+        default=config.CONFIG['IMAGE_MAGICK_CONVERT'],
+        update=apply_preferences_to_config
     )
     OGRETOOLS_XML_CONVERTER = bpy.props.StringProperty(
         name="OGRETOOLS_XML_CONVERTER",
         subtype='FILE_PATH',
-        default=config.CONFIG['OGRETOOLS_XML_CONVERTER']
+        default=config.CONFIG['OGRETOOLS_XML_CONVERTER'],
+        update=apply_preferences_to_config
     )
     OGRETOOLS_MESH_MAGICK = bpy.props.StringProperty(
         name="OGRETOOLS_MESH_MAGICK",
         subtype='FILE_PATH',
-        default=config.CONFIG['OGRETOOLS_MESH_MAGICK']
+        default=config.CONFIG['OGRETOOLS_MESH_MAGICK'],
+        update=apply_preferences_to_config
     )
     TUNDRA_ROOT = bpy.props.StringProperty(
         name="TUNDRA_ROOT",
         subtype='FILE_PATH',
-        default=config.CONFIG['TUNDRA_ROOT']
+        default=config.CONFIG['TUNDRA_ROOT'],
+        update=apply_preferences_to_config
     )
-    OGRE_MESHY = bpy.props.StringProperty(
-        name="OGRE_MESHY",
+    MESH_PREVIEWER = bpy.props.StringProperty(
+        name="MESH_PREVIEWER",
         subtype='FILE_PATH',
-        default=config.CONFIG['OGRE_MESHY']
-    )
-    NVIDIATOOLS_EXE = bpy.props.StringProperty(
-        name="NVIDIATOOLS_EXE",
-        subtype='FILE_PATH',
-        default=config.CONFIG['NVIDIATOOLS_EXE']
+        default=config.CONFIG['MESH_PREVIEWER'],
+        update=apply_preferences_to_config
     )
     USER_MATERIALS = bpy.props.StringProperty(
         name="USER_MATERIALS",
         subtype='FILE_PATH',
-        default=config.CONFIG['USER_MATERIALS']
+        default=config.CONFIG['USER_MATERIALS'],
+        update=apply_preferences_to_config
     )
     SHADER_PROGRAMS = bpy.props.StringProperty(
         name="SHADER_PROGRAMS",
         subtype='FILE_PATH',
-        default=config.CONFIG['SHADER_PROGRAMS']
+        default=config.CONFIG['SHADER_PROGRAMS'],
+        update=apply_preferences_to_config
     )
 
     def draw(self, context):
@@ -95,12 +95,10 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "OGRETOOLS_XML_CONVERTER")
         layout.prop(self, "OGRETOOLS_MESH_MAGICK")
         layout.prop(self, "TUNDRA_ROOT")
-        layout.prop(self, "OGRE_MESHY")
+        layout.prop(self, "MESH_PREVIEWER")
         layout.prop(self, "IMAGE_MAGICK_CONVERT")
-        layout.prop(self, "NVIDIATOOLS_EXE")
         layout.prop(self, "USER_MATERIALS")
-        layout.prop(self, "SHADER_PROGRAMS")
-        layout.prop(self, "NVCOMPRESS")        
+        layout.prop(self, "SHADER_PROGRAMS")      
 
 def register():
     logging.info('Starting io_ogre %s', bl_info["version"])
@@ -110,6 +108,9 @@ def register():
         bpy.utils.register_class(clazz)
 
     bpy.utils.register_class(Blender2OgreAddonPreferences)
+
+    # read user preferences
+    config.update_from_addon_preference(bpy.context)
 
 def unregister():
     logging.info('Unloading io_ogre %s', bl_info["version"])

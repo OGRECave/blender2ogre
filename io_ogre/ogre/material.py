@@ -11,6 +11,9 @@ import shutil
 import logging
 from itertools import chain
 
+from bpy.props import EnumProperty
+from .program import OgreProgram
+
 def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kwargs):
     """
     generate material files, or copy them into a single file
@@ -32,9 +35,10 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
         mat_file_name = prefix
         target_file = os.path.join(path, '%s.material' % mat_file_name)
         with open(target_file, 'wb') as fd:
-            fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
+            include_missing = False
             for mat in materials:
                 if mat is None:
+                    include_missing = True
                     continue
                 Report.materials.append( material_name(mat) )
                 generator = OgreMaterialGenerator(mat)
@@ -44,6 +48,9 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
                     generator.copy_textures(path)
                 material_text = generator.generate()
                 fd.write(bytes(material_text+"\n",'utf-8'))
+            
+            if include_missing:
+                fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
 
 def dot_material(mat, path, **kwargs):
     """
@@ -113,17 +120,17 @@ class OgreMaterialGenerator(object):
             if mat.use_in_ogre_material_pass: # submaterials
                 self.generate_pass(mat)
 
-    def generate_pass( self, mat, pass_name=None ):
+    def generate_pass( self, mat, pass_name="" ):
         usermat = texnodes = None
         if mat.use_ogre_parent_material:
             usermat = get_ogre_user_material( mat.ogre_parent_material )
             texnodes = shader.get_texture_subnodes( self.material, mat )
 
-        if not pass_name: pass_name = mat.name
         if usermat:
             self.w.iword('pass %s : %s/PASS0' %(pass_name,usermat.name))
         else:
-            self.w.iword('pass').word(pass_name)
+            self.w.iword('pass')
+            if pass_name: self.w.word(pass_name)
 
         with self.w.embed():
             color = mat.diffuse_color
@@ -224,8 +231,11 @@ class OgreMaterialGenerator(object):
             btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
             ex = False; texop = None
             if btype in TEXTURE_COLOUR_OP:
-                if btype=='MIX' and slot.use_map_alpha and not slot.use_stencil:
-                    if slot.diffuse_color_factor >= 1.0: texop = 'alpha_blend'
+                if btype=='MIX' and \
+                    ((slot.use_map_alpha and not slot.use_stencil) or \
+                     (slot.texture.use_alpha and slot.texture.image.use_alpha and not slot.use_map_alpha)):
+                    if slot.diffuse_color_factor >= 1.0:
+                        texop = 'alpha_blend'
                     else:
                         texop = TEXTURE_COLOUR_OP[ btype ]
                         ex = True
@@ -267,23 +277,22 @@ class OgreMaterialGenerator(object):
         updated_image = False
         if image.packed_file:
             # a is a packed png
-            origin_filepath = image.filepath
-            _, ext = splitext(origin_filepath)
-            tmp_filepath = tempfile.mkstemp(suffix=ext)
+            ext = splitext(origin_filepath)[1]
+            tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
             image.filepath = tmp_filepath 
             image.save()
             image.filepath = origin_filepath
             updated_image = True
 
-        _, target_file_ext = split(origin_filepath)
-        target_file, ext = splitext(target_file_ext)
+        target_file_ext = split(origin_filepath)[1]
+        ext = splitext(target_file_ext)[1]
 
         if not tmp_filepath:
-            _, tmp_filepath = tempfile.mkstemp(suffix=ext)
+            tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
 
         target_file_ext = self.change_ext(target_file_ext, image)
         target_filepath = join(target_path, target_file_ext)
-        if not os.path.isfile(target_filepath):
+        if not os.path.isfile(target_filepath) and not updated_image:
             # or os.stat(target_filepath).st_mtime < os.stat( origin_filepath ).st_mtime:
             updated_image = True
             shutil.copyfile(origin_filepath, tmp_filepath)
@@ -368,7 +377,7 @@ def load_user_materials():
     if os.path.isdir( config.get('USER_MATERIALS') ):
         scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
         for prog in progs:
-            logging.info('Ogre shader program', prog.name)
+            logging.info('Ogre shader program ' + prog.name)
 
 
 def material_name( mat, clean = False, prefix='' ):
@@ -409,11 +418,11 @@ def parse_material_and_program_scripts( path, scripts, progs, missing ):   # rec
 
         elif os.path.isfile( url ):
             if name.endswith( '.material' ):
-                logging.debug( '<found material>', url )
+                logging.debug( '<found material> ' + url )
                 scripts.append( MaterialScripts( url ) )
 
             if name.endswith('.program'):
-                logging.debug( '<found program>', url )
+                logging.debug( '<found program> ' + url )
                 data = open( url, 'rb' ).read().decode('utf-8')
 
                 chk = []; chunks = [ chk ]
@@ -544,7 +553,7 @@ class OgreMaterialScript(object):
             if 'texture' not in tex['params']:
                 rem.append( tex )
         for tex in rem:
-            logging.debug('WARNING: not using texture_unit because it lacks a "texture" parameter', tex['name'])
+            logging.debug('WARNING: not using texture_unit because it lacks a "texture" parameter ' + tex['name'])
             self.texture_units.pop( tex['name'] )
 
         if len(self.techniques)>1:
@@ -618,7 +627,7 @@ IMAGE_FORMATS =  [
     ('gif', 'gif', 'gif format'),
     ('png', 'png', 'png format'),
     ('tga', 'tga', 'targa format'),
-    ('dds', 'dds', 'nvidia dds format'),
+    ('dds', 'dds', 'dds format'),
 ]
 
 def is_image_postprocessed( image ):

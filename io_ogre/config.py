@@ -9,6 +9,11 @@ AXIS_MODES =  [
     ('-xzy', '-xzy', 'non standard'),
 ]
 
+MESH_EXPORT_VERSIONS = [
+    ('v1', 'v1', 'Export the mesh as a v1 object'),
+    ('v2', 'v2', 'Export the mesh as a v2 object')
+]
+
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'io_ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
@@ -32,9 +37,10 @@ _CONFIG_DEFAULTS_ALL = {
     'TOUCH_TEXTURES' : True,
     'ARM_ANIM' : True,
     'SHAPE_ANIM' : True,
+    'SHAPE_NORMALS' : True,
     'ARRAY' : True,
     'MATERIALS' : True,
-    'DDS_MIPS' : True,
+    'DDS_MIPS' : 16,
     'TRIM_BONE_WEIGHTS' : 0.01,
     'TUNDRA_STREAMING' : True,
     'lodLevels' : 0,
@@ -50,9 +56,13 @@ _CONFIG_DEFAULTS_ALL = {
     'reorganiseBuffers' : True,
     'optimiseAnimations' : True,
     'interface_toggle': False,
+    'optimizeVertexBuffersForShaders' : True,
+    'optimizeVertexBuffersForShadersOptions' : 'puqs',
+    'EXPORT_ENABLE_LOGGING' : False,
+    'MESH_TOOL_EXPORT_VERSION' : 'v2'
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT OGRE_MESHY IMAGE_MAGICK_CONVERT NVCOMPRESS NVIDIATOOLS_EXE USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
 
 ''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
     Ogre tools and Tundra from various default folders. Also consider making a installer that
@@ -62,24 +72,20 @@ _CONFIG_DEFAULTS_WINDOWS = {
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
-    'OGRE_MESHY' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
+    'MESH_PREVIEWER' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
-    'NVIDIATOOLS_EXE' : 'C:\\Program Files\\NVIDIA Corporation\\DDS Utilities\\nvdxt.exe',
     'USER_MATERIALS' : 'C:\\Tundra2\\media\\materials',
-    'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs',
-    'NVCOMPRESS' : 'C:\\nvcompress.exe'
+    'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs'
 }
 
 _CONFIG_DEFAULTS_UNIX = {
     # do not use absolute paths like /usr/bin/exe_name. some distris install to /usr/local/bin ...
     # just trust the env PATH variable
     'IMAGE_MAGICK_CONVERT' : 'convert',
-    'NVCOMPRESS' : 'nvcompress',
     'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
-    'OGRE_MESHY' : '~/OgreMeshy/Ogre Meshy.exe',
-    'NVIDIATOOLS_EXE' : '~/.wine/drive_c/Program Files/NVIDIA Corporation/DDS Utilities',
+    'MESH_PREVIEWER' : 'ogre-meshviewer',
     'USER_MATERIALS' : '~/Tundra2/media/materials',
     'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
     #'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',

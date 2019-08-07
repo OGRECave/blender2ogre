@@ -5,15 +5,25 @@ import bpy
 from . import config
 import os
 from os.path import split, splitext
-from itertools import chain
 import logging
 import subprocess
 import re
+import sys
 
 def xml_converter_parameters():
     """
     Return the name of the ogre converter
     """
+    if sys.platform.startswith("win"):
+        # Don't display the Windows GPF dialog if the invoked program dies.
+        # See comp.os.ms-windows.programmer.win32
+        # How to suppress crash notification dialog?, Jan 14,2004 -
+        # Raymond Chen's response [1]
+
+        import ctypes
+        SEM_NOGPFAULTERRORBOX = 0x0002 # From MSDN
+        ctypes.windll.kernel32.SetErrorMode(SEM_NOGPFAULTERRORBOX);
+
     exe = config.get('OGRETOOLS_XML_CONVERTER')
     proc = subprocess.Popen([exe,'-v'],stdout=subprocess.PIPE)
     output, _ = proc.communicate()
@@ -31,29 +41,78 @@ def xml_converter_parameters():
 def xml_converter_version():
     return xml_converter_parameters()[1]
 
+def mesh_tool_parameters():
+    """
+    Extract OgreMeshTool version info and stuff
+    """
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+    exe_path, name = os.path.split(exe)
+    proc = subprocess.Popen([exe], stdout=subprocess.PIPE, cwd=exe_path)
+    output, _ = proc.communicate()
+
+    pattern = re.compile("OgreMeshTool ([^ ]+) \((\d+)\.(\d+).(\d+)\) ([^ ]+)")
+    match = pattern.match(output.decode('utf-8'))
+
+    if match:
+        version = (int(match.group(2)), int(match.group(3)), int(match.group(4)))
+        return (match.group(1), version, match.group(5))
+
+    return ("unknown", (0,0,0), "unknown") # should not happen
+
+def mesh_tool_version():
+    return mesh_tool_parameters()[1]
+
+def detect_converter_type():
+    # todo: executing the same exe twice might not be efficient but will do for now
+    # (twice because version will be extracted later in xml_converter_parameters)
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+
+    # extract converter type from its output
+    proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
+    output, _ = proc.communicate()
+
+    output = output.decode('utf-8')
+
+    if output.find("OgreXMLConverter") != -1:
+        return "OgreXMLConverter"
+    if output.find("OgreMeshTool") != -1:
+        return "OgreMeshTool"
+    return "unknown"
+
 def xml_convert(infile, has_uvs=False):
     # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
     # We should show how to configure the converter location in config panel or tell the default path.
     exe = config.get('OGRETOOLS_XML_CONVERTER')
-    version = xml_converter_version()
+
+    converter_type = detect_converter_type()
+    if converter_type == "OgreXMLConverter":
+        version = xml_converter_version()
+    elif converter_type == "OgreMeshTool":
+        version = mesh_tool_version()
+
+    assert converter_type != "unknown", "Cannot find suitable OgreXMLConverter or OgreMeshTool executable"
 
     basicArguments = ''
 
-    if config.get('nuextremityPoints') > 0:
+    if config.get('nuextremityPoints') > 0 and version < (2,1,0):
         basicArguments += ' -x %s' %config.get('nuextremityPoints')
 
-    if version < (1,10,0):
+    if version < (1,10,0) or version >= (2,1,0):
         if not config.get('generateEdgeLists'):
             basicArguments += ' -e'
 
     # note: OgreXmlConverter fails to convert meshes without UVs
+    #       OgreMeshTool has not been tested
     if config.get('generateTangents') and has_uvs:
-        if version < (1,10,0):
+        if version < (1,10,0) or version >= (2,1,0):
             basicArguments += ' -t'
         if config.get('tangentSemantic'):
             basicArguments += ' -td %s' %config.get('tangentSemantic')
         if config.get('tangentUseParity'):
             basicArguments += ' -ts %s' %config.get('tangentUseParity')
+        if version >= (2,1,0):
+            if config.get('optimizeVertexBuffersForShaders'):
+                basicArguments += ' -O %s' %config.get('optimizeVertexBuffersForShadersOptions')
         if config.get('tangentSplitMirrored'):
             basicArguments += ' -tm'
         if config.get('tangentSplitRotated'):
@@ -63,47 +122,48 @@ def xml_convert(infile, has_uvs=False):
     if not config.get('optimiseAnimations'):
         basicArguments += ' -o'
 
-    # Make xml converter print less stuff, comment this if you want more debug info out
-    basicArguments += ' -q'
+    if version < (2,1,0):
+        # Make xml converter print less stuff, comment this if you want more debug info out
+        basicArguments += ' -q'
 
-    opts = '-log _ogre_debug.txt %s' %basicArguments
-    path,name = os.path.split( infile )
-
-    cmd = list(chain([exe], opts.split(), [infile]))
-    subprocess.call( cmd )
-
-def nvcompress(texture, infile, outfile=None, version=1, fast=False, blocking=True):
-    logging.debug('[NVCompress DDS Wrapper]', infile )
-    assert version in (1,2,3,4,5)
-    exe = config.get('NVCOMPRESS')
-    cmd = [ exe ]
-
-    if texture.image.use_alpha and texture.image.depth==32:
-        cmd.append( '-alpha' )
-    if not texture.use_mipmap:
-        cmd.append( '-nomips' )
-
-    if texture.use_normal_map:
-        cmd.append( '-normal' )
-        if version in (1,3):
-            cmd.append( '-bc%sn' %version )
+        # Print log if enabled
+        if config.get('EXPORT_ENABLE_LOGGING'):
+            logfile_path, name = os.path.split(infile)
+            opts = '-log %s/OgreXMLConverter.log %s' % (logfile_path, basicArguments)
         else:
-            cmd.append( '-bc%s' %version )
+            opts = basicArguments
+
+        cmd = [exe] + opts.split() + [infile]
+        ret = subprocess.call(cmd)
+        assert ret == 0, "OgreXMLConverter failed"
     else:
-        cmd.append( '-bc%s' %version )
+        # Convert to v2 format if required
+        basicArguments += ' -%s' %config.get('MESH_TOOL_EXPORT_VERSION')
 
-    if fast:
-        cmd.append( '-fast' )
-    cmd.append( infile )
+        cmd = [exe] + basicArguments.split() + [infile]
 
-    if outfile: cmd.append( outfile )
+        # Open log file to replace old logging feature that the new tool dropped
+        # The log file will be created along side the exported mesh
+        if config.get('EXPORT_ENABLE_LOGGING'):
+            logfile_path, name = os.path.split(infile)
+            logfile = open('%s/OgreMeshTool.log' %logfile_path, 'w')
+            logfile.write('%s\n' %cmd)
 
-    logging.debug( cmd )
-    if blocking:
-        subprocess.call( cmd )
-    else:
-        subprocess.Popen( cmd )
+        # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
+        # otherwise it will complain about missing render system (missing plugins_tools.cfg)
+        exe_path, name = os.path.split(exe)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, cwd=exe_path)
+        if config.get('EXPORT_ENABLE_LOGGING'):
+            for line in proc.stdout:
+                logfile.write(line)
+        proc.wait()
 
+        # Close log file
+        if config.get('EXPORT_ENABLE_LOGGING'):
+            logfile.close()
+
+        # Check converter status
+        assert proc.returncode == 0, "OgreMeshTool failed"
 
 def image_magick( texture, origin_filepath, target_filepath ):
     exe = config.get('IMAGE_MAGICK_CONVERT')
@@ -134,22 +194,13 @@ def image_magick( texture, origin_filepath, target_filepath ):
         cmd.append('-colors')
         cmd.append(str(texture.image.color_quantize))
 
+    if target_filepath.endswith('.dds'):
+        cmd.append('-define')
+        cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS') if texture.use_mipmap else 0))
+
     cmd.append(target_filepath)
     logging.debug('image magick: "%s"', ' '.join(cmd))
     subprocess.call(cmd)
-
-    #path,name = os.path.split( origin_filepath )
-    ##target_filepath = os.path.join( path, self._reformat(name,texture.image) )
-    # this does not work. at all. i find now place where _temp_.png is generated,
-    # thus this file will never be found
-    #if target_filepath.endswith('.dds'):
-    #    temp = os.path.join( path, '_temp_.png' )
-    #    cmd.append( temp )
-    #    logging.debug( 'IMAGE MAGICK: %s' %cmd )
-    #    subprocess.call( cmd )
-    #    self.nvcompress( texture, temp, outfile=target_filepath )
-    #else:
-
 
 def swap(vec):
     if config.get('SWAP_AXIS') == 'xyz': return vec
@@ -247,7 +298,7 @@ def texture_image_path(image):
         image_filepath = bpy.path.abspath(tex.filepath, libpath)
     else:
         if tex.image.packed_file:
-            return '.'
+            return tex.image.name+".png"
 
         return bpy.path.abspath( tex.image.filepath )
 
@@ -336,19 +387,21 @@ def get_parent_matrix( ob, objects ):
             return get_parent_matrix(ob.parent, objects)
 
 def merge_group( group ):
-    print('--------------- merge group ->', group )
+    print('--------------- merge group ->', group.name )
     copies = []
     for ob in group.objects:
         if ob.type == 'MESH':
-            print( '\t group member', ob.name )
             o2 = ob.copy(); copies.append( o2 )
             o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
-            bpy.context.scene.objects.link( o2 ) #; o2.select_set(True)
+            bpy.context.scene.objects.link( o2 ) #; o2.select = True
+
+    name = group.name[len("merge."):] if group.name != "merge." else "mergeGroup"
+
     merged = merge( copies )
-    merged.name = group.name
-    merged.data.name = group.name
+    merged.name = name
+    merged.data.name = name
     return merged
 
 def merge_objects( objects, name='_temp_', transform=None ):
@@ -370,7 +423,6 @@ def merge_objects( objects, name='_temp_', transform=None ):
     return merged
 
 def merge( objects ):
-    print('MERGE', objects)
     for ob in bpy.context.selected_objects:
         ob.select_set(False)
     for ob in objects:
@@ -381,7 +433,7 @@ def merge( objects ):
     bpy.ops.object.join()
     return bpy.context.active_object
 
-def get_merge_group( ob, prefix='merge' ):
+def get_merge_group( ob, prefix='merge.' ):
     m = []
     for grp in ob.users_collection:
         if grp.name.lower().startswith(prefix): m.append( grp )

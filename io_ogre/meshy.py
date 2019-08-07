@@ -1,13 +1,17 @@
 import bpy, sys, os, subprocess
 from bpy.props import BoolProperty
 from .report import Report
+from .config import CONFIG
+from .ogre.mesh import dot_mesh
+from .ogre.material import dot_materials
+from .util import objects_merge_materials, merge_objects
 
-## OgreMeshy
+## mesh previewer
 
-class OgreMeshyPreviewOp(bpy.types.Operator):
-    '''helper to open ogremeshy'''
-    bl_idname = 'ogremeshy.preview'
-    bl_label = "opens ogremeshy in a subprocess"
+class OGREMESH_OT_preview(bpy.types.Operator):
+    '''helper to open ogremesh'''
+    bl_idname = 'ogremesh.preview'
+    bl_label = "opens mesh viewer in a subprocess"
     bl_options = {'REGISTER'}
     preview = BoolProperty(name="preview", description="fast preview", default=True)
     groups = BoolProperty(name="preview merge groups", description="use merge groups", default=False)
@@ -23,23 +27,17 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
 
     def execute(self, context):
         Report.reset()
-        Report.messages.append('running %s' %CONFIG['OGRE_MESHY'])
+        Report.messages.append('running %s' %CONFIG['MESH_PREVIEWER'])
 
-        if sys.platform.startswith('linux'):
-            # If OgreMeshy ends with .exe, set the path for preview meshes to
-            # the user's wine directory, otherwise to /tmp.
-            if CONFIG['OGRE_MESHY'].endswith('.exe'):
-                path = '%s/.wine/drive_c/tmp' % os.environ['HOME']
-            else:
-                path = '/tmp'
-        elif sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
-            path = '/tmp'
+        if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
+            path = os.path.expanduser("~/io_blender2ogre") # use $HOME so snap can access it
+            if not os.path.exists(path):
+                os.makedirs(path)
         else:
             path = 'C:\\tmp'
 
         mat = None
         mgroup = merged = None
-        umaterials = []
 
         if context.active_object.type == 'MESH':
             mat = context.active_object.active_material
@@ -66,7 +64,7 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
                         if mat and mat not in umaterials: umaterials.append( mat )
 
         if not merged:
-            mgroup = MeshMagick.get_merge_group( context.active_object )
+            mgroup = False # TODO relevant? MeshMagick.get_merge_group( context.active_object )
             if not mgroup and self.groups:
                 group = get_merge_group( context.active_object )
                 if group:
@@ -83,33 +81,18 @@ class OgreMeshyPreviewOp(bpy.types.Operator):
                     for m in nmats:
                         if m not in umaterials: umaterials.append( m )
                 MeshMagick.merge( mgroup, path=path, force_name='preview' )
-            elif merged:
-                umaterials = dot_mesh( merged, path=path, force_name='preview' )
             else:
-                umaterials = dot_mesh( context.active_object, path=path, force_name='preview' )
+                dot_mesh( merged or context.active_object, path=path, force_name='preview', overwrite=True )
 
-        if mat or umaterials:
-            #CONFIG['TOUCH_TEXTURES'] = True
-            #CONFIG['PATH'] = path   # TODO deprecate
-            data = ''
-            for umat in umaterials:
-                data += generate_material( umat, path=path, copy_programs=True, touch_textures=True ) # copies shader programs to path
-            f=open( os.path.join( path, 'preview.material' ), 'wb' )
-            f.write( bytes(data,'utf-8') ); f.close()
+        mats = objects_merge_materials([merged or context.active_object])
+        dot_materials(mats, path, False, "preview")
 
         if merged: context.scene.objects.unlink( merged )
 
         if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
-            if CONFIG['OGRE_MESHY'].endswith('.exe'):
-                cmd = ['wine', CONFIG['OGRE_MESHY'], 'c:\\tmp\\preview.mesh' ]
-            else:
-                cmd = [CONFIG['OGRE_MESHY'], '/tmp/preview.mesh']
-            print( cmd )
-            #subprocess.call(cmd)
-            subprocess.Popen(cmd)
+            subprocess.Popen([CONFIG['MESH_PREVIEWER'], path+'/preview.mesh'])
         else:
-            #subprocess.call([CONFIG_OGRE_MESHY, 'C:\\tmp\\preview.mesh'])
-            subprocess.Popen( [CONFIG['OGRE_MESHY'], 'C:\\tmp\\preview.mesh'] )
+            subprocess.Popen( [CONFIG['MESH_PREVIEWER'], 'C:\\tmp\\preview.mesh'] )
 
         Report.show()
         return {'FINISHED'}

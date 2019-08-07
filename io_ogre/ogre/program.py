@@ -1,3 +1,6 @@
+import os
+from .. import config
+
 class OgreProgram(object):
     '''
     parses .program scripts
@@ -20,11 +23,11 @@ class OgreProgram(object):
     PROGRAMS = {}
 
     def reload(self): # only one directory is allowed to hold shader programs
-        if self.source not in os.listdir( CONFIG['SHADER_PROGRAMS'] ):
+        if self.source not in os.listdir( config.get('SHADER_PROGRAMS') ):
             print( 'ERROR: ogre material %s is missing source: %s' %(self.name,self.source) )
-            print( CONFIG['SHADER_PROGRAMS'] )
+            print( config.get('SHADER_PROGRAMS') )
             return False
-        url = os.path.join(  CONFIG['SHADER_PROGRAMS'], self.source )
+        url = os.path.join(  config.get('SHADER_PROGRAMS'), self.source )
         print('shader source:', url)
         self.source_bytes = open( url, 'rb' ).read()#.decode('utf-8')
         print('shader source num bytes:', len(self.source_bytes))
@@ -34,7 +37,7 @@ class OgreProgram(object):
             if line.startswith('#include') and line.count('"')==2:
                 name = line.split()[-1].replace('"','').strip()
                 print('shader includes:', name)
-                url = os.path.join(  CONFIG['SHADER_PROGRAMS'], name )
+                url = os.path.join(  config.get('SHADER_PROGRAMS'), name )
                 self.includes[ name ] = open( url, 'rb' ).read()
         return True
 
@@ -59,7 +62,6 @@ class OgreProgram(object):
         self.data = txt
         print('--parsing ogre shader program--' )
         for line in self.data.splitlines():
-            print(line)
             line = line.split('//')[0]
             line = line.strip()
             if line.startswith('vertex_program') or line.startswith('fragment_program'):

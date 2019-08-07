@@ -96,6 +96,9 @@ def dot_scene(path, scene_name=None):
             objects.append( m )
             temps.append( m )
 
+    # Track that we don't export same data multiple times
+    exported_meshes = []
+
     # Find merge groups
     mgroups = []
     mobjects = []
@@ -106,7 +109,9 @@ def dot_scene(path, scene_name=None):
                 if member not in mobjects: mobjects.append( member )
             if group not in mgroups: mgroups.append( group )
     for rem in mobjects:
-        if rem in objects: objects.remove( rem )
+        if rem in objects:
+            objects.remove( rem )
+            exported_meshes.append(rem.data.name)
 
     for group in mgroups:
         merged = merge_group( group )
@@ -141,8 +146,6 @@ def dot_scene(path, scene_name=None):
 
     mesh_collision_prims = {}
     mesh_collision_files = {}
-    # Track that we don't export same data multiple times
-    exported_meshes = []
 
     for root in roots:
         print('      - Exporting root node:', root.name)
@@ -420,7 +423,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             collisionFile = mesh_collision_files[ ob.data.name ]
 
         e = doc.createElement('entity')
-        o.appendChild(e); e.setAttribute('name', ob.data.name)
+        o.appendChild(e); e.setAttribute('name', ob.name)
         prefix = ''
         e.setAttribute('meshFile', '%s%s.mesh' %(prefix,clean_object_name(ob.data.name)) )
 
@@ -442,13 +445,12 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         _mesh_entity_helper( doc, ob, e )
 
         # export mesh.xml file of this object
-        if config.get('MESH'):
+        if config.get('MESH') and ob.data.name not in exported_meshes:
             exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
             overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
             mesh.dot_mesh(ob, path, overwrite=overwrite)
-            skeleton.dot_skeleton(ob, path, overwrite=overwrite)
-            if ob.data.name not in exported_meshes:
-                exported_meshes.append( ob.data.name )
+            skeleton.dot_skeleton(ob, path, overwrite=overwrite)    
+            exported_meshes.append( ob.data.name )
 
         # Deal with Array modifier
         vecs = [ ob.matrix_world.to_translation() ]
