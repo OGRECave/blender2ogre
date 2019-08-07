@@ -232,19 +232,19 @@ def is_strictly_simple_terrain( ob ):
 
 def get_image_textures( mat ):
     r = []
-    for s in mat.texture_slots:
-        if s and s.texture != None and s.texture.type == 'IMAGE':
+    for s in mat.texture_paint_images:
+        if s:
             r.append( s )
     return r
 
-def texture_image_path(tex):
-
-    if not tex.image:
+def texture_image_path(image):
+    raise NotImplementedError("TODO: Remove??")
+    if not image:
         return None
 
     if tex.library: # support library linked textures
         libpath = split(bpy.path.abspath(tex.library.filepath))[0]
-        image_filepath = bpy.path.abspath(tex.image.filepath, libpath)
+        image_filepath = bpy.path.abspath(tex.filepath, libpath)
     else:
         if tex.image.packed_file:
             return '.'
@@ -283,16 +283,16 @@ def gather_instances():
 
 def select_instances( context, name ):
     for ob in bpy.context.scene.objects:
-        ob.select = False
+        ob.select_set(False)
     ob = bpy.context.scene.objects[ name ]
     if ob.data:
         inst = gather_instances()
-        for ob in inst[ ob.data ]: ob.select = True
+        for ob in inst[ ob.data ]: ob.select_set(True)
         bpy.context.scene.objects.active = ob
 
 def select_group( context, name, options={} ):
     for ob in bpy.context.scene.objects:
-        ob.select = False
+        ob.select_set(False)
     for grp in bpy.data.groups:
         if grp.name == name:
             # context.scene.objects.active = grp.objects
@@ -302,7 +302,7 @@ def select_group( context, name, options={} ):
             # will work as expected. - http://wiki.blender.org/index.php?title=Dev:2.5/Py/API/Intro&useskin=monobook
             bpy.context.scene.objects.active = grp.objects[0]
             for ob in grp.objects:
-                ob.select = True
+                ob.select_set(True)
         else:
             pass
 
@@ -345,7 +345,7 @@ def merge_group( group ):
             o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
-            bpy.context.scene.objects.link( o2 ) #; o2.select = True
+            bpy.context.scene.objects.link( o2 ) #; o2.select_set(True)
     merged = merge( copies )
     merged.name = group.name
     merged.data.name = group.name
@@ -355,7 +355,7 @@ def merge_objects( objects, name='_temp_', transform=None ):
     assert objects
     copies = []
     for ob in objects:
-        ob.select = False
+        ob.select_set(False)
         if ob.type == 'MESH':
             o2 = ob.copy(); copies.append( o2 )
             o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
@@ -363,7 +363,7 @@ def merge_objects( objects, name='_temp_', transform=None ):
                 o2.modifiers.remove( o2.modifiers[0] )
             if transform:
                 o2.matrix_world =  transform * o2.matrix_local
-            bpy.context.scene.objects.link( o2 ) #; o2.select = True
+            bpy.context.scene.objects.link( o2 ) #; o2.select_set(True)
     merged = merge( copies )
     merged.name = name
     merged.data.name = name
@@ -372,10 +372,10 @@ def merge_objects( objects, name='_temp_', transform=None ):
 def merge( objects ):
     print('MERGE', objects)
     for ob in bpy.context.selected_objects:
-        ob.select = False
+        ob.select_set(False)
     for ob in objects:
         print('\t'+ob.name)
-        ob.select = True
+        ob.select_set(True)
         assert not ob.library
     bpy.context.scene.objects.active = ob
     bpy.ops.object.join()
@@ -383,7 +383,7 @@ def merge( objects ):
 
 def get_merge_group( ob, prefix='merge' ):
     m = []
-    for grp in ob.users_group:
+    for grp in ob.users_collection:
         if grp.name.lower().startswith(prefix): m.append( grp )
     if len(m)==1:
         #if ob.data.users != 1:

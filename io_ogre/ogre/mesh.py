@@ -34,10 +34,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     # blender per default does not calculate these. when querying the quads/tris 
     # of the object blender would crash if calc_tessface was not updated
-    ob.data.update(calc_tessface=True)
+    ob.data.update(calc_loop_triangles=True)
+    ob.data.calc_loop_triangles()
 
     Report.meshes.append( obj_name )
-    Report.faces += len( ob.data.tessfaces )
+    Report.faces += len( ob.data.loop_triangles )
     Report.orig_vertices += len( ob.data.vertices )
 
     cleanup = False
@@ -78,16 +79,16 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'positions':'true',
                 'normals':'true',
                 'colours_diffuse' : str(bool( mesh.vertex_colors )),
-                'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
+                'texture_coords' : '%s' % len(mesh.uv_layers) if mesh.uv_layers.active else 0
         })
 
         # Vertex colors, note that you can define a vertex color
         # material. see 'vertex_color_materials' below!
         vcolors = None
         vcolors_alpha = None
-        if len( mesh.tessface_vertex_colors ):
-            vcolors = mesh.tessface_vertex_colors[0]
-            for bloc in mesh.tessface_vertex_colors:
+        if len( mesh.vertex_colors ):
+            vcolors = mesh.vertex_colors[0]
+            for bloc in mesh.vertex_colors:
                 if bloc.name.lower().startswith('alpha'):
                     vcolors_alpha = bloc; break
 
@@ -120,33 +121,34 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         # Textures
         dotextures = False
-        uvcache = [] # should get a little speed boost by this cache
-        if mesh.tessface_uv_textures.active:
+        #uvcache = [] # should get a little speed boost by this cache
+        if mesh.uv_layers.active:
             dotextures = True
-            for layer in mesh.tessface_uv_textures:
+            """
+            Works very different now!
+            
+            for layer in mesh.uv_layers:
                 uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
                 for uvface in layer.data:
-                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
+                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )"""
 
         shared_vertices = {}
         _remap_verts_ = []
         numverts = 0
 
-        for F in mesh.tessfaces:
+        for F in mesh.loop_triangles:
             smooth = F.use_smooth
             faces = material_faces[ F.material_index ]
             # Ogre only supports triangles
             tris = []
             tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
-            if len(F.vertices) >= 4:
-                tris.append( (F.vertices[0], F.vertices[2], F.vertices[3]) )
-            if dotextures:
+            """if dotextures:
                 a = []; b = []
                 uvtris = [ a, b ]
                 for layer in uvcache:
                     uv1, uv2, uv3, uv4 = layer[ F.index ]
                     a.append( (uv1, uv2, uv3) )
-                    b.append( (uv1, uv3, uv4) )
+                    b.append( (uv1, uv3, uv4) )"""
 
             for tidx, tri in enumerate(tris):
                 face = []
@@ -165,8 +167,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     # Texture maps
                     vert_uvs = []
                     if dotextures:
-                        for layer in uvtris[ tidx ]:
-                            vert_uvs.append(layer[ vidx ])
+                        for layer in mesh.uv_layers:
+                            vert_uvs.append(layer.data[F.loops[vidx]].uv)
+                        """for layer in uvtris[ tidx ]:
+                            vert_uvs.append(layer[ vidx ])"""
 
                     ''' Check if we already exported that vertex with same normal, do not export in that case,
                         (flat shading in blender seems to work with face normals, so we copy each flat face'
@@ -328,7 +332,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             def activate_object(obj):
                 bpy.ops.object.select_all(action = 'DESELECT')
                 bpy.context.scene.objects.active = obj
-                obj.select = True
+                obj.select_set(True)
 
             def duplicate_object(scene, name, copyobj):
 
@@ -346,7 +350,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                 # Link new object to the given scene and select it
                 scene.objects.link(ob_new)
-                ob_new.select = True
+                ob_new.select_set(True)
 
                 return ob_new, mesh
 
@@ -418,10 +422,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         'manual'    : "true"
                     })
 
-                    print('        - Generating', len(lod_generated), 'LOD meshes. Original: vertices', len(mesh.vertices), "faces", len(mesh.tessfaces))
+                    print('        - Generating', len(lod_generated), 'LOD meshes. Original: vertices', len(mesh.vertices), "faces", len(mesh.loop_triangles))
                     for lod in lod_generated:
                         ratio_percent = round(lod['ratio'] * 100.0, 0)
-                        print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
+                        print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].loop_triangles), 'faces')
                         lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
                         lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
                         dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, isLOD=True)
@@ -596,7 +600,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             del copy
             del mesh
         del _remap_verts_
-        del uvcache
         doc.close() # reported by Reyn
         f.close()
 
@@ -636,7 +639,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
 def triangle_list_in_group(mesh, shared_vertices, group_index):
     faces = []
-    for face in mesh.data.tessfaces: 
+    for face in mesh.data.loop_triangles: 
         vertices = [mesh.data.vertices[v] for v in face.vertices]
         match_group = lambda g, v: g in [x.group for x in v.groups]
         all_in_group = all([match_group(group_index, v) for v in vertices])
