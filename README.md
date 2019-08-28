@@ -11,9 +11,7 @@ Integrated help docs will be shown in the upper right hand toolbar, replacing bl
 
 The following versions of blender have been tested. It might also work with older versions of Blender.
 
-* Blender 2.75
-* Blender 2.71
-* Blender 2.66
+* Blender 2.80
 
 ## Updating to new versions ##
 
