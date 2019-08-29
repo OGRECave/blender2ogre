@@ -148,7 +148,7 @@ class OgreMaterialGenerator(object):
 
             self.w.iline('diffuse %s %s %s %s' %(color[0], color[1], color[2], alpha) )
 
-            f = mat.specular_intensity
+            f = mat.metallic
             s = mat.specular_color
             self.w.iline('specular %s %s %s %s %s' %(s[0]*f, s[1]*f, s[2]*f, alpha, f) )
 
