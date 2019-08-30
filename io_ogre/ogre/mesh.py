@@ -851,20 +851,3 @@ class VertexNoPos(object):
 
     def __repr__(self):
         return 'vertex(%d)' % self.ogre_vidx
-
-def extract_vertex_color(vcolors, vcolors_alpha, face, index):
-    r = 1.0
-    g = 1.0
-    b = 1.0
-    ra = 1.0
-    export = False
-    if vcolors:
-        k = list(face.vertices).index(index)
-        r,g,b = getattr( vcolors.data[face.index], 'color%s'%(k+1) )
-        if vcolors_alpha:
-            ra,ga,ba = getattr( vcolors_alpha.data[face.index], 'color%s'%(k+1) )
-        else:
-            ra = 1.0
-        export = True
-    return export, (r,g,b,ra)
-
