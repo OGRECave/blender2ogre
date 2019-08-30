@@ -8,6 +8,46 @@ from .. import util
 from .material import *
 from .skeleton import Skeleton
 
+class VertexColorLookup:
+    def __init__(self, mesh):
+        self.mesh = mesh
+        
+        self.__colors = None
+        self.__alphas = None
+
+        color_names = ["col", "color"]
+        alpha_names = ["a", "alpha"]
+
+        if len(self.mesh.vertex_colors):
+            for key, colors in self.mesh.vertex_colors.items():
+                if (self.__colors is None) and (key.lower() in color_names):
+                    self.__colors = colors
+                if (self.__alphas is None) and (key.lower() in alpha_names):
+                    self.__alphas = colors
+            if self.__colors is None and self.__alphas is None:
+                # No alpha and color found by name, assume that the only
+                # vertex color data is actual color data
+                self.__colors = colors
+
+            if self.__colors:
+                self.__colors = [x.color for x in self.__colors.data]
+            if self.__alphas:
+                self.__alphas = [x.color for x in self.__alphas.data]
+
+    @property
+    def has_color_data(self):
+        return self.__colors is not None or self.__alphas is not None
+
+    def get(self, item):
+        if self.__colors:
+            color = self.__colors[item]
+        else:
+            color = [1.0] * 4
+        if self.__alphas:
+            color[3] = mathutils.Vector(self.__alphas[item]).length
+        return color
+
+
 def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
@@ -84,22 +124,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'texture_coords' : '%s' % len(mesh.uv_layers) if mesh.uv_layers.active else 0
         })
 
-        # Vertex colors, note that you can define a vertex color
-        # material. see 'vertex_color_materials' below!
-        vcolors = None
-        vcolors_alpha = None
-        if len( mesh.vertex_colors ):
-            vcolors = mesh.vertex_colors[0]
-            for bloc in mesh.vertex_colors:
-                if bloc.name.lower().startswith('alpha'):
-                    vcolors_alpha = bloc; break
+        vertex_color_lookup = VertexColorLookup(mesh)
 
         # Materials
         # saves tuples of material name and material obj (or None)
         materials = []
         # a material named 'vertex.color.<yourname>' will overwrite
         # the diffuse color in the mesh file!
-        vertex_color_materials = []
         for mat in ob.data.materials:
             mat_name = "_missing_material_"
             if mat is not None:
@@ -181,9 +212,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         nx,ny,nz = swap( F.normal )
                         n = mathutils.Vector( [nx, ny, nz] )
 
-                    export_vertex_color, color_tuple = \
-                            extract_vertex_color(vcolors, vcolors_alpha, F, idx)
-                    r,g,b,ra = color_tuple
+                    r,g,b,ra = vertex_color_lookup.get(F.loops[vidx])
 
                     # Texture maps
                     vert_uvs = []
@@ -241,7 +270,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             'z' : '%6f' % nz
                     })
 
-                    if export_vertex_color:
+                    if vertex_color_lookup.has_color_data:
                         doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
 
                     # Texture maps
@@ -413,6 +442,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 lod_min_vertice_count = 12
 
                 for level in range(lod_levels+1)[1:]:
+                    raise ValueError("No lod please!")
                     decimate.ratio = lod_current_ratio
                     lod_mesh = ob_copy.to_mesh(scene = bpy.context.scene, apply_modifiers = True, settings = 'PREVIEW')
                     ob_copy_meshes.append(lod_mesh)
