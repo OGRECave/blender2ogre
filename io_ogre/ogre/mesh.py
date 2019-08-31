@@ -153,17 +153,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             material_faces.append([])
 
         # Textures
-        dotextures = False
-        #uvcache = [] # should get a little speed boost by this cache
-        if mesh.uv_layers.active:
-            dotextures = True
-            """
-            Works very different now!
-            
-            for layer in mesh.uv_layers:
-                uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
-                for uvface in layer.data:
-                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )"""
+        dotextures = len(mesh.uv_layers) > 0
 
         shared_vertices = {}
         _remap_verts_ = []
@@ -185,13 +175,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             # Ogre only supports triangles
             tris = []
             tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
-            """if dotextures:
-                a = []; b = []
-                uvtris = [ a, b ]
-                for layer in uvcache:
-                    uv1, uv2, uv3, uv4 = layer[ F.index ]
-                    a.append( (uv1, uv2, uv3) )
-                    b.append( (uv1, uv3, uv4) )"""
 
             for tidx, tri in enumerate(tris):
                 face = []
