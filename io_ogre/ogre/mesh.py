@@ -8,6 +8,35 @@ from .. import util
 from .material import *
 from .skeleton import Skeleton
 
+class VertexColorLookup:
+    def __init__(self, mesh):
+        self.vcolors = None
+        self.vcolors_alpha = None
+        self.has_vcolors = False
+        
+        if len(mesh.tessface_vertex_colors) == 0:
+            return
+        self.vcolors = mesh.tessface_vertex_colors[0]
+        self.has_vcolors = bool(self.vcolors)
+        
+        for bloc in mesh.tessface_vertex_colors:
+            if bloc.name.lower().startswith('alpha'):
+                self.vcolors_alpha = bloc
+                break
+    
+    def get(self, face, index):
+        if not self.has_vcolors:
+            return (1.0,) * 4
+        
+        k = list(face.vertices).index(index)
+        r,g,b = getattr( self.vcolors.data[face.index], 'color%s'%(k+1) )
+        if self.vcolors_alpha:
+            ra,ga,ba = getattr( self.vcolors_alpha.data[face.index], 'color%s'%(k+1) )
+        else:
+            ra = 1.0
+        
+        return (r,g,b,ra)
+
 def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
@@ -83,22 +112,15 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
         })
 
-        # Vertex colors, note that you can define a vertex color
-        # material. see 'vertex_color_materials' below!
-        vcolors = None
-        vcolors_alpha = None
-        if len( mesh.tessface_vertex_colors ):
-            vcolors = mesh.tessface_vertex_colors[0]
-            for bloc in mesh.tessface_vertex_colors:
-                if bloc.name.lower().startswith('alpha'):
-                    vcolors_alpha = bloc; break
+        # Vertex colors
+        vertex_color_lookup = VertexColorLookup(mesh)
 
         # Materials
         # saves tuples of material name and material obj (or None)
         materials = []
         # a material named 'vertex.color.<yourname>' will overwrite
         # the diffuse color in the mesh file!
-        vertex_color_materials = []
+
         for mat in ob.data.materials:
             mat_name = "_missing_material_"
             if mat is not None:
@@ -179,9 +201,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         nx,ny,nz = swap( F.normal )
                         n = mathutils.Vector( [nx, ny, nz] )
 
-                    export_vertex_color, color_tuple = \
-                            extract_vertex_color(vcolors, vcolors_alpha, F, idx)
-                    r,g,b,ra = color_tuple
+                    r,g,b,ra = vertex_color_lookup.get(F, idx)
 
                     # Texture maps
                     vert_uvs = []
@@ -237,7 +257,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             'z' : '%6f' % nz
                     })
 
-                    if export_vertex_color:
+                    if vertex_color_lookup.has_vcolors:
                         doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
 
                     # Texture maps
@@ -818,20 +838,4 @@ class VertexNoPos(object):
 
     def __repr__(self):
         return 'vertex(%d)' % self.ogre_vidx
-
-def extract_vertex_color(vcolors, vcolors_alpha, face, index):
-    r = 1.0
-    g = 1.0
-    b = 1.0
-    ra = 1.0
-    export = False
-    if vcolors:
-        k = list(face.vertices).index(index)
-        r,g,b = getattr( vcolors.data[face.index], 'color%s'%(k+1) )
-        if vcolors_alpha:
-            ra,ga,ba = getattr( vcolors_alpha.data[face.index], 'color%s'%(k+1) )
-        else:
-            ra = 1.0
-        export = True
-    return export, (r,g,b,ra)
 
