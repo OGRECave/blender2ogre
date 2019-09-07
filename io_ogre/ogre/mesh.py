@@ -10,32 +10,43 @@ from .skeleton import Skeleton
 
 class VertexColorLookup:
     def __init__(self, mesh):
-        self.vcolors = None
-        self.vcolors_alpha = None
-        self.has_vcolors = False
+        self.mesh = mesh
         
-        if len(mesh.tessface_vertex_colors) == 0:
-            return
-        self.vcolors = mesh.tessface_vertex_colors[0]
-        self.has_vcolors = bool(self.vcolors)
-        
-        for bloc in mesh.tessface_vertex_colors:
-            if bloc.name.lower().startswith('alpha'):
-                self.vcolors_alpha = bloc
-                break
-    
-    def get(self, face, index):
-        if not self.has_vcolors:
-            return (1.0,) * 4
-        
-        k = list(face.vertices).index(index)
-        r,g,b = getattr( self.vcolors.data[face.index], 'color%s'%(k+1) )
-        if self.vcolors_alpha:
-            ra,ga,ba = getattr( self.vcolors_alpha.data[face.index], 'color%s'%(k+1) )
+        self.__colors = None
+        self.__alphas = None
+
+        color_names = ["col", "color"]
+        alpha_names = ["a", "alpha"]
+
+        if len(self.mesh.vertex_colors):
+            for key, colors in self.mesh.vertex_colors.items():
+                if (self.__colors is None) and (key.lower() in color_names):
+                    self.__colors = colors
+                if (self.__alphas is None) and (key.lower() in alpha_names):
+                    self.__alphas = colors
+            if self.__colors is None and self.__alphas is None:
+                # No alpha and color found by name, assume that the only
+                # vertex color data is actual color data
+                self.__colors = colors
+
+            if self.__colors:
+                self.__colors = [x.color for x in self.__colors.data]
+            if self.__alphas:
+                self.__alphas = [x.color for x in self.__alphas.data]
+
+    @property
+    def has_color_data(self):
+        return self.__colors is not None or self.__alphas is not None
+
+    def get(self, item):
+        if self.__colors:
+            color = self.__colors[item]
         else:
-            ra = 1.0
-        
-        return (r,g,b,ra)
+            color = [1.0] * 4
+        if self.__alphas:
+            color[3] = mathutils.Vector(self.__alphas[item]).length
+        return color
+
 
 def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
     """
@@ -65,10 +76,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     # blender per default does not calculate these. when querying the quads/tris 
     # of the object blender would crash if calc_tessface was not updated
-    ob.data.update(calc_tessface=True)
+    ob.data.update(calc_loop_triangles=True)
+    ob.data.calc_loop_triangles()
 
     Report.meshes.append( obj_name )
-    Report.faces += len( ob.data.tessfaces )
+    Report.faces += len( ob.data.loop_triangles )
     Report.orig_vertices += len( ob.data.vertices )
 
     cleanup = False
@@ -109,10 +121,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'positions':'true',
                 'normals':'true',
                 'colours_diffuse' : str(bool( mesh.vertex_colors )),
-                'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
+                'texture_coords' : '%s' % len(mesh.uv_layers) if mesh.uv_layers.active else 0
         })
 
-        # Vertex colors
         vertex_color_lookup = VertexColorLookup(mesh)
 
         # Materials
@@ -120,7 +131,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         materials = []
         # a material named 'vertex.color.<yourname>' will overwrite
         # the diffuse color in the mesh file!
-
         for mat in ob.data.materials:
             mat_name = "_missing_material_"
             if mat is not None:
@@ -143,14 +153,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             material_faces.append([])
 
         # Textures
-        dotextures = False
-        uvcache = [] # should get a little speed boost by this cache
-        if mesh.tessface_uv_textures.active:
-            dotextures = True
-            for layer in mesh.tessface_uv_textures:
-                uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
-                for uvface in layer.data:
-                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
+        dotextures = len(mesh.uv_layers) > 0
 
         shared_vertices = {}
         _remap_verts_ = []
@@ -166,21 +169,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
 
-        for F in mesh.tessfaces:
+        for F in mesh.loop_triangles:
             smooth = F.use_smooth
             faces = material_faces[ F.material_index ]
             # Ogre only supports triangles
             tris = []
             tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
-            if len(F.vertices) >= 4:
-                tris.append( (F.vertices[0], F.vertices[2], F.vertices[3]) )
-            if dotextures:
-                a = []; b = []
-                uvtris = [ a, b ]
-                for layer in uvcache:
-                    uv1, uv2, uv3, uv4 = layer[ F.index ]
-                    a.append( (uv1, uv2, uv3) )
-                    b.append( (uv1, uv3, uv4) )
 
             for tidx, tri in enumerate(tris):
                 face = []
@@ -201,13 +195,15 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         nx,ny,nz = swap( F.normal )
                         n = mathutils.Vector( [nx, ny, nz] )
 
-                    r,g,b,ra = vertex_color_lookup.get(F, idx)
+                    r,g,b,ra = vertex_color_lookup.get(F.loops[vidx])
 
                     # Texture maps
                     vert_uvs = []
                     if dotextures:
-                        for layer in uvtris[ tidx ]:
-                            vert_uvs.append(layer[ vidx ])
+                        for layer in mesh.uv_layers:
+                            vert_uvs.append(layer.data[F.loops[vidx]].uv)
+                        """for layer in uvtris[ tidx ]:
+                            vert_uvs.append(layer[ vidx ])"""
 
                     ''' Check if we already exported that vertex with same normal, do not export in that case,
                         (flat shading in blender seems to work with face normals, so we copy each flat face'
@@ -257,7 +253,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             'z' : '%6f' % nz
                     })
 
-                    if vertex_color_lookup.has_vcolors:
+                    if vertex_color_lookup.has_color_data:
                         doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
 
                     # Texture maps
@@ -371,7 +367,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             def activate_object(obj):
                 bpy.ops.object.select_all(action = 'DESELECT')
                 bpy.context.scene.objects.active = obj
-                obj.select = True
+                obj.select_set(True)
 
             def duplicate_object(scene, name, copyobj):
 
@@ -389,7 +385,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                 # Link new object to the given scene and select it
                 scene.objects.link(ob_new)
-                ob_new.select = True
+                ob_new.select_set(True)
 
                 return ob_new, mesh
 
@@ -429,6 +425,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 lod_min_vertice_count = 12
 
                 for level in range(lod_levels+1)[1:]:
+                    raise ValueError("No lod please!")
                     decimate.ratio = lod_current_ratio
                     lod_mesh = ob_copy.to_mesh(scene = bpy.context.scene, apply_modifiers = True, settings = 'PREVIEW')
                     ob_copy_meshes.append(lod_mesh)
@@ -461,10 +458,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         'manual'    : "true"
                     })
 
-                    print('        - Generating', len(lod_generated), 'LOD meshes. Original: vertices', len(mesh.vertices), "faces", len(mesh.tessfaces))
+                    print('        - Generating', len(lod_generated), 'LOD meshes. Original: vertices', len(mesh.vertices), "faces", len(mesh.loop_triangles))
                     for lod in lod_generated:
                         ratio_percent = round(lod['ratio'] * 100.0, 0)
-                        print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
+                        print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].loop_triangles), 'faces')
                         lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
                         lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
                         dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, isLOD=True)
@@ -670,7 +667,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         del _remap_verts_
         del _remap_normals_
         del _face_indices_
-        del uvcache
         doc.close() # reported by Reyn
         f.close()
 
@@ -710,7 +706,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
 def triangle_list_in_group(mesh, shared_vertices, group_index):
     faces = []
-    for face in mesh.data.tessfaces: 
+    for face in mesh.data.loop_triangles: 
         vertices = [mesh.data.vertices[v] for v in face.vertices]
         match_group = lambda g, v: g in [x.group for x in v.groups]
         all_in_group = all([match_group(group_index, v) for v in vertices])

@@ -24,9 +24,9 @@ def auto_register(register):
     yield OP_ogre_export
 
     if register:
-        bpy.types.INFO_MT_file_export.append(menu_func)
+        bpy.types.TOPBAR_MT_file_export.append(menu_func)
     else:
-        bpy.types.INFO_MT_file_export.remove(menu_func)
+        bpy.types.TOPBAR_MT_file_export.remove(menu_func)
 
     
 

@@ -202,9 +202,8 @@ def save_config():
 
 
 def update_from_addon_preference(context):
+    addon_preferences = context.preferences.addons["io_ogre"].preferences
 
-    addon_preferences = context.user_preferences.addons["io_ogre"].preferences
-    
     for key in _CONFIG_TAGS_:
         addon_pref_value = getattr(addon_preferences,key,None)
         if addon_pref_value is not None:
