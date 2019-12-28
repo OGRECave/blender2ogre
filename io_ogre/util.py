@@ -392,7 +392,7 @@ def merge_group( group ):
     for ob in group.objects:
         if ob.type == 'MESH':
             o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
+            o2.data = o2.to_mesh() # collaspe modifiers
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             bpy.context.scene.objects.link( o2 ) #; o2.select = True
@@ -411,11 +411,11 @@ def merge_objects( objects, name='_temp_', transform=None ):
         ob.select_set(False)
         if ob.type == 'MESH':
             o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
+            o2.data = o2.to_mesh() # collaspe modifiers
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             if transform:
-                o2.matrix_world =  transform * o2.matrix_local
+                o2.matrix_world =  transform @ o2.matrix_local
             bpy.context.scene.objects.link( o2 ) #; o2.select_set(True)
     merged = merge( copies )
     merged.name = name
