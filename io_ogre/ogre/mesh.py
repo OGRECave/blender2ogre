@@ -76,7 +76,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     # blender per default does not calculate these. when querying the quads/tris 
     # of the object blender would crash if calc_tessface was not updated
-    ob.data.update(calc_loop_triangles=True)
+    ob.data.update()
     ob.data.calc_loop_triangles()
 
     Report.meshes.append( obj_name )
@@ -93,7 +93,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
         for mod in rem: copy.modifiers.remove( mod )
         # bake mesh
-        mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
+        mesh = copy.to_mesh()    # collaspe
+        mesh.update()
+        mesh.calc_loop_triangles()
     else:
         copy = ob
         mesh = ob.data
@@ -427,7 +429,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 for level in range(lod_levels+1)[1:]:
                     raise ValueError("No lod please!")
                     decimate.ratio = lod_current_ratio
-                    lod_mesh = ob_copy.to_mesh(scene = bpy.context.scene, apply_modifiers = True, settings = 'PREVIEW')
+                    lod_mesh = ob_copy.to_mesh()
                     ob_copy_meshes.append(lod_mesh)
 
                     # Check min vertice count and that the vertice count got reduced from last iteration
@@ -655,13 +657,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 print('        Done at', timer_diff_str(start), "seconds")
 
         ## Clean up and save
-        #bpy.context.scene.meshes.unlink(mesh)
         if cleanup:
-            #bpy.context.scene.objects.unlink(copy)
             copy.user_clear()
             bpy.data.objects.remove(copy)
-            mesh.user_clear()
-            bpy.data.meshes.remove(mesh)
             del copy
             del mesh
         del _remap_verts_

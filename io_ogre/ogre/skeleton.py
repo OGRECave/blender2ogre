@@ -71,14 +71,14 @@ class Bone(object):
         self._inverse_total_trans_pose = pose.inverted()
         # calculate difference to parent bone
         if self.parent:
-            pose = self.parent._inverse_total_trans_pose* pose
+            pose = self.parent._inverse_total_trans_pose @ pose
         elif self.fixUpAxis:
-            pose = self.flipMat * pose
+            pose = self.flipMat @ pose
         else:
             pass
 
         self.pose_location =  pose.to_translation() - self.ogre_rest_matrix.to_translation()
-        pose = self.inverse_ogre_rest_matrix * pose
+        pose = self.inverse_ogre_rest_matrix @ pose
         self.pose_rotation = pose.to_quaternion()
 
         #self.pose_location = pbone.location.copy()
@@ -162,12 +162,12 @@ class Bone(object):
         else:
             inverseParentMatrix = mathutils.Matrix(((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)))
 
-        #self.ogre_rest_matrix = self.skeleton.object_space_transformation * self.matrix    # ALLOW ROTATION?
+        #self.ogre_rest_matrix = self.skeleton.object_space_transformation @ self.matrix    # ALLOW ROTATION?
         self.ogre_rest_matrix = self.matrix.copy()
         # store total inverse transformation
         self.inverse_total_trans = self.ogre_rest_matrix.inverted()
         # relative to OGRE parent bone origin
-        self.ogre_rest_matrix = inverseParentMatrix * self.ogre_rest_matrix
+        self.ogre_rest_matrix = inverseParentMatrix @ self.ogre_rest_matrix
         self.inverse_ogre_rest_matrix = self.ogre_rest_matrix.inverted()
 
         # recursion
@@ -305,8 +305,7 @@ class Skeleton(object):
         self.bones = []
         mats = {}
         self.arm = arm = findArmature( ob )
-        arm.hide = False
-        self._restore_layers = list(arm.layers)
+        arm.hide_viewport = False
         #arm.layers = [True]*20      # can not have anything hidden - REQUIRED?
 
         for pbone in arm.pose.bones:

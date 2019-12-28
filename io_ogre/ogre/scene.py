@@ -407,7 +407,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
     if ob.type == 'MESH':
         # ob.data.tessfaces is empty. always until the following call
-        ob.data.update(calc_loop_triangles=True)
+        ob.data.update()
         ob.data.calc_loop_triangles()
         # if it has no faces at all, the object itself will not be exported, BUT 
         # it might have children
