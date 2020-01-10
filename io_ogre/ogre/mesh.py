@@ -240,7 +240,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     _remap_normals_.append( n )
                     _face_indices_.append( F.index )
 
-                    x,y,z = swap(v.co)        # xz-y is correct!
+                    x,y,z = swap(ob.matrix_world * v.co)        # xz-y is correct!
 
                     doc.start_tag('vertex', {})
                     doc.leaf_tag('position', {
@@ -579,7 +579,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                 for vidx, v in enumerate(_remap_verts_):
                     pv = skey.data[ v.index ]
-                    x,y,z = swap( pv.co - v.co )
+                    x,y,z = swap( ob.matrix_world * pv.co - ob.matrix_world * v.co )
 
                     if config.get('SHAPE_NORMALS'):
                         n = _remap_normals_[ vidx ]
