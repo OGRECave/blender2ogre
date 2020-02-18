@@ -443,13 +443,14 @@ class Skeleton(object):
 
                 for strip in nla.strips:
                     action = strip.action
-                    actions[ action.name ] = action
+                    actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end]
                     print('   strip name:', strip.name)
                     print('   action name:', action.name)
 
             actionNames = sorted( actions.keys() )  # output actions in alphabetical order
             for actionName in actionNames:
-                action = actions[ actionName ]
+                actionData = actions[ actionName ]
+                action = actionData[0]
                 arm.animation_data.action = action  # set as the current action
                 suppressedBones = []
                 if config.get('ONLY_KEYFRAMED_BONES'):
@@ -461,7 +462,7 @@ class Skeleton(object):
                             # suppress this bone's output
                             b.shouldOutput = False
                             suppressedBones.append( b.name )
-                self.write_animation( arm, actionName, action.frame_range[0], action.frame_range[1], doc, anims )
+                self.write_animation( arm, actionName, actionData[1], actionData[2], doc, anims )
                 # restore suppressed bones
                 for boneName in suppressedBones:
                     bone = self.get_bone( boneName )
