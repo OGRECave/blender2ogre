@@ -11,7 +11,7 @@ from .skeleton import Skeleton
 class VertexColorLookup:
     def __init__(self, mesh):
         self.mesh = mesh
-        
+
         self.__colors = None
         self.__alphas = None
 
@@ -74,7 +74,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     start = time.time()
 
-    # blender per default does not calculate these. when querying the quads/tris 
+    # blender per default does not calculate these. when querying the quads/tris
     # of the object blender would crash if calc_tessface was not updated
     ob.data.update()
     ob.data.calc_loop_triangles()
@@ -87,7 +87,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     if ob.modifiers:
         cleanup = True
         copy = ob.copy()
-        #bpy.context.scene.objects.link(copy)
+        #bpy.context.scene.collection.objects.link(copy)
         rem = []
         for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
             if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
@@ -167,7 +167,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if mesh.has_custom_normals:
             mesh.calc_normals_split()
             # Create bmesh to help obtain custom vertex normals
-            bm = bmesh.new() 
+            bm = bmesh.new()
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
 
@@ -240,7 +240,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     _remap_normals_.append( n )
                     _face_indices_.append( F.index )
 
-                    x,y,z = swap(ob.matrix_world * v.co)        # xz-y is correct!
+                    x,y,z = swap(v.co)        # xz-y is correct!
 
                     doc.start_tag('vertex', {})
                     doc.leaf_tag('position', {
@@ -386,7 +386,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 ob_new.scale = copyobj.scale
 
                 # Link new object to the given scene and select it
-                scene.objects.link(ob_new)
+                scene.collection.objects.link(ob_new)
                 ob_new.select_set(True)
 
                 return ob_new, mesh
@@ -525,7 +525,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             badverts = 0
             for vidx, v in enumerate(_remap_verts_):
                 check = 0
-                for vgroup in v.groups:
+                for vgroup in v.collections:
                     if vgroup.weight > config.get('TRIM_BONE_WEIGHTS'):
                         groupIndex = vgroup.group
                         if groupIndex < len(copy.vertex_groups):
@@ -570,7 +570,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 })
 
                 snormals = None
-                
+
                 if config.get('SHAPE_NORMALS'):
                     if smooth:
                         snormals = skey.normals_vertex_get()
@@ -579,7 +579,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                 for vidx, v in enumerate(_remap_verts_):
                     pv = skey.data[ v.index ]
-                    x,y,z = swap( ob.matrix_world * pv.co - ob.matrix_world * v.co )
+                    x,y,z = swap( pv.co - v.co )
 
                     if config.get('SHAPE_NORMALS'):
                         n = _remap_normals_[ vidx ]
@@ -704,9 +704,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
 def triangle_list_in_group(mesh, shared_vertices, group_index):
     faces = []
-    for face in mesh.data.loop_triangles: 
+    for face in mesh.data.loop_triangles:
         vertices = [mesh.data.vertices[v] for v in face.vertices]
-        match_group = lambda g, v: g in [x.group for x in v.groups]
+        match_group = lambda g, v: g in [x.group for x in v.collections]
         all_in_group = all([match_group(group_index, v) for v in vertices])
         if not all_in_group:
             continue
@@ -726,7 +726,7 @@ def append_triangle_in_vertex_group(mesh, obj, vertex_groups, ogre_indices, blen
             if not group.name.startswith("ogre.vertex.group."):
                 return
             names.add(group.name)
-    match_group = lambda name, v: name in [obj.vertex_groups[x.group].name for x in v.groups]
+    match_group = lambda name, v: name in [obj.vertex_groups[x.group].name for x in v.collections]
     for name in names:
         all_in_group = all([match_group(name, v) for v in vertices])
         if not all_in_group:
@@ -832,4 +832,3 @@ class VertexNoPos(object):
 
     def __repr__(self):
         return 'vertex(%d)' % self.ogre_vidx
-

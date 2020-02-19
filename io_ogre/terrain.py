@@ -98,7 +98,7 @@ class OgreCollisionOp(bpy.types.Operator):
 
     def create_DECIMATED(self, ob):
         child = ob.copy()
-        bpy.context.scene.objects.link( child )
+        bpy.context.scene.collection.objects.link( child )
         child.matrix_local = mathutils.Matrix()
         child.parent = ob
         child.hide_select = True

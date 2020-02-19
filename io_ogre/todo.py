@@ -381,7 +381,7 @@ class INFO_MT_groups(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-        for group in bpy.data.groups:
+        for group in bpy.data.collections:
             op = layout.operator(INFO_MT_group.bl_idname, text=group.name)    # operator no variable for button name?
             op.mystring = group.name
         layout.separator()

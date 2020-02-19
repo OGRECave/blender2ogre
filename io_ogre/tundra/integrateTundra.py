@@ -94,19 +94,19 @@ TUNDRA_GEN_SCRIPT_PATH = '/tmp/interfaceTundra.py'	# for now put there by Tundra
 TUNDRA_CONFIG_XML = '''<?xml version="1.0"?>
 <Tundra>
   <plugin path="OgreRenderingModule" />
-  <plugin path="EnvironmentModule" />          
-  <plugin path="OgreAssetEditorModule" />    
-  <plugin path="PhysicsModule" />         
-  <plugin path="TundraProtocolModule" />     
-  <plugin path="JavascriptModule" />          
-  <plugin path="AssetModule" />         
-  <plugin path="AvatarModule" />               
-  <plugin path="ECEditorModule" />            
-  <plugin path="DebugStatsModule" />         
+  <plugin path="EnvironmentModule" />
+  <plugin path="OgreAssetEditorModule" />
+  <plugin path="PhysicsModule" />
+  <plugin path="TundraProtocolModule" />
+  <plugin path="JavascriptModule" />
+  <plugin path="AssetModule" />
+  <plugin path="AvatarModule" />
+  <plugin path="ECEditorModule" />
+  <plugin path="DebugStatsModule" />
   <plugin path="SkyXHydrax" />
   <plugin path="VlcPlugin" />
-  <plugin path="SceneWidgetComponents" />    
-  <plugin path="PythonScriptModule" />   
+  <plugin path="SceneWidgetComponents" />
+  <plugin path="PythonScriptModule" />
   <jsplugin path="MenuBar.js" />
   <jsplugin path="cameraapplication.js" />
   <jsplugin path="FirstPersonMouseLook.js" />
@@ -199,8 +199,8 @@ class TundraServer(object):
 		self._handle = None
 		self.setup_callback( bpy.context )
 		self.ready = threading._allocate_lock()
-		self.ID = threading._start_new_thread( 
-			self.loop, (None,) 
+		self.ID = threading._start_new_thread(
+			self.loop, (None,)
 		)
 		print( '.....thread started......')
 
@@ -298,7 +298,7 @@ class _sync_mesh_op(bpy.types.Operator):
 	@classmethod
 	def poll(cls, context):
 		if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
-			if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
+			if context.active_object.type == 'EMPTY' and context.active_object.instance_type != 'COLLECTION': return False
 			else: return True
 
 	def invoke(self, context, event):
@@ -314,7 +314,7 @@ class _sync_material_op(bpy.types.Operator):
 	@classmethod
 	def poll(cls, context):
 		if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
-			if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP': return False
+			if context.active_object.type == 'EMPTY' and context.active_object.instance_type != 'COLLECTION': return False
 			else: return True
 
 	def invoke(self, context, event):
@@ -334,6 +334,3 @@ class tundraheader(bpy.types.Header):
 		op = layout.operator( 'tundra.sync_material', text='material', icon='PLUG' )
 
 bpy.utils.register_class( tundraheader )
-
-
-
