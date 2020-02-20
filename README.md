@@ -15,7 +15,7 @@ The following versions of blender have been tested. It might also work with olde
 * Blender 2.6x
 * **Blender 2.8x mostly working** (see 2.80-support branch - mesh export with merge working, no textures)
 
-For OGRE v2.1 meshes, use OgreMeshTool from Ogre 2 build
+For OGRE v2.1 meshes, use OgreMeshTool from Ogre 2 build for `OGRETOOLS_XML_CONVERTER`
 
 ## Updating to new versions ##
 
