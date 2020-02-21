@@ -20,7 +20,7 @@ class OGREMESH_OT_preview(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         if context.active_object and context.active_object.type in ('MESH','EMPTY') and context.mode != 'EDIT_MESH':
-            if context.active_object.type == 'EMPTY' and context.active_object.dupli_type != 'GROUP':
+            if context.active_object.type == 'EMPTY' and context.active_object.instance_type != 'COLLECTION':
                 return False
             else:
                 return True
@@ -44,8 +44,8 @@ class OGREMESH_OT_preview(bpy.types.Operator):
         elif context.active_object.type == 'EMPTY': # assume group
             obs = []
             for e in context.selected_objects:
-                if e.type != 'EMPTY' and e.dupli_group: continue
-                grp = e.dupli_group
+                if e.type != 'EMPTY' and e.instance_collection: continue
+                grp = e.instance_collection
                 subs = []
                 for o in grp.objects:
                     if o.type=='MESH': subs.append( o )

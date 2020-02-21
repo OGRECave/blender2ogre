@@ -344,7 +344,7 @@ def select_instances( context, name ):
 def select_group( context, name, options={} ):
     for ob in bpy.context.scene.objects:
         ob.select_set(False)
-    for grp in bpy.data.groups:
+    for grp in bpy.data.collections:
         if grp.name == name:
             # context.scene.objects.active = grp.objects
             # Note that the context is read-only. These values cannot be modified directly,
@@ -392,16 +392,21 @@ def merge_group( group ):
     for ob in group.objects:
         if ob.type == 'MESH':
             o2 = ob.copy(); copies.append( o2 )
-            o2.data = o2.to_mesh() # collaspe modifiers
+            #BQfix needed? o2.data = bpy.data.meshes.new_from_object(o2)
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
-            bpy.context.scene.objects.link( o2 ) #; o2.select = True
+            bpy.context.scene.collection.objects.link( o2 ) #; o2.select = True
 
     name = group.name[len("merge."):] if group.name != "merge." else "mergeGroup"
 
+    #BQfix for .data.name being read-only
+    copies[len(copies) - 1].data.name = name
+
     merged = merge( copies )
     merged.name = name
-    merged.data.name = name
+    #merged.data.name = name #2.8 not renaming, readonly?
+    #print('.data.name: ', merged.data.name )
+
     return merged
 
 def merge_objects( objects, name='_temp_', transform=None ):
@@ -416,10 +421,11 @@ def merge_objects( objects, name='_temp_', transform=None ):
                 o2.modifiers.remove( o2.modifiers[0] )
             if transform:
                 o2.matrix_world =  transform @ o2.matrix_local
-            bpy.context.scene.objects.link( o2 ) #; o2.select_set(True)
+            bpy.context.scene.collection.objects.link( o2 ) #; o2.select_set(True)
     merged = merge( copies )
     merged.name = name
-    merged.data.name = name
+    #merged.data.name = name #2.8 not renaming, readonly?
+
     return merged
 
 def merge( objects ):
@@ -429,7 +435,8 @@ def merge( objects ):
         print('\t'+ob.name)
         ob.select_set(True)
         assert not ob.library
-    bpy.context.scene.objects.active = ob
+    #2.8update
+    bpy.context.view_layer.objects.active = ob
     bpy.ops.object.join()
     return bpy.context.active_object
 

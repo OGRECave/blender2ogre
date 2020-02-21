@@ -46,7 +46,7 @@ def dot_scene(path, scene_name=None):
                 pass
             else:
                 continue
-        if ob.type == 'EMPTY' and ob.dupli_group and ob.dupli_type == 'GROUP':
+        if ob.type == 'EMPTY' and ob.instance_collection and ob.instance_type == 'COLLECTION':
             linkedgroups.append(ob)
         else:
             # Gather data of invalid names. Don't bother user with warnings on names
@@ -68,19 +68,19 @@ def dot_scene(path, scene_name=None):
     # Linked groups - allows 3 levels of nested blender library linking
     temps = []
     for e in linkedgroups:
-        grp = e.dupli_group
+        grp = e.instance_collection
         subs = []
         for o in grp.objects:
             if o.type=='MESH':
                 subs.append( o )     # TOP-LEVEL
-            elif o.type == 'EMPTY' and o.dupli_group and o.dupli_type == 'GROUP':
+            elif o.type == 'EMPTY' and o.instance_collection and o.instance_type == 'COLLECTION':
                 ss = []     # LEVEL2
-                for oo in o.dupli_group.objects:
+                for oo in o.instance_collection.objects:
                     if oo.type=='MESH':
                         ss.append( oo )
-                    elif oo.type == 'EMPTY' and oo.dupli_group and oo.dupli_type == 'GROUP':
+                    elif oo.type == 'EMPTY' and oo.instance_collection and oo.instance_type == 'COLLECTION':
                         sss = []    # LEVEL3
-                        for ooo in oo.dupli_group.objects:
+                        for ooo in oo.instance_collection.objects:
                             if ooo.type=='MESH':
                                 sss.append( ooo )
                         if sss:
@@ -166,7 +166,11 @@ def dot_scene(path, scene_name=None):
         print('  Exported Ogre Scene:', target_scene_file)
 
     for ob in temps:
-        bpy.context.scene.objects.unlink( ob )
+        #BQfix for 2.8 unable to find merged object in collection
+        #bpy.context.scene.objects.unlink( ob )
+        #bpy.context.collection.objects.unlink( ob )
+        bpy.data.objects.remove(ob)
+
 
 class _WrapLogic(object):
     SwapName = { 'frame_property' : 'animation' } # custom name hacks
