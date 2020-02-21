@@ -37,7 +37,7 @@ class VertexColorLookup:
 
         return (r,g,b,ra)
 
-def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=True, isLOD=False, **kwargs):
+def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=3, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
 
@@ -105,12 +105,25 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if logging:
             print('      - Writing shared geometry')
 
+        # Textures
+        dotextures = False
+        uvcache = [] # should get a little speed boost by this cache
+        if mesh.tessface_uv_textures.active:
+            dotextures = True
+            for layer in mesh.tessface_uv_textures:
+                uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
+                for uvface in layer.data:
+                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
+        else:
+            tangents = 0
+
         doc.start_tag('vertexbuffer', {
                 'positions':'true',
                 'normals':'true',
-                'tangents': str(tangents),
+                'tangents': str(bool(tangents)),
+                'tangent_dimensions': str(tangents),
                 'colours_diffuse' : str(bool( mesh.vertex_colors )),
-                'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
+                'texture_coords' : '%s' % len(mesh.uv_textures) * dotextures
         })
 
         # Vertex colors
@@ -142,16 +155,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         material_faces = []
         for matidx, mat in enumerate(materials):
             material_faces.append([])
-
-        # Textures
-        dotextures = False
-        uvcache = [] # should get a little speed boost by this cache
-        if mesh.tessface_uv_textures.active:
-            dotextures = True
-            for layer in mesh.tessface_uv_textures:
-                uvs = []; uvcache.append( uvs ) # layer contains: name, active, data
-                for uvface in layer.data:
-                    uvs.append( (uvface.uv1, uvface.uv2, uvface.uv3, uvface.uv4) )
 
         shared_vertices = {}
         _remap_verts_ = []
@@ -207,6 +210,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                     if tangents:
                         tx,ty,tz = swap( mesh.loops[ idx ].tangent )
+                        tw = mesh.loops[ idx ].bitangent_sign
 
                     r,g,b,ra = vertex_color_lookup.get(F, idx)
 
@@ -268,7 +272,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         doc.leaf_tag('tangent', {
                                 'x' : '%6f' % tx,
                                 'y' : '%6f' % ty,
-                                'z' : '%6f' % tz
+                                'z' : '%6f' % tz,
+                                'w' : '%6f' % tw
                         })
 
                     if vertex_color_lookup.has_vcolors:
