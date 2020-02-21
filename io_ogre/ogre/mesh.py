@@ -13,31 +13,31 @@ class VertexColorLookup:
         self.vcolors = None
         self.vcolors_alpha = None
         self.has_vcolors = False
-        
+
         if len(mesh.tessface_vertex_colors) == 0:
             return
         self.vcolors = mesh.tessface_vertex_colors[0]
         self.has_vcolors = bool(self.vcolors)
-        
+
         for bloc in mesh.tessface_vertex_colors:
             if bloc.name.lower().startswith('alpha'):
                 self.vcolors_alpha = bloc
                 break
-    
+
     def get(self, face, index):
         if not self.has_vcolors:
             return (1.0,) * 4
-        
+
         k = list(face.vertices).index(index)
         r,g,b = getattr( self.vcolors.data[face.index], 'color%s'%(k+1) )
         if self.vcolors_alpha:
             ra,ga,ba = getattr( self.vcolors_alpha.data[face.index], 'color%s'%(k+1) )
         else:
             ra = 1.0
-        
+
         return (r,g,b,ra)
 
-def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
+def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=True, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
 
@@ -63,7 +63,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     start = time.time()
 
-    # blender per default does not calculate these. when querying the quads/tris 
+    # blender per default does not calculate these. when querying the quads/tris
     # of the object blender would crash if calc_tessface was not updated
     ob.data.update(calc_tessface=True)
 
@@ -108,6 +108,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.start_tag('vertexbuffer', {
                 'positions':'true',
                 'normals':'true',
+                'tangents': str(tangents),
                 'colours_diffuse' : str(bool( mesh.vertex_colors )),
                 'texture_coords' : '%s' % len(mesh.uv_textures) if mesh.uv_textures.active else '0'
         })
@@ -162,9 +163,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if mesh.has_custom_normals:
             mesh.calc_normals_split()
             # Create bmesh to help obtain custom vertex normals
-            bm = bmesh.new() 
+            bm = bmesh.new()
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
+
+        if tangents:
+            mesh.calc_tangents()
 
         for F in mesh.tessfaces:
             smooth = F.use_smooth
@@ -200,6 +204,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     else:
                         nx,ny,nz = swap( F.normal )
                         n = mathutils.Vector( [nx, ny, nz] )
+
+                    if tangents:
+                        tx,ty,tz = swap( mesh.loops[ idx ].tangent )
 
                     r,g,b,ra = vertex_color_lookup.get(F, idx)
 
@@ -256,6 +263,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             'y' : '%6f' % ny,
                             'z' : '%6f' % nz
                     })
+
+                    if tangents:
+                        doc.leaf_tag('tangent', {
+                                'x' : '%6f' % tx,
+                                'y' : '%6f' % ty,
+                                'z' : '%6f' % tz
+                        })
 
                     if vertex_color_lookup.has_vcolors:
                         doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
@@ -467,7 +481,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
                         lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
                         lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
-                        dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, isLOD=True)
+                        dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, tangents, isLOD=True)
 
                         # 'value' is the distance this LOD kicks in for the 'Distance' strategy.
                         doc.leaf_tag('lodmanual', {
@@ -571,7 +585,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 })
 
                 snormals = None
-                
+
                 if config.get('SHAPE_NORMALS'):
                     if smooth:
                         snormals = skey.normals_vertex_get()
@@ -710,7 +724,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
 def triangle_list_in_group(mesh, shared_vertices, group_index):
     faces = []
-    for face in mesh.data.tessfaces: 
+    for face in mesh.data.tessfaces:
         vertices = [mesh.data.vertices[v] for v in face.vertices]
         match_group = lambda g, v: g in [x.group for x in v.groups]
         all_in_group = all([match_group(group_index, v) for v in vertices])
