@@ -452,7 +452,10 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if config.get('MESH') and ob.data.name not in exported_meshes:
             exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
             overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
-            mesh.dot_mesh(ob, path, overwrite=overwrite)
+            tangents = 0
+            if config.get("generateTangents"):
+                tangents = 3 + config.get("tangentUseParity")
+            mesh.dot_mesh(ob, path, overwrite=overwrite, tangents=tangents)
             skeleton.dot_skeleton(ob, path, overwrite=overwrite)    
             exported_meshes.append( ob.data.name )
 

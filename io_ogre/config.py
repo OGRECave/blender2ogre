@@ -48,11 +48,8 @@ _CONFIG_DEFAULTS_ALL = {
     'lodPercent' : 40,
     'nuextremityPoints' : 0,
     'generateEdgeLists' : False,
-    'generateTangents' : True, # this is now safe - ignored if mesh is missing UVs
-    'tangentSemantic' : 'tangent', # used to default to "uvw" but that doesn't seem to work with anything and breaks shaders
-    'tangentUseParity' : 4,
-    'tangentSplitMirrored' : False,
-    'tangentSplitRotated' : False,
+    'generateTangents' : True,
+    'tangentUseParity' : False,
     'reorganiseBuffers' : True,
     'optimiseAnimations' : True,
     'interface_toggle': False,

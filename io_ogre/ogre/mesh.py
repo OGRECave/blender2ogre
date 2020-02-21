@@ -48,7 +48,7 @@ class VertexColorLookup:
         return color
 
 
-def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, isLOD=False, **kwargs):
+def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=3, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
 
@@ -114,14 +114,20 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc = SimpleSaxWriter(f, 'mesh', {})
 
         # Very ugly, have to replace number of vertices later
-        doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
+        doc.start_tag('sharedgeometry ', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
 
         if logging:
             print('      - Writing shared geometry')
 
+        if not mesh.uv_layers.active:
+            tangents = 0
+
+
         doc.start_tag('vertexbuffer', {
                 'positions':'true',
                 'normals':'true',
+                'tangents': str(bool(tangents)),
+                'tangent_dimensions': str(tangents),
                 'colours_diffuse' : str(bool( mesh.vertex_colors )),
                 'texture_coords' : '%s' % len(mesh.uv_layers) if mesh.uv_layers.active else 0
         })
@@ -171,6 +177,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
 
+        if tangents:
+            mesh.calc_tangents()
+
         for F in mesh.loop_triangles:
             smooth = F.use_smooth
             faces = material_faces[ F.material_index ]
@@ -196,6 +205,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     else:
                         nx,ny,nz = swap( F.normal )
                         n = mathutils.Vector( [nx, ny, nz] )
+
+                    if tangents:
+                        loop = F.loops[vidx]
+                        tx,ty,tz = swap( mesh.loops[ loop ].tangent )
+                        tw = mesh.loops[ loop ].bitangent_sign
 
                     r,g,b,ra = vertex_color_lookup.get(F.loops[vidx])
 
@@ -254,6 +268,14 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             'y' : '%6f' % ny,
                             'z' : '%6f' % nz
                     })
+
+                    if tangents:
+                        doc.leaf_tag('tangent', {
+                                'x' : '%6f' % tx,
+                                'y' : '%6f' % ty,
+                                'z' : '%6f' % tz,
+                                'w' : '%6f' % tw
+                        })
 
                     if vertex_color_lookup.has_color_data:
                         doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
@@ -466,7 +488,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         print('        > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].loop_triangles), 'faces')
                         lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
                         lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
-                        dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, isLOD=True)
+                        dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, tangents, isLOD=True)
 
                         # 'value' is the distance this LOD kicks in for the 'Distance' strategy.
                         doc.leaf_tag('lodmanual', {

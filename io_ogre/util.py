@@ -101,22 +101,8 @@ def xml_convert(infile, has_uvs=False):
         if not config.get('generateEdgeLists'):
             basicArguments += ' -e'
 
-    # note: OgreXmlConverter fails to convert meshes without UVs
-    #       OgreMeshTool has not been tested
-    if config.get('generateTangents') and has_uvs:
-        if version < (1,10,0) or version >= (2,1,0):
-            basicArguments += ' -t'
-        if config.get('tangentSemantic'):
-            basicArguments += ' -td %s' %config.get('tangentSemantic')
-        if config.get('tangentUseParity'):
-            basicArguments += ' -ts %s' %config.get('tangentUseParity')
-        if version >= (2,1,0):
-            if config.get('optimizeVertexBuffersForShaders'):
-                basicArguments += ' -O %s' %config.get('optimizeVertexBuffersForShadersOptions')
-        if config.get('tangentSplitMirrored'):
-            basicArguments += ' -tm'
-        if config.get('tangentSplitRotated'):
-            basicArguments += ' -tr'
+    if config.get('optimizeVertexBuffersForShaders') and version >= (2,1,0):
+        basicArguments += ' -O %s' %config.get('optimizeVertexBuffersForShadersOptions')
     if not config.get('reorganiseBuffers'):
         basicArguments += ' -r'
     if not config.get('optimiseAnimations'):
