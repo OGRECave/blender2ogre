@@ -21,7 +21,7 @@ def dot_scene(path, scene_name=None):
         scene_name = bpy.context.scene.name
     scene_file = scene_name + '.scene'
     target_scene_file = join(path, scene_file)
-    
+
     # Create target path if it does not exist
     if not os.path.exists(path):
         print("Creating Directory -", path)
@@ -376,7 +376,7 @@ def ogre_document(materials):
         #a.setAttribute('mode', world.mist_settings.falloff.lower() )    # not on DTD spec
         a.setAttribute('linearEnd', '%s' %(world.mist_settings.start+world.mist_settings.depth))
         a.setAttribute('expDensity', world.mist_settings.intensity)
-        
+
         c = doc.createElement('colourDiffuse'); a.appendChild( c )
         c.setAttribute('r', '%s'%color.r)
         c.setAttribute('g', '%s'%color.g)
@@ -422,7 +422,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     if ob.type == 'MESH':
         # ob.data.tessfaces is empty. always until the following call
         ob.data.update(calc_tessface=True)
-        # if it has no faces at all, the object itself will not be exported, BUT 
+        # if it has no faces at all, the object itself will not be exported, BUT
         # it might have children
 
     if ob.type == 'MESH' and len(ob.data.tessfaces):
@@ -463,8 +463,9 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if config.get('MESH') and ob.data.name not in exported_meshes:
             exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
             overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
-            mesh.dot_mesh(ob, path, overwrite=overwrite)
-            skeleton.dot_skeleton(ob, path, overwrite=overwrite)    
+            tangents = config.get("exportTangents")
+            mesh.dot_mesh(ob, path, overwrite=overwrite, tangents=tangents)
+            skeleton.dot_skeleton(ob, path, overwrite=overwrite)
             exported_meshes.append( ob.data.name )
 
         # Deal with Array modifier

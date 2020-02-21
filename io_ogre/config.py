@@ -48,6 +48,7 @@ _CONFIG_DEFAULTS_ALL = {
     'lodPercent' : 40,
     'nuextremityPoints' : 0,
     'generateEdgeLists' : False,
+    'exportTangents' : True,
     'generateTangents' : True, # this is now safe - ignored if mesh is missing UVs
     'tangentSemantic' : 'tangent', # used to default to "uvw" but that doesn't seem to work with anything and breaks shaders
     'tangentUseParity' : 4,
@@ -175,7 +176,7 @@ def load_config():
 CONFIG = load_config()
 
 def get(name, default=None):
-    
+
     global CONFIG
     if name in CONFIG:
         return CONFIG[name]
@@ -204,7 +205,7 @@ def save_config():
 def update_from_addon_preference(context):
 
     addon_preferences = context.user_preferences.addons["io_ogre"].preferences
-    
+
     for key in _CONFIG_TAGS_:
         addon_pref_value = getattr(addon_preferences,key,None)
         if addon_pref_value is not None:
