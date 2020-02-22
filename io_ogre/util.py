@@ -112,12 +112,9 @@ def xml_convert(infile, has_uvs=False):
         # Make xml converter print less stuff, comment this if you want more debug info out
         basicArguments += ' -q'
 
-        # Print log if enabled
-        if config.get('EXPORT_ENABLE_LOGGING'):
-            logfile_path, name = os.path.split(infile)
-            opts = '-log %s/OgreXMLConverter.log %s' % (logfile_path, basicArguments)
-        else:
-            opts = basicArguments
+        # Put logfile into output directory
+        logfile_path, name = os.path.split(infile)
+        opts = '-log %s/OgreXMLConverter.log %s' % (logfile_path, basicArguments)
 
         cmd = [exe] + opts.split() + [infile]
         ret = subprocess.call(cmd)
