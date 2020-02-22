@@ -6,11 +6,19 @@ from . import export
 from . import helper
 from ..meshy import OGREMESH_OT_preview
 
+def add_preview_button(self, context):
+    layout = self.layout
+    op = layout.operator( 'ogremesh.preview', text='', icon='VIEWZOOM' )
+    if op is not None:
+        op.mesh = True
+
 def auto_register(register):
     yield HT_toggle_ogre
     yield OP_interface_toggle
     yield MT_mini_report
     yield OGREMESH_OT_preview
+
+    bpy.types.VIEW3D_PT_tools_active.append(add_preview_button)
 
     yield from export.auto_register(register)
     yield from helper.auto_register(register)
@@ -102,9 +110,7 @@ class HT_info_header(bpy.types.Header):
         #        op = row.operator( 'tundra.toggle_physics_debug', text='', icon='MOD_PHYSICS' )
         #        op = row.operator( 'tundra.exit', text='', icon='CANCEL' )
 
-        op = layout.operator( 'ogremesh.preview', text='', icon='VIEWZOOM' )
-        if op is not None:
-            op.mesh = True
+        add_preview_button(self, context)
 
         #row = layout.row(align=True)
         #sub = row.row(align=True)
