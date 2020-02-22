@@ -145,12 +145,17 @@ class OgreMaterialGenerator(object):
 
             ## force material alpha to 1.0 if textures use_alpha?
             #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
+            
+            # arbitrary bad translation from PBR to Blinn Phong
+            # derive proportions from metallic
+            bf = 1.0 - mat.metallic
+            mf = max(0.04, mat.metallic)
+            # derive specular color
+            sc = mathutils.Color(color[:3]) * mf + (1.0 - mf) * mathutils.Color((1, 1, 1)) * (1.0 - mat.roughness)
+            si = (1.0 - mat.roughness) * 128
 
-            self.w.iline('diffuse %s %s %s %s' %(color[0], color[1], color[2], alpha) )
-
-            f = mat.metallic
-            s = mat.specular_color
-            self.w.iline('specular %s %s %s %s %s' %(s[0]*f, s[1]*f, s[2]*f, alpha, f) )
+            self.w.iline('diffuse %s %s %s %s' %(color[0]*bf, color[1]*bf, color[2]*bf, alpha) )
+            self.w.iline('specular %s %s %s %s %s' % (sc[0], sc[1], sc[2], alpha, si) )
 
             for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
                 if name.startswith('ogre_') and name != 'ogre_parent_material':
