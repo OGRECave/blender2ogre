@@ -168,7 +168,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         _remap_normals_ = []
         _face_indices_ = []
         numverts = 0
-        bm = None
+
+        # Ogre only supports triangles
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bmesh.ops.triangulate(bm, faces=bm.faces)
+        bm.to_mesh(mesh)
+        bm.free()
 
         if mesh.has_custom_normals:
             mesh.calc_normals_split()
@@ -178,120 +184,116 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bm.verts.ensure_lookup_table()
 
         if tangents:
-            mesh.calc_tangents()
+            mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
 
-        for F in mesh.loop_triangles:
+        for F in mesh.polygons:
             smooth = F.use_smooth
-            faces = material_faces[ F.material_index ]
-            # Ogre only supports triangles
-            tris = []
-            tris.append( (F.vertices[0], F.vertices[1], F.vertices[2]) )
+            tri = (F.vertices[0], F.vertices[1], F.vertices[2])
+            face = []
+            for loop_idx, idx in zip(F.loop_indices, tri):
+                v = mesh.vertices[ idx ]
 
-            for tidx, tri in enumerate(tris):
-                face = []
-                for vidx, idx in enumerate(tri):
-                    v = mesh.vertices[ idx ]
-
-                    if smooth:
-                        if mesh.has_custom_normals:
-                            n = mathutils.Vector()
-                            for loop in bm.verts[idx].link_loops:
-                                n += mesh.loops[loop.index].normal
-                            n.normalize()
-                            nx,ny,nz = swap( n )
-                        else:
-                            nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
-                            n = mathutils.Vector( [nx, ny, nz] )
+                if smooth:
+                    if mesh.has_custom_normals:
+                        n = mathutils.Vector()
+                        for loop in bm.verts[idx].link_loops:
+                            n += mesh.loops[loop.index].normal
+                        n.normalize()
+                        nx,ny,nz = swap( n )
                     else:
-                        nx,ny,nz = swap( F.normal )
+                        nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
                         n = mathutils.Vector( [nx, ny, nz] )
+                elif tangents:
+                    nx,ny,nz = swap( mesh.loops[ loop_idx ].normal )
+                    n = mathutils.Vector( [nx, ny, nz] )
+                else:
+                    nx,ny,nz = swap( F.normal )
+                    n = mathutils.Vector( [nx, ny, nz] )
+                if tangents:
+                    tx,ty,tz = swap( mesh.loops[ loop_idx ].tangent )
+                    tw = mesh.loops[ loop_idx ].bitangent_sign
 
-                    if tangents:
-                        loop = F.loops[vidx]
-                        tx,ty,tz = swap( mesh.loops[ loop ].tangent )
-                        tw = mesh.loops[ loop ].bitangent_sign
+                r,g,b,ra = vertex_color_lookup.get(loop_idx)
 
-                    r,g,b,ra = vertex_color_lookup.get(F.loops[vidx])
+                # Texture maps
+                vert_uvs = []
+                if dotextures:
+                    for layer in mesh.uv_layers:
+                        vert_uvs.append(layer.data[loop_idx].uv)
+                    """for layer in uvtris[ tidx ]:
+                        vert_uvs.append(layer[ vidx ])"""
 
-                    # Texture maps
-                    vert_uvs = []
-                    if dotextures:
-                        for layer in mesh.uv_layers:
-                            vert_uvs.append(layer.data[F.loops[vidx]].uv)
-                        """for layer in uvtris[ tidx ]:
-                            vert_uvs.append(layer[ vidx ])"""
-
-                    ''' Check if we already exported that vertex with same normal, do not export in that case,
-                        (flat shading in blender seems to work with face normals, so we copy each flat face'
-                        vertices, if this vertex with same normals was already exported,
-                        todo: maybe not best solution, check other ways (let blender do all the work, or only
-                        support smooth shading, what about seems, smoothing groups, materials, ...)
-                    '''
-                    vert = VertexNoPos(numverts, nx, ny, nz, r, g, b, ra, vert_uvs)
-                    alreadyExported = False
-                    if idx in shared_vertices:
-                        for vert2 in shared_vertices[idx]:
-                            #does not compare ogre_vidx (and position at the moment)
-                            if vert == vert2:
-                                face.append(vert2.ogre_vidx)
-                                alreadyExported = True
-                                #print(idx,numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "already exported")
-                                break
-                        if not alreadyExported:
-                            face.append(vert.ogre_vidx)
-                            shared_vertices[idx].append(vert)
-                            #print(numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "appended")
-                    else:
+                ''' Check if we already exported that vertex with same normal, do not export in that case,
+                    (flat shading in blender seems to work with face normals, so we copy each flat face'
+                    vertices, if this vertex with same normals was already exported,
+                    todo: maybe not best solution, check other ways (let blender do all the work, or only
+                    support smooth shading, what about seems, smoothing groups, materials, ...)
+                '''
+                vert = VertexNoPos(numverts, nx, ny, nz, r, g, b, ra, vert_uvs)
+                alreadyExported = False
+                if idx in shared_vertices:
+                    for vert2 in shared_vertices[idx]:
+                        #does not compare ogre_vidx (and position at the moment)
+                        if vert == vert2:
+                            face.append(vert2.ogre_vidx)
+                            alreadyExported = True
+                            #print(idx,numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "already exported")
+                            break
+                    if not alreadyExported:
                         face.append(vert.ogre_vidx)
-                        shared_vertices[idx] = [vert]
-                        #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "created")
+                        shared_vertices[idx].append(vert)
+                        #print(numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "appended")
+                else:
+                    face.append(vert.ogre_vidx)
+                    shared_vertices[idx] = [vert]
+                    #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "created")
 
-                    if alreadyExported:
-                        continue
+                if alreadyExported:
+                    continue
 
-                    numverts += 1
-                    _remap_verts_.append( v )
-                    _remap_normals_.append( n )
-                    _face_indices_.append( F.index )
+                numverts += 1
+                _remap_verts_.append( v )
+                _remap_normals_.append( n )
+                _face_indices_.append( F.index )
 
-                    x,y,z = swap(ob.matrix_world @ v.co)        # xz-y is correct!
+                x,y,z = swap(ob.matrix_world @ v.co)        # xz-y is correct!
 
-                    doc.start_tag('vertex', {})
-                    doc.leaf_tag('position', {
-                            'x' : '%6f' % x,
-                            'y' : '%6f' % y,
-                            'z' : '%6f' % z
+                doc.start_tag('vertex', {})
+                doc.leaf_tag('position', {
+                        'x' : '%6f' % x,
+                        'y' : '%6f' % y,
+                        'z' : '%6f' % z
+                })
+
+                doc.leaf_tag('normal', {
+                        'x' : '%6f' % nx,
+                        'y' : '%6f' % ny,
+                        'z' : '%6f' % nz
+                })
+
+                if tangents:
+                    doc.leaf_tag('tangent', {
+                            'x' : '%6f' % tx,
+                            'y' : '%6f' % ty,
+                            'z' : '%6f' % tz,
+                            'w' : '%6f' % tw
                     })
 
-                    doc.leaf_tag('normal', {
-                            'x' : '%6f' % nx,
-                            'y' : '%6f' % ny,
-                            'z' : '%6f' % nz
-                    })
+                if vertex_color_lookup.has_color_data:
+                    doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
 
-                    if tangents:
-                        doc.leaf_tag('tangent', {
-                                'x' : '%6f' % tx,
-                                'y' : '%6f' % ty,
-                                'z' : '%6f' % tz,
-                                'w' : '%6f' % tw
+                # Texture maps
+                if dotextures:
+                    for uv in vert_uvs:
+                        doc.leaf_tag('texcoord', {
+                                'u' : '%6f' % uv[0],
+                                'v' : '%6f' % (1.0-uv[1])
                         })
 
-                    if vertex_color_lookup.has_color_data:
-                        doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
+                doc.end_tag('vertex')
 
-                    # Texture maps
-                    if dotextures:
-                        for uv in vert_uvs:
-                            doc.leaf_tag('texcoord', {
-                                    'u' : '%6f' % uv[0],
-                                    'v' : '%6f' % (1.0-uv[1])
-                            })
-
-                    doc.end_tag('vertex')
-
-                append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
-                faces.append( (face[0], face[1], face[2]) )
+            append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
+            material_faces[F.material_index].append(face)
 
         Report.vertices += numverts
 
