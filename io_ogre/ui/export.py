@@ -261,10 +261,6 @@ class _OgreCommonExport_(object):
         name="Tangent Parity",
         description="Store bitangent sign in W",
         default=config.get('tangentUseParity'))
-    EX_reorganiseBuffers = BoolProperty(
-        name="Reorganise Buffers",
-        description="MESH reorganise vertex buffers",
-        default=config.get('reorganiseBuffers'))
     EX_optimiseAnimations = BoolProperty(
         name="Optimize Animations",
         description="MESH optimize animations",

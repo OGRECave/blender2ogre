@@ -50,7 +50,6 @@ _CONFIG_DEFAULTS_ALL = {
     'generateEdgeLists' : False,
     'generateTangents' : True,
     'tangentUseParity' : False,
-    'reorganiseBuffers' : True,
     'optimiseAnimations' : True,
     'interface_toggle': False,
     'optimizeVertexBuffersForShaders' : True,
