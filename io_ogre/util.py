@@ -103,8 +103,6 @@ def xml_convert(infile, has_uvs=False):
 
     if config.get('optimizeVertexBuffersForShaders') and version >= (2,1,0):
         basicArguments += ' -O %s' %config.get('optimizeVertexBuffersForShadersOptions')
-    if not config.get('reorganiseBuffers'):
-        basicArguments += ' -r'
     if not config.get('optimiseAnimations'):
         basicArguments += ' -o'
 
