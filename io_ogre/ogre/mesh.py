@@ -37,7 +37,7 @@ class VertexColorLookup:
 
         return (r,g,b,ra)
 
-def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=3, isLOD=False, **kwargs):
+def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=4, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
 

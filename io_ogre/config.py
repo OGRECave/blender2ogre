@@ -14,6 +14,12 @@ MESH_EXPORT_VERSIONS = [
     ('v2', 'v2', 'Export the mesh as a v2 object')
 ]
 
+TANGENT_MODES =  [
+    ('0', 'none', 'do not export'),
+    ('3', 'generate', 'generate'),
+    ('4', 'with parity', 'generate with parity'),
+]
+
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'io_ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
@@ -48,8 +54,7 @@ _CONFIG_DEFAULTS_ALL = {
     'lodPercent' : 40,
     'nuextremityPoints' : 0,
     'generateEdgeLists' : False,
-    'generateTangents' : True,
-    'tangentUseParity' : False,
+    'generateTangents' : "0",
     'optimiseAnimations' : True,
     'interface_toggle': False,
     'optimizeVertexBuffersForShaders' : True,
