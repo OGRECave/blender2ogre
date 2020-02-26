@@ -14,12 +14,12 @@ class VertexColorLookup:
         self.vcolors_alpha = None
         self.has_vcolors = False
 
-        if len(mesh.tessface_vertex_colors) == 0:
+        if len(mesh.vertex_colors) == 0:
             return
-        self.vcolors = mesh.tessface_vertex_colors[0]
+        self.vcolors = mesh.vertex_colors[0]
         self.has_vcolors = bool(self.vcolors)
 
-        for bloc in mesh.tessface_vertex_colors:
+        for bloc in mesh.vertex_colors:
             if bloc.name.lower().startswith('alpha'):
                 self.vcolors_alpha = bloc
                 break
@@ -173,7 +173,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bm.verts.ensure_lookup_table()
 
         if tangents:
-            mesh.calc_tangents()
+            mesh.calc_tangents(mesh.uv_layers.active.name)
 
         for F in mesh.polygons:
             smooth = F.use_smooth
@@ -181,6 +181,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             face = []
             for vidx, idx in enumerate(tri):
                 v = mesh.vertices[ idx ]
+                loop_idx = F.loop_indices[vidx]
 
                 if smooth:
                     if mesh.has_custom_normals:
@@ -192,21 +193,24 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     else:
                         nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
                         n = mathutils.Vector( [nx, ny, nz] )
+                elif tangents:
+                    nx,ny,nz = swap( mesh.loops[ loop_idx ].normal )
+                    n = mathutils.Vector( [nx, ny, nz] )
                 else:
                     nx,ny,nz = swap( F.normal )
                     n = mathutils.Vector( [nx, ny, nz] )
 
                 if tangents:
-                    tx,ty,tz = swap( mesh.loops[ idx ].tangent )
-                    tw = mesh.loops[ idx ].bitangent_sign
+                    tx,ty,tz = swap( mesh.loops[ loop_idx ].tangent )
+                    tw = mesh.loops[ loop_idx ].bitangent_sign
 
-                r,g,b,ra = vertex_color_lookup.get(F, idx)
+                r,g,b,ra = vertex_color_lookup.get(F, loop_idx)
 
                 # Texture maps
                 vert_uvs = []
                 if dotextures:
                     for layer in mesh.uv_layers:
-                        vert_uvs.append( layer.data[ idx ].uv )
+                        vert_uvs.append( layer.data[ loop_idx ].uv )
 
                 ''' Check if we already exported that vertex with same normal, do not export in that case,
                     (flat shading in blender seems to work with face normals, so we copy each flat face'
@@ -278,7 +282,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 doc.end_tag('vertex')
 
             append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
-            material_faces[0].append(face)
+            material_faces[F.material_index].append(face)
 
         Report.vertices += numverts
 
@@ -844,4 +848,3 @@ class VertexNoPos(object):
 
     def __repr__(self):
         return 'vertex(%d)' % self.ogre_vidx
-
