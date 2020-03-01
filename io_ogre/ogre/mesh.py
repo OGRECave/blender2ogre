@@ -74,15 +74,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     start = time.time()
 
-    # blender per default does not calculate these. when querying the quads/tris 
-    # of the object blender would crash if calc_tessface was not updated
-    ob.data.update()
-    ob.data.calc_loop_triangles()
-
-    Report.meshes.append( obj_name )
-    Report.faces += len( ob.data.loop_triangles )
-    Report.orig_vertices += len( ob.data.vertices )
-
     cleanup = False
     if ob.modifiers:
         cleanup = True
@@ -92,13 +83,17 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
             if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
         for mod in rem: copy.modifiers.remove( mod )
-        # bake mesh
-        mesh = copy.to_mesh()    # collaspe
-        mesh.update()
-        mesh.calc_loop_triangles()
     else:
         copy = ob
-        mesh = ob.data
+
+    # bake mesh
+    mesh = copy.to_mesh()    # collaspe
+    mesh.update()
+    mesh.calc_loop_triangles()
+
+    Report.meshes.append( obj_name )
+    Report.faces += len( mesh.loop_triangles )
+    Report.orig_vertices += len( mesh.vertices )
 
     if logging:
         print('      - Generating:', '%s.mesh.xml' % obj_name)
