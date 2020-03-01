@@ -80,11 +80,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
             if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
         for mod in rem: copy.modifiers.remove( mod )
-        # bake mesh
-        mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")    # collaspe
     else:
         copy = ob
-        mesh = ob.data
+    
+    # bake mesh
+    mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")
 
     if logging:
         print('      - Generating:', '%s.mesh.xml' % obj_name)
@@ -156,14 +156,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         _remap_normals_ = []
         _face_indices_ = []
         numverts = 0
-        bm = None
-
-        # Ogre only supports triangles
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
-        bmesh.ops.triangulate(bm, faces=bm.faces)
-        bm.to_mesh(mesh)
-        bm.free()
 
         if mesh.has_custom_normals:
             mesh.calc_normals_split()
@@ -172,16 +164,22 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
 
+        # Ogre only supports triangles
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bmesh.ops.triangulate(bm, faces=bm.faces)
+        bm.to_mesh(mesh)
+        bm.free()
+
         if tangents:
-            mesh.calc_tangents(mesh.uv_layers.active.name)
+            mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
 
         for F in mesh.polygons:
             smooth = F.use_smooth
             tri = (F.vertices[0], F.vertices[1], F.vertices[2])
             face = []
-            for vidx, idx in enumerate(tri):
+            for loop_idx, idx in zip(F.loop_indices, tri):
                 v = mesh.vertices[ idx ]
-                loop_idx = F.loop_indices[vidx]
 
                 if smooth:
                     if mesh.has_custom_normals:
