@@ -544,7 +544,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             badverts = 0
             for vidx, v in enumerate(_remap_verts_):
                 check = 0
-                for vgroup in v.collections:
+                for vgroup in v.groups:
                     if vgroup.weight > config.get('TRIM_BONE_WEIGHTS'):
                         groupIndex = vgroup.group
                         if groupIndex < len(copy.vertex_groups):
@@ -725,7 +725,7 @@ def triangle_list_in_group(mesh, shared_vertices, group_index):
     faces = []
     for face in mesh.data.loop_triangles: 
         vertices = [mesh.data.vertices[v] for v in face.vertices]
-        match_group = lambda g, v: g in [x.group for x in v.collections]
+        match_group = lambda g, v: g in [x.group for x in v.groups]
         all_in_group = all([match_group(group_index, v) for v in vertices])
         if not all_in_group:
             continue
@@ -745,7 +745,7 @@ def append_triangle_in_vertex_group(mesh, obj, vertex_groups, ogre_indices, blen
             if not group.name.startswith("ogre.vertex.group."):
                 return
             names.add(group.name)
-    match_group = lambda name, v: name in [obj.vertex_groups[x.group].name for x in v.collections]
+    match_group = lambda name, v: name in [obj.vertex_groups[x.group].name for x in v.groups]
     for name in names:
         all_in_group = all([match_group(name, v) for v in vertices])
         if not all_in_group:
