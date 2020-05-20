@@ -110,6 +110,10 @@ def xml_convert(infile, has_uvs=False):
         # Make xml converter print less stuff, comment this if you want more debug info out
         basicArguments += ' -q'
 
+        # use ubyte4_norm colour type
+        if version >= (1, 12, 7):
+            basicArguments += ' -byte'
+
         # Put logfile into output directory
         logfile_path, name = os.path.split(infile)
         opts = '-log %s/OgreXMLConverter.log %s' % (logfile_path, basicArguments)
