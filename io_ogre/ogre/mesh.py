@@ -24,14 +24,13 @@ class VertexColorLookup:
                 self.vcolors_alpha = bloc
                 break
 
-    def get(self, face, index):
+    def get(self, index):
         if not self.has_vcolors:
             return (1.0,) * 4
 
-        k = list(face.vertices).index(index)
-        r,g,b = getattr( self.vcolors.data[face.index], 'color%s'%(k+1) )
+        r,g,b = self.vcolors.data[index].color
         if self.vcolors_alpha:
-            ra,ga,ba = getattr( self.vcolors_alpha.data[face.index], 'color%s'%(k+1) )
+            ra,ga,ba = self.vcolors_alpha.data[index].color
         else:
             ra = 1.0
 
@@ -121,9 +120,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'texture_coords' : '%s' % len(mesh.uv_textures) * dotextures
         })
 
-        # Vertex colors
-        vertex_color_lookup = VertexColorLookup(mesh)
-
         # Materials
         # saves tuples of material name and material obj (or None)
         materials = []
@@ -171,6 +167,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         bm.to_mesh(mesh)
         bm.free()
 
+        # Vertex colors
+        vertex_color_lookup = VertexColorLookup(mesh)
+
         if tangents:
             mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
 
@@ -202,7 +201,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     tx,ty,tz = swap( mesh.loops[ loop_idx ].tangent )
                     tw = mesh.loops[ loop_idx ].bitangent_sign
 
-                r,g,b,ra = vertex_color_lookup.get(F, loop_idx)
+                r,g,b,ra = vertex_color_lookup.get(loop_idx)
 
                 # Texture maps
                 vert_uvs = []
