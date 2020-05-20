@@ -127,8 +127,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'texture_coords' : '%s' % len(mesh.uv_layers) if mesh.uv_layers.active else 0
         })
 
-        vertex_color_lookup = VertexColorLookup(mesh)
-
         # Materials
         # saves tuples of material name and material obj (or None)
         materials = []
@@ -170,6 +168,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         bmesh.ops.triangulate(bm, faces=bm.faces)
         bm.to_mesh(mesh)
         bm.free()
+
+        vertex_color_lookup = VertexColorLookup(mesh)
 
         if mesh.has_custom_normals:
             mesh.calc_normals_split()
