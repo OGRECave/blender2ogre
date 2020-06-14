@@ -92,40 +92,47 @@ def xml_convert(infile, has_uvs=False):
 
     assert converter_type != "unknown", "Cannot find suitable OgreXMLConverter or OgreMeshTool executable"
 
-    basicArguments = ''
+    cmd = [exe]
 
     if config.get('nuextremityPoints') > 0 and version < (2,1,0):
-        basicArguments += ' -x %s' %config.get('nuextremityPoints')
+        cmd.append('-x')
+        cmd.append(config.get('nuextremityPoints'))
 
     if version < (1,10,0) or version >= (2,1,0):
         if not config.get('generateEdgeLists'):
-            basicArguments += ' -e'
+            cmd.append('-e')
 
     if config.get('optimizeVertexBuffersForShaders') and version >= (2,1,0):
-        basicArguments += ' -O %s' %config.get('optimizeVertexBuffersForShadersOptions')
+        cmd.append('-O')
+        cmd.append(config.get('optimizeVertexBuffersForShadersOptions'))
+
     if not config.get('optimiseAnimations'):
-        basicArguments += ' -o'
+        cmd.append('-o')
 
     if version < (2,1,0):
-        # Make xml converter print less stuff, comment this if you want more debug info out
-        basicArguments += ' -q'
+        # Use quiet mode by default (comment this if you want more debug info out)
+        cmd.append('-q')
 
         # use ubyte4_norm colour type
         if version >= (1, 12, 7):
-            basicArguments += ' -byte'
+            cmd.append('-byte')
 
         # Put logfile into output directory
         logfile_path, name = os.path.split(infile)
-        opts = '-log %s/OgreXMLConverter.log %s' % (logfile_path, basicArguments)
+        cmd.append('-log')
+        cmd.append(os.path.join(logfile_path, 'OgreXMLConverter.log'))
 
-        cmd = [exe] + opts.split() + [infile]
+        # Finally, specify input file
+        cmd.append(infile)
+
         ret = subprocess.call(cmd)
         assert ret == 0, "OgreXMLConverter failed"
     else:
         # Convert to v2 format if required
-        basicArguments += ' -%s' %config.get('MESH_TOOL_EXPORT_VERSION')
+        cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
 
-        cmd = [exe] + basicArguments.split() + [infile]
+        # Finally, specify input file
+        cmd.append(infile)
 
         # Open log file to replace old logging feature that the new tool dropped
         # The log file will be created along side the exported mesh
