@@ -153,19 +153,18 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         _face_indices_ = []
         numverts = 0
 
+        bm = bmesh.new()
         if mesh.has_custom_normals:
             mesh.calc_normals_split()
             # Create bmesh to help obtain custom vertex normals
-            bm = bmesh.new()
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
+        else:
+            bm.from_mesh(mesh)
 
         # Ogre only supports triangles
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
         bmesh.ops.triangulate(bm, faces=bm.faces)
         bm.to_mesh(mesh)
-        bm.free()
 
         # Vertex colors
         vertex_color_lookup = VertexColorLookup(mesh)
