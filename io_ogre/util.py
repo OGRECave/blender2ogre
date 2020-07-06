@@ -281,18 +281,17 @@ def get_image_textures( mat ):
     return r
 
 def texture_image_path(image):
-    raise NotImplementedError("TODO: Remove??")
     if not image:
         return None
 
-    if tex.library: # support library linked textures
-        libpath = split(bpy.path.abspath(tex.library.filepath))[0]
-        image_filepath = bpy.path.abspath(tex.filepath, libpath)
+    if image.library: # support library linked textures
+        libpath = split(bpy.path.abspath(image.library.filepath))[0]
+        return bpy.path.abspath(image.filepath, libpath)
     else:
-        if tex.image.packed_file:
-            return tex.image.name+".png"
+        if image.packed_file:
+            return image.name + ".png"
 
-        return bpy.path.abspath( tex.image.filepath )
+        return bpy.path.abspath( image.filepath )
 
 def objects_merge_materials(objs):
     """
@@ -303,6 +302,13 @@ def objects_merge_materials(objs):
         for mat in obj.data.materials:
             materials.add(mat)
     return materials
+
+def should_export(obj):
+    """
+    Tells if that object should be exported,
+    according to its visibility and the configuration
+    """
+    return config.get("EXPORT_HIDDEN") or obj in bpy.context.visible_objects
 
 def indent( level, *args ):
     if not args:
@@ -530,7 +536,9 @@ class IndentedWriter(object):
             sym_stack.append(None)
 
     def __enter__(self, **kwargs):
-        begin_sym, end_sym, nl = self.embed_syms
+        begin_sym, end_sym, nl, space = self.embed_syms
+        if space:
+            self.write(" ")
         self.write(begin_sym)
         if nl:
             self.nl()
@@ -540,8 +548,8 @@ class IndentedWriter(object):
         sym = self.sym_stack.pop()
         self.indent().write(sym).nl()
 
-    def embed(self, begin_sym="{", end_sym="}", nl=True):
-        self.embed_syms = (begin_sym, end_sym, nl)
+    def embed(self, begin_sym="{", end_sym="}", nl=True, space=True):
+        self.embed_syms = (begin_sym, end_sym, nl, space)
         return self
 
     def string(self, text):
@@ -568,13 +576,13 @@ class IndentedWriter(object):
         return self
 
     def word(self, text):
-        return self.write(str(text)).write(" ")
+        return self.write(" ").write(str(text))
 
     def iwrite(self, text):
         return self.indent().write(str(text))
 
     def iword(self, text):
-        return self.indent().word(text)
+        return self.indent().write(str(text))
 
     def iline(self, text):
         return self.indent().line(text)
