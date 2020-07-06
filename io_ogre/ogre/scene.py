@@ -37,7 +37,7 @@ def dot_scene(path, scene_name=None):
     for ob in bpy.context.scene.objects:
         if ob.subcollision:
             continue
-        if not config.get("EXPORT_HIDDEN") and ob.hide:
+        if not util.should_export(ob):
             continue
         if config.get("SELONLY") and not ob.select_get():
             if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
@@ -361,7 +361,7 @@ def ogre_document(materials):
         item.setAttribute('type','material')
         a = doc.createElement('file')
         item.appendChild( a )
-        a.setAttribute('name', material.material_name(mat))
+        a.setAttribute('name', '%s.material'%material.material_name(mat))
 
     # Environ settings
     world = bpy.context.scene.world

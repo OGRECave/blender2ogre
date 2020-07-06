@@ -13,6 +13,8 @@ from itertools import chain
 
 from bpy.props import EnumProperty
 from .program import OgreProgram
+from bpy_extras import io_utils, node_shader_utils
+from mathutils import Vector
 
 def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kwargs):
     """
@@ -41,12 +43,13 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
                     include_missing = True
                     continue
                 Report.materials.append( material_name(mat) )
-                generator = OgreMaterialGenerator(mat)
-                if kwargs.get('copy_programs', config.get('COPY_SHADER_PROGRAMS')):
-                    generator.copy_programs(path)
-                if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
-                    generator.copy_textures(path)
+                generator = OgreMaterialGenerator(mat, path)
+                # Generate before copying textures to collect images first
                 material_text = generator.generate()
+                if kwargs.get('copy_programs', config.get('COPY_SHADER_PROGRAMS')):
+                    generator.copy_programs()
+                if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
+                    generator.copy_textures()
                 fd.write(bytes(material_text+"\n",'utf-8'))
             
             if include_missing:
@@ -64,23 +67,37 @@ def dot_material(mat, path, **kwargs):
       * touch_textures - bool. Copy the images along to the material files.
     """
     prefix = kwargs.get('prefix', '')
-    generator = OgreMaterialGenerator(mat, prefix=prefix)
-    if kwargs.get('copy_programs', config.get('COPY_SHADER_PROGRAMS')):
-        generator.copy_programs(path)
-    if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
-        generator.copy_textures(path)
+    generator = OgreMaterialGenerator(mat, path, prefix=prefix)
+    # Generate before copying textures to collect images first
     material_text = generator.generate()
+    if kwargs.get('copy_programs', config.get('COPY_SHADER_PROGRAMS')):
+        generator.copy_programs()
+    if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
+        generator.copy_textures()
     with open(join(path, generator.material_name + ".material"), 'wb') as fd:
         fd.write(bytes(material_text,'utf-8'))
 
     return generator.material_name
 
 class OgreMaterialGenerator(object):
-    def __init__(self, material, prefix=''):
+    # Texture wrapper attribute names
+    TEXTURE_KEYS = [
+        "base_color_texture",
+        "specular_texture",
+        "roughness_texture",
+        "alpha_texture",
+        "normalmap_texture",    # useless ?
+        "metallic_texture",
+        "emission_color_texture"
+    ]
+    
+    def __init__(self, material, target_path, prefix=''):
         self.material = material
+        self.target_path = target_path
         self.w = util.IndentedWriter()
         self.passes = []
         self.material_name = material_name(self.material,prefix=prefix)
+        self.images = set()
 
         if material.node_tree:
             nodes = shader.get_subnodes( self.material.node_tree, type='MATERIAL_EXT' )
@@ -138,12 +155,22 @@ class OgreMaterialGenerator(object):
             if mat.blend_method != "OPAQUE":
                 alpha = color[3]
 
-            images = get_image_textures( mat )        
-            usealpha = False #mat.ogre_depth_write
-            for image in images:
-                if (image is not None) and (image.alpha_mode != "NONE"): usealpha = True; break
-
+            # Texture wrappers
+            textures = {}
+            mat_wrapper = node_shader_utils.PrincipledBSDFWrapper(mat)
+            for tex_key in self.TEXTURE_KEYS:
+                texture = getattr(mat_wrapper, tex_key, None)
+                if texture and texture.image:
+                    textures[tex_key] = texture
+                    # adds image to the list for later copy
+                    self.images.add(texture.image)
+            
             ## force material alpha to 1.0 if textures use_alpha?
+#             usealpha = False #mat.ogre_depth_write
+#             for texture in textures:
+#                 if (texture.image.alpha_mode != "NONE"):
+#                     usealpha = True;
+#                     break
             #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
             
             # arbitrary bad translation from PBR to Blinn Phong
@@ -175,11 +202,57 @@ class OgreMaterialGenerator(object):
                         if node.texture:
                             geo = shader.get_connected_input_nodes( self.material, node )[0]
                             self.generate_texture_unit( node.texture, name=name, uv_layer=geo.uv_layer )
-            elif images:
-                for image in images:
-                    self.generate_texture_unit(image)
+            elif textures:
+                for key, texture in textures.items():
+                    self.generate_image_texture_unit(key, texture)
 
+    def generate_image_texture_unit(self, key, texture):
+        """
+        Generates a texture_unit of a pass.
+        
+        key: key of the texture in the material wrapper (not used, for normal map if needed)
+        texture: the texture wrapper (node_shader_utils.PrincipledBSDFWrapper)
+        """
+        src_dir = os.path.dirname(bpy.data.filepath)
+        # For target path relative
+        # dst_dir = os.path.dirname(self.target_path)
+        dst_dir = src_dir
+        filename = io_utils.path_reference(texture.image.filepath, src_dir, dst_dir, mode='RELATIVE', library=texture.image.library)
+        # Do not use if target path relative
+        # filename = repr(filepath)[1:-1]
+        _, filename = split(filename)
+        filename = self.change_ext(filename, texture.image)
+        with self.w.iword('texture_unit').embed():
+            self.w.iword('texture').word(filename).nl()
+            
+            exmode = texture.extension
+            if exmode in TEXTURE_ADDRESS_MODE:
+                self.w.iword('tex_address_mode').word(TEXTURE_ADDRESS_MODE[exmode]).nl()
 
+            if exmode == 'CLIP':
+                self.w.iword('tex_border_colour').word(texture.color.r).word(texture.color.g).word(texture.color.b).nl()
+            if texture.scale != Vector((1.0, 1.0, 1.0)):
+                self.w.iword('scale').real(1.0 / texture.scale.x).real(1.0 / texture.scale.y).nl()
+            
+            if texture.texcoords == 'Reflection':
+                if texture.projection == 'SPHERE':
+                    self.w.iline('env_map spherical')
+                elif texture.projection == 'FLAT':
+                    self.w.iline('env_map planar')
+                else: 
+                    logging.debug('WARNING: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' %(texture.name, texture.projection))
+            
+            if texture.translation.x or texture.translation.y:
+                self.w.iword('scroll').real(texture.translation.x).real(texture.translation.y).nl()
+            if texture.rotation.z:
+                # TODO: how do we set the amount of rotation (here in radians) ?
+                self.w.iword('rotate').real(texture.rotation.z).nl()
+ 
+            # TODO: What can we do with normal map ?
+            # if key == "normalmap_texture": if texture.material.normalmap_strength != 1.0:
+            
+            self.w.iword('colour_op').word('modulate').nl()
+    
     def generate_texture_unit(self, slot, name=None, uv_layer=None):
         raise NotImplementedError("TODO: slots dont exist anymore - use image")
         
@@ -267,46 +340,42 @@ class OgreMaterialGenerator(object):
                     idx = find_uv_layer_index( uv_layer )
                     self.w.iword('tex_coord_set').integer(idx)
 
-    def copy_textures(self, target_path):
-        textures = get_image_textures(self.material) + list(chain([get_image_textures(mat) for mat in self.passes]))
-        for image in textures:
-            self.copy_texture(image, target_path)
+    def copy_textures(self):
+        for image in self.images:
+            self.copy_texture(image)
 
-    def copy_texture(self, image, target_path):
-        if not image:
-            return
-
+    def copy_texture(self, image):
         origin_filepath = image.filepath
-
-        tmp_filepath = None
-        updated_image = False
+        target_filepath = split(origin_filepath)[1]
+        target_filepath = self.change_ext(target_filepath, image)
+        target_filepath = join(self.target_path, target_filepath)
+        
         if image.packed_file:
-            # a is a packed png
-            ext = splitext(origin_filepath)[1]
-            tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
-            image.filepath = tmp_filepath 
+            # packed in .blend file, save image as target file
+            image.filepath = target_filepath
             image.save()
             image.filepath = origin_filepath
-            updated_image = True
-
-        target_file_ext = split(origin_filepath)[1]
-        ext = splitext(target_file_ext)[1]
-
-        if not tmp_filepath:
-            tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
-
-        target_file_ext = self.change_ext(target_file_ext, image)
-        target_filepath = join(target_path, target_file_ext)
-        if not os.path.isfile(target_filepath) and not updated_image:
-            # or os.stat(target_filepath).st_mtime < os.stat( origin_filepath ).st_mtime:
-            updated_image = True
-            shutil.copyfile(origin_filepath, tmp_filepath)
+            logging.info("copy (%s)", origin_filepath)
         else:
-            logging.info("skip copy (%s). texture is already up to date.", origin_filepath)
-
-        if updated_image:
-                shutil.copyfile(tmp_filepath, target_filepath)
+            image_filepath = bpy.path.abspath(image.filepath, library=image.library)
+            image_filepath = os.path.normpath(image_filepath)
+            
+            # Should we update the file
+            update = False
+            if os.path.isfile(target_filepath):
+                src_stat = os.stat(target_filepath)
+                dst_stat = os.stat(image_filepath)
+                update = src_stat.st_size != dst_stat.st_size \
+                    or src_stat.st_mtime != dst_stat.st_mtime
+            else:
+                update = True
+                
+            if (update):
+                # copy2 tries to copy all metadata (modification date included), to keep update decision consistent
+                shutil.copy2(image_filepath, target_filepath)
                 logging.info("copy (%s)", origin_filepath)
+            else:
+                logging.info("skip copy (%s). texture is already up to date.", origin_filepath)
 
     def get_active_programs(self):
         r = []
@@ -316,10 +385,10 @@ class OgreMaterialGenerator(object):
                 for prog in usermat.get_programs(): r.append( prog )
         return r
 
-    def copy_programs(self, target_path):
+    def copy_programs(self):
         for prog in self.get_active_programs():
             if prog.source:
-                prog.save(path)
+                prog.save(self.target_path)
             else:
                 logging.warn('uses program %s which has no source' % (prog.name))
 
@@ -659,4 +728,3 @@ def update_parent_material_path( path ):
 
     MaterialScripts.reset_rna( callback=shader.on_change_parent_material )
     return scripts, progs
-
