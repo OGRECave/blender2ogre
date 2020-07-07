@@ -137,15 +137,17 @@ class OgreMaterialGenerator(object):
             alpha = 1.0
             if mat.use_transparency:
                 alpha = mat.alpha
+                mat.ogre_depth_write = False
+                mat.ogre_scene_blend = "alpha_blend"
+                mat.ogre_cull_hardware = "none"
 
             slots = get_image_textures( mat )        # returns texture_slot objects (CLASSIC MATERIAL)
-            usealpha = False #mat.ogre_depth_write
+            texalpha = False
             for slot in slots:
-                #if slot.use_map_alpha and slot.texture.use_alpha: usealpha = True; break
-                if (slot.texture.image is not None) and (slot.texture.image.use_alpha): usealpha = True; break
+                if slot.use_map_alpha and \
+                    (slot.texture.image is not None) and (slot.texture.image.use_alpha): texalpha = True; break
 
-            ## force material alpha to 1.0 if textures use_alpha?
-            #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
+            if texalpha: alpha = 1.0    # let the alpha of the texture control material alpha
 
             self.w.iline('lighting %s' % ('off' if mat.use_shadeless else 'on'))
 
