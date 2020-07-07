@@ -317,10 +317,10 @@ class OgreMaterialGenerator(object):
 
         target_file_ext = self.change_ext(target_file_ext, slot.texture.image)
         target_filepath = join(target_path, target_file_ext)
-        if not os.path.isfile(target_filepath) and not updated_image:
-            # or os.stat(target_filepath).st_mtime < os.stat( origin_filepath ).st_mtime:
+        if not os.path.isfile(target_filepath) and not updated_image \
+            or os.stat(target_filepath).st_mtime != os.stat( origin_filepath ).st_mtime:
             updated_image = True
-            shutil.copyfile(origin_filepath, tmp_filepath)
+            shutil.copy2(origin_filepath, tmp_filepath)
         else:
             logging.info("skip copy (%s). texture is already up to date.", origin_filepath)
 
@@ -329,7 +329,7 @@ class OgreMaterialGenerator(object):
                 logging.info("magick (%s) -> (%s)", tmp_filepath, origin_filepath)
                 util.image_magick(slot.texture, tmp_filepath, target_filepath)
             else:
-                shutil.copyfile(tmp_filepath, target_filepath)
+                shutil.copy2(tmp_filepath, target_filepath)
                 logging.info("copy (%s)", origin_filepath)
 
     def get_active_programs(self):
