@@ -249,28 +249,19 @@ class OgreMaterialGenerator(object):
                 idx = find_uv_layer_index( slot.uv_layer, self.material )
                 self.w.iword('tex_coord_set').integer(idx).nl()
 
-            rgba = False
-            if texture.image.depth == 32: rgba = True
             btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
             ex = False; texop = None
-            if btype in TEXTURE_COLOUR_OP:
-                if btype=='MIX' and \
-                    ((slot.use_map_alpha and not slot.use_stencil) or \
-                     (slot.texture.use_alpha and slot.texture.image.use_alpha and not slot.use_map_alpha)):
-                    if slot.diffuse_color_factor >= 1.0:
-                        texop = 'alpha_blend'
-                    else:
-                        texop = TEXTURE_COLOUR_OP[ btype ]
-                        ex = True
-                elif btype=='MIX' and slot.use_map_alpha and slot.use_stencil:
-                    texop = 'blend_current_alpha'; ex=True
-                elif btype=='MIX' and not slot.use_map_alpha and slot.use_stencil:
-                    texop = 'blend_texture_alpha'; ex=True
-                else:
-                    texop = TEXTURE_COLOUR_OP[ btype ]
-            elif btype in TEXTURE_COLOUR_OP_EXcolour_op_ex:
-                    texop = TEXTURE_COLOUR_OP_EX[ btype ]
-                    ex = True
+            if btype=='MIX' and \
+                ((slot.use_map_alpha and not slot.use_stencil) or \
+                    (slot.texture.use_alpha and slot.texture.image.use_alpha and not slot.use_map_alpha)):
+                if slot.diffuse_color_factor >= 1.0:
+                    texop = 'alpha_blend'
+            elif btype=='MIX' and slot.use_map_alpha and slot.use_stencil:
+                texop = 'blend_current_alpha'; ex=True
+            elif btype=='MIX' and not slot.use_map_alpha and slot.use_stencil:
+                texop = 'blend_texture_alpha'; ex=True
+            elif btype in TEXTURE_COLOUR_OP:
+                texop = TEXTURE_COLOUR_OP[ btype ]
 
             if texop and ex:
                 if texop == 'blend_manual':
@@ -362,16 +353,6 @@ TEXTURE_COLOUR_OP = {
     'MIX'       :   'modulate',        # Ogre Default - was "replace" but that kills lighting
     'ADD'     :   'add',
     'MULTIPLY' : 'modulate',
-    #'alpha_blend' : '',
-}
-TEXTURE_COLOUR_OP_EX = {
-    'MIX'       :    'blend_manual',
-    'SCREEN': 'modulate_x2',
-    'LIGHTEN': 'modulate_x4',
-    'SUBTRACT': 'subtract',
-    'OVERLAY':    'add_signed',
-    'DIFFERENCE': 'dotproduct',        # best match?
-    'VALUE': 'blend_diffuse_colour',
 }
 
 TEXTURE_ADDRESS_MODE = {
