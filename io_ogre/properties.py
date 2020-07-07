@@ -168,11 +168,6 @@ bpy.types.Material.ogre_colour_write = BoolProperty(
     # when using complex fragment programs, because if the depth check fails then the fragment program is never run.
     name='color-write',
     default=True)
-bpy.types.Material.use_fixed_pipeline = BoolProperty(
-    # Fixed pipeline is oldschool
-    # todo: whats the meaning of this?
-    name='fixed pipeline',
-    default=True)
 bpy.types.Material.use_material_passes = BoolProperty(
     # hidden option - gets turned on by operator
     # todo: What is a hidden option, is this needed?
