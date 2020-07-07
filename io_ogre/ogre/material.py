@@ -154,6 +154,9 @@ class OgreMaterialGenerator(object):
             alpha = 1.0
             if mat.blend_method != "OPAQUE":
                 alpha = color[3]
+                mat.ogre_depth_write = False
+                mat.ogre_scene_blend = "alpha_blend"
+                mat.ogre_cull_hardware = "none"
 
             # Texture wrappers
             textures = {}
@@ -164,14 +167,6 @@ class OgreMaterialGenerator(object):
                     textures[tex_key] = texture
                     # adds image to the list for later copy
                     self.images.add(texture.image)
-            
-            ## force material alpha to 1.0 if textures use_alpha?
-#             usealpha = False #mat.ogre_depth_write
-#             for texture in textures:
-#                 if (texture.image.alpha_mode != "NONE"):
-#                     usealpha = True;
-#                     break
-            #if usealpha: alpha = 1.0    # let the alpha of the texture control material alpha?
             
             # arbitrary bad translation from PBR to Blinn Phong
             # derive proportions from metallic
