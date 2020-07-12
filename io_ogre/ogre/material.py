@@ -248,10 +248,11 @@ class OgreMaterialGenerator(object):
                 # Radians to degrees
                 self.w.iword('rotate').round(math.degrees(texture.rotation.z), 2).nl()
  
-            # Blend type is always 'MIX'
-            # btype = texture.image_node.color_mapping.blend_type
+            btype = 'modulate'
+            if key == "emission_color_texture":
+                btype = "add"
             
-            self.w.iword('colour_op').word('modulate').nl()
+            self.w.iword('colour_op').word(btype).nl()
 
     def copy_textures(self):
         for image in self.images:
