@@ -566,7 +566,15 @@ class IndentedWriter(object):
 
     def integer(self, i):
         return self.word(str(i))
-
+    
+    def round(self, f, p=6):
+        """
+        Adds a rounded float
+        f: float value
+        p: precision
+        """
+        return self.word(str(round(f, p)))
+    
     def nl(self):
         self.write("\n")
         return self

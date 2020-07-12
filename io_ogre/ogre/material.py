@@ -1,20 +1,20 @@
 from datetime import datetime
-import os
-from os.path import join, split, splitext
-from ..util import *
-from .. import util
-from .. import config
-from .. import shader
-from ..report import Report
-import tempfile
+from os.path import join
+import math
 import shutil
-import logging
-from itertools import chain
+import tempfile
+
+from bpy_extras import io_utils
 
 from bpy.props import EnumProperty
-from .program import OgreProgram
-from bpy_extras import io_utils, node_shader_utils
+from bpy_extras import node_shader_utils
 from mathutils import Vector
+
+from .. import shader
+from .. import util
+from ..report import Report
+from ..util import *
+from .program import OgreProgram
 
 def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kwargs):
     """
@@ -125,8 +125,9 @@ class OgreMaterialGenerator(object):
             if mat.use_ogre_parent_material and mat.ogre_parent_material:
                 usermat = get_ogre_user_material( mat.ogre_parent_material )
                 self.w.iline( '// user material: %s' %usermat.name )
-                for prog in usermat.get_programs():
-                    r.append( prog.data )
+                # TODO: fix what is r
+#                 for prog in usermat.get_programs():
+#                     r.append( prog.data )
                 self.w.iline( '// abstract passes //' )
                 for line in usermat.as_abstract_passes():
                     self.w.iline(line)
@@ -176,8 +177,8 @@ class OgreMaterialGenerator(object):
             sc = mathutils.Color(color[:3]) * mf + (1.0 - mf) * mathutils.Color((1, 1, 1)) * (1.0 - mat.roughness)
             si = (1.0 - mat.roughness) * 128
 
-            self.w.iline('diffuse %s %s %s %s' %(color[0]*bf, color[1]*bf, color[2]*bf, alpha) )
-            self.w.iline('specular %s %s %s %s %s' % (sc[0], sc[1], sc[2], alpha, si) )
+            self.w.iword('diffuse').round(color[0]*bf).round(color[1]*bf).round(color[2]*bf).round(alpha).nl()
+            self.w.iword('specular').round(sc[0]).round(sc[1]).round(sc[2]).round(alpha).round(si, 3).nl()
 
             for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
                 if name.startswith('ogre_') and name != 'ogre_parent_material':
@@ -196,17 +197,18 @@ class OgreMaterialGenerator(object):
                         node = texnodes[i]
                         if node.texture:
                             geo = shader.get_connected_input_nodes( self.material, node )[0]
-                            self.generate_texture_unit( node.texture, name=name, uv_layer=geo.uv_layer )
+                            # self.generate_texture_unit( node.texture, name=name, uv_layer=geo.uv_layer )
+                            raise NotImplementedError("TODO: slots dont exist anymore - use image")
             elif textures:
                 for key, texture in textures.items():
-                    self.generate_image_texture_unit(key, texture)
+                    self.generate_texture_unit(key, texture)
 
-    def generate_image_texture_unit(self, key, texture):
+    def generate_texture_unit(self, key, texture):
         """
         Generates a texture_unit of a pass.
         
-        key: key of the texture in the material wrapper (not used, for normal map if needed)
-        texture: the texture wrapper (node_shader_utils.PrincipledBSDFWrapper)
+        key: key of the texture in the material shader (not used, for normal if needed)
+        texture: the material texture
         """
         src_dir = os.path.dirname(bpy.data.filepath)
         # For target path relative
@@ -225,9 +227,11 @@ class OgreMaterialGenerator(object):
                 self.w.iword('tex_address_mode').word(TEXTURE_ADDRESS_MODE[exmode]).nl()
 
             if exmode == 'CLIP':
-                self.w.iword('tex_border_colour').word(texture.color.r).word(texture.color.g).word(texture.color.b).nl()
-            if texture.scale != Vector((1.0, 1.0, 1.0)):
-                self.w.iword('scale').real(1.0 / texture.scale.x).real(1.0 / texture.scale.y).nl()
+                r,g,b = texture.node_image.color_mapping.blend_color
+                self.w.iword('tex_border_colour').round(r).round(g).round(b).nl()
+            x,y = texture.scale[0:2]
+            if x != 1 or y != 1:
+                self.w.iword('scale').round(1.0 / x).round(1.0 / y).nl()
             
             if texture.texcoords == 'Reflection':
                 if texture.projection == 'SPHERE':
@@ -237,103 +241,17 @@ class OgreMaterialGenerator(object):
                 else: 
                     logging.debug('WARNING: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' %(texture.name, texture.projection))
             
-            if texture.translation.x or texture.translation.y:
-                self.w.iword('scroll').real(texture.translation.x).real(texture.translation.y).nl()
+            x,y = texture.translation[0:2]
+            if x or y:
+                self.w.iword('scroll').round(x).round(y).nl()
             if texture.rotation.z:
-                # TODO: how do we set the amount of rotation (here in radians) ?
-                self.w.iword('rotate').real(texture.rotation.z).nl()
+                # Radians to degrees
+                self.w.iword('rotate').round(math.degrees(texture.rotation.z), 2).nl()
  
-            # TODO: What can we do with normal map ?
-            # if key == "normalmap_texture": if texture.material.normalmap_strength != 1.0:
+            # Blend type is always 'MIX'
+            # btype = texture.image_node.color_mapping.blend_type
             
             self.w.iword('colour_op').word('modulate').nl()
-    
-    def generate_texture_unit(self, slot, name=None, uv_layer=None):
-        raise NotImplementedError("TODO: slots dont exist anymore - use image")
-        
-        if not slot.use:
-            return
-        texture = slot.texture
-        if not hasattr(texture, 'image'):
-            logging.warn('texture must be of type IMAGE', texture)
-            return
-        if not texture.image:
-            logging.warn('texture has no image assigned', texture)
-            return
-
-        _alphahack = None
-        if not name:
-            name = ''
-        _, filename = split(util.texture_image_path(texture))
-        filename = self.change_ext(filename, texture.image)
-        with self.w.iword('texture_unit').word(name).embed():
-            self.w.iword('texture').word(filename).nl()
-
-            exmode = texture.extension
-            if exmode in TEXTURE_ADDRESS_MODE:
-                self.w.iword('tex_address_mode').word(TEXTURE_ADDRESS_MODE[exmode]).nl()
-
-            if exmode == 'CLIP':
-                self.w.iword('tex_border_colour').word(slot.color.r).word(slot.color.g).word(slot.color.b).nl()
-            self.w.iword('scale').real(1.0/slot.scale.x).real(1.0/slot.scale.y).nl()
-            if slot.texture_coords == 'REFLECTION':
-                if slot.mapping == 'SPHERE':
-                    self.w.iword('env_map spherical').nl()
-                elif slot.mapping == 'FLAT':
-                    self.w.iword('env_map planar').nl()
-                else: 
-                    logging.debug('WARNING: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' %(texture.name, slot.mapping))
-
-            ox,oy,oz = slot.offset
-            if ox or oy:
-                self.w.iword('scroll').real(ox).real(oy).nl()
-            if oz:
-                self.w.iword('rotate').real(oz).nl()
-
-            if slot.use_from_dupli:    # hijacked again - june7th
-                self.w.iword('rotate_anim').real(slot.density_factor).real(slot.emission_factor).nl()
-            if slot.use_map_scatter:    # hijacked from volume shaders
-                self.w.iword('scroll_anim').real(slot.density_factor).real(slot.emission_factor).nl()
-
-            if slot.uv_layer:
-                idx = find_uv_layer_index( slot.uv_layer, self.material )
-                self.w.iword('tex_coord_set').integer(idx).nl()
-
-            rgba = False
-            if texture.image.depth == 32: rgba = True
-            btype = slot.blend_type     # TODO - fix this hack if/when slots support pyRNA
-            ex = False; texop = None
-            if btype in TEXTURE_COLOUR_OP:
-                if btype=='MIX' and \
-                    ((slot.use_map_alpha and not slot.use_stencil) or \
-                     (slot.texture.use_alpha and slot.texture.image.use_alpha and not slot.use_map_alpha)):
-                    if slot.diffuse_color_factor >= 1.0:
-                        texop = 'alpha_blend'
-                    else:
-                        texop = TEXTURE_COLOUR_OP[ btype ]
-                        ex = True
-                elif btype=='MIX' and slot.use_map_alpha and slot.use_stencil:
-                    texop = 'blend_current_alpha'; ex=True
-                elif btype=='MIX' and not slot.use_map_alpha and slot.use_stencil:
-                    texop = 'blend_texture_alpha'; ex=True
-                else:
-                    texop = TEXTURE_COLOUR_OP[ btype ]
-            elif btype in TEXTURE_COLOUR_OP_EXcolour_op_ex:
-                    texop = TEXTURE_COLOUR_OP_EX[ btype ]
-                    ex = True
-
-            if texop and ex:
-                if texop == 'blend_manual':
-                    factor = 1.0 - slot.diffuse_color_factor
-                    self.w.iword('colour_op_ex').word(texop).word('src_texture src_current').word(factor).nl()
-                else:
-                    self.w.iword('colour_op_ex').word(texop).word('src_texture src_current').nl()
-            elif texop:
-                    self.w.iword('colour_op').word(texop).nl()
-            else:
-                if uv_layer:
-                    idx = find_uv_layer_index( uv_layer )
-                    self.w.iword('tex_coord_set').integer(idx)
 
     def copy_textures(self):
         for image in self.images:
