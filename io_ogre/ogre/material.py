@@ -86,7 +86,7 @@ class OgreMaterialGenerator(object):
         "specular_texture",
         "roughness_texture",
         "alpha_texture",
-        "normalmap_texture",    # useless ?
+        "normalmap_texture",
         "metallic_texture",
         "emission_color_texture"
     ]
@@ -219,6 +219,13 @@ class OgreMaterialGenerator(object):
         # filename = repr(filepath)[1:-1]
         _, filename = split(filename)
         filename = self.change_ext(filename, texture.image)
+
+        # special case of normal maps
+        if key == "normalmap_texture":
+            with self.w.iword('rtshader_system').embed():
+                self.w.iword('lighting_stage normal_map').word(filename).nl()
+                return
+
         with self.w.iword('texture_unit').embed():
             self.w.iword('texture').word(filename).nl()
             
