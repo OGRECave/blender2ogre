@@ -7,6 +7,7 @@ import tempfile
 from bpy_extras import io_utils
 
 from bpy.props import EnumProperty
+from bpy_extras import node_shader_utils
 from mathutils import Vector
 
 from .. import shader
@@ -14,7 +15,6 @@ from .. import util
 from ..report import Report
 from ..util import *
 from .program import OgreProgram
-from .material_utils import MaterialShader, MaterialTexture
 
 def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kwargs):
     """
@@ -80,16 +80,15 @@ def dot_material(mat, path, **kwargs):
     return generator.material_name
 
 class OgreMaterialGenerator(object):
-    # Useful texture to select
+    # Texture wrapper attribute names
     TEXTURE_KEYS = [
-        "base",
-        "specular",
-        "roughness",
-        "alpha",
-        "normal",
-        "metallic",
-        "emission",
-        "ior"
+        "base_color_texture",
+        "specular_texture",
+        "roughness_texture",
+        "alpha_texture",
+        "normalmap_texture",    # useless ?
+        "metallic_texture",
+        "emission_color_texture"
     ]
     
     def __init__(self, material, target_path, prefix=''):
@@ -160,11 +159,13 @@ class OgreMaterialGenerator(object):
                 mat.ogre_scene_blend = "alpha_blend"
                 mat.ogre_cull_hardware = "none"
 
-            # Material textures
+            # Texture wrappers
             textures = {}
-            for key,texture in MaterialShader(mat).get_textures(self.TEXTURE_KEYS).items():
-                if texture.image:
-                    textures[key] = texture
+            mat_wrapper = node_shader_utils.PrincipledBSDFWrapper(mat)
+            for tex_key in self.TEXTURE_KEYS:
+                texture = getattr(mat_wrapper, tex_key, None)
+                if texture and texture.image:
+                    textures[tex_key] = texture
                     # adds image to the list for later copy
                     self.images.add(texture.image)
             
@@ -202,7 +203,7 @@ class OgreMaterialGenerator(object):
                 for key, texture in textures.items():
                     self.generate_texture_unit(key, texture)
 
-    def generate_texture_unit(self, key, texture: MaterialTexture):
+    def generate_texture_unit(self, key, texture):
         """
         Generates a texture_unit of a pass.
         
@@ -226,13 +227,13 @@ class OgreMaterialGenerator(object):
                 self.w.iword('tex_address_mode').word(TEXTURE_ADDRESS_MODE[exmode]).nl()
 
             if exmode == 'CLIP':
-                r,g,b = texture.image_node.color_mapping.blend_color
+                r,g,b = texture.node_image.color_mapping.blend_color
                 self.w.iword('tex_border_colour').round(r).round(g).round(b).nl()
             x,y = texture.scale[0:2]
             if x != 1 or y != 1:
                 self.w.iword('scale').round(1.0 / x).round(1.0 / y).nl()
             
-            if texture.coordinates == 'Reflection':
+            if texture.texcoords == 'Reflection':
                 if texture.projection == 'SPHERE':
                     self.w.iline('env_map spherical')
                 elif texture.projection == 'FLAT':
