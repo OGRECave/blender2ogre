@@ -9,9 +9,10 @@ Note on Windows: you have to set the correct path to `OGRETOOLS_XML_CONVERTER` i
 After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.  
 Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
 
-The following versions of blender have been tested. It might also work with older versions of Blender.
+The following versions of blender have been tested.
 
-* Blender 2.8x (**no textures yet**)
+* Blender 2.8x
+* **for Blender 2.7x: see 2.7x-support branch**
 
 For OGRE v2.1 meshes, use OgreMeshTool from Ogre 2 build for `OGRETOOLS_XML_CONVERTER`
 
