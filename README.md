@@ -13,7 +13,7 @@ The following versions of blender have been tested. It might also work with olde
 
 * Blender 2.7x
 * Blender 2.6x
-* **Blender 2.8x DOES NOT WORK** (see 2.80-support branch)
+* **Blender 2.8x: use master branch**
 
 ## Updating to new versions ##
 
