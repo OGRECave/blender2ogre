@@ -157,38 +157,19 @@ def xml_convert(infile, has_uvs=False):
         # Check converter status
         assert proc.returncode == 0, "OgreMeshTool failed"
 
-def image_magick( texture, origin_filepath, target_filepath ):
+def image_magick( image, origin_filepath, target_filepath ):
     exe = config.get('IMAGE_MAGICK_CONVERT')
     cmd = [ exe, origin_filepath ]
 
-    x,y = texture.image.size
-    ax = texture.image.resize_x
-    ay = texture.image.resize_y
+    x,y = image.size
 
-    if texture.image.use_convert_format and texture.image.convert_format == 'jpg':
-        cmd.append( '-quality' )
-        cmd.append( '%s' %texture.image.jpeg_quality )
-
-    if texture.image.use_resize_half:
-        cmd.append( '-resize' )
-        cmd.append( '%sx%s' %(x/2, y/2) )
-    elif texture.image.use_resize_absolute and (x>ax or y>ay):
-        cmd.append( '-resize' )
-        cmd.append( '%sx%s' %(ax,ay) )
-
-    elif x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
+    if x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
         cmd.append( '-resize' )
         cmd.append( str(config.get('MAX_TEXTURE_SIZE')) )
 
-    if texture.image.use_color_quantize:
-        if texture.image.use_color_quantize_dither:
-            cmd.append( '+dither' )
-        cmd.append('-colors')
-        cmd.append(str(texture.image.color_quantize))
-
     if target_filepath.endswith('.dds'):
         cmd.append('-define')
-        cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS') if texture.use_mipmap else 0))
+        cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS')))
 
     cmd.append(target_filepath)
     logging.debug('image magick: "%s"', ' '.join(cmd))

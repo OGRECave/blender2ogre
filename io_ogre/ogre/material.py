@@ -291,10 +291,14 @@ class OgreMaterialGenerator(object):
             else:
                 update = True
                 
-            if (update):
-                # copy2 tries to copy all metadata (modification date included), to keep update decision consistent
-                shutil.copy2(image_filepath, target_filepath)
-                logging.info("copy (%s)", origin_filepath)
+            if update:
+                if is_image_postprocessed(image):
+                    logging.info("magick (%s) -> (%s)", image_filepath, target_filepath)
+                    util.image_magick(image, image_filepath, target_filepath)
+                else:
+                    # copy2 tries to copy all metadata (modification date included), to keep update decision consistent
+                    shutil.copy2(image_filepath, target_filepath)
+                    logging.info("copy (%s)", origin_filepath)
             else:
                 logging.info("skip copy (%s). texture is already up to date.", origin_filepath)
 
@@ -626,8 +630,7 @@ IMAGE_FORMATS =  [
 ]
 
 def is_image_postprocessed( image ):
-    return False
-    if config.get('FORCE_IMAGE_FORMAT') != 'NONE' or image.use_resize_half or image.use_resize_absolute or image.use_color_quantize or image.use_convert_format:
+    if config.get('FORCE_IMAGE_FORMAT') != 'NONE':
         return True
     else:
         return False
