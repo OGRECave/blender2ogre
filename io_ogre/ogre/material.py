@@ -151,14 +151,6 @@ class OgreMaterialGenerator(object):
             if pass_name: self.w.word(pass_name)
 
         with self.w.embed():
-            color = mat.diffuse_color
-            alpha = 1.0
-            if mat.blend_method != "OPAQUE":
-                alpha = color[3]
-                mat.ogre_depth_write = False
-                mat.ogre_scene_blend = "alpha_blend"
-                mat.ogre_cull_hardware = "none"
-
             # Texture wrappers
             textures = {}
             mat_wrapper = node_shader_utils.PrincipledBSDFWrapper(mat)
@@ -169,13 +161,21 @@ class OgreMaterialGenerator(object):
                     # adds image to the list for later copy
                     self.images.add(texture.image)
             
+            color = mat_wrapper.base_color
+            alpha = 1.0
+            if mat.blend_method != "OPAQUE":
+                alpha = mat_wrapper.alpha
+                mat.ogre_scene_blend = "alpha_blend"
+                mat.ogre_cull_hardware = "none" if mat.show_transparent_back else "clockwise"
+                mat.ogre_depth_write = not mat.show_transparent_back
+
             # arbitrary bad translation from PBR to Blinn Phong
             # derive proportions from metallic
-            bf = 1.0 - mat.metallic
-            mf = max(0.04, mat.metallic)
+            bf = 1.0 - mat_wrapper.metallic
+            mf = max(0.04, mat_wrapper.metallic)
             # derive specular color
-            sc = mathutils.Color(color[:3]) * mf + (1.0 - mf) * mathutils.Color((1, 1, 1)) * (1.0 - mat.roughness)
-            si = (1.0 - mat.roughness) * 128
+            sc = mathutils.Color(color[:3]) * mf + (1.0 - mf) * mathutils.Color((1, 1, 1)) * (1.0 - mat_wrapper.roughness)
+            si = (1.0 - mat_wrapper.roughness) * 128
 
             self.w.iword('diffuse').round(color[0]*bf).round(color[1]*bf).round(color[2]*bf).round(alpha).nl()
             self.w.iword('specular').round(sc[0]).round(sc[1]).round(sc[2]).round(alpha).round(si, 3).nl()
