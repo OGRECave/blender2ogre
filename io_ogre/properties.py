@@ -121,11 +121,6 @@ bpy.types.Image.resize_y = IntProperty(
     default=256, min=2, max=4096)
 
 # Materials
-
-bpy.types.Material.ogre_depth_write = BoolProperty(
-    # Material.ogre_depth_write = AUTO|ON|OFF
-    name='depth write',
-    default=True)
 bpy.types.Material.ogre_depth_check = BoolProperty(
     # If depth-buffer checking is on, whenever a pixel is about to be written to
     # the frame buffer the depth buffer is checked to see if the pixel is in front
@@ -205,13 +200,6 @@ bpy.types.Material.ogre_shading = EnumProperty(
             ('gouraud', 'gouraud', 'GOURAUD'),
             ('phong', 'phong', 'PHONG') ],
     default='gouraud')
-bpy.types.Material.ogre_cull_hardware = EnumProperty(
-    name='hardware culling',
-    description="If the option 'cull_hardware clockwise' is set, all triangles whose vertices are viewed in clockwise order from the camera will be culled by the hardware.",
-    items=[ ('clockwise', 'clockwise', 'CLOCKWISE'),
-            ('anticlockwise', 'anticlockwise', 'COUNTER CLOCKWISE'),
-            ('none', 'none', 'NONE') ],
-    default='clockwise')
 bpy.types.Material.ogre_transparent_sorting = EnumProperty(
     name='transparent sorting',
     description="By default all transparent materials are sorted such that renderables furthest away from the camera are rendered first. This is usually the desired behaviour but in certain cases this depth sorting may be unnecessary and undesirable. If for example it is necessary to ensure the rendering order does not change from one frame to the next. In this case you could set the value to 'off' to prevent sorting.",
@@ -259,23 +247,6 @@ bpy.types.Material.ogre_scene_blend_op = EnumProperty(
     name='scene blending operation',
     description='This directive changes the operation which is applied between the two components of the scene blending equation',
     default='add')
-
-_ogre_scene_blend_types =  [
-    ('one zero', 'one zero', 'DEFAULT'),
-    ('alpha_blend', 'alpha_blend', "The alpha value of the rendering output is used as a mask. Equivalent to 'scene_blend src_alpha one_minus_src_alpha'"),
-    ('add', 'add', "The colour of the rendering output is added to the scene. Good for explosions, flares, lights, ghosts etc. Equivalent to 'scene_blend one one'."),
-    ('modulate', 'modulate', "The colour of the rendering output is multiplied with the scene contents. Generally colours and darkens the scene, good for smoked glass, semi-transparent objects etc. Equivalent to 'scene_blend dest_colour zero'"),
-    ('colour_blend', 'colour_blend', 'Colour the scene based on the brightness of the input colours, but dont darken. Equivalent to "scene_blend src_colour one_minus_src_colour"'),
-]
-for mode in 'dest_colour src_colour one_minus_dest_colour dest_alpha src_alpha one_minus_dest_alpha one_minus_src_alpha'.split():
-    _ogre_scene_blend_types.append( ('one %s'%mode, 'one %s'%mode, '') )
-del mode
-
-bpy.types.Material.ogre_scene_blend = EnumProperty(
-    items=_ogre_scene_blend_types,
-    name='scene blend',
-    description='blending operation of material to scene',
-    default='one zero')
 
 bpy.types.World.ogre_skyX = BoolProperty(
     name="enable sky", description="ogre sky",

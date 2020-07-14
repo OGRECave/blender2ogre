@@ -153,51 +153,21 @@ def ogre_material_panel_extra( parent, mat ):
     box = parent.box()
     header = box.row()
 
-    if mat.use_fixed_pipeline:
-        header.prop( mat, 'use_fixed_pipeline', text='Fixed Pipeline', icon='LAMP_SUN' )
-        if mat.use_shadeless and not mat.use_vertex_color_paint:
-            row = box.row()
-            row.prop(mat, "diffuse_color", text='')
-        elif not mat.use_shadeless:
-            if not mat.use_vertex_color_paint:
-                row = box.row()
-                row.prop(mat, "diffuse_color", text='')
-                row.prop(mat, "diffuse_intensity", text='intensity')
-            row = box.row()
-            row.prop(mat, "specular_color", text='')
-            row.prop(mat, "specular_intensity", text='intensity')
-            row = box.row()
-            row.prop(mat, "specular_hardness")
-            row = box.row()
-            row.prop(mat, "ambient")
-            #row = box.row()
-            row.prop(mat, "emit")
-        box.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
-    else:
-        header.prop( mat, 'use_fixed_pipeline', text='', icon='LAMP_SUN' )
-        header.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
+    header.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
 
     if mat.use_ogre_advanced_options:
         box.prop(mat, 'offset_z')
-        box.prop(mat, 'ogre_depth_write' )
         for tag in 'ogre_colour_write ogre_normalise_normals ogre_light_clip_planes ogre_light_scissor ogre_alpha_to_coverage ogre_depth_check'.split():
             box.prop(mat, tag)
-        for tag in 'ogre_polygon_mode ogre_shading ogre_cull_hardware ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
+        for tag in 'ogre_polygon_mode ogre_shading ogre_transparent_sorting ogre_illumination_stage ogre_depth_func ogre_scene_blend_op'.split():
             box.prop(mat, tag)
 
 def ogre_material_panel( layout, mat, parent=None, show_programs=True ):
-    box = layout.box()
-    header = box.row()
-    header.prop(mat, 'ogre_scene_blend', text='')
-    if mat.ogre_scene_blend and 'alpha' in mat.ogre_scene_blend:
-        row = box.row()
-        if mat.use_transparency:
-            row.prop(mat, "use_transparency", text='')
-            row.prop(mat, "alpha")
-        else:
-            row.prop(mat, "use_transparency", text='Transparent')
     if not parent:
         return # only allow on pass1 and higher
+
+    box = layout.box()
+    header = box.row()
 
     header.prop(mat, 'use_ogre_parent_material', icon='FILE_SCRIPT', text='')
 

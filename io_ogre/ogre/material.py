@@ -165,9 +165,10 @@ class OgreMaterialGenerator(object):
             alpha = 1.0
             if mat.blend_method != "OPAQUE":
                 alpha = mat_wrapper.alpha
-                mat.ogre_scene_blend = "alpha_blend"
-                mat.ogre_cull_hardware = "none" if mat.show_transparent_back else "clockwise"
-                mat.ogre_depth_write = not mat.show_transparent_back
+                self.w.iword('scene_blend alpha_blend').nl()
+                if mat.show_transparent_back:
+                    self.w.iword('cull_hardware none').nl()
+                    self.w.iword('depth_write off').nl()
 
             # arbitrary bad translation from PBR to Blinn Phong
             # derive proportions from metallic
