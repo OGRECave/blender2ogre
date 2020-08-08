@@ -68,10 +68,12 @@ def detect_converter_type():
     exe = config.get('OGRETOOLS_XML_CONVERTER')
 
     # extract converter type from its output
-    proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
-    output, _ = proc.communicate()
-
-    output = output.decode('utf-8')
+    try:
+        proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
+        output, _ = proc.communicate()
+        output = output.decode('utf-8')
+    except:
+        output = ""
 
     if output.find("OgreXMLConverter") != -1:
         return "OgreXMLConverter"
@@ -89,8 +91,9 @@ def xml_convert(infile, has_uvs=False):
         version = xml_converter_version()
     elif converter_type == "OgreMeshTool":
         version = mesh_tool_version()
-
-    assert converter_type != "unknown", "Cannot find suitable OgreXMLConverter or OgreMeshTool executable"
+    elif converter_type == "unknown":
+        print("WARNING: Cannot find suitable OgreXMLConverter or OgreMeshTool executable")
+        return
 
     cmd = [exe]
 
