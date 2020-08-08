@@ -81,12 +81,12 @@ class _OgreCommonExport_(object):
                 layout.prop(self, key)
 
     def execute(self, context):
-        # abort with error otherwise
+        # add warinng about missing XML converter
+        Report.reset()
         if self.converter == "unknown":
-            Report.reset()
-            Report.errors.append("No suitable converter found. Nothing has been exported.")
-            Report.show()
-            return {'FINISHED'}
+            Report.errors.append(
+              "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
+              "Export XML mesh - do NOT automatically convert .xml to .mesh file. You MUST run converter mesh manually.")
 
         logger.info("context.blend_data %s"%context.blend_data.filepath)
         logger.info("context.scene.name %s"%context.scene.name)
@@ -133,7 +133,6 @@ class _OgreCommonExport_(object):
         logger.info("target_file_name %s"%target_file_name)
         logger.info("target_file_name_no_ext %s"%target_file_name_no_ext)
 
-        Report.reset()
         scene.dot_scene(target_path, target_file_name_no_ext)
         Report.show()
 
