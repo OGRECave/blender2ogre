@@ -52,7 +52,8 @@ def dot_scene(path, scene_name=None):
             # Gather data of invalid names. Don't bother user with warnings on names
             # that only get spaces converted to _, just do that automatically.
             cleanname = clean_object_name(ob.name)
-            cleannamespaces = clean_object_name_with_spaces(ob.name)
+            cleannamespaces = clean_object_name(ob.name, spaces = False)
+            print("ABABA", ob.name)
             if cleanname != ob.name:
                 if cleannamespaces != ob.name:
                     invalidnamewarnings.append(ob.name + " -> " + cleanname)

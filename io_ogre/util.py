@@ -457,17 +457,14 @@ def get_lights_by_type( T ):
             if ob.data.type==T: r.append( ob )
     return r
 
-invalid_chars = '\/:*?"<>|'
+invalid_chars_in_name     = '"<>\:' # "<> is xml prohibited, : is Ogre prohibited, \ is standard escape char
+invalid_chars_in_filename = '/|?*' + invalid_chars_in_name
+invalid_chars_spaces      = ' \t'
 
-def clean_object_name(value):
-    global invalid_chars
-    for invalid_char in invalid_chars:
-        value = value.replace(invalid_char, '_')
-    value = value.replace(' ', '_')
-    return value;
-
-def clean_object_name_with_spaces(value):
-    global invalid_chars
+def clean_object_name(value, invalid_chars = invalid_chars_in_filename, spaces = True):
+    if spaces:
+        invalid_chars += invalid_chars_spaces
+    
     for invalid_char in invalid_chars:
         value = value.replace(invalid_char, '_')
     return value;
