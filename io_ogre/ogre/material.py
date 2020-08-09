@@ -74,7 +74,7 @@ def dot_material(mat, path, **kwargs):
         generator.copy_programs()
     if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
         generator.copy_textures()
-    with open(join(path, generator.material_name + ".material"), 'wb') as fd:
+    with open(join(path, clean_object_name(generator.material_name) + ".material"), 'wb') as fd:
         fd.write(bytes(material_text,'utf-8'))
 
     return generator.material_name
@@ -392,8 +392,8 @@ def material_name( mat, clean = False, prefix='' ):
     clean: deprecated. do not use!
     """
     if type(mat) is str:
-        return prefix + clean_object_name(mat)
-    name = clean_object_name(mat.name)
+        return prefix + clean_object_name(mat, invalid_chars=invalid_chars_in_name)
+    name = clean_object_name(mat.name, invalid_chars=invalid_chars_in_name)
     if mat.library:
         _, filename = split(mat.library.filepath)
         prefix, _ = splitext(filename)
