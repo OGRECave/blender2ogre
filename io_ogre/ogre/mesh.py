@@ -180,16 +180,15 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 v = mesh.vertices[ idx ]
 
                 if smooth:
-                    nx,ny,nz = 0,0,0
+                    n = mathutils.Vector()
                     if mesh.has_custom_normals:
-                        n = mathutils.Vector()
                         for loop in bm.verts[idx].link_loops:
                             n += mesh.loops[loop.index].normal
                         n.normalize()
                         nx,ny,nz = swap( n )
                     # when no custom normals or mesh.loops[...].normal is zero vector
                     # use normal vector from vertex
-                    if nx == 0 and ny == 0 and nz == 0:
+                    if n.length_squared == 0:
                         nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
                         n = mathutils.Vector( [nx, ny, nz] )
                 elif tangents:
