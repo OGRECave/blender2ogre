@@ -29,7 +29,7 @@ _CONFIG_DEFAULTS_ALL = {
     'SCENE' : True,
     'COPY_SHADER_PROGRAMS' : True,
     'MAX_TEXTURE_SIZE' : 4096,
-    'SWAP_AXIS' : 'xyz', # ogre standard is 'xz-y', but swapping is currently broken
+    'SWAP_AXIS' : 'xz-y', # ogre standard
     'SEP_MATS' : True,
     'SELONLY' : True,
     'EXPORT_HIDDEN' : True,
