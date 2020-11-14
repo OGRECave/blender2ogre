@@ -118,9 +118,7 @@ class _OgreCommonExport_(object):
 
         kw = {}
         for name in dir(_OgreCommonExport_):
-            if name.startswith('EX_V1_'):
-                kw[ name[6:] ] = getattr(self,name)
-            elif name.startswith('EX_V2_'):
+            if name[:6] in ('EX_V1_', 'EX_V2_', 'EX_Vx_'):
                 kw[ name[6:] ] = getattr(self,name)
             elif name.startswith('EX_'):
                 kw[ name[3:] ] = getattr(self,name)
@@ -163,15 +161,15 @@ class _OgreCommonExport_(object):
         default=config.get('SEP_MATS'))
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well.",
+        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well",
         default=config.get('ONLY_DEFORMABLE_BONES'))
     EX_ONLY_KEYFRAMED_BONES = BoolProperty(
         name="Only Keyframed Bones",
-        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis.",
+        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis",
         default=config.get('ONLY_KEYFRAMED_BONES'))
     EX_OGRE_INHERIT_SCALE = BoolProperty(
         name="OGRE Inherit Scale",
-        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.",
+        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE",
         default=config.get('OGRE_INHERIT_SCALE'))
     EX_SCENE = BoolProperty(
         name="Export Scene",
@@ -183,7 +181,7 @@ class _OgreCommonExport_(object):
         default=config.get('SELONLY'))
     EX_EXPORT_HIDDEN = BoolProperty(
         name="Export Hidden Also",
-        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
+        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff",
         default=config.get('EXPORT_HIDDEN'))
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",

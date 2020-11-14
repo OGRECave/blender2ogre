@@ -53,7 +53,7 @@ def dot_scene(path, scene_name=None):
             # that only get spaces converted to _, just do that automatically.
             cleanname = clean_object_name(ob.name)
             cleannamespaces = clean_object_name(ob.name, spaces = False)
-            print("ABABA", ob.name)
+
             if cleanname != ob.name:
                 if cleannamespaces != ob.name:
                     invalidnamewarnings.append(ob.name + " -> " + cleanname)
@@ -417,7 +417,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         # if it has no faces at all, the object itself will not be exported, BUT 
         # it might have children
         print("Vertices: ", len(ob.data.vertices))
-        print("Loop triangles: ", ob.data.loop_triangles, len(ob.data.loop_triangles))
+        print("Loop triangles: ", len(ob.data.loop_triangles))
 
     if ob.type == 'MESH' and len(ob.data.loop_triangles):
         collisionFile = None

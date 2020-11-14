@@ -13,9 +13,9 @@ class OGREMESH_OT_preview(bpy.types.Operator):
     bl_idname = 'ogremesh.preview'
     bl_label = "opens mesh viewer in a subprocess"
     bl_options = {'REGISTER'}
-    preview = BoolProperty(name="preview", description="fast preview", default=True)
-    groups = BoolProperty(name="preview merge groups", description="use merge groups", default=False)
-    mesh = BoolProperty(name="update mesh", description="update mesh (disable for fast material preview", default=True)
+    preview : BoolProperty(name="preview", description="fast preview", default=True)
+    groups : BoolProperty(name="preview merge groups", description="use merge groups", default=False)
+    mesh : BoolProperty(name="update mesh", description="update mesh (disable for fast material preview", default=True)
 
     @classmethod
     def poll(cls, context):
