@@ -458,7 +458,8 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         elif collisionFile:
             e.setAttribute('collisionFile', collisionFile )
 
-        _mesh_entity_helper( doc, ob, e )
+        if config.get('EXPORT_USER'):
+            _mesh_entity_helper( doc, ob, e )
 
         # export mesh.xml file of this object
         if config.get('MESH') and ob.data.name not in exported_meshes:

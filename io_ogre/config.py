@@ -33,6 +33,7 @@ _CONFIG_DEFAULTS_ALL = {
     'SEP_MATS' : True,
     'SELONLY' : True,
     'EXPORT_HIDDEN' : True,
+    'EXPORT_USER' : True,
     'FORCE_CAMERA' : True,
     'FORCE_LAMPS' : True,
     'MESH_OVERWRITE' : True,

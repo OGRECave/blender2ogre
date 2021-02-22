@@ -185,6 +185,10 @@ class _OgreCommonExport_(object):
         name="Export Hidden Also",
         description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff.",
         default=config.get('EXPORT_HIDDEN'))
+    EX_EXPORT_USER = BoolProperty(
+        name="Export User Properties",
+        description="Export user properties such as as physical properties. Turn off to avoid exporting the user data.",
+        default=config.get('EXPORT_USER'))
     EX_FORCE_CAMERA = BoolProperty(
         name="Force Camera",
         description="export active camera",
