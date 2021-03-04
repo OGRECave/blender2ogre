@@ -129,7 +129,7 @@ material none {
 ```
 
 ### Exporting Particle Systems
-![particle-system5.png](images/particle-system5)
+![particle-system5.png](images/particle-system5.png)
 
 A common technique for laying out random objects on a scene in Blender is to use the Particle System. 
 Check out the [Particle System README](ParticleSystem.md) to see how to create and export a scene where the trees, foliage and rocks are distributed randomly using a particle system.
