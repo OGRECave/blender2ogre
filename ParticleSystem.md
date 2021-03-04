@@ -27,19 +27,19 @@ By default `Hair Length` is set to 4 which makes the debris show 4 x larger so s
 
 With `Number` it is possible to control the amount of objects that will appear randomly on the mesh surface.
 
-![ParticleSystem1.png](images/ParticleSystem1.png)
+![particle-system1.png](images/particle-system1.png)
 
 Click on `Rotation` and select `Initial Orientation: Normal`.
 
 You can change the `Phase` and `Random` values to have the debris show random rotations around the Z axis (tangent space), this way if you have trees they will be showing in different orientations.
 
-![ParticleSystem2.png](images/ParticleSystem2.png)
+![particle-system2.png](images/particle-system2.png)
 
 In the `Render` setting change the type to `Object` and in `Dupli Object` select the object you want to duplicate randomly over the mesh.
 Check the `Rotation` and `Scale` options so the Particle System will take the *Dupli Objects* rotation and scale into account.
 Set `Size` to 1 and choose a `Random Size` value to control the amount of randomness in the size distribution of the *Dupli Objects*.
 
-![ParticleSystem3.png](images/ParticleSystem3.png)
+![particle-system3.png](images/particle-system3.png)
 
 At this point you should see the object appearing randomly in the places where there were hair strands.
 But, the objects appear rotated -90 degree over the Y axis.
@@ -58,7 +58,7 @@ One way to tesselate is to go into Edit mode and subdivide, or activate Dynotopo
 
 After painting the areas go back to the `Particles` tab and in the `Vertex Groups` section choose the vertex group in `Density` and `Length` (the default vertex group is `Default`).
 
-![ParticleSystem4.png](images/ParticleSystem4.png)
+![particle-system4.png](images/particle-system4.png)
 
 ## Troubleshooting
 Some tips for troubleshooting:
