@@ -26,14 +26,14 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [Animations](http://www.youtube.com/watch?feature=player_embedded&v=5oVM0Lmeb68)
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
 
-# Additional Features
+## Additional Features
 
-## Merge Objects on export
+### Merge Objects on export
 
 You might have hundrets of objects, which you want to keep separate but have them in one `.mesh` on export.
 For this create a new group (Ctrl+G) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the group.
 
-## External OGRE Materials
+### External OGRE Materials
 
 You might already have some materials in OGRE that you do not want to export.
 Prefix them with `extern.<yourname>` and the sub entity will have the material name set,
@@ -42,7 +42,7 @@ your OGRE project:
 
 ![extern-material.png](https://bitbucket.org/repo/dAG7Gx/images/3637870399-extern-material.png)
 
-## Console Export
+### Console Export
 
 You might have several blender files in your project you want to export to Ogre. Do this by hand? NO! You can do better! After all, you have build scripts to compile your source code? Why not export your files automated?
 Here is how you can export a scene with blender2ogre. Take a look at [io_ogre/console.py](io_ogre/console.py). You might want to write your own script for your project to export individual objects.
@@ -71,7 +71,7 @@ $ ls /tmp/blender
 abc.scene  Cube.mesh  Cube.mesh.xml  Material.material
 ```
 
-# Exporting Custom Vertex Groups
+### Exporting Custom Vertex Groups
 
 As shown in the picture below, you can now export SubEntities that contain
 a user defined amount of faces.
@@ -128,7 +128,13 @@ material none {
 }
 ```
 
-# About
+### Exporting Particle Systems
+![particle-system5.png](images/particle-system5.png)
+
+A common technique for laying out random objects on a scene in Blender is to use the Particle System. 
+Check out the [Particle System README](ParticleSystem.md) to see how to create and export a scene where the trees, foliage and rocks are distributed randomly using a particle system.
+
+## About
 
 [The original version of this](https://bitbucket.org/iboshkov/blender2ogre) was a *single* monolithic Python file.
 This is not maintainable, and contains a tremendous amount of bugs. There was the need to export blender model to ogre from

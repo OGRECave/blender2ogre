@@ -498,6 +498,29 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                             elif collisionFile: e.setAttribute('collisionFile', collisionFile )
                     vecs += newvecs
 
+        # Deal with Particle Systems
+        print(' *** Deal with Particle Systems ***')
+        
+        y_rot = mathutils.Quaternion((0.0, 1.0, 0.0), math.radians(90.0))
+
+        for partsys in ob.particle_systems:
+            if partsys.settings.type == 'HAIR' and partsys.settings.render_type == 'OBJECT':
+                index = 0
+                for particle in partsys.particles:
+                    dupob = partsys.settings.dupli_object
+                    ao = _ogre_node_helper( doc, dupob, prefix='%s_particle_%s_' % (clean_object_name(ob.data.name), index), pos=particle.hair_keys[0].co, rot=(particle.rotation * y_rot), scl=(dupob.scale * particle.size) )
+                    o.appendChild(ao)
+
+                    e = doc.createElement('entity')
+                    ao.appendChild(e); e.setAttribute('name', ('%s_particle_%s_%s' % (clean_object_name(ob.data.name), index, clean_object_name(dupob.data.name))))
+                    e.setAttribute('meshFile', '%s.mesh' % clean_object_name(dupob.data.name))
+                    #print(particle.location)
+                    #print(particle.rotation)
+                    #print(particle.size)
+                    index += 1
+            else:
+                print( 'WARNING: Particle System %s is not supported for export (should be type: HAIR and render: OBJECT)' )
+
     elif ob.type == 'CAMERA':
         Report.cameras.append( ob.name )
         c = doc.createElement('camera')
