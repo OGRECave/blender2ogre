@@ -35,6 +35,21 @@ import bpy
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
+# https://blender.stackexchange.com/questions/2691/is-there-a-way-to-restart-a-modified-addon
+# https://blender.stackexchange.com/questions/28504/blender-ignores-changes-to-python-scripts/28505
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    # ...so we need to reload our submodule(s) using importlib
+    import importlib
+    if "config" in locals():
+        importlib.reload(config)
+    if "properties" in locals():
+        importlib.reload(properties)
+    if "ui" in locals():
+        importlib.reload(ui)
+
+# This is only relevant on first run, on later reloads those modules
+# are already in locals() and those statements do not do anything.
 from . import config
 from . import properties
 from . import ui
