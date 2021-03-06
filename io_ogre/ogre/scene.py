@@ -393,19 +393,20 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
 
-    # Custom user props
-    if len(ob.items()) + len(ob.game.properties) > 0:
-        user = doc.createElement('userData')
-        o.appendChild(user)
+    if config.get('EXPORT_USER'):
+        # Custom user props
+        if len(ob.items()) + len(ob.game.properties) > 0:
+            user = doc.createElement('userData')
+            o.appendChild(user)
 
-    for prop in ob.items():
-        propname, propvalue = prop
-        if not propname.startswith('_'):
-            _property_helper(doc, user, propname, propvalue)
+        for prop in ob.items():
+            propname, propvalue = prop
+            if not propname.startswith('_'):
+                _property_helper(doc, user, propname, propvalue)
 
-    # Custom user props from BGE props by Mind Calamity
-    for prop in ob.game.properties:
-        _property_helper(doc, user, prop.name, prop.value)
+        # Custom user props from BGE props by Mind Calamity
+        for prop in ob.game.properties:
+            _property_helper(doc, user, prop.name, prop.value)
 
     # BGE subset
     if len(ob.game.sensors) + len(ob.game.actuators) > 0:
@@ -475,10 +476,10 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         for mod in ob.modifiers:
             if mod.type == 'ARRAY':
                 if mod.fit_type != 'FIXED_COUNT':
-                    print( 'WARNING: unsupport array-modifier type->', mod.fit_type )
+                    print( 'WARNING: Unsupported array-modifier type->', mod.fit_type )
                     continue
                 if not mod.use_constant_offset:
-                    print( 'WARNING: unsupport array-modifier mode, must be "constant offset" type' )
+                    print( 'WARNING: Unsupported array-modifier mode, must be of "constant offset" type' )
                     continue
                 else:
                     #v = ob.matrix_world.to_translation()
