@@ -1,4 +1,24 @@
 import bpy
+
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    # ...so we need to reload our submodule(s) using importlib
+    import importlib
+    if "config" in locals():
+        importlib.reload(config)
+    #if "Report" in locals():
+    #    importlib.reload(Report)
+    if "material" in locals():
+        importlib.reload(material)
+    if "export" in locals():
+        importlib.reload(export)
+    if "helper" in locals():
+        importlib.reload(helper)
+    #if "OGREMESH_OT_preview" in locals():
+    #    importlib.reload(OGREMESH_OT_preview)
+
+# This is only relevant on first run, on later reloads those modules
+# are already in locals() and those statements do not do anything.
 from .. import config
 from ..report import Report
 from . import material
