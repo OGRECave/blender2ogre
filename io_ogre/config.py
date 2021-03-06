@@ -33,6 +33,7 @@ _CONFIG_DEFAULTS_ALL = {
     'SEP_MATS' : True,
     'SELONLY' : True,
     'EXPORT_HIDDEN' : True,
+    'EXPORT_USER' : True,
     'FORCE_CAMERA' : True,
     'FORCE_LAMPS' : True,
     'MESH_OVERWRITE' : True,
@@ -176,7 +177,6 @@ def load_config():
 CONFIG = load_config()
 
 def get(name, default=None):
-    
     global CONFIG
     if name in CONFIG:
         return CONFIG[name]

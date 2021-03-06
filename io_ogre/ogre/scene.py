@@ -21,7 +21,7 @@ def dot_scene(path, scene_name=None):
         scene_name = bpy.context.scene.name
     scene_file = scene_name + '.scene'
     target_scene_file = join(path, scene_file)
-    
+
     # Create target path if it does not exist
     if not os.path.exists(path):
         print("Creating Directory -", path)
@@ -53,7 +53,7 @@ def dot_scene(path, scene_name=None):
             # that only get spaces converted to _, just do that automatically.
             cleanname = clean_object_name(ob.name)
             cleannamespaces = clean_object_name(ob.name, spaces = False)
-
+            print("ABABA", ob.name)
             if cleanname != ob.name:
                 if cleannamespaces != ob.name:
                     invalidnamewarnings.append(ob.name + " -> " + cleanname)
@@ -400,15 +400,16 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
 
-    # Custom user props
-    if len(ob.items()) > 0:
-        user = doc.createElement('userData')
-        o.appendChild(user)
+    if config.get('EXPORT_USER'):
+	    # Custom user props
+	    if len(ob.items()) > 0:
+	        user = doc.createElement('userData')
+	        o.appendChild(user)
 
-    for prop in ob.items():
-        propname, propvalue = prop
-        if not propname.startswith('_'):
-            _property_helper(doc, user, propname, propvalue)
+	    for prop in ob.items():
+	        propname, propvalue = prop
+	        if not propname.startswith('_'):
+	            _property_helper(doc, user, propname, propvalue)
 
     if ob.type == 'MESH':
         # ob.data.tessfaces is empty. always until the following call
@@ -447,7 +448,8 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         elif collisionFile:
             e.setAttribute('collisionFile', collisionFile )
 
-        _mesh_entity_helper( doc, ob, e )
+        if config.get('EXPORT_USER'):
+            _mesh_entity_helper( doc, ob, e )
 
         # export mesh.xml file of this object
         if config.get('MESH') and ob.data.name not in exported_meshes:
@@ -455,7 +457,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
             tangents = int(config.get("generateTangents"))
             mesh.dot_mesh(ob, path, overwrite=overwrite, tangents=tangents)
-            skeleton.dot_skeleton(ob, path, overwrite=overwrite)    
+            skeleton.dot_skeleton(ob, path, overwrite=overwrite)
             exported_meshes.append( ob.data.name )
 
         # Deal with Array modifier
@@ -463,10 +465,10 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         for mod in ob.modifiers:
             if mod.type == 'ARRAY':
                 if mod.fit_type != 'FIXED_COUNT':
-                    print( 'WARNING: unsupport array-modifier type->', mod.fit_type )
+                    print( 'WARNING: Unsupported array-modifier type->', mod.fit_type )
                     continue
                 if not mod.use_constant_offset:
-                    print( 'WARNING: unsupport array-modifier mode, must be "constant offset" type' )
+                    print( 'WARNING: Unsupported array-modifier mode, must be of "constant offset" type' )
                     continue
                 else:
                     #v = ob.matrix_world.to_translation()
@@ -485,6 +487,29 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                             if collisionPrim: e.setAttribute('collisionPrim', collisionPrim )
                             elif collisionFile: e.setAttribute('collisionFile', collisionFile )
                     vecs += newvecs
+
+        # Deal with Particle Systems
+        print(' *** Deal with Particle Systems ***')
+        
+        z_rot = mathutils.Quaternion((0.0, 0.0, 1.0), math.radians(90.0))
+        
+        degp = bpy.context.evaluated_depsgraph_get()
+        particle_systems = ob.evaluated_get(degp).particle_systems
+
+        for partsys in particle_systems:
+            if partsys.settings.type == 'HAIR' and partsys.settings.render_type == 'OBJECT':
+                index = 0
+                for particle in partsys.particles:
+                    dupob = partsys.settings.instance_object
+                    ao = _ogre_node_helper( doc, dupob, prefix='%s_particle_%s_' % (clean_object_name(ob.data.name), index), pos=particle.hair_keys[0].co, rot=(particle.rotation * z_rot), scl=(dupob.scale * particle.size) )
+                    o.appendChild(ao)
+
+                    e = doc.createElement('entity')
+                    ao.appendChild(e); e.setAttribute('name', ('%s_particle_%s_%s' % (clean_object_name(ob.data.name), index, clean_object_name(dupob.data.name))))
+                    e.setAttribute('meshFile', '%s.mesh' % clean_object_name(dupob.data.name))
+                    index += 1
+            else:
+                print( 'WARNING: Particle System %s is not supported for export (should be type: HAIR and render: OBJECT)' )
 
     elif ob.type == 'CAMERA':
         Report.cameras.append( ob.name )
