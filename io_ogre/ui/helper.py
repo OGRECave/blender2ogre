@@ -2,7 +2,7 @@ import bpy
 from ..util import wordwrap
 
 def auto_register(register):
-    yield MT_ogre_docs
+    yield OGRE_MT_ogre_docs
     for clazz in _OGRE_DOCS_:
         yield clazz
 
@@ -13,7 +13,7 @@ def ogredoc( cls ):
     _OGRE_DOCS_.append( cls )
     return cls
 
-class MT_ogre_docs(bpy.types.Menu):
+class OGRE_MT_ogre_docs(bpy.types.Menu):
     bl_label = "Ogre Help"
 
     def draw(self, context):
@@ -23,7 +23,7 @@ class MT_ogre_docs(bpy.types.Menu):
             layout.separator()
         layout.label(text='bug reports to: https://github.com/OGRECave/blender2ogre/issues')
 
-class MT_ogre_helper(bpy.types.Menu):
+class OGRE_MT_ogre_helper(bpy.types.Menu):
     bl_label = '_overloaded_'
 
     def draw(self, context):
@@ -40,7 +40,7 @@ class MT_ogre_helper(bpy.types.Menu):
         layout.separator()
 
 @ogredoc
-class _ogredoc_Installing( MT_ogre_helper ):
+class OGRE_MT_ogredoc_Installing( OGRE_MT_ogre_helper ):
     mydoc = """
 Installing:
     Installing the Addon:
@@ -69,7 +69,7 @@ Installing:
 """
 
 @ogredoc
-class _ogredoc_FAQ( MT_ogre_helper ):
+class OGRE_MT_ogredoc_FAQ( OGRE_MT_ogre_helper ):
     mydoc = """
 
 Q: I have hundres of objects, is there a way i can merge them on export only?
@@ -93,7 +93,7 @@ A: No.
 """
 
 @ogredoc
-class _ogredoc_Animation_System( MT_ogre_helper ):
+class OGRE_MT_ogredoc_Animation_System( OGRE_MT_ogre_helper ):
     mydoc = '''
 Armature Animation System | OgreDotSkeleton
     Quick Start:
@@ -119,7 +119,7 @@ Armature Animation System | OgreDotSkeleton
 '''
 
 @ogredoc
-class _ogredoc_Physics( MT_ogre_helper ):
+class OGRE_MT_ogredoc_Physics( OGRE_MT_ogre_helper ):
     mydoc = '''
 Ogre Dot Scene + BGE Physics
     extended format including external collision mesh, and BGE physics settings
@@ -141,7 +141,7 @@ Blender Collision Setup:
 '''
 
 @ogredoc
-class _ogredoc_Bugs( MT_ogre_helper ):
+class OGRE_MT_ogredoc_Bugs( OGRE_MT_ogre_helper ):
     mydoc = '''
 Known Issues:
     . shape animation breaks when using modifiers that change the vertex count

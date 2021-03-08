@@ -13,9 +13,9 @@ def add_preview_button(self, context):
         op.mesh = True
 
 def auto_register(register):
-    yield HT_toggle_ogre
-    yield OP_interface_toggle
-    yield MT_mini_report
+    yield OGRE_HT_toggle_ogre
+    yield OGRE_OP_interface_toggle
+    yield OGRE_MT_mini_report
     yield OGREMESH_OT_preview
 
     bpy.types.VIEW3D_PT_tools_active.append(add_preview_button)
@@ -24,14 +24,14 @@ def auto_register(register):
     yield from helper.auto_register(register)
 
     if register and config.get('interface_toggle'):
-        OP_interface_toggle.toggle(True)
+        OGRE_OP_interface_toggle.toggle(True)
 
 """
 General purpose ui elements
 """
 
 # FILE | RENDER | ... | OGRE |x| <-- check box
-class OP_interface_toggle(bpy.types.Operator):
+class OGRE_OP_interface_toggle(bpy.types.Operator):
     '''Toggle Ogre UI'''
     bl_idname = "ogre.toggle_interface"
     bl_label = "Ogre UI"
@@ -55,12 +55,12 @@ class OP_interface_toggle(bpy.types.Operator):
         if not show:
             class_func = bpy.utils.unregister_class
 
-        class_func(HT_info_header)
+        class_func(OGRE_HT_info_header)
 
         for clazz in material.ogre_register(show):
             class_func(clazz)
 
-class HT_toggle_ogre(bpy.types.Header):
+class OGRE_HT_toggle_ogre(bpy.types.Header):
     bl_space_type = 'INFO'
 
     def draw(self, context):
@@ -71,7 +71,7 @@ class HT_toggle_ogre(bpy.types.Header):
             icon = 'CHECKBOX_HLT'
         op = layout.operator('ogre.toggle_interface', text='Ogre', icon=icon)
 
-class MT_mini_report(bpy.types.Menu):
+class OGRE_MT_mini_report(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
     def draw(self, context):
         layout = self.layout
@@ -79,7 +79,7 @@ class MT_mini_report(bpy.types.Menu):
         for line in txt.splitlines():
             layout.label(text=line)
 
-class HT_info_header(bpy.types.Header):
+class OGRE_HT_info_header(bpy.types.Header):
     bl_space_type = 'INFO'
     def draw(self, context):
         layout = self.layout
@@ -158,6 +158,6 @@ class HT_info_header(bpy.types.Header):
 
             layout.menu( 'MT_preview_material_text', icon='TEXT', text='' )
 
-            layout.menu( "MT_ogre_docs" )
+            layout.menu( "OGRE_MT_ogre_docs" )
             layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
 
