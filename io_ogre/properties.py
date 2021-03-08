@@ -184,8 +184,9 @@ bpy.types.Material.use_ogre_parent_material = BoolProperty(
     default=False)
 bpy.types.Material.ogre_parent_material = EnumProperty(
     name="Script Inheritence",
-    description='ogre parent material class', #default='NONE',
-    items=[])
+    description='ogre parent material class',
+    items=[ ('none', 'none', 'NONE') ],
+    default='none')
 bpy.types.Material.ogre_polygon_mode = EnumProperty(
     name='faces draw type',
     description="ogre face draw mode",
@@ -210,12 +211,10 @@ bpy.types.Material.ogre_transparent_sorting = EnumProperty(
 bpy.types.Material.ogre_illumination_stage = EnumProperty(
     name='illumination stage',
     description='When using an additive lighting mode (SHADOWTYPE_STENCIL_ADDITIVE or SHADOWTYPE_TEXTURE_ADDITIVE), the scene is rendered in 3 discrete stages, ambient (or pre-lighting), per-light (once per light, with shadowing) and decal (or post-lighting). Usually OGRE figures out how to categorise your passes automatically, but there are some effects you cannot achieve without manually controlling the illumination.',
-    items=[ ('', '', 'autodetect'),
-            ('ambient', 'ambient', 'ambient'),
+    items=[ ('ambient', 'ambient', 'ambient'),
             ('per_light', 'per_light', 'lights'),
             ('decal', 'decal', 'decal') ],
-    default=''
-)
+    default='per_light')
 
 _ogre_depth_func =  [
     ('less_equal', 'less_equal', '<='),
