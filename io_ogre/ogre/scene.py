@@ -400,16 +400,15 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
 
-    if config.get('EXPORT_USER'):
-	    # Custom user props
-	    if len(ob.items()) > 0:
-	        user = doc.createElement('userData')
-	        o.appendChild(user)
+    # Custom user props
+    if len(ob.items()) > 0:
+        user = doc.createElement('userData')
+        o.appendChild(user)
 
-	    for prop in ob.items():
-	        propname, propvalue = prop
-	        if not propname.startswith('_'):
-	            _property_helper(doc, user, propname, propvalue)
+    for prop in ob.items():
+        propname, propvalue = prop
+        if not propname.startswith('_'):
+            _property_helper(doc, user, propname, propvalue)
 
     if ob.type == 'MESH':
         # ob.data.tessfaces is empty. always until the following call
@@ -448,8 +447,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         elif collisionFile:
             e.setAttribute('collisionFile', collisionFile )
 
-        if config.get('EXPORT_USER'):
-            _mesh_entity_helper( doc, ob, e )
+        _mesh_entity_helper( doc, ob, e )
 
         # export mesh.xml file of this object
         if config.get('MESH') and ob.data.name not in exported_meshes:
