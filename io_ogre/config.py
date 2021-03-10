@@ -176,7 +176,6 @@ def load_config():
 CONFIG = load_config()
 
 def get(name, default=None):
-    
     global CONFIG
     if name in CONFIG:
         return CONFIG[name]
