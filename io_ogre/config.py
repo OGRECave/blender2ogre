@@ -117,7 +117,6 @@ def load_config():
             with open( CONFIG_FILEPATH, 'rb' ) as f:
                 config_dict = pickle.load( f )
         except:
-            #print('[ERROR]: Can not read config from %s' %CONFIG_FILEPATH)
             logger.error(' Can not read config from %s' % CONFIG_FILEPATH)
 
     for tag in _CONFIG_DEFAULTS_ALL:
@@ -131,7 +130,6 @@ def load_config():
             elif sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
                 config_dict[ tag ] = _CONFIG_DEFAULTS_UNIX[ tag ]
             else:
-                #print( 'ERROR: unknown platform' )
                 logger.error( ' Unknown platform: %s' % sys.platform)
                 assert 0
 
@@ -144,7 +142,6 @@ def load_config():
             if exe_install_dir != "":
                 # OgreXmlConverter
                 if os.path.isfile(exe_install_dir + "OgreXmlConverter.exe"):
-                    #print ("Using OgreXmlConverter from install path:", exe_install_dir + "OgreXmlConverter.exe")
                     logger.info (" Using OgreXmlConverter from install path: %sOgreXmlConverter.exe" % exe_install_dir)
                     config_dict['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXmlConverter.exe"
                 # Run auto updater as silent. Notifies user if there is a new version out.
@@ -154,7 +151,6 @@ def load_config():
                 if os.path.isfile(exe_install_dir + "check-for-updates.exe"):
                     subprocess.Popen([exe_install_dir + "check-for-updates.exe", "/silent"])
     except Exception as e:
-        #print("Exception while reading windows registry:", e)
         logger.error(" Exception while reading windows registry: %s" % e)
 
     # Setup temp hidden RNA to expose the file paths
@@ -191,7 +187,6 @@ def get(name, default=None):
 def update(**kwargs):
     for k,v in kwargs.items():
         if k not in _CONFIG_DEFAULTS_ALL:
-            #print("trying to set CONFIG['%s']=%s, but is not a known config setting" % (k,v))
             logger.warn(" Trying to set CONFIG['%s'] = %s, but it is not a known config setting" % (k,v))
         CONFIG[k] = v
     save_config()
@@ -204,10 +199,8 @@ def save_config():
             with open( CONFIG_FILEPATH, 'wb' ) as f:
                 pickle.dump( CONFIG, f, -1 )
         except:
-            #print('[ERROR]: Can not write to %s' %CONFIG_FILEPATH)
             logger.error(' Can not write to %s' % CONFIG_FILEPATH)
     else:
-        #print('[ERROR:] Config directory does not exist %s' %CONFIG_PATH)
         logger.error(' Config directory %s does not exist' % CONFIG_PATH)
 
 def update_from_addon_preference(context):

@@ -29,7 +29,6 @@ def dot_scene(path, scene_name=None):
         print("Creating Directory: ", path)
         os.mkdir(path)
 
-    #print("Processing Scene -> name: %s, path: %s" % (scene_name, path))
     logger.info(" * Processing Scene -> name: %s, path: %s" % (scene_name, path))
     prefix = scene_name
 
@@ -56,8 +55,7 @@ def dot_scene(path, scene_name=None):
             # that only get spaces converted to _, just do that automatically.
             cleanname = clean_object_name(ob.name)
             cleannamespaces = clean_object_name(ob.name, spaces = False)
-            #print("ABABA", ob.name)
-            #logger.info(" ABABA %s" % ob.name)
+            logger.debug(" ABABA %s" % ob.name)
             if cleanname != ob.name:
                 if cleannamespaces != ob.name:
                     invalidnamewarnings.append(ob.name + " -> " + cleanname)
@@ -65,11 +63,9 @@ def dot_scene(path, scene_name=None):
 
     # Print invalid obj names so user can go and fix them.
     if len(invalidnamewarnings) > 0:
-        #print ("[Warning]: Following object names have invalid characters for creating files. They will be automatically converted.")
         logger.warning(" The following object names have invalid characters for creating files. They will be automatically converted.")
         for namewarning in invalidnamewarnings:
             Report.warnings.append('Auto corrected Object name: "%s"' % namewarning)
-            #print (" - ", namewarning)
             logger.warning(" + - %s" % namewarning)
 
     # Linked groups - allows 3 levels of nested blender library linking
@@ -145,7 +141,6 @@ def dot_scene(path, scene_name=None):
 
     materials = []
     if config.get("MATERIALS"):
-        #print ("  Processing Materials")
         logger.info(" * Processing Materials")
         materials = util.objects_merge_materials(meshes)
         dot_materials(materials, path, separate_files=config.get('SEP_MATS'), prefix=prefix)
@@ -156,7 +151,6 @@ def dot_scene(path, scene_name=None):
     mesh_collision_files = {}
 
     for root in roots:
-        #print('      - Exporting root node:', root.name)
         logger.info(" * Exporting root node: %s " % root.name)
         dot_scene_node_export(root, path = path, doc = doc,
             exported_meshes = exported_meshes,
@@ -172,7 +166,6 @@ def dot_scene(path, scene_name=None):
         data = doc.toprettyxml()
         with open(target_scene_file, 'wb') as fd:
             fd.write(bytes(data,'utf-8'))
-        #print('  Exported Ogre Scene:', target_scene_file)
         logger.info(" - Exported Ogre Scene: %s " % target_scene_file)
 
     for ob in temps:
@@ -220,7 +213,6 @@ class _WrapLogic(object):
                 elif hasattr(attr,'x') and hasattr(attr,'y') and hasattr(attr,'z'):
                     a.setAttribute('value', '%s %s %s' %(attr.x, attr.y, attr.z))
                 else:
-                    #print('ERROR: unknown type', attr)
                     logger.error(' Unknown type: %s' % attr)
         return g
 
@@ -449,7 +441,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         # and the user requested to have tangents generated 
         # (they won't be without a UV Map)
         if int(config.get("generateTangents")) != 0 and len(ob.data.uv_layers) == 0:
-            #print( "[%s] WARNING: No UV Maps were created for this object, tangents won't be exported." % ob.name )
             logger.warning(" No UV Maps were created for this object: <%s>, tangents won't be exported." % ob.name)
             Report.warnings.append( 'Object "%s" has no UV Maps, tangents won\'t be exported.' % ob.name )
 
@@ -494,12 +485,10 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         for mod in ob.modifiers:
             if mod.type == 'ARRAY':
                 if mod.fit_type != 'FIXED_COUNT':
-                    #print( "[%s] WARNING: Unsupported array-modifier type -> %s, only 'FIXED_COUNT' is supported" % (ob.name, mod.fit_type) )
                     logger.warning(" <%s> Unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
                     Report.warnings.append("Object \"%s\" has unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
                     continue
                 if not mod.use_constant_offset:
-                    #print( "[%s] WARNING: Unsupported array-modifier mode, must be of 'constant offset' type" % ob.name )
                     logger.warning(" <%s> Unsupported array-modifier mode, must be of 'Constant Offset' type" % ob.name)
                     Report.warnings.append("Object \"%s\" has unsupported array-modifier mode, must be of 'Constant Offset' type" % ob.name)
                     continue
@@ -537,7 +526,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                     e.setAttribute('meshFile', '%s.mesh' % clean_object_name(dupob.data.name))
                     index += 1
             else:
-                #print( "[%s] WARNING: Particle System %s is not supported for export (should be type: HAIR and render_type: OBJECT)" % (ob.name, partsys.name) )
                 logger.warn(" <%s> Particle System %s is not supported for export (should be of type: 'Hair' and render_type: 'Object')" % (ob.name, partsys.name))
                 Report.warnings.append("Object \"%s\" has Particle System: \"%s\" not supported for export (should be of type: 'Hair' and render_type: 'Object')" % (ob.name, partsys.name))
 

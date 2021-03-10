@@ -49,7 +49,6 @@ class Bone(object):
                 #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1))) # thanks to Waruck
             else:
-                #print( 'ERROR - TODO: axis swap mode not supported with armature animation' )
                 logger.error( ' - TODO: Axis swap mode not supported with armature animation' )
                 assert 0
 
@@ -286,7 +285,6 @@ def findArmature( ob ):
         # search for another armature that is a proxy for it
         for ob2 in bpy.data.objects:
             if ob2.type == 'ARMATURE' and ob2.proxy == arm:
-                #print( "proxy armature %s found" % ob2.name )
                 logger.info( " - Proxy armature %s found" % ob2.name )
                 return ob2
     return arm
@@ -443,14 +441,11 @@ class Skeleton(object):
             # the only thing NLA is used for is to gather the names of the actions
             # it doesn't matter if the actions are all in the same NLA track or in different tracks
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
-                #print('NLA track:',  nla.name)
                 logger.info(' + NLA track: %s' % nla.name)
 
                 for strip in nla.strips:
                     action = strip.action
                     actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end]
-                    #print('   strip name:', strip.name)
-                    #print('   action name:', action.name)
                     logger.info('   - Action name: %s' % action.name)
                     logger.info('   -  Strip name: %s' % strip.name)
 

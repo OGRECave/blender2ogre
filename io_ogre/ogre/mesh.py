@@ -87,8 +87,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     # bake mesh
     mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")
 
-    #if logging:
-    #    print('      - Generating:', '%s.mesh.xml' % obj_name)
     logger.info(' * Generating: %s.mesh.xml' % obj_name)
 
     try:
@@ -104,8 +102,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         # Very ugly, have to replace number of vertices later
         doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
 
-        #if logging:
-        #    print('      - Writing shared geometry')
         logger.info(' * Writing shared geometry')
 
         # Textures
@@ -142,7 +138,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             if mat:
                 materials.append( (mat_name, extern, mat) )
             else:
-                #print('[WARNING:] Bad material data in', ob)
                 logger.warn(' Bad material data in: %s' % ob.name)
                 materials.append( ('_missing_material_', True, None) ) # fixed dec22, keep proper index
         if not materials:
@@ -292,9 +287,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
 
-        #if logging:
-        #    print('        Done at', timer_diff_str(start), "seconds")
-        #    print('      - Writing submeshes')
         logger.info(' - Done at %s seconds' % timer_diff_str(start))
         logger.info(' * Writing submeshes')
 
@@ -370,8 +362,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             idx += 1
         doc.end_tag('submeshnames')
 
-        #if logging:
-        #    print('        Done at', timer_diff_str(start), "seconds")
         logger.info(' - Done at %s seconds' % timer_diff_str(start))
 
         # Generate lod levels
@@ -453,11 +443,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     # Check min vertice count and that the vertice count got reduced from last iteration
                     lod_mesh_vertices = len(lod_mesh.vertices)
                     if lod_mesh_vertices < lod_min_vertice_count:
-                        #print('        - LOD', level, 'vertice count', lod_mesh_vertices, 'too small. Ignoring LOD.')
                         logger.info(' - LOD level: %s, vertice count: %s too small. Ignoring LOD.' % (level, lod_mesh_vertices))
                         break
                     if lod_mesh_vertices >= lod_current_vertice_count:
-                        #print('        - LOD', level-1, 'vertice count', lod_mesh_vertices, 'cannot be decimated any longer. Ignoring LOD.')
                         logger.info(' - LOD level: %s, vertice count: %s cannot be decimated any longer. Ignoring LOD.' % (level - 1, lod_mesh_vertices))
                         break
                     # todo: should we check if the ratio gets too small? although its up to the user to configure from the export panel
@@ -480,11 +468,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         'manual'    : "true"
                     })
 
-                    #print('        - Generating', len(lod_generated), 'LOD meshes. Original: vertices', len(mesh.vertices), "faces", len(mesh.tessfaces))
                     logger.info(' - Generating: %s LOD meshes. Original: vertices %s, faces: %s' % (len(lod_generated), len(mesh.vertices), len(mesh.tessfaces)))
                     for lod in lod_generated:
                         ratio_percent = round(lod['ratio'] * 100.0, 0)
-                        #print(' > Writing LOD', lod['level'], 'for distance', lod['distance'], 'and ratio', str(ratio_percent) + "%", 'with', len(lod['mesh'].vertices), 'vertices', len(lod['mesh'].tessfaces), 'faces')
                         logger.info(" > Writing LOD %s for distance %s and ratio %s/100, with %s vertices, %s faces" % (lod['level'], lod['distance'], str(ratio_percent), len(lod['mesh'].vertices), len(lod['mesh'].tessfaces)))
                         lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
                         lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
@@ -516,7 +502,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             ob_copy_meshes = []
 
             if lod_pre_mesh_count != len(bpy.data.meshes):
-                #print('        - WARNING: After LOD generation, cleanup failed to erase all temporary data!')
                 logger.warn(' - After LOD generation, cleanup failed to erase all temporary data!')
 
         arm = ob.find_armature()
@@ -562,11 +547,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                                 })
                                 check += 1
                         else:
-                            #print('WARNING: object vertex groups not in sync with armature', copy, arm, groupIndex)
                             logger.warn(' Mesh: %s vertex groups not in sync with armature %s (groupIndex = %s)' % (mesh.name, arm.name, groupIndex))
                 if check > 4:
                     badverts += 1
-                    #print('WARNING: vertex %s is in more than 4 vertex groups (bone weights)\n(this maybe Ogre incompatible)' %vidx)
                     logger.warn(' <%s> vertex %s is in more than 4 vertex groups (bone weights). This maybe Ogre incompatible' % (mesh.name, vidx))
             if badverts:
                 Report.warnings.append( 'Mesh "%s" has %s vertices weighted to too many bones (Ogre limits a vertex to 4 bones). Try increasing the Trim-Weights threshold option' % (mesh.name, badverts) )
@@ -574,7 +557,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         # Updated June3 2011 - shape animation works
         if config.get('SHAPE_ANIM') and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
-            #print('      - Writing shape keys')
             logger.info(' * Writing shape keys')
 
             doc.start_tag('poses', {})
@@ -584,7 +566,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     failure = 'FAILED to save shape animation - you can not use a modifier that changes the vertex count! '
                     failure += '[ mesh : %s ]' % mesh.name
                     Report.warnings.append( failure )
-                    #print( failure )
                     logger.error( failure )
                     break
 
@@ -641,13 +622,9 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 doc.end_tag('pose')
             doc.end_tag('poses')
 
-
-            #if logging:
-            #    print('        Done at', timer_diff_str(start), "seconds")
             logger.info(' - Done at %s seconds' % timer_diff_str(start))
 
             if ob.data.shape_keys.animation_data and len(ob.data.shape_keys.animation_data.nla_tracks):
-                #print('      - Writing shape animations')
                 logger.info(' * Writing shape animations')
                 doc.start_tag('animations', {})
                 _fps = float( bpy.context.scene.render.fps )
@@ -683,7 +660,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         doc.end_tag('tracks')
                         doc.end_tag('animation')
                 doc.end_tag('animations')
-                #print('        Done at', timer_diff_str(start), "seconds")
                 logger.info(' - Done at %s seconds' % timer_diff_str(start))
 
         ## Clean up and save
@@ -702,8 +678,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.close() # reported by Reyn
         f.close()
 
-        #if logging:
-        #    print('      - Created .mesh.xml at', timer_diff_str(start), "seconds")
         logger.info(' - Created %s.mesh.xml at %s seconds' % (obj_name, timer_diff_str(start)))
 
     # todo: Very ugly, find better way
@@ -730,7 +704,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if not extern:
             mats.append(mat_name)
         else:
-            #print("extern material", mat_name)
             logger.info(" Extern material: %s" % mat_name)
 
     logger.info(' - Created %s.mesh in total time %s seconds' % (obj_name, timer_diff_str(start)))
