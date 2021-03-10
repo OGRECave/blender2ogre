@@ -1,10 +1,4 @@
-
-import bpy
-import os
-import getpass
-import math
-import mathutils
-import logging
+import bpy, os, getpass, math, mathutils, logging
 
 from pprint import pprint
 
@@ -35,7 +29,7 @@ from ..ogre import skeleton
 from ..ogre import scene
 from ..ogre import material
 
-logger = logging.getLogger('root')
+logger = logging.getLogger('export.py')
 
 def auto_register(register):
     yield OP_ogre_export
@@ -60,12 +54,11 @@ class _OgreCommonExport_(object):
             return True
 
     def __init__(self):
-        # check that converter is setup
+        # Check that converter is setup
         self.converter = detect_converter_type()
 
     def invoke(self, context, event):
-
-        # update the interface with the config values
+        # Update the interface with the config values
         for key, value in config.CONFIG.items():
             if getattr(self, "EX_" + key, None) or getattr(self, "EX_Vx_" + key, None) or getattr(self, "EX_V1_" + key, None) or getattr(self, "EX_V2_" + key, None):
                 # todo: isn't the key missing the "EX_" prefix?
@@ -98,23 +91,23 @@ class _OgreCommonExport_(object):
                 layout.prop(self, key)
 
     def execute(self, context):
-        # add warinng about missing XML converter
+        # Add warinng about missing XML converter
         Report.reset()
         if self.converter == "unknown":
             Report.errors.append(
               "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
               "Export XML mesh - do NOT automatically convert .xml to .mesh file. You MUST run converter mesh manually.")
 
-        logger.info("context.blend_data %s"%context.blend_data.filepath)
-        logger.info("context.scene.name %s"%context.scene.name)
-        logger.info("self.filepath %s"%self.filepath)
-        logger.info("self.last_export_path %s"%self.last_export_path)
+        logger.debug(" Context.blend_data: %s" % context.blend_data.filepath)
+        logger.debug(" Context.scene.name: %s" % context.scene.name)
+        logger.debug(" Self.filepath: %s" % self.filepath)
+        logger.debug(" Self.last_export_path: %s" % self.last_export_path)
 
-        #-- load addonPreferenc in CONFIG
+        # Load addonPreference in CONFIG
         config.update_from_addon_preference(context)
 
-        # Resolve path from opened .blend if available. It's not if
-        # blender normally was opened with "last open scene".
+        # Resolve path from opened .blend if available. 
+        # Normally it's not if blender was opened with "Recover Last Session".
         # After export is done once, remember that path when re-exporting.
         if not self.last_export_path:
             # First export during this blender run
@@ -128,7 +121,7 @@ class _OgreCommonExport_(object):
         if self.filepath == "" or not self.filepath:
             self.filepath = "blender2ogre"
 
-        logger.info("self.filepath %s"%self.filepath)
+        logger.debug(" Self.filepath: %s" % self.filepath)
 
         kw = {}
         for name in dir(_OgreCommonExport_):
@@ -145,9 +138,9 @@ class _OgreCommonExport_(object):
         target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
-        logger.info("target_path %s"%target_path)
-        logger.info("target_file_name %s"%target_file_name)
-        logger.info("target_file_name_no_ext %s"%target_file_name_no_ext)
+        logger.debug(" Target_path: %s" % target_path)
+        logger.debug(" Target_file_name: %s" % target_file_name)
+        logger.debug(" Target_file_name_no_ext: %s" % target_file_name_no_ext)
 
         scene.dot_scene(target_path, target_file_name_no_ext)
         Report.show()

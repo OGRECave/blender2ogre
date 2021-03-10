@@ -27,7 +27,7 @@ class OGREMESH_OT_preview(bpy.types.Operator):
 
     def execute(self, context):
         Report.reset()
-        Report.messages.append('running %s' %CONFIG['MESH_PREVIEWER'])
+        Report.messages.append('Running "%s"' % CONFIG['MESH_PREVIEWER'])
 
         if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
             path = os.path.expanduser("~/io_blender2ogre") # use $HOME so snap can access it

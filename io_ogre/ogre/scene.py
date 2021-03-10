@@ -12,6 +12,8 @@ from .material import *
 from . import material
 from .. import bl_info
 
+logger = logging.getLogger('scene.py')
+
 def dot_scene(path, scene_name=None):
     """
     path: string - target path to save the scene file and related files to
@@ -24,10 +26,10 @@ def dot_scene(path, scene_name=None):
 
     # Create target path if it does not exist
     if not os.path.exists(path):
-        print("Creating Directory -", path)
+        print("Creating Directory: ", path)
         os.mkdir(path)
 
-    print("Processing Scene: name:%s, path: %s"%(scene_name, path))
+    logger.info(" * Processing Scene -> name: %s, path: %s" % (scene_name, path))
     prefix = scene_name
 
     # Nodes (objects) - gather because macros will change selection state
@@ -53,7 +55,7 @@ def dot_scene(path, scene_name=None):
             # that only get spaces converted to _, just do that automatically.
             cleanname = clean_object_name(ob.name)
             cleannamespaces = clean_object_name(ob.name, spaces = False)
-            print("ABABA", ob.name)
+            logger.debug(" ABABA %s" % ob.name)
             if cleanname != ob.name:
                 if cleannamespaces != ob.name:
                     invalidnamewarnings.append(ob.name + " -> " + cleanname)
@@ -61,10 +63,10 @@ def dot_scene(path, scene_name=None):
 
     # Print invalid obj names so user can go and fix them.
     if len(invalidnamewarnings) > 0:
-        print ("[Warning]: Following object names have invalid characters for creating files. They will be automatically converted.")
+        logger.warning(" The following object names have invalid characters for creating files. They will be automatically converted.")
         for namewarning in invalidnamewarnings:
-            Report.warnings.append("Auto correcting object name: " + namewarning)
-            print ("  - ", namewarning)
+            Report.warnings.append('Auto corrected Object name: "%s"' % namewarning)
+            logger.warning(" + - %s" % namewarning)
 
     # Linked groups - allows 3 levels of nested blender library linking
     temps = []
@@ -139,7 +141,7 @@ def dot_scene(path, scene_name=None):
 
     materials = []
     if config.get("MATERIALS"):
-        print ("  Processing Materials")
+        logger.info(" * Processing Materials")
         materials = util.objects_merge_materials(meshes)
         dot_materials(materials, path, separate_files=config.get('SEP_MATS'), prefix=prefix)
 
@@ -149,7 +151,7 @@ def dot_scene(path, scene_name=None):
     mesh_collision_files = {}
 
     for root in roots:
-        print('      - Exporting root node:', root.name)
+        logger.info(" * Exporting root node: %s " % root.name)
         dot_scene_node_export(root, path = path, doc = doc,
             exported_meshes = exported_meshes,
             meshes = meshes,
@@ -164,7 +166,7 @@ def dot_scene(path, scene_name=None):
         data = doc.toprettyxml()
         with open(target_scene_file, 'wb') as fd:
             fd.write(bytes(data,'utf-8'))
-        print('  Exported Ogre Scene:', target_scene_file)
+        logger.info(" - Exported Ogre Scene: %s " % target_scene_file)
 
     for ob in temps:
         bpy.context.scene.objects.unlink( ob )
@@ -211,7 +213,7 @@ class _WrapLogic(object):
                 elif hasattr(attr,'x') and hasattr(attr,'y') and hasattr(attr,'z'):
                     a.setAttribute('value', '%s %s %s' %(attr.x, attr.y, attr.z))
                 else:
-                    print('ERROR: unknown type', attr)
+                    logger.error(' Unknown type: %s' % attr)
         return g
 
 class WrapSensor( _WrapLogic ):
@@ -434,11 +436,18 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             collisionPrim = mesh_collision_prims[ ob.data.name ]
         if ob.data.name in mesh_collision_files:
             collisionFile = mesh_collision_files[ ob.data.name ]
+        
+        # Print a warning if there are no UV Maps created for the object
+        # and the user requested to have tangents generated 
+        # (they won't be without a UV Map)
+        if int(config.get("generateTangents")) != 0 and len(ob.data.uv_layers) == 0:
+            logger.warning(" No UV Maps were created for this object: <%s>, tangents won't be exported." % ob.name)
+            Report.warnings.append( 'Object "%s" has no UV Maps, tangents won\'t be exported.' % ob.name )
 
         e = doc.createElement('entity')
         o.appendChild(e); e.setAttribute('name', ob.name)
         prefix = ''
-        e.setAttribute('meshFile', '%s%s.mesh' %(prefix,clean_object_name(ob.data.name)) )
+        e.setAttribute('meshFile', '%s%s.mesh' % (prefix, clean_object_name(ob.data.name)) )
 
         if not collisionPrim and not collisionFile:
             if ob.game.use_collision_bounds:
@@ -447,11 +456,11 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             else:
                 for child in ob.children:
                     if child.subcollision and child.name.startswith('DECIMATE'):
-                        collisionFile = '%s_collision_%s.mesh' %(prefix,ob.data.name)
+                        collisionFile = '%s_collision_%s.mesh' % (prefix, ob.data.name)
                         break
                 if collisionFile:
                     mesh_collision_files[ ob.data.name ] = collisionFile
-                    mesh.dot_mesh(child, target_path, force_name='%s_collision_%s' % (prefix,ob.data.name) )
+                    mesh.dot_mesh(child, target_path, force_name='%s_collision_%s' % (prefix, ob.data.name) )
                     skeleton.dot_skeleton(child, target_path)
 
         if collisionPrim:
@@ -476,10 +485,12 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         for mod in ob.modifiers:
             if mod.type == 'ARRAY':
                 if mod.fit_type != 'FIXED_COUNT':
-                    print( 'WARNING: Unsupported array-modifier type->', mod.fit_type )
+                    logger.warning(" <%s> Unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
+                    Report.warnings.append("Object \"%s\" has unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
                     continue
                 if not mod.use_constant_offset:
-                    print( 'WARNING: Unsupported array-modifier mode, must be of "constant offset" type' )
+                    logger.warning(" <%s> Unsupported array-modifier mode, must be of 'Constant Offset' type" % ob.name)
+                    Report.warnings.append("Object \"%s\" has unsupported array-modifier mode, must be of 'Constant Offset' type" % ob.name)
                     continue
                 else:
                     #v = ob.matrix_world.to_translation()
@@ -500,8 +511,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                     vecs += newvecs
 
         # Deal with Particle Systems
-        print(' *** Deal with Particle Systems ***')
-        
         y_rot = mathutils.Quaternion((0.0, 1.0, 0.0), math.radians(90.0))
 
         for partsys in ob.particle_systems:
@@ -515,12 +524,10 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                     e = doc.createElement('entity')
                     ao.appendChild(e); e.setAttribute('name', ('%s_particle_%s_%s' % (clean_object_name(ob.data.name), index, clean_object_name(dupob.data.name))))
                     e.setAttribute('meshFile', '%s.mesh' % clean_object_name(dupob.data.name))
-                    #print(particle.location)
-                    #print(particle.rotation)
-                    #print(particle.size)
                     index += 1
             else:
-                print( 'WARNING: Particle System %s is not supported for export (should be type: HAIR and render: OBJECT)' )
+                logger.warn(" <%s> Particle System %s is not supported for export (should be of type: 'Hair' and render_type: 'Object')" % (ob.name, partsys.name))
+                Report.warnings.append("Object \"%s\" has Particle System: \"%s\" not supported for export (should be of type: 'Hair' and render_type: 'Object')" % (ob.name, partsys.name))
 
     elif ob.type == 'CAMERA':
         Report.cameras.append( ob.name )

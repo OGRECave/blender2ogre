@@ -1,10 +1,11 @@
-import bpy
-import mathutils
+import bpy, mathutils, logging
 from .. import config
 from ..report import Report
 from ..xml import RDocument
 from .. import util
 from os.path import join
+
+logger = logging.getLogger('skeleton.py')
 
 def dot_skeleton(obj, path, **kwargs):
     """
@@ -48,7 +49,7 @@ class Bone(object):
                 #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1))) # thanks to Waruck
             else:
-                print( 'ERROR - TODO: axis swap mode not supported with armature animation' )
+                logger.error( ' - TODO: Axis swap mode not supported with armature animation' )
                 assert 0
 
         self.skeleton = skeleton
@@ -284,7 +285,7 @@ def findArmature( ob ):
         # search for another armature that is a proxy for it
         for ob2 in bpy.data.objects:
             if ob2.type == 'ARMATURE' and ob2.proxy == arm:
-                print( "proxy armature %s found" % ob2.name )
+                logger.info( " - Proxy armature %s found" % ob2.name )
                 return ob2
     return arm
 
@@ -297,9 +298,9 @@ class Skeleton(object):
 
     def __init__(self, ob ):
         if ob.location.x != 0 or ob.location.y != 0 or ob.location.z != 0:
-            Report.warnings.append('ERROR: Mesh (%s): is offset from Armature - zero transform is required' %ob.name)
+            Report.warnings.append('ERROR: Mesh (%s): is offset from Armature - zero transform is required' % ob.name)
         if ob.scale.x != 1 or ob.scale.y != 1 or ob.scale.z != 1:
-            Report.warnings.append('ERROR: Mesh (%s): has been scaled - scale(1,1,1) is required' %ob.name)
+            Report.warnings.append('ERROR: Mesh (%s): has been scaled - scale(1,1,1) is required' % ob.name)
 
         self.object = ob
         self.bones = []
@@ -323,7 +324,7 @@ class Skeleton(object):
         #self.object_space_transformation = e.to_matrix().to_4x4()
         x,y,z = arm.matrix_local.to_euler()
         if x != 0 or y != 0 or z != 0:
-            Report.warnings.append('ERROR: Armature: %s is rotated - (rotation is ignored)' %arm.name)
+            Report.warnings.append('ERROR: Armature: %s is rotated - (rotation is ignored)' % arm.name)
 
         ## setup bones for Ogre format ##
         for b in self.bones:
@@ -434,19 +435,19 @@ class Skeleton(object):
             savedAction = arm.animation_data.action
             arm.animation_data.use_nla = False
             if not len( arm.animation_data.nla_tracks ):
-                Report.warnings.append('you must assign an NLA strip to armature (%s) that defines the start and end frames' %arm.name)
+                Report.warnings.append('You must assign an NLA strip to armature (%s) that defines the start and end frames' % arm.name)
 
             actions = {}  # actions by name
             # the only thing NLA is used for is to gather the names of the actions
             # it doesn't matter if the actions are all in the same NLA track or in different tracks
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
-                print('NLA track:',  nla.name)
+                logger.info(' + NLA track: %s' % nla.name)
 
                 for strip in nla.strips:
                     action = strip.action
                     actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end]
-                    print('   strip name:', strip.name)
-                    print('   action name:', action.name)
+                    logger.info('   - Action name: %s' % action.name)
+                    logger.info('   -  Strip name: %s' % strip.name)
 
             actionNames = sorted( actions.keys() )  # output actions in alphabetical order
             for actionName in actionNames:

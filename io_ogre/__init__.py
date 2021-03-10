@@ -116,7 +116,7 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "SHADER_PROGRAMS")      
 
 def register():
-    logging.info('Starting io_ogre %s', bl_info["version"])
+    logging.info(' Starting io_ogre %s', bl_info["version"])
     # the ui modules define auto_register functions that
     # return classes that should be loaded by the plugin
     for clazz in ui.auto_register(True):
@@ -128,7 +128,7 @@ def register():
     config.update_from_addon_preference(bpy.context)
 
 def unregister():
-    logging.info('Unloading io_ogre %s', bl_info["version"])
+    logging.info(' Unloading io_ogre %s', bl_info["version"])
     for clazz in ui.auto_register(False):
         bpy.utils.unregister_class(clazz)
 

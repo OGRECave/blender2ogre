@@ -1,5 +1,7 @@
-import os
+import os, logging
 from .. import config
+
+logger = logging.getLogger('program.py')
 
 class OgreProgram(object):
     '''
@@ -24,19 +26,19 @@ class OgreProgram(object):
 
     def reload(self): # only one directory is allowed to hold shader programs
         if self.source not in os.listdir( config.get('SHADER_PROGRAMS') ):
-            print( 'ERROR: ogre material %s is missing source: %s' %(self.name,self.source) )
-            print( config.get('SHADER_PROGRAMS') )
+            logger.error( ' Ogre material %s is missing source: %s' % (self.name,self.source) )
+            logger.error( config.get('SHADER_PROGRAMS') )
             return False
         url = os.path.join(  config.get('SHADER_PROGRAMS'), self.source )
-        print('shader source:', url)
+        logger.info(' Shader source: %s' % url)
         self.source_bytes = open( url, 'rb' ).read()#.decode('utf-8')
-        print('shader source num bytes:', len(self.source_bytes))
+        logger.info(' Shader source num bytes: %s' % len(self.source_bytes))
         data = self.source_bytes.decode('utf-8')
 
         for line in data.splitlines():  # only cg shaders use the include macro?
             if line.startswith('#include') and line.count('"')==2:
                 name = line.split()[-1].replace('"','').strip()
-                print('shader includes:', name)
+                logger.info(' Shader includes: %s' % name)
                 url = os.path.join(  config.get('SHADER_PROGRAMS'), name )
                 self.includes[ name ] = open( url, 'rb' ).read()
         return True
@@ -48,7 +50,7 @@ class OgreProgram(object):
         self.includes = {} # cg files may use #include something.cg
 
         if self.name in OgreProgram.PROGRAMS:
-            print('---copy ogreprogram---', self.name)
+            logger.info(' <%s> --- Copy Ogre Program --- ' % self.name)
             other = OgreProgram.PROGRAMS
             self.source = other.source
             self.data = other.data
@@ -60,7 +62,7 @@ class OgreProgram(object):
 
     def parse( self, txt ):
         self.data = txt
-        print('--parsing ogre shader program--' )
+        logger.info(' <%s> -- Parsing Ogre Shader Program-- ' % self.name )
         for line in self.data.splitlines():
             line = line.split('//')[0]
             line = line.strip()
@@ -70,4 +72,3 @@ class OgreProgram(object):
             elif line.startswith('source'): self.source = line.split()[-1]
             elif line.startswith('entry_point'): self.entry_point = line.split()[-1]
             elif line.startswith('profiles'): self.profiles = line.split()[1:]
-
