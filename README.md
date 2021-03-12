@@ -3,7 +3,20 @@
 * License: [GNU LGPL](http://www.gnu.org/licenses/lgpl.html)
 * [Ogre forum thread](http://ogre3d.org/forums/viewtopic.php?f=8&t=61485)
 
-## Installing ##
+## Index
+ - [Installing](#installing)
+ - [Updating to new versions](#updating-to-new-versions)
+ - [Video Tutorials](#video-tutorials)
+ - [Additional Features](#additional-features)
+ - [Merge Objects on export](#merge-objects-on-export)
+ - [External OGRE Materials](#external-ogre-materials)
+ - [Console Export](#console-export)
+ - [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
+ - [Exporting Particle Systems](#exporting-particle-systems)
+ - [About](#about)
+ - [Authors](#authors)
+
+## Installing
 Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/ja/dev/getting_started/installing/configuration/directories.html)`/scripts/addons` folder.
 Note on Windows: you have to set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) prior to the first run.  
 After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.  
@@ -15,7 +28,7 @@ The following versions of blender have been tested. It might also work with olde
 * Blender 2.6x
 * **Blender 2.8x: use master branch**
 
-## Updating to new versions ##
+## Updating to new versions
 
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
 [$BLENDER_DIR](https://docs.blender.org/manual/ja/dev/getting_started/installing/configuration/directories.html)`/config/scripts/blender2ogre.pickle` and restart blender.
@@ -141,7 +154,7 @@ This is not maintainable, and contains a tremendous amount of bugs. There was th
 the console, thus I rewrote the whole script and split it into several files.
 It has been well tested on linux 64-bit and should work with others.
 
-## Authors ##
+## Authors
 
 This Blender addon was made possible by the following list of people. Anyone can contribute to the project by sending bug reports and feature requests [here](https://bitbucket.org/plan_rich/blender2ogre/issues). Naturally the most welcome contribution is actual code via [pull requests](https://bitbucket.org/plan_rich/blender2ogre/pull-requests). If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. So that there is no overlap with other developers or the overall roadmap.
  
