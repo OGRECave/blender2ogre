@@ -8,11 +8,12 @@
  - [Updating to new versions](#updating-to-new-versions)
  - [Video Tutorials](#video-tutorials)
  - [Additional Features](#additional-features)
- - [Merge Objects on export](#merge-objects-on-export)
- - [External OGRE Materials](#external-ogre-materials)
- - [Console Export](#console-export)
- - [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
- - [Exporting Particle Systems](#exporting-particle-systems)
+	- [Merge Objects on export](#merge-objects-on-export)
+	- [External OGRE Materials](#external-ogre-materials)
+	- [Console Export](#console-export)
+	- [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
+	- [Exporting Particle Systems](#exporting-particle-systems)
+	- [Creating Shape (or Pose) Animations](#creating-shape-animations)
  - [About](#about)
  - [Authors](#authors)
 
@@ -53,7 +54,7 @@ Prefix them with `extern.<yourname>` and the sub entity will have the material n
 but the material is not exported. The following material 'vertexcolor' can be defined in
 your OGRE project:
 
-![extern-material.png](https://bitbucket.org/repo/dAG7Gx/images/3637870399-extern-material.png)
+![extern-material.png](images/extern-material.png)
 
 ### Console Export
 
@@ -89,7 +90,7 @@ abc.scene  Cube.mesh  Cube.mesh.xml  Material.material
 As shown in the picture below, you can now export SubEntities that contain
 a user defined amount of faces.
 
-![blender-vertex-group.png](https://bitbucket.org/repo/dAG7Gx/images/1164854951-blender-vertex-group.png)
+![blender-vertex-group.png](images/blender-vertex-group.png)
 
 You simply call your vertex group with the
 prefix `ogre.vertex.group.<yourname>` and access it in Ogre similar to
@@ -147,6 +148,12 @@ material none {
 A common technique for laying out random objects on a scene in Blender is to use the Particle System. 
 Check out the [Particle System README](ParticleSystem.md) to see how to create and export a scene where the trees, foliage and rocks are distributed randomly using a particle system.
 
+### Creating Shape Animations
+![shape-animations4.png](images/shape-animations4.png)
+
+Shape (or Pose) Animations allow animating different poses, a technique commonly used to do face animations.
+Check out the [Shape Animations](ShapeAnimations.md) tutorial to see how to create some poses and animate them. Then you can use `blender2ogre` to export the poses and animations into a `.mesh` file.
+
 ## About
 
 [The original version of this](https://bitbucket.org/iboshkov/blender2ogre) was a *single* monolithic Python file.
@@ -156,7 +163,7 @@ It has been well tested on linux 64-bit and should work with others.
 
 ## Authors
 
-This Blender addon was made possible by the following list of people. Anyone can contribute to the project by sending bug reports and feature requests [here](https://bitbucket.org/plan_rich/blender2ogre/issues). Naturally the most welcome contribution is actual code via [pull requests](https://bitbucket.org/plan_rich/blender2ogre/pull-requests). If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. So that there is no overlap with other developers or the overall roadmap.
+This Blender addon was made possible by the following list of people. Anyone can contribute to the project by sending bug reports and feature requests [here](https://github.com/OGRECave/blender2ogre/issues). Naturally the most welcome contribution is actual code via [pull requests](https://github.com/OGRECave/blender2ogre/pulls). If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. So that there is no overlap with other developers or the overall roadmap.
  
 * [Brett](http://pyppet.blogspot.fi/)
 * S. Rombauts
