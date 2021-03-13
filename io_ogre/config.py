@@ -26,43 +26,61 @@ CONFIG_FILENAME = 'io_ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 
 _CONFIG_DEFAULTS_ALL = {
-    'MESH' : True,
-    'SCENE' : True,
-    'COPY_SHADER_PROGRAMS' : True,
-    'MAX_TEXTURE_SIZE' : 4096,
+    # General
     'SWAP_AXIS' : 'xyz', # ogre standard is 'xz-y', but swapping is currently broken
-    'SEP_MATS' : True,
-    'SELONLY' : True,
+    'MESH_TOOL_EXPORT_VERSION' : 'v2',
+    
+    # Scene
+    'SCENE' : True,
+    'SELECTED_ONLY' : True,
     'EXPORT_HIDDEN' : True,
     'EXPORT_USER' : True,
     'FORCE_CAMERA' : True,
     'FORCE_LAMPS' : True,
-    'MESH_OVERWRITE' : True,
+    
+    # Materials
+    'MATERIALS' : True,
+    'COPY_SHADER_PROGRAMS' : True,
+    'SEPARATE_MATERIALS' : True,
+    
+    # Textures
+    'MAX_TEXTURE_SIZE' : 4096,
+    'FORCE_IMAGE_FORMAT' : 'NONE',
+    'TOUCH_TEXTURES' : True,
+    'DDS_MIPS' : 16,
+    
+    # Armature
     'ONLY_DEFORMABLE_BONES' : False,
     'ONLY_KEYFRAMED_BONES' : False,
     'OGRE_INHERIT_SCALE' : False,
-    'FORCE_IMAGE_FORMAT' : 'NONE',
-    'TOUCH_TEXTURES' : True,
-    'ARM_ANIM' : True,
-    'SHAPE_ANIM' : True,
-    'SHAPE_NORMALS' : True,
-    'ARRAY' : True,
-    'MATERIALS' : True,
-    'DDS_MIPS' : 16,
+    'ARMATURE_ANIMATION' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
-    'TUNDRA_STREAMING' : True,
-    'lodLevels' : 0,
-    'lodDistance' : 300,
-    'lodPercent' : 40,
-    'nuextremityPoints' : 0,
-    'generateEdgeLists' : False,
-    'generateTangents' : "0",
-    'optimiseAnimations' : True,
+
+    # Mesh
+    'MESH' : True,
+    'MESH_OVERWRITE' : True,
+    'ARRAY' : True,
+    'EXTREMITY_POINTS' : 0,
+    'GENERATE_EDGE_LISTS' : False,
+    'GENERATE_TANGENTS' : "0",
+    'OPTIMISE_ANIMATIONS' : True,
     'interface_toggle': False,
-    'optimizeVertexBuffersForShaders' : True,
-    'optimizeVertexBuffersForShadersOptions' : 'puqs',
+    'OPTIMISE_VERTEX_BUFFERS' : True,
+    'OPTIMISE_VERTEX_BUFFERS_OPTIONS' : 'puqs',
+    
+    # LOD
+    'LOD_LEVELS' : 0,
+    'LOD_DISTANCE' : 300,
+    'LOD_PERCENT' : 40,
+    
+    # Pose Animation
+    'SHAPE_ANIMATIONS' : True,
+    'SHAPE_NORMALS' : True,
+    
+    # Logging
     'EXPORT_ENABLE_LOGGING' : False,
-    'MESH_TOOL_EXPORT_VERSION' : 'v2'
+    
+    'TUNDRA_STREAMING' : True
 }
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()

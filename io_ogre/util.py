@@ -97,19 +97,19 @@ def xml_convert(infile, has_uvs=False):
 
     cmd = [exe]
 
-    if config.get('nuextremityPoints') > 0 and version < (2,1,0):
+    if config.get('EXTREMITY_POINTS') > 0 and version < (2,1,0):
         cmd.append('-x')
-        cmd.append(config.get('nuextremityPoints'))
+        cmd.append(config.get('EXTREMITY_POINTS'))
 
     if version < (1,10,0) or version >= (2,1,0):
-        if not config.get('generateEdgeLists'):
+        if not config.get('GENERATE_EDGE_LISTS'):
             cmd.append('-e')
 
-    if config.get('optimizeVertexBuffersForShaders') and version >= (2,1,0):
+    if config.get('OPTIMISE_VERTEX_BUFFERS') and version >= (2,1,0):
         cmd.append('-O')
-        cmd.append(config.get('optimizeVertexBuffersForShadersOptions'))
+        cmd.append(config.get('OPTIMISE_VERTEX_BUFFERS_OPTIONS'))
 
-    if not config.get('optimiseAnimations'):
+    if not config.get('OPTIMISE_ANIMATIONS'):
         cmd.append('-o')
 
     if version < (2,1,0):

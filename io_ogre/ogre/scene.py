@@ -29,7 +29,7 @@ def dot_scene(path, scene_name=None):
         print("Creating Directory: ", path)
         os.mkdir(path)
 
-    logger.info(" * Processing Scene -> name: %s, path: %s" % (scene_name, path))
+    logger.info(" * Processing Scene: %s, Path: %s" % (scene_name, path))
     prefix = scene_name
 
     # Nodes (objects) - gather because macros will change selection state
@@ -41,7 +41,7 @@ def dot_scene(path, scene_name=None):
             continue
         if not config.get("EXPORT_HIDDEN") and ob.hide:
             continue
-        if config.get("SELONLY") and not ob.select:
+        if config.get("SELECTED_ONLY") and not ob.select:
             if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
                 pass
             elif ob.type == 'LAMP' and config.get("FORCE_LAMPS"):
@@ -143,7 +143,7 @@ def dot_scene(path, scene_name=None):
     if config.get("MATERIALS"):
         logger.info(" * Processing Materials")
         materials = util.objects_merge_materials(meshes)
-        dot_materials(materials, path, separate_files=config.get('SEP_MATS'), prefix=prefix)
+        dot_materials(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)
 
     doc = ogre_document(materials)
 
@@ -440,7 +440,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         # Print a warning if there are no UV Maps created for the object
         # and the user requested to have tangents generated 
         # (they won't be without a UV Map)
-        if int(config.get("generateTangents")) != 0 and len(ob.data.uv_layers) == 0:
+        if int(config.get("GENERATE_TANGENTS")) != 0 and len(ob.data.uv_layers) == 0:
             logger.warning(" No UV Maps were created for this object: <%s>, tangents won't be exported." % ob.name)
             Report.warnings.append( 'Object "%s" has no UV Maps, tangents won\'t be exported.' % ob.name )
 
@@ -475,7 +475,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if config.get('MESH') and ob.data.name not in exported_meshes:
             exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
             overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
-            tangents = int(config.get("generateTangents"))
+            tangents = int(config.get("GENERATE_TANGENTS"))
             mesh.dot_mesh(ob, path, overwrite=overwrite, tangents=tangents)
             skeleton.dot_skeleton(ob, path, overwrite=overwrite)
             exported_meshes.append( ob.data.name )

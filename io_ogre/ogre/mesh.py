@@ -365,10 +365,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         logger.info(' - Done at %s seconds' % timer_diff_str(start))
 
         # Generate lod levels
-        if isLOD == False and ob.type == 'MESH' and config.get('lodLevels') > 0:
-            lod_levels = config.get('lodLevels')
-            lod_distance = config.get('lodDistance')
-            lod_ratio = config.get('lodPercent') / 100.0
+        if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0:
+            lod_levels = config.get('LOD_LEVELS')
+            lod_distance = config.get('LOD_DISTANCE')
+            lod_ratio = config.get('LOD_PERCENT') / 100.0
             lod_pre_mesh_count = len(bpy.data.meshes)
 
             # Cap lod levels to something sensible (what is it?)
@@ -556,7 +556,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             doc.end_tag('boneassignments')
 
         # Updated June3 2011 - shape animation works
-        if config.get('SHAPE_ANIM') and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
+        if config.get('SHAPE_ANIMATIONS') and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
             logger.info(' * Writing shape keys')
 
             doc.start_tag('poses', {})

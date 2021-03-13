@@ -1,7 +1,7 @@
 # blender2ogre #
 
 * License: [GNU LGPL](http://www.gnu.org/licenses/lgpl.html)
-* [Ogre forum thread](http://ogre3d.org/forums/viewtopic.php?f=8&t=61485)
+* [Ogre forum thread](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
 
 ## Index
  - [Installing](#installing)
@@ -18,7 +18,7 @@
  - [Authors](#authors)
 
 ## Installing
-Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/ja/dev/getting_started/installing/configuration/directories.html)`/scripts/addons` folder.
+Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
 Note on Windows: you have to set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) prior to the first run.  
 After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.  
 Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
@@ -32,7 +32,7 @@ The following versions of blender have been tested. It might also work with olde
 ## Updating to new versions
 
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
-[$BLENDER_DIR](https://docs.blender.org/manual/ja/dev/getting_started/installing/configuration/directories.html)`/config/scripts/blender2ogre.pickle` and restart blender.
+[$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/config/scripts/blender2ogre.pickle` and restart blender.
 
 ## Video Tutorials
 
