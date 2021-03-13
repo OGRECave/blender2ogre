@@ -22,7 +22,7 @@ def dot_skeleton(obj, path, **kwargs):
     """
 
     arm = obj.find_armature()
-    if arm and config.get('ARM_ANIM'):
+    if arm and config.get('ARMATURE_ANIMATION'):
         skel = Skeleton( obj )
         name = kwargs.get('force_name') or obj.data.name
         name = util.clean_object_name(name)
