@@ -14,8 +14,6 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-import os, sys, logging
-
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg",
@@ -27,13 +25,6 @@ bl_info = {
     "tracker_url": "https://github.com/OGRECave/blender2ogre/issues",
     "category": "Import-Export"
 }
-
-from pprint import pprint
-
-# import the plugin directory and setup the plugin
-import bpy
-
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 # https://blender.stackexchange.com/questions/2691/is-there-a-way-to-restart-a-modified-addon
 # https://blender.stackexchange.com/questions/28504/blender-ignores-changes-to-python-scripts/28505
@@ -54,8 +45,11 @@ from . import config
 from . import properties
 from . import ui
 
-import sys
+import os, sys, logging
+from pprint import pprint
+import bpy
 
+# Import the plugin directory and setup the plugin
 class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __name__
 
@@ -116,19 +110,22 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "SHADER_PROGRAMS")      
 
 def register():
-    logging.info(' Starting io_ogre %s', bl_info["version"])
-    # the ui modules define auto_register functions that
+    #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='[%(levelname)5s] %(message)s', datefmt='%H:%M:%S')
+
+    logging.info('Starting io_ogre %s', bl_info["version"])
+    # The UI modules define auto_register functions that
     # return classes that should be loaded by the plugin
     for clazz in ui.auto_register(True):
         bpy.utils.register_class(clazz)
 
     bpy.utils.register_class(Blender2OgreAddonPreferences)
 
-    # read user preferences
+    # Read user preferences
     config.update_from_addon_preference(bpy.context)
 
 def unregister():
-    logging.info(' Unloading io_ogre %s', bl_info["version"])
+    logging.info('Unloading io_ogre %s', bl_info["version"])
     for clazz in ui.auto_register(False):
         bpy.utils.unregister_class(clazz)
 

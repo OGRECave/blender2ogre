@@ -13,7 +13,6 @@ def get_subnodes(mat, type='TEXTURE'):
     for key in keys: r.append( d[key] )
     return r
 
-
 def get_texture_subnodes( parent, submaterial=None ):
     if not submaterial: submaterial = parent.active_node_material
     d = {}
