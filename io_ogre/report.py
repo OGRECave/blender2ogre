@@ -1,4 +1,6 @@
-import bpy
+import bpy, logging
+
+logger = logging.getLogger('report')
 
 class ReportSingleton(object):
     def __init__(self):
@@ -63,10 +65,10 @@ class ReportSingleton(object):
 
         txt = '\n'.join( r )
         ex = '\n'.join( ex )        # console only - extended report
-        print('_'*80)
+        print('_' * 80)
         print(txt)
         print(ex)
-        print('_'*80)
+        print('_' * 80)
         return txt
 
 Report = ReportSingleton()

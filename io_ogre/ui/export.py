@@ -29,7 +29,7 @@ from ..ogre import skeleton
 from ..ogre import scene
 from ..ogre import material
 
-logger = logging.getLogger('export.py')
+logger = logging.getLogger('export')
 
 def auto_register(register):
     yield OP_ogre_export
@@ -95,7 +95,7 @@ class _OgreCommonExport_(object):
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
             "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
-            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
+            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
             "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT"], 
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
             "Logging" : ["EX_Vx_EXPORT_ENABLE_LOGGING"]
@@ -126,10 +126,10 @@ class _OgreCommonExport_(object):
               "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
               "Export XML mesh - do NOT automatically convert .xml to .mesh file. You MUST run converter mesh manually.")
 
-        logger.debug(" Context.blend_data: %s" % context.blend_data.filepath)
-        logger.debug(" Context.scene.name: %s" % context.scene.name)
-        logger.debug(" Self.filepath: %s" % self.filepath)
-        logger.debug(" Self.last_export_path: %s" % self.last_export_path)
+        logger.debug("Context.blend_data: %s" % context.blend_data.filepath)
+        logger.debug("Context.scene.name: %s" % context.scene.name)
+        logger.debug("Self.filepath: %s" % self.filepath)
+        logger.debug("Self.last_export_path: %s" % self.last_export_path)
 
         # Load addonPreference in CONFIG
         config.update_from_addon_preference(context)
@@ -149,7 +149,7 @@ class _OgreCommonExport_(object):
         if self.filepath == "" or not self.filepath:
             self.filepath = "blender2ogre"
 
-        logger.debug(" Self.filepath: %s" % self.filepath)
+        logger.debug("Self.filepath: %s" % self.filepath)
 
         kw = {}
         for name in dir(_OgreCommonExport_):
@@ -163,17 +163,47 @@ class _OgreCommonExport_(object):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
 
-        print ("_"*80)
+        print ("_" * 80)
+        
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
-        logger.debug(" Target_path: %s" % target_path)
-        logger.debug(" Target_file_name: %s" % target_file_name)
-        logger.debug(" Target_file_name_no_ext: %s" % target_file_name_no_ext)
+        file_handler = None
+        
+        # Add a file handler to all Logger instances
+        if config.get('EXPORT_ENABLE_LOGGING') == True:
+            log_file = ("%s\\blender2ogre.log" % target_path)
+            logger.info("Writing log file to: %s" % log_file)
+
+            file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
+            file_formatter = logging.Formatter(fmt='%(asctime)s [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+            # Uncomment the following line to get the python module name in the logging
+            #file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+            file_handler.setFormatter(file_formatter)
+
+            for logger_name in logging.Logger.manager.loggerDict.keys():
+                #print("Attach handler to %s" % logger_name)
+                logging.getLogger(logger_name).addHandler(file_handler)
+
+        logger.info("Target_path: %s" % target_path)
+        logger.info("Target_file_name: %s" % target_file_name)
+        logger.debug("Target_file_name_no_ext: %s" % target_file_name_no_ext)
 
         scene.dot_scene(target_path, target_file_name_no_ext)
         Report.show()
+
+        # Flush and close all logging file handlers
+        if config.get('EXPORT_ENABLE_LOGGING') == True:
+            for logger_name in logging.Logger.manager.loggerDict.keys():
+                logger_instance = logging.getLogger(logger_name)
+                    
+                # Remove handlers
+                logger_instance.handlers.clear()
+            
+            file_handler.flush()
+            file_handler.close()
 
         return {'FINISHED'}
 
@@ -285,10 +315,13 @@ class _OgreCommonExport_(object):
         name="Export Meshes (overwrite)",
         description="Export meshes (overwrite existing files)",
         default=config.get('MESH_OVERWRITE'))
-    EX_ARRAY = BoolProperty(
-        name="Optimise Arrays",
-        description="Optimise array modifiers as instances (constant offset only)",
-        default=config.get('ARRAY'))
+        
+    # This is actually implemented as if EX_ARRAY=True always, there is not an actual choice possible
+    #EX_ARRAY = BoolProperty(
+    #    name="Optimise Arrays",
+    #    description="Optimise array modifiers as instances (constant offset only)",
+    #    default=config.get('ARRAY'))
+    
     EX_V1_EXTREMITY_POINTS = IntProperty(
         name="Extremity Points",
         description="""Submeshes can have optional 'extremity points' stored with them to allow 
@@ -354,8 +387,20 @@ S - strips the buffers for shadow mapping (consumes less space and memory)""",
     # Logging
     EX_Vx_EXPORT_ENABLE_LOGGING = BoolProperty(
         name="Write Exporter Logs",
-        description="Write Log file to the output directory",
+        description="Write Log file to the output directory (blender2ogre.log)",
         default=config.get('EXPORT_ENABLE_LOGGING'))
+    
+    # It seems that it is not possible to exclude DEBUG when selecting a log level
+    #EX_Vx_DEBUG_LOGGING = BoolProperty(
+    #    name="Debug Logging",
+    #    description="Whether to show DEBUG log messages",
+    #    default=config.get('DEBUG_LOGGING'))
+    
+    # It was decided to make this an option that is not user-facing
+    #EX_Vx_SHOW_LOG_NAME = BoolProperty(
+    #    name="Show Log name",
+    #    description="Show .py file from where each log message originated",
+    #    default=config.get('SHOW_LOG_NAME'))
 
 class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''

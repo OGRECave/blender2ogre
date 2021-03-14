@@ -5,7 +5,7 @@ from ..xml import RDocument
 from .. import util
 from os.path import join
 
-logger = logging.getLogger('skeleton.py')
+logger = logging.getLogger('skeleton')
 
 def dot_skeleton(obj, path, **kwargs):
     """
@@ -49,7 +49,7 @@ class Bone(object):
                 #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1))) # thanks to Waruck
             else:
-                logger.error( ' - TODO: Axis swap mode not supported with armature animation' )
+                logger.error( '- TODO: Axis swap mode not supported with armature animation' )
                 assert 0
 
         self.skeleton = skeleton
@@ -62,7 +62,7 @@ class Bone(object):
         if config.get('ONLY_DEFORMABLE_BONES') and not pbone.bone.use_deform:
             self.shouldOutput = False
 
-        # todo: Test -> #if pbone.bone.use_inherit_scale: print('warning: bone <%s> is using inherit scaling, Ogre has no support for this' %self.name)
+        # todo: Test -> #if pbone.bone.use_inherit_scale: logger.warn('Bone <%s> is using inherit scaling, Ogre has no support for this' % self.name)
         self.parent = pbone.parent
         self.children = []
 
@@ -285,7 +285,7 @@ def findArmature( ob ):
         # search for another armature that is a proxy for it
         for ob2 in bpy.data.objects:
             if ob2.type == 'ARMATURE' and ob2.proxy == arm:
-                logger.info( " - Proxy armature %s found" % ob2.name )
+                logger.info( "- Proxy armature %s found" % ob2.name )
                 return ob2
     return arm
 
@@ -441,13 +441,13 @@ class Skeleton(object):
             # the only thing NLA is used for is to gather the names of the actions
             # it doesn't matter if the actions are all in the same NLA track or in different tracks
             for nla in arm.animation_data.nla_tracks:        # NLA required, lone actions not supported
-                logger.info(' + NLA track: %s' % nla.name)
+                logger.info('+ NLA track: %s' % nla.name)
 
                 for strip in nla.strips:
                     action = strip.action
                     actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end]
-                    logger.info('   - Action name: %s' % action.name)
-                    logger.info('   -  Strip name: %s' % strip.name)
+                    logger.info('  - Action name: %s' % action.name)
+                    logger.info('  -  Strip name: %s' % strip.name)
 
             actionNames = sorted( actions.keys() )  # output actions in alphabetical order
             for actionName in actionNames:
