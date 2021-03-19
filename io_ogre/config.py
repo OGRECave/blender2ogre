@@ -1,7 +1,8 @@
-
 import bpy, os, sys, logging, pickle, mathutils
 from pprint import pprint
 from bpy.props import *
+
+logger = logging.getLogger('config')
 
 AXIS_MODES =  [
     ('xyz', 'xyz', 'no swapping'),
@@ -25,42 +26,63 @@ CONFIG_FILENAME = 'io_ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 
 _CONFIG_DEFAULTS_ALL = {
-    'MESH' : True,
-    'SCENE' : True,
-    'COPY_SHADER_PROGRAMS' : True,
-    'MAX_TEXTURE_SIZE' : 4096,
+    # General
     'SWAP_AXIS' : 'xyz', # ogre standard is 'xz-y', but swapping is currently broken
-    'SEP_MATS' : True,
-    'SELONLY' : True,
+    'MESH_TOOL_EXPORT_VERSION' : 'v2',
+    
+    # Scene
+    'SCENE' : True,
+    'SELECTED_ONLY' : True,
     'EXPORT_HIDDEN' : True,
+    #'EXPORT_USER' : True,
     'FORCE_CAMERA' : True,
     'FORCE_LAMPS' : True,
-    'MESH_OVERWRITE' : True,
+    
+    # Materials
+    'MATERIALS' : True,
+    'COPY_SHADER_PROGRAMS' : True,
+    'SEPARATE_MATERIALS' : True,
+    
+    # Textures
+    'MAX_TEXTURE_SIZE' : 4096,
+    'FORCE_IMAGE_FORMAT' : 'NONE',
+    'TOUCH_TEXTURES' : True,
+    'DDS_MIPS' : 16,
+    
+    # Armature
     'ONLY_DEFORMABLE_BONES' : False,
     'ONLY_KEYFRAMED_BONES' : False,
     'OGRE_INHERIT_SCALE' : False,
-    'FORCE_IMAGE_FORMAT' : 'NONE',
-    'TOUCH_TEXTURES' : True,
-    'ARM_ANIM' : True,
-    'SHAPE_ANIM' : True,
-    'SHAPE_NORMALS' : True,
-    'ARRAY' : True,
-    'MATERIALS' : True,
-    'DDS_MIPS' : 16,
+    'ARMATURE_ANIMATION' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
-    'TUNDRA_STREAMING' : True,
-    'lodLevels' : 0,
-    'lodDistance' : 300,
-    'lodPercent' : 40,
-    'nuextremityPoints' : 0,
-    'generateEdgeLists' : False,
-    'generateTangents' : "0",
-    'optimiseAnimations' : True,
+
+    # Mesh
+    'MESH' : True,
+    'MESH_OVERWRITE' : True,
+    'ARRAY' : True,
+    'EXTREMITY_POINTS' : 0,
+    'GENERATE_EDGE_LISTS' : False,
+    'GENERATE_TANGENTS' : "0",
+    'OPTIMISE_ANIMATIONS' : True,
     'interface_toggle': False,
-    'optimizeVertexBuffersForShaders' : True,
-    'optimizeVertexBuffersForShadersOptions' : 'puqs',
+    'OPTIMISE_VERTEX_BUFFERS' : True,
+    'OPTIMISE_VERTEX_BUFFERS_OPTIONS' : 'puqs',
+    
+    # LOD
+    'LOD_LEVELS' : 0,
+    'LOD_DISTANCE' : 300,
+    'LOD_PERCENT' : 40,
+    
+    # Pose Animation
+    'SHAPE_ANIMATIONS' : True,
+    'SHAPE_NORMALS' : True,
+    
+    # Logging
     'EXPORT_ENABLE_LOGGING' : False,
-    'MESH_TOOL_EXPORT_VERSION' : 'v2'
+    #'DEBUG_LOGGING' : False,
+    'SHOW_LOG_NAME' : False,
+    
+    'TUNDRA_STREAMING' : True
 }
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
@@ -115,7 +137,7 @@ def load_config():
             with open( CONFIG_FILEPATH, 'rb' ) as f:
                 config_dict = pickle.load( f )
         except:
-            print('[ERROR]: Can not read config from %s' %CONFIG_FILEPATH)
+            logger.error('Can not read config from %s' % CONFIG_FILEPATH)
 
     for tag in _CONFIG_DEFAULTS_ALL:
         if tag not in config_dict:
@@ -128,7 +150,7 @@ def load_config():
             elif sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
                 config_dict[ tag ] = _CONFIG_DEFAULTS_UNIX[ tag ]
             else:
-                print( 'ERROR: unknown platform' )
+                logger.error('Unknown platform: %s' % sys.platform)
                 assert 0
 
     try:
@@ -140,7 +162,7 @@ def load_config():
             if exe_install_dir != "":
                 # OgreXmlConverter
                 if os.path.isfile(exe_install_dir + "OgreXmlConverter.exe"):
-                    print ("Using OgreXmlConverter from install path:", exe_install_dir + "OgreXmlConverter.exe")
+                    logger.info ("Using OgreXmlConverter from install path: %sOgreXmlConverter.exe" % exe_install_dir)
                     config_dict['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXmlConverter.exe"
                 # Run auto updater as silent. Notifies user if there is a new version out.
                 # This will not show any UI if there are no update and will go to network
@@ -149,7 +171,7 @@ def load_config():
                 if os.path.isfile(exe_install_dir + "check-for-updates.exe"):
                     subprocess.Popen([exe_install_dir + "check-for-updates.exe", "/silent"])
     except Exception as e:
-        print("Exception while reading windows registry:", e)
+        logger.error("Exception while reading windows registry: %s" % e)
 
     # Setup temp hidden RNA to expose the file paths
     for tag in _CONFIG_TAGS_:
@@ -176,6 +198,7 @@ def load_config():
 CONFIG = load_config()
 
 def get(name, default=None):
+
     global CONFIG
     if name in CONFIG:
         return CONFIG[name]
@@ -184,7 +207,7 @@ def get(name, default=None):
 def update(**kwargs):
     for k,v in kwargs.items():
         if k not in _CONFIG_DEFAULTS_ALL:
-            print("trying to set CONFIG['%s']=%s, but is not a known config setting" % (k,v))
+            logger.warn("Trying to set CONFIG['%s'] = %s, but it is not a known config setting" % (k,v))
         CONFIG[k] = v
     save_config()
 
@@ -196,12 +219,13 @@ def save_config():
             with open( CONFIG_FILEPATH, 'wb' ) as f:
                 pickle.dump( CONFIG, f, -1 )
         except:
-            print('[ERROR]: Can not write to %s' %CONFIG_FILEPATH)
+            logger.error('Can not write to %s' % CONFIG_FILEPATH)
     else:
-        print('[ERROR:] Config directory does not exist %s' %CONFIG_PATH)
-
+        logger.error('Config directory %s does not exist' % CONFIG_PATH)
 
 def update_from_addon_preference(context):
+
+    #addon_preferences = context.user_preferences.addons["io_ogre"].preferences
     addon_preferences = context.preferences.addons["io_ogre"].preferences
 
     for key in _CONFIG_TAGS_:
