@@ -1,4 +1,4 @@
-import bpy, sys, os, subprocess
+import bpy, sys, os, subprocess, logging
 from bpy.props import BoolProperty
 from .report import Report
 from .config import CONFIG
@@ -27,7 +27,7 @@ class OGREMESH_OT_preview(bpy.types.Operator):
 
     def execute(self, context):
         Report.reset()
-        Report.messages.append('running %s' %CONFIG['MESH_PREVIEWER'])
+        Report.messages.append('Running: "%s"' % CONFIG['MESH_PREVIEWER'])
 
         if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
             path = os.path.expanduser("~/io_blender2ogre") # use $HOME so snap can access it
@@ -89,10 +89,13 @@ class OGREMESH_OT_preview(bpy.types.Operator):
 
         if merged: context.scene.objects.unlink( merged )
 
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
-            subprocess.Popen([CONFIG['MESH_PREVIEWER'], path+'/preview.mesh'])
-        else:
-            subprocess.Popen( [CONFIG['MESH_PREVIEWER'], 'C:\\tmp\\preview.mesh'] )
+        try:
+            if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
+                subprocess.Popen([CONFIG['MESH_PREVIEWER'], path + '/preview.mesh'])
+            else:
+                subprocess.Popen([CONFIG['MESH_PREVIEWER'], 'C:\\tmp\\preview.mesh'] )
+        except:
+            Report.messages.append('ERROR: Viewer not found at "%s"' % CONFIG['MESH_PREVIEWER'])
 
         Report.show()
         return {'FINISHED'}

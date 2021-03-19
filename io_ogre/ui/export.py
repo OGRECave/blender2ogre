@@ -1,10 +1,4 @@
-
-import bpy
-import os
-import getpass
-import math
-import mathutils
-import logging
+import bpy, os, getpass, math, mathutils, logging
 
 from pprint import pprint
 
@@ -35,7 +29,7 @@ from ..ogre import skeleton
 from ..ogre import scene
 from ..ogre import material
 
-logger = logging.getLogger('root')
+logger = logging.getLogger('export')
 
 def auto_register(register):
     yield OP_ogre_export
@@ -44,8 +38,6 @@ def auto_register(register):
         bpy.types.TOPBAR_MT_file_export.append(menu_func)
     else:
         bpy.types.TOPBAR_MT_file_export.remove(menu_func)
-
-
 
 def menu_func(self, context):
     """ invoked when export in drop down menu is clicked """
@@ -62,12 +54,11 @@ class _OgreCommonExport_(object):
             return True
 
     def __init__(self):
-        # check that converter is setup
+        # Check that converter is setup
         self.converter = detect_converter_type()
 
     def invoke(self, context, event):
-
-        # update the interface with the config values
+        # Update the interface with the config values
         for key, value in config.CONFIG.items():
             if getattr(self, "EX_" + key, None) or getattr(self, "EX_Vx_" + key, None) or getattr(self, "EX_V1_" + key, None) or getattr(self, "EX_V2_" + key, None):
                 # todo: isn't the key missing the "EX_" prefix?
@@ -86,38 +77,65 @@ class _OgreCommonExport_(object):
         else:
             layout.label(text="Using '%s'" % self.converter, icon='INFO')
 
-        for key in dir(_OgreCommonExport_):
-            if key.startswith('EX_V1_'):
-                if self.converter == "OgreXMLConverter":
-                    layout.prop(self, key)
-            elif key.startswith('EX_V2_'):
-                if self.converter == "OgreMeshTool":
-                    layout.prop(self, key)
-            elif key.startswith('EX_Vx_'):
-                if self.converter != "unknown":
-                    layout.prop(self, key)
-            elif key.startswith('EX_'):
-                layout.prop(self, key)
-
+        # The Sections are listed in an array to have them in this particular order
+        sections = ["General", "Scene", "Materials", "Textures", "Armature", "Mesh", "LOD", "Shape Animation", "Logging"]
+        
+        # Icons to use for the sections
+        section_icons = {
+            "General" : "WORLD", "Scene" : "SCENE_DATA", 
+            "Materials" : "MATERIAL", "Textures" : "TEXTURE", 
+            "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "LOD" : "LATTICE_DATA", "Shape Animation" : "POSE_HLT", 
+            "Logging" : "TEXT"
+        }
+        
+        # Options associated with each section
+        section_options = {
+            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_EXPORT_VERSION"], 
+            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_EXPORT_USER", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS"], 
+            "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
+            "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
+            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
+            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
+            "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT"], 
+            "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
+            "Logging" : ["EX_Vx_EXPORT_ENABLE_LOGGING"]
+        }
+        
+        for section in sections:
+            row = layout.row()
+            box = row.box()
+            box.label(text=section, icon=section_icons[section])
+            for prop in section_options[section]:
+                if prop.startswith('EX_V1_'):
+                    if self.converter == "OgreXMLConverter":
+                        box.prop(self, prop)
+                elif prop.startswith('EX_V2_'):
+                    if self.converter == "OgreMeshTool":
+                        box.prop(self, prop)
+                elif prop.startswith('EX_Vx_'):
+                    if self.converter != "unknown":
+                        box.prop(self, prop)
+                elif prop.startswith('EX_'):
+                    box.prop(self, prop)
+        
     def execute(self, context):
-        # add warinng about missing XML converter
+        # Add warinng about missing XML converter
         Report.reset()
         if self.converter == "unknown":
             Report.errors.append(
               "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
               "Export XML mesh - do NOT automatically convert .xml to .mesh file. You MUST run converter mesh manually.")
 
-        logger.info("context.blend_data %s"%context.blend_data.filepath)
-        logger.info("context.scene.name %s"%context.scene.name)
-        logger.info("self.filepath %s"%self.filepath)
-        logger.info("self.last_export_path %s"%self.last_export_path)
+        logger.debug("Context.blend_data: %s" % context.blend_data.filepath)
+        logger.debug("Context.scene.name: %s" % context.scene.name)
+        logger.debug("Self.filepath: %s" % self.filepath)
+        logger.debug("Self.last_export_path: %s" % self.last_export_path)
 
-
-        #-- load addonPreferenc in CONFIG
+        # Load addonPreference in CONFIG
         config.update_from_addon_preference(context)
 
-        # Resolve path from opened .blend if available. It's not if
-        # blender normally was opened with "last open scene".
+        # Resolve path from opened .blend if available. 
+        # Normally it's not if blender was opened with "Recover Last Session".
         # After export is done once, remember that path when re-exporting.
         if not self.last_export_path:
             # First export during this blender run
@@ -131,31 +149,69 @@ class _OgreCommonExport_(object):
         if self.filepath == "" or not self.filepath:
             self.filepath = "blender2ogre"
 
-        logger.info("self.filepath %s"%self.filepath)
+        logger.debug("Self.filepath: %s" % self.filepath)
 
         kw = {}
         for name in dir(_OgreCommonExport_):
-            if name[:6] in ('EX_V1_', 'EX_V2_', 'EX_Vx_'):
+            if name.startswith('EX_V1_'):
+                kw[ name[6:] ] = getattr(self,name)
+            elif name.startswith('EX_V2_'):
+                kw[ name[6:] ] = getattr(self,name)
+            elif name.startswith('EX_Vx_'):
                 kw[ name[6:] ] = getattr(self,name)
             elif name.startswith('EX_'):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
 
-        print ("_"*80)
+        print ("_" * 80)
+        
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
-        logger.info("target_path %s"%target_path)
-        logger.info("target_file_name %s"%target_file_name)
-        logger.info("target_file_name_no_ext %s"%target_file_name_no_ext)
+        file_handler = None
+        
+        # Add a file handler to all Logger instances
+        if config.get('EXPORT_ENABLE_LOGGING') == True:
+            log_file = ("%s/blender2ogre.log" % target_path)
+            logger.info("Writing log file to: %s" % log_file)
+
+            file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
+            
+            # Show the python file name from where each log message originated
+            SHOW_LOG_NAME = False
+            
+            if SHOW_LOG_NAME:
+                file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+            else:
+                file_formatter = logging.Formatter(fmt='%(asctime)s [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+            file_handler.setFormatter(file_formatter)
+
+            for logger_name in logging.Logger.manager.loggerDict.keys():
+                logging.getLogger(logger_name).addHandler(file_handler)
+
+        logger.info("Target_path: %s" % target_path)
+        logger.info("Target_file_name: %s" % target_file_name)
+        logger.debug("Target_file_name_no_ext: %s" % target_file_name_no_ext)
 
         scene.dot_scene(target_path, target_file_name_no_ext)
         Report.show()
 
+        # Flush and close all logging file handlers
+        if config.get('EXPORT_ENABLE_LOGGING') == True:
+            for logger_name in logging.Logger.manager.loggerDict.keys():
+                logger_instance = logging.getLogger(logger_name)
+                    
+                # Remove handlers
+                logger_instance.handlers.clear()
+            
+            file_handler.flush()
+            file_handler.close()
+
         return {'FINISHED'}
 
-    filepath = StringProperty(name="File Path",
+    filepath : StringProperty(name="File Path",
         description="Filepath used for exporting Ogre .scene file",
         maxlen=1024,
         default="",
@@ -167,153 +223,188 @@ class _OgreCommonExport_(object):
     # EX_V1_<config-name> for OgreXMLConverter
     # EX_V2_<config-name> for OgreMeshTool
     # EX_Vx_<config-name> for OgreXMLConverter and OgreMeshTool (hide only when no converter found)
-    EX_SWAP_AXIS = EnumProperty(
+
+    # General
+    EX_SWAP_AXIS : EnumProperty(
         items=config.AXIS_MODES,
         name='Swap Axis',
-        description='axis swapping mode',
-        default= config.get('SWAP_AXIS'))
-    EX_SEP_MATS = BoolProperty(
-        name="Separate Materials",
-        description="exports a .material for each material (rather than putting all materials in a single .material file)",
-        default=config.get('SEP_MATS'))
-    EX_ONLY_DEFORMABLE_BONES = BoolProperty(
-        name="Only Deformable Bones",
-        description="only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. Note: Any bone with deformable children/descendants will be output as well",
-        default=config.get('ONLY_DEFORMABLE_BONES'))
-    EX_ONLY_KEYFRAMED_BONES = BoolProperty(
-        name="Only Keyframed Bones",
-        description="only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis",
-        default=config.get('ONLY_KEYFRAMED_BONES'))
-    EX_OGRE_INHERIT_SCALE = BoolProperty(
-        name="OGRE Inherit Scale",
-        description="whether the OGRE bones have the 'inherit scale' flag on.  If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE",
-        default=config.get('OGRE_INHERIT_SCALE'))
-    EX_SCENE = BoolProperty(
-        name="Export Scene",
-        description="export current scene (OgreDotScene xml)",
-        default=config.get('SCENE'))
-    EX_SELONLY = BoolProperty(
-        name="Export Selected Only",
-        description="export selected",
-        default=config.get('SELONLY'))
-    EX_EXPORT_HIDDEN = BoolProperty(
-        name="Export Hidden Also",
-        description="Export hidden meshes in addition to visible ones. Turn off to avoid exporting hidden stuff",
-        default=config.get('EXPORT_HIDDEN'))
-    EX_FORCE_CAMERA = BoolProperty(
-        name="Force Camera",
-        description="export active camera",
-        default=config.get('FORCE_CAMERA'))
-    EX_FORCE_LAMPS = BoolProperty(
-        name="Force Lamps",
-        description="export all lamps",
-        default=config.get('FORCE_LAMPS'))
-    EX_MESH = BoolProperty(
-        name="Export Meshes",
-        description="export meshes",
-        default=config.get('MESH'))
-    EX_MESH_OVERWRITE = BoolProperty(
-        name="Export Meshes (overwrite)",
-        description="export meshes (overwrite existing files)",
-        default=config.get('MESH_OVERWRITE'))
-    EX_ARM_ANIM = BoolProperty(
-        name="Armature Animation",
-        description="export armature animations - updates the .skeleton file",
-        default=config.get('ARM_ANIM'))
-    EX_SHAPE_ANIM = BoolProperty(
-        name="Shape Animation",
-        description="export shape animations - updates the .mesh file",
-        default=config.get('SHAPE_ANIM'))
-    EX_SHAPE_NORMALS = BoolProperty(
-        name="Shape Normals",
-        description="export normals in shape animations - updates the .mesh file",
-        default=config.get('SHAPE_NORMALS'))
-    EX_TRIM_BONE_WEIGHTS = FloatProperty(
-        name="Trim Weights",
-        description="ignore bone weights below this value (Ogre supports 4 bones per vertex)",
-        min=0.0, max=0.5, default=config.get('TRIM_BONE_WEIGHTS') )
-    EX_ARRAY = BoolProperty(
-        name="Optimize Arrays",
-        description="optimize array modifiers as instances (constant offset only)",
-        default=config.get('ARRAY'))
-    EX_MATERIALS = BoolProperty(
-        name="Export Materials",
-        description="exports .material script",
-        default=config.get('MATERIALS'))
-    EX_DDS_MIPS = IntProperty(
-        name="DDS Mips",
-        description="number of mip maps (DDS)",
-        min=0, max=16,
-        default=config.get('DDS_MIPS'))
-
-    # Mesh options
-    EX_lodLevels = IntProperty(
-        name="LOD Levels",
-        description="MESH number of LOD levels",
-        min=0, max=32,
-        default=config.get('lodLevels'))
-    EX_lodDistance = IntProperty(
-        name="LOD Distance",
-        description="MESH distance increment to reduce LOD",
-        min=0, max=2000, default=config.get('lodDistance'))
-    EX_lodPercent = IntProperty(
-        name="LOD Percentage",
-        description="LOD percentage reduction",
-        min=0, max=99,
-        default=config.get('lodPercent'))
-    EX_V1_nuextremityPoints = IntProperty(
-        name="Extremity Points",
-        description="MESH Extremity Points",
-        min=0, max=65536,
-        default=config.get('nuextremityPoints'))
-    EX_Vx_generateEdgeLists = BoolProperty(
-        name="Edge Lists",
-        description="MESH generate edge lists (for stencil shadows)",
-        default=config.get('generateEdgeLists'))
-    EX_generateTangents = EnumProperty(
-        items=config.TANGENT_MODES,
-        name="Tangents",
-        description="Export tangents generated by Blender",
-        default=config.get('generateTangents'))
-    EX_Vx_optimiseAnimations = BoolProperty(
-        name="Optimize Animations",
-        description="MESH optimize animations",
-        default=config.get('optimiseAnimations'))
-    EX_COPY_SHADER_PROGRAMS = BoolProperty(
-        name="Copy Shader Programs",
-        description="when using script inheritance copy the source shader programs to the output path",
-        default=config.get('COPY_SHADER_PROGRAMS'))
-    EX_FORCE_IMAGE_FORMAT = EnumProperty(
-        items=material.IMAGE_FORMATS,
-        name='Convert Images',
-        description='convert all textures to format',
-        default=config.get('FORCE_IMAGE_FORMAT') )
-
-    EX_Vx_EXPORT_ENABLE_LOGGING = BoolProperty(
-        name="Write Exporter Logs",
-        description="Log file will be created in the output directory",
-        default=config.get('EXPORT_ENABLE_LOGGING'))
-    EX_V2_MESH_TOOL_EXPORT_VERSION = EnumProperty(
+        description='Axis swapping mode',
+        default=config.get('SWAP_AXIS')) = {}
+    EX_V2_MESH_TOOL_EXPORT_VERSION : EnumProperty(
         items=config.MESH_EXPORT_VERSIONS,
         name='Mesh Export Version',
         description='Specify Ogre version format to write',
-        default=config.get('MESH_TOOL_EXPORT_VERSION') )
+        default=config.get('MESH_TOOL_EXPORT_VERSION')) = {}
+    
+    # Scene
+    EX_SCENE : BoolProperty(
+        name="Export Scene",
+        description="Export current scene (OgreDotScene xml file)",
+        default=config.get('SCENE')) = {}
+    EX_SELECTED_ONLY : BoolProperty(
+        name="Export Selected Only",
+        description="Export only selected objects",
+        default=config.get('SELECTED_ONLY')) = {}
+    EX_EXPORT_HIDDEN : BoolProperty(
+        name="Export Hidden Also",
+        description="Export hidden meshes in addition to visible ones.\nTurn off to avoid exporting hidden stuff",
+        default=config.get('EXPORT_HIDDEN')) = {}
+    #EX_EXPORT_USER : BoolProperty(
+    #    name="Export User Properties",
+    #    description="Export user properties such as as physical properties.\nTurn off to avoid exporting the user data",
+    #    default=config.get('EXPORT_USER')) = {}
+    EX_FORCE_CAMERA : BoolProperty(
+        name="Force Camera",
+        description="Export active camera",
+        default=config.get('FORCE_CAMERA')) = {}
+    EX_FORCE_LAMPS : BoolProperty(
+        name="Force Lamps",
+        description="Export all Lamps",
+        default=config.get('FORCE_LAMPS')) = {}
+    
+    # Materials
+    EX_MATERIALS : BoolProperty(
+        name="Export Materials",
+        description="Exports .material scripts",
+        default=config.get('MATERIALS')) = {}
+    EX_SEPARATE_MATERIALS : BoolProperty(
+        name="Separate Materials",
+        description="Exports a .material for each material\n(rather than putting all materials into a single .material file)",
+        default=config.get('SEPARATE_MATERIALS')) = {}
+    EX_COPY_SHADER_PROGRAMS : BoolProperty(
+        name="Copy Shader Programs",
+        description="When using script inheritance copy the source shader programs to the output path",
+        default=config.get('COPY_SHADER_PROGRAMS')) = {}
 
-    EX_V2_optimizeVertexBuffersForShaders = BoolProperty(
-        name="Optimize Vertex Buffers For Shaders",
-        description="MESH optimize vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
-        default=config.get('optimizeVertexBuffersForShaders'))
-    EX_V2_optimizeVertexBuffersForShadersOptions = StringProperty(
+    # Textures
+    EX_DDS_MIPS : IntProperty(
+        name="DDS Mips",
+        description="Number of Mip Maps (DDS)",
+        min=0, max=16,
+        default=config.get('DDS_MIPS')) = {}
+    EX_FORCE_IMAGE_FORMAT : EnumProperty(
+        items=material.IMAGE_FORMATS,
+        name='Convert Images',
+        description='Convert all textures to selected image format',
+        default=config.get('FORCE_IMAGE_FORMAT')) = {}
+    
+    # Armature
+    EX_ARMATURE_ANIMATION : BoolProperty(
+        name="Armature Animation",
+        description="Export armature animations (updates the .skeleton file)",
+        default=config.get('ARMATURE_ANIMATION')) = {}
+    EX_ONLY_DEFORMABLE_BONES : BoolProperty(
+        name="Only Deformable Bones",
+        description="Only exports bones that are deformable. Useful for hiding IK-Bones used in Blender.\nNOTE: Any bone with deformable children/descendants will be output as well",
+        default=config.get('ONLY_DEFORMABLE_BONES')) = {}
+    EX_ONLY_KEYFRAMED_BONES : BoolProperty(
+        name="Only Keyframed Bones",
+        description="Only exports bones that have been keyframed for a given animation.\nUseful to limit the set of bones on a per-animation basis",
+        default=config.get('ONLY_KEYFRAMED_BONES')) = {}
+    EX_OGRE_INHERIT_SCALE : BoolProperty(
+        name="OGRE Inherit Scale",
+        description="Whether the OGRE bones have the 'inherit scale' flag on.\nIf the animation has scale in it, the exported animation needs to be\nadjusted to account for the state of the inherit-scale flag in OGRE",
+        default=config.get('OGRE_INHERIT_SCALE')) = {}
+    EX_TRIM_BONE_WEIGHTS : FloatProperty(
+        name="Trim Weights",
+        description="Ignore bone weights below this value (Ogre supports 4 bones per vertex)",
+        min=0.0, max=0.5, default=config.get('TRIM_BONE_WEIGHTS')) = {}
+
+    # Mesh Options
+    EX_MESH : BoolProperty(
+        name="Export Meshes",
+        description="Export meshes",
+        default=config.get('MESH')) = {}
+    EX_MESH_OVERWRITE : BoolProperty(
+        name="Export Meshes (overwrite)",
+        description="Export meshes (overwrite existing files)",
+        default=config.get('MESH_OVERWRITE')) = {}
+        
+    # This is actually implemented as if EX_ARRAY=True always, there is not an actual choice possible
+    #EX_ARRAY : BoolProperty(
+    #    name="Optimise Arrays",
+    #    description="Optimise array modifiers as instances (constant offset only)",
+    #    default=config.get('ARRAY')) = {}
+    
+    EX_V1_EXTREMITY_POINTS : IntProperty(
+        name="Extremity Points",
+        description="""Submeshes can have optional 'extremity points' stored with them to allow 
+submeshes to be sorted with respect to each other in the case of transparency. 
+For some meshes with transparent materials (partial transparency) this can be useful""",
+        min=0, max=65536,
+        default=config.get('EXTREMITY_POINTS')) = {}
+    EX_Vx_GENERATE_EDGE_LISTS : BoolProperty(
+        name="Edge Lists",
+        description="Generate edge lists (for stencil shadows)",
+        default=config.get('GENERATE_EDGE_LISTS')) = {}
+    EX_GENERATE_TANGENTS : EnumProperty(
+        items=config.TANGENT_MODES,
+        name="Tangents",
+        description="Export tangents generated by Blender",
+        default=config.get('GENERATE_TANGENTS')) = {}
+    EX_Vx_OPTIMISE_ANIMATIONS : BoolProperty(
+        name="Optimise Animations",
+        description="DON'T optimise out redundant tracks & keyframes",
+        default=config.get('OPTIMISE_ANIMATIONS')) = {}
+    EX_V2_OPTIMISE_VERTEX_BUFFERS : BoolProperty(
+        name="Optimise Vertex Buffers For Shaders",
+        description="Optimise vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
+        default=config.get('OPTIMISE_VERTEX_BUFFERS')) = {}
+    EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS : StringProperty(
         name="Vertex Buffers Options",
         description="""Used when optimizing vertex buffers for shaders.
 Available flags are:
 p - converts POSITION to 16-bit floats.
 q - converts normal tangent and bitangent (28-36 bytes) to QTangents (8 bytes).
 u - converts UVs to 16-bit floats.
-s - make shadow mapping passes have their own optimized buffers. Overrides existing ones if any.
+s - make shadow mapping passes have their own optimised buffers. Overrides existing ones if any.
 S - strips the buffers for shadow mapping (consumes less space and memory)""",
         maxlen=5,
-        default=config.get('optimizeVertexBuffersForShadersOptions'))
+        default=config.get('OPTIMISE_VERTEX_BUFFERS_OPTIONS')) = {}
+
+    # LOD
+    EX_LOD_LEVELS : IntProperty(
+        name="LOD Levels",
+        description="Number of LOD levels",
+        min=0, max=32,
+        default=config.get('LOD_LEVELS')) = {}
+    EX_LOD_DISTANCE : IntProperty(
+        name="LOD Distance",
+        description="Distance increment to reduce LOD",
+        min=0, max=2000, default=config.get('LOD_DISTANCE')) = {}
+    EX_LOD_PERCENT : IntProperty(
+        name="LOD Percentage",
+        description="LOD percentage reduction",
+        min=0, max=99,
+        default=config.get('LOD_PERCENT')) = {}
+
+    # Pose Animation
+    EX_SHAPE_ANIMATIONS : BoolProperty(
+        name="Shape Animation",
+        description="Export shape animations (updates the .mesh file)",
+        default=config.get('SHAPE_ANIMATIONS')) = {}
+    EX_SHAPE_NORMALS : BoolProperty(
+        name="Shape Normals",
+        description="Export normals in shape animations (updates the .mesh file)",
+        default=config.get('SHAPE_NORMALS')) = {}
+    
+    # Logging
+    EX_Vx_EXPORT_ENABLE_LOGGING : BoolProperty(
+        name="Write Exporter Logs",
+        description="Write Log file to the output directory (blender2ogre.log)",
+        default=config.get('EXPORT_ENABLE_LOGGING')) = {}
+    
+    # It seems that it is not possible to exclude DEBUG when selecting a log level
+    #EX_Vx_DEBUG_LOGGING : BoolProperty(
+    #    name="Debug Logging",
+    #    description="Whether to show DEBUG log messages",
+    #    default=config.get('DEBUG_LOGGING')) = {}
+    
+    # It was decided to make this an option that is not user-facing
+    #EX_Vx_SHOW_LOG_NAME : BoolProperty(
+    #    name="Show Log name",
+    #    description="Show .py file from where each log message originated",
+    #    default=config.get('SHOW_LOG_NAME')) = {}
 
 class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
     '''Export Ogre Scene'''
@@ -321,5 +412,3 @@ class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
     bl_label = "Export Ogre"
     bl_options = {'REGISTER'}
     # export logic is contained in the subclass
-
-

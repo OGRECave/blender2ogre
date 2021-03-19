@@ -6,16 +6,16 @@ if "bpy" in locals():
     import importlib
     if "config" in locals():
         importlib.reload(config)
-    #if "Report" in locals():
-    #    importlib.reload(Report)
+    if "report.Report" in locals():
+        importlib.reload(report.Report)
     if "material" in locals():
         importlib.reload(material)
     if "export" in locals():
         importlib.reload(export)
     if "helper" in locals():
         importlib.reload(helper)
-    #if "OGREMESH_OT_preview" in locals():
-    #    importlib.reload(OGREMESH_OT_preview)
+    if "meshy.OGREMESH_OT_preview" in locals():
+        importlib.reload(meshy.OGREMESH_OT_preview)
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.

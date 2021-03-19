@@ -10,6 +10,8 @@ import subprocess
 import re
 import sys
 
+logger = logging.getLogger('util')
+
 def xml_converter_parameters():
     """
     Return the name of the ogre converter
@@ -92,24 +94,24 @@ def xml_convert(infile, has_uvs=False):
     elif converter_type == "OgreMeshTool":
         version = mesh_tool_version()
     elif converter_type == "unknown":
-        print("WARNING: Cannot find suitable OgreXMLConverter or OgreMeshTool executable")
+        logger.warn("Cannot find suitable OgreXMLConverter or OgreMeshTool executable")
         return
 
     cmd = [exe]
 
-    if config.get('nuextremityPoints') > 0 and version < (2,1,0):
+    if config.get('EXTREMITY_POINTS') > 0 and version < (2,1,0):
         cmd.append('-x')
-        cmd.append(config.get('nuextremityPoints'))
+        cmd.append(config.get('EXTREMITY_POINTS'))
 
     if version < (1,10,0) or version >= (2,1,0):
-        if not config.get('generateEdgeLists'):
+        if not config.get('GENERATE_EDGE_LISTS'):
             cmd.append('-e')
 
-    if config.get('optimizeVertexBuffersForShaders') and version >= (2,1,0):
+    if config.get('OPTIMISE_VERTEX_BUFFERS') and version >= (2,1,0):
         cmd.append('-O')
-        cmd.append(config.get('optimizeVertexBuffersForShadersOptions'))
+        cmd.append(config.get('OPTIMISE_VERTEX_BUFFERS_OPTIONS'))
 
-    if not config.get('optimiseAnimations'):
+    if not config.get('OPTIMISE_ANIMATIONS'):
         cmd.append('-o')
 
     if version < (2,1,0):
@@ -218,7 +220,7 @@ def find_bone_index( ob, arm, groupidx): # sometimes the groups are out of order
             if bone.name == vg.name:
                 return i-j
     else:
-        print('WARNING: object vertex groups not in sync with armature', ob, arm, groupidx)
+        logger.warn('Object vertex groups not in sync with armature', ob, arm, groupidx)
 
 def mesh_is_smooth( mesh ):
     for face in mesh.tessfaces:
@@ -369,7 +371,7 @@ def get_parent_matrix( ob, objects ):
             return get_parent_matrix(ob.parent, objects)
 
 def merge_group( group ):
-    print('--------------- merge group ->', group.name )
+    logger.info('--------------- merge group ->', group.name )
     copies = []
     for ob in group.objects:
         if ob.type == 'MESH':
@@ -414,8 +416,8 @@ def merge( objects ):
     for ob in bpy.context.selected_objects:
         ob.select_set(False)
     for ob in objects:
-        print('\t'+ob.name)
-        ob.select_set(True)
+        logger.info('\t' + ob.name)
+        ob.select = True
         assert not ob.library
     #2.8update
     bpy.context.view_layer.objects.active = ob
@@ -428,11 +430,11 @@ def get_merge_group( ob, prefix='merge.' ):
         if grp.name.lower().startswith(prefix): m.append( grp )
     if len(m)==1:
         #if ob.data.users != 1:
-        #    print( 'WARNING: an instance can not be in a merge group' )
+        #    logger.warn( 'An instance can not be in a merge group' )
         #    return
         return m[0]
     elif m:
-        print('WARNING: an object can not be in two merge groups at the same time', ob)
+        logger.warn('An object can not be in two merge groups at the same time', ob)
         return
 
 def wordwrap( txt ):
@@ -503,9 +505,6 @@ class IndentedWriter(object):
           schnaps
         }
       }
-
-
-
     """
 
     sym_stack = []

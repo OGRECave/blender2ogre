@@ -16,6 +16,8 @@ from ..report import Report
 from ..util import *
 from .program import OgreProgram
 
+logger = logging.getLogger('material')
+
 def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kwargs):
     """
     generate material files, or copy them into a single file
@@ -24,7 +26,7 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
     separate_files: bool - each material gets it's own filename
     """
     if not materials:
-        logging.debug('WARNING: no materials, not writting .material script')
+        logger.warn('No materials, not writting .material script')
         return []
 
     if not path:
@@ -247,7 +249,7 @@ class OgreMaterialGenerator(object):
                 elif texture.projection == 'FLAT':
                     self.w.iline('env_map planar')
                 else: 
-                    logging.debug('WARNING: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' %(texture.name, texture.projection))
+                    logger.warn('Texture: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' % (texture.name, slot.mapping))
             
             x,y = texture.translation[0:2]
             if x or y:
@@ -277,7 +279,7 @@ class OgreMaterialGenerator(object):
             image.filepath = target_filepath
             image.save()
             image.filepath = origin_filepath
-            logging.info("copy (%s)", origin_filepath)
+            logger.info("Copy (%s)", origin_filepath)
         else:
             image_filepath = bpy.path.abspath(image.filepath, library=image.library)
             image_filepath = os.path.normpath(image_filepath)
@@ -294,14 +296,14 @@ class OgreMaterialGenerator(object):
                 
             if update:
                 if is_image_postprocessed(image):
-                    logging.info("magick (%s) -> (%s)", image_filepath, target_filepath)
+                    logger.info("Magick (%s) -> (%s)", image_filepath, target_filepath)
                     util.image_magick(image, image_filepath, target_filepath)
                 else:
                     # copy2 tries to copy all metadata (modification date included), to keep update decision consistent
                     shutil.copy2(image_filepath, target_filepath)
-                    logging.info("copy (%s)", origin_filepath)
+                    logger.info("Copy (%s)", origin_filepath)
             else:
-                logging.info("skip copy (%s). texture is already up to date.", origin_filepath)
+                logger.info("Skip copy (%s). texture is already up to date.", origin_filepath)
 
     def get_active_programs(self):
         r = []
@@ -316,7 +318,7 @@ class OgreMaterialGenerator(object):
             if prog.source:
                 prog.save(self.target_path)
             else:
-                logging.warn('uses program %s which has no source' % (prog.name))
+                logger.warn('Uses program %s which has no source' % prog.name)
 
     def change_ext( self, name, image ):
         name_no_ext, _ = splitext(name)
@@ -377,7 +379,7 @@ def load_user_materials():
     if os.path.isdir( config.get('USER_MATERIALS') ):
         scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
         for prog in progs:
-            logging.info('Ogre shader program ' + prog.name)
+            logger.info('Ogre shader program: %s' % prog.name)
 
 
 def material_name( mat, clean = False, prefix='' ):
@@ -405,7 +407,7 @@ def get_shader_program( name ):
     if name in OgreProgram.PROGRAMS:
         return OgreProgram.PROGRAMS[ name ]
     else:
-        logging.debug('WARNING: no shader program named: %s' %name)
+        logger.warn('No shader program named: %s' % name)
 
 def get_shader_programs():
     return OgreProgram.PROGRAMS.values()
@@ -417,12 +419,12 @@ def parse_material_and_program_scripts( path, scripts, progs, missing ):   # rec
             parse_material_and_program_scripts( url, scripts, progs, missing )
 
         elif os.path.isfile( url ):
-            if name.endswith( '.material' ):
-                logging.debug( '<found material> ' + url )
+            if name.endswith('.material'):
+                logger.debug('<found material> %s' % url )
                 scripts.append( MaterialScripts( url ) )
 
             if name.endswith('.program'):
-                logging.debug( '<found program> ' + url )
+                logger.debug('<found program> %s' % url )
                 data = open( url, 'rb' ).read().decode('utf-8')
 
                 chk = []; chunks = [ chk ]
@@ -469,14 +471,14 @@ class OgreMaterialScript(object):
         if ':' in line:
             line, self.parent = line.split(':')
         self.name = line.split()[-1]
-        logging.debug( 'new ogre material: %s' %self.name )
+        logger.debug('New ogre material: %s' % self.name )
 
         brace = 0
         self.techniques = techs = []
         prog = None  # pick up program params
         tex = None  # pick up texture_unit options, require "texture" ?
         for line in self.data.splitlines():
-            #logging.debug( line )
+            #logger.debug( line )
             rawline = line
             line = line.split('//')[0]
             line = line.strip()
@@ -485,7 +487,7 @@ class OgreMaterialScript(object):
             if line == '{': brace += 1
             elif line == '}': brace -= 1; prog = None; tex = None
 
-            if line.startswith( 'technique' ):
+            if line.startswith('technique'):
                 tech = {'passes':[]}; techs.append( tech )
                 if len(line.split()) > 1: tech['technique-name'] = line.split()[-1]
             elif techs:
@@ -511,8 +513,8 @@ class OgreMaterialScript(object):
                         prog = None
                         tex = {'name':line.split()[-1], 'params':{}}
                         if tex['name'] == 'texture_unit': # ignore unnamed texture units
-                            logging.debug('WARNING: material %s contains unnamed texture_units' %self.name)
-                            logging.debug('---unnamed texture units will be ignored---')
+                            logger.warn('Material %s contains unnamed texture_units' % self.name)
+                            logger.warn('--- Unnamed texture units will be ignored ---')
                         else:
                             P['texture_units'].append( tex )
                             self.texture_units[ tex['name'] ] = tex
@@ -534,7 +536,7 @@ class OgreMaterialScript(object):
                             prog['params'][ o ] = opt
                             if t=='float': opt['value'] = float(v)
                             elif t in 'float2 float3 float4'.split(): opt['value'] = [ float(a) for a in v ]
-                            else: logging.debug('unknown type:', t)
+                            else: logger.debug('Unknown type: %s' % t)
 
                     elif tex:   # (not used)
                         tex['params'][ line.split()[0] ] = line.split()[ 1 : ]
@@ -547,17 +549,17 @@ class OgreMaterialScript(object):
             P['body'] = '\n'.join( lines )
             assert P['body'].count('{') == P['body'].count('}')     # if this fails, the parser choked
 
-        #logging.debug( self.techniques )
+        #logger.debug( self.techniques )
         self.hidden_texture_units = rem = []
         for tex in self.texture_units.values():
             if 'texture' not in tex['params']:
                 rem.append( tex )
         for tex in rem:
-            logging.debug('WARNING: not using texture_unit because it lacks a "texture" parameter ' + tex['name'])
+            logger.warn('Not using texture_unit <%s> because it lacks a "texture" parameter' % tex['name'])
             self.texture_units.pop( tex['name'] )
 
         if len(self.techniques)>1:
-            logging.debug('WARNING: user material %s has more than one technique' %self.url)
+            logger.warn('User material %s has more than one technique' % self.url)
 
     def as_abstract_passes( self ):
         r = []
@@ -599,13 +601,13 @@ class MaterialScripts(object):
 
         ##########################
         for mat in mats:
-            omat = OgreMaterialScript( '\n'.join( mat ), url )
+            omat = OgreMaterialScript('\n'.join( mat ), url )
             if omat.name in self.ALL_MATERIALS:
-                logging.debug( 'WARNING: material %s redefined' %omat.name )
-                #logging.debug( '--OLD MATERIAL--')
-                #logging.debug( self.ALL_MATERIALS[ omat.name ].data )
-                #logging.debug( '--NEW MATERIAL--')
-                #logging.debug( omat.data )
+                logger.warn('Material %s redefined' % omat.name )
+                #logger.debug('--- OLD MATERIAL ---')
+                #logger.debug( self.ALL_MATERIALS[ omat.name ].data )
+                #logger.debug('--- NEW MATERIAL ---')
+                #logger.debug( omat.data )
             self.materials[ omat.name ] = omat
             self.ALL_MATERIALS[ omat.name ] = omat
             if omat.vertex_programs or omat.fragment_programs:  # ignore materials without programs
@@ -639,17 +641,17 @@ def is_image_postprocessed( image ):
 
 def update_parent_material_path( path ):
     ''' updates RNA '''
-    logging.debug( '>>SEARCHING FOR OGRE MATERIALS: %s' %path )
+    logger.debug('>> SEARCHING FOR OGRE MATERIALS: %s' % path )
     scripts = []
     progs = []
     missing = []
     parse_material_and_program_scripts( path, scripts, progs, missing )
 
     if missing:
-        logging.debug('WARNING: missing shader programs:')
-        for p in missing: logging.debug(p.name)
+        logger.warn('Missing shader programs:')
+        for p in missing: logger.debug(p.name)
     if missing and not progs:
-        logging.debug('WARNING: no shader programs were found - set "SHADER_PROGRAMS" to your path')
+        logger.warn('No shader programs were found - set "SHADER_PROGRAMS" to your path')
 
     MaterialScripts.reset_rna( callback=shader.on_change_parent_material )
     return scripts, progs

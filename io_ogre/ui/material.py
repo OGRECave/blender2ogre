@@ -152,7 +152,6 @@ class MatPass8( _OgreMatPass, bpy.types.Panel ): INDEX = 7; bl_label = "Ogre Mat
 def ogre_material_panel_extra( parent, mat ):
     box = parent.box()
     header = box.row()
-
     header.prop(mat, 'use_ogre_advanced_options', text='---guru options---' )
 
     if mat.use_ogre_advanced_options:
