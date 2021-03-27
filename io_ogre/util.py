@@ -1,14 +1,16 @@
-import mathutils
-import logging
-import time
-import bpy
+
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    # ...so we need to reload our submodule(s) using importlib
+    import importlib
+    if "config" in locals():
+        importlib.reload(config)
+
+# This is only relevant on first run, on later reloads those modules
+# are already in locals() and those statements do not do anything.
 from . import config
-import os
 from os.path import split, splitext
-import logging
-import subprocess
-import re
-import sys
+import bpy, logging, logging, mathutils, os, re, subprocess, sys, time
 
 logger = logging.getLogger('util')
 
@@ -239,7 +241,7 @@ def find_bone_index( ob, arm, groupidx): # sometimes the groups are out of order
             if bone.name == vg.name:
                 return i-j
     else:
-        logger.warn('Object vertex groups not in sync with armature', ob, arm, groupidx)
+        logger.warn('<%s> Object vertex groups (%s) not in sync with armature: %s', ob.name, groupidx, arm.name)
 
 def mesh_is_smooth( mesh ):
     for face in mesh.tessfaces:
@@ -384,7 +386,7 @@ def get_parent_matrix( ob, objects ):
             return get_parent_matrix(ob.parent, objects)
 
 def merge_group( group ):
-    logger.info('--------------- merge group ->', group.name )
+    logger.info('+ Merge Group: %s' % group.name )
     copies = []
     for ob in group.objects:
         if ob.type == 'MESH':
@@ -399,6 +401,12 @@ def merge_group( group ):
     merged = merge( copies )
     merged.name = name
     merged.data.name = name
+
+    # Clean up orphan meshes
+    for copy in copies:
+        if copy.name != name:
+            bpy.data.meshes.remove(copy.data)
+    
     return merged
 
 def merge_objects( objects, name='_temp_', transform=None ):
@@ -423,7 +431,7 @@ def merge( objects ):
     for ob in bpy.context.selected_objects:
         ob.select = False
     for ob in objects:
-        logger.info('\t' + ob.name)
+        logger.info('  - %s' % ob.name)
         ob.select = True
         assert not ob.library
     bpy.context.scene.objects.active = ob
@@ -440,7 +448,7 @@ def get_merge_group( ob, prefix='merge.' ):
         #    return
         return m[0]
     elif m:
-        logger.warn('An object can not be in two merge groups at the same time', ob)
+        logger.warn('An object can not be in two merge groups at the same time: %s' % ob.name)
         return
 
 def wordwrap( txt ):
