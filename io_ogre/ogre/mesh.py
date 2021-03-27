@@ -172,7 +172,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if tangents:
             mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
 
+        progressScale = 1.0 / (len(mesh.polygons) - 1)
         for F in mesh.polygons:
+            percent = F.index * progressScale
+            sys.stdout.write( "\r + Faces [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
+            sys.stdout.flush()
+            
             smooth = F.use_smooth
             tri = (F.vertices[0], F.vertices[1], F.vertices[2])
             face = []
@@ -287,6 +292,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
 
+        print("")
         logger.info('- Done at %s seconds' % timer_diff_str(start))
         logger.info('* Writing submeshes')
 
@@ -375,13 +381,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             if lod_levels > 10:
                 lod_levels = 10
 
-            def activate_object(obj):
-                bpy.ops.object.select_all(action = 'DESELECT')
-                bpy.context.scene.objects.active = obj
-                obj.select = True
-
             def duplicate_object(scene, name, copyobj):
-
                 # Create new mesh
                 mesh = bpy.data.meshes.new(name)
 
@@ -400,29 +400,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                 return ob_new, mesh
 
-            def delete_object(obj):
-                activate_object(obj)
-                bpy.ops.object.delete()
-
-            # todo: Potential infinite recursion creation fails?
-            def get_or_create_modifier(obj, modifier_name):
-                if obj.type != 'MESH':
-                    return None
-                # Find modifier
-                for mod_iter in obj.modifiers:
-                    if mod_iter.type == modifier_name:
-                        return mod_iter
-                # Not found? Create it and call recurse
-                activate_object(obj)
-                bpy.ops.object.modifier_add(type=modifier_name)
-                return get_or_create_modifier(obj, modifier_name)
-
             # Create a temporary duplicate
             ob_copy, ob_copy_mesh = duplicate_object(bpy.context.scene, obj_name + "_LOD_TEMP_COPY", ob)
             ob_copy_meshes = [ ob_copy.data, ob_copy_mesh ]
 
             # Activate clone for modifier manipulation
-            decimate = get_or_create_modifier(ob_copy, 'DECIMATE')
+            decimate = ob_copy.modifiers.new(name="Ogre-LOD_Decimate", type='DECIMATE')
             if decimate is not None:
                 decimate.decimate_type = 'COLLAPSE'
                 decimate.show_viewport = True
@@ -485,13 +468,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         # Delete temporary LOD object.
                         # The clone meshes will be deleted later.
                         lod_ob_temp.user_clear()
-                        delete_object(lod_ob_temp)
+                        bpy.data.objects.remove(bpy.data.objects[lod_ob_temp.name], do_unlink=True)
                         del lod_ob_temp
 
                     doc.end_tag('levelofdetail')
 
             # Delete temporary LOD object
-            delete_object(ob_copy)
+            bpy.data.objects.remove(ob_copy, do_unlink=True)
             del ob_copy
 
             # Delete temporary data/mesh objects
@@ -663,15 +646,16 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 logger.info('- Done at %s seconds' % timer_diff_str(start))
 
         ## Clean up and save
-        #bpy.context.scene.meshes.unlink(mesh)
+        mesh.user_clear()
+        bpy.data.meshes.remove(mesh)
+        del mesh
+
         if cleanup:
             #bpy.context.scene.objects.unlink(copy)
             copy.user_clear()
             bpy.data.objects.remove(copy)
-            mesh.user_clear()
-            bpy.data.meshes.remove(mesh)
             del copy
-            del mesh
+
         del _remap_verts_
         del _remap_normals_
         del _face_indices_
