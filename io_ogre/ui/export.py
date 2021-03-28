@@ -21,13 +21,13 @@ if "bpy" in locals():
 # are already in locals() and those statements do not do anything.
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
 from .. import config
+from ..ogre import material
+from ..ogre import mesh
+from ..ogre import scene
+from ..ogre import skeleton
 from ..report import Report
 from ..util import *
 from ..xml import *
-from ..ogre import mesh
-from ..ogre import skeleton
-from ..ogre import scene
-from ..ogre import material
 
 logger = logging.getLogger('export')
 
@@ -96,7 +96,7 @@ class _OgreCommonExport_(object):
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
             "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
             "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
-            "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT"], 
+            "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"], 
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
             "Logging" : ["EX_Vx_EXPORT_ENABLE_LOGGING"]
         }
@@ -373,6 +373,12 @@ S - strips the buffers for shadow mapping (consumes less space and memory)""",
         description="LOD percentage reduction",
         min=0, max=99,
         default=config.get('LOD_PERCENT'))
+    EX_LOD_MESH_TOOLS = BoolProperty(
+        name="Use OgreMesh Tools",
+        description="""Use OgreMeshUpgrader/OgreMeshTool instead of Blender to generate the mesh LODs.
+OgreMeshUpgrader/OgreMeshTool does LOD by removing edges, which allows only changing the index buffer and re-use the vertex-buffer (storage efficient).
+Blenders decimate does LOD by collapsing vertices, which can result in a visually better LOD, but needs different vertex-buffers per LOD.""",
+        default=config.get('LOD_MESH_TOOLS'))
 
     # Pose Animation
     EX_SHAPE_ANIMATIONS = BoolProperty(
