@@ -371,7 +371,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         logger.info('- Done at %s seconds' % timer_diff_str(start))
 
         # Generate lod levels
-        if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0:
+        if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == False:
             lod_levels = config.get('LOD_LEVELS')
             lod_distance = config.get('LOD_DISTANCE')
             lod_ratio = config.get('LOD_PERCENT') / 100.0
@@ -679,8 +679,15 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     # Start .mesh.xml to .mesh convertion tool
     util.xml_convert(target_file, has_uvs=dotextures)
 
-    # note that exporting the skeleton does not happen here anymore
-    # it moved to the function dot_skeleton in its own module
+    logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, timer_diff_str(start)))
+
+    # If requested by the user, generate LOD levels through OgreMeshUpgrader
+    if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+        target_mesh_file = os.path.join(path, '%s.mesh' % obj_name )
+        util.lod_create(target_mesh_file)
+    
+    # Note that exporting the skeleton does not happen here anymore
+    # It was moved to the function dot_skeleton in its own module (skeleton.py)
 
     mats = []
     for mat_name, extern, mat in materials:
@@ -689,8 +696,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             mats.append(mat_name)
         else:
             logger.info("Extern material: %s" % mat_name)
-
-    logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, timer_diff_str(start)))
 
     return mats
 
