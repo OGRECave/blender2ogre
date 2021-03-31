@@ -1,20 +1,35 @@
-from datetime import datetime
-from os.path import join
-import math
-import shutil
-import tempfile
 
-from bpy_extras import io_utils
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    # ...so we need to reload our submodule(s) using importlib
+    import importlib
+    if "config" in locals():
+        importlib.reload(config)
+    if "util" in locals():
+        importlib.reload(util)
+    if "shader" in locals():
+        importlib.reload(shader)
+    if "report" in locals():
+        importlib.reload(report)
+    if "program" in locals():
+        importlib.reload(program)
 
-from bpy.props import EnumProperty
-from bpy_extras import node_shader_utils
-from mathutils import Vector
-
+# This is only relevant on first run, on later reloads those modules
+# are already in locals() and those statements do not do anything.
+import logging, os, shutil, tempfile, math
+from .. import config
 from .. import shader
 from .. import util
 from ..report import Report
 from ..util import *
 from .program import OgreProgram
+from bpy.props import EnumProperty
+from bpy_extras import io_utils
+from bpy_extras import node_shader_utils
+from datetime import datetime
+from itertools import chain
+from mathutils import Vector
+from os.path import join, split, splitext
 
 logger = logging.getLogger('material')
 

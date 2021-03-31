@@ -1,16 +1,38 @@
+
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    # ...so we need to reload our submodule(s) using importlib
+    import importlib
+    if "material" in locals():
+        importlib.reload(material)
+    if "mesh" in locals():
+        importlib.reload(mesh)
+    if "skeleton" in locals():
+        importlib.reload(skeleton)
+    if "config" in locals():
+        importlib.reload(config)
+    if "util" in locals():
+        importlib.reload(util)
+    if "report" in locals():
+        importlib.reload(report)
+    if "xml" in locals():
+        importlib.reload(xml)
+
+# This is only relevant on first run, on later reloads those modules
+# are already in locals() and those statements do not do anything.
 import bpy, mathutils, os, getpass, math
 from os.path import join
-from .. import util
-from .. import config
+from . import material
 from . import mesh
 from . import skeleton
+from .. import bl_info
+from .. import config
+from .. import util
 from ..report import Report
 from ..util import *
 from ..xml import *
-from .mesh import *
 from .material import *
-from . import material
-from .. import bl_info
+from .mesh import *
 
 logger = logging.getLogger('scene')
 
@@ -173,7 +195,6 @@ def dot_scene(path, scene_name=None):
         #bpy.context.scene.objects.unlink( ob )
         #bpy.context.collection.objects.unlink( ob )
         bpy.data.objects.remove(ob)
-
 
 class _WrapLogic(object):
     SwapName = { 'frame_property' : 'animation' } # custom name hacks
@@ -449,8 +470,8 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                         break
                 if collisionFile:
                     mesh_collision_files[ ob.data.name ] = collisionFile
-                    mesh.dot_mesh(child, target_path, force_name='%s_collision_%s' % (prefix, ob.data.name) )
-                    skeleton.dot_skeleton(child, target_path)
+                    mesh.dot_mesh(child, path, force_name='%s_collision_%s' % (prefix, ob.data.name) )
+                    skeleton.dot_skeleton(child, path)
 
         if collisionPrim:
             e.setAttribute('collisionPrim', collisionPrim )

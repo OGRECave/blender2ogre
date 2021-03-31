@@ -1,14 +1,17 @@
-import mathutils
-import logging
-import time
-import bpy
+
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    # ...so we need to reload our submodule(s) using importlib
+    import importlib
+    if "config" in locals():
+        importlib.reload(config)
+
+# This is only relevant on first run, on later reloads those modules
+# are already in locals() and those statements do not do anything.
 from . import config
-import os
+from . report import Report
 from os.path import split, splitext
-import logging
-import subprocess
-import re
-import sys
+import bpy, logging, logging, mathutils, os, re, subprocess, sys, time
 
 logger = logging.getLogger('util')
 
@@ -64,6 +67,84 @@ def mesh_tool_parameters():
 def mesh_tool_version():
     return mesh_tool_parameters()[1]
 
+# Calls OgreMeshUpgrader to generate the LOD levels
+def lod_create(infile):
+    exe = config.get('OGRETOOLS_MESH_UPGRADER')
+
+    # OgreMeshUpgrader only works in tandem with OgreXMLConverter, which are both Ogre v1.x tools.
+    # For Ogre v2.x we will use OgreMeshTool to generate the LODs
+    if detect_converter_type() != "OgreXMLConverter":
+        return
+    
+    output_path, filename = os.path.split(infile)
+    
+    if not os.path.exists(infile):
+        logger.warn("Cannot find file mesh file: %s, unable to generate LOD" % filename)
+        Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
+        return
+    
+    # Extract converter type from its output
+    try:
+        exe_path, exe_name = os.path.split(exe)
+        proc = subprocess.Popen([exe], stdout=subprocess.PIPE, cwd=exe_path)
+        output, _ = proc.communicate()
+        output = output.decode('utf-8')
+    except:
+        output = ""
+    
+    # Check to see if the executable is actually OgreMeshUpgrader
+    if output.find("OgreMeshUpgrader") == -1:
+        logger.warn("Cannot find suitable OgreMeshUpgrader executable, unable to generate LOD")
+        return
+
+    cmd = [exe]
+
+    cmd.append('-l')
+    cmd.append(str(config.get('LOD_LEVELS')))
+    
+    cmd.append('-d')
+    cmd.append(str(config.get('LOD_DISTANCE')))
+
+    cmd.append('-p')
+    cmd.append(str(config.get('LOD_PERCENT')))
+
+    # Edge lists should be generated (or not) by mesh.py, not OgreMeshUpgrader
+    cmd.append('-e')
+
+    # Put logfile into output directory
+    use_logger = False
+    logfile = os.path.join(output_path, 'OgreMeshUpgrader.log')
+
+    # Check to see if the -log option is available in this OgreMeshUpgrader version
+    if output.find("-log") != -1:
+        use_logger = True
+        cmd.append('-log')
+        cmd.append(logfile)
+
+    # Finally, specify input file
+    cmd.append(infile)
+
+    logger.info("* Generating %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
+
+    # First try to execute with the -log option
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    output, error = proc.communicate()
+
+    if use_logger == False:
+        # If this OgreMeshUpgrader does not have -log then use python to write the output of stdout to a log file
+        with open(logfile, 'w') as log:
+            log.write(output)
+    
+    if proc.returncode != 0:
+        logger.warn("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
+        Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
+        if error != None:
+            logger.error(error)
+        logger.warn(output)
+    else:
+        logger.info("- Generated %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
+
+
 def detect_converter_type():
     # todo: executing the same exe twice might not be efficient but will do for now
     # (twice because version will be extracted later in xml_converter_parameters)
@@ -95,6 +176,7 @@ def xml_convert(infile, has_uvs=False):
         version = mesh_tool_version()
     elif converter_type == "unknown":
         logger.warn("Cannot find suitable OgreXMLConverter or OgreMeshTool executable")
+        Report.warnings.append("Cannot find suitable OgreXMLConverter or OgreMeshTool executable, binary mesh files won't be generated")
         return
 
     cmd = [exe]
@@ -131,36 +213,52 @@ def xml_convert(infile, has_uvs=False):
         cmd.append(infile)
 
         ret = subprocess.call(cmd)
-        assert ret == 0, "OgreXMLConverter failed"
+
+        # Instead of asserting, report an error
+        #assert ret == 0, "OgreXMLConverter failed"
+        if ret != 0:
+            logger.error("OgreXMLConverter returned with non-zero status, check OgreXMLConverter.log")
+            logger.info(" ".join(cmd))
+            Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
     else:
         # Convert to v2 format if required
         cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
 
+        # If requested by the user, generate LOD levels through OgreMeshUpgrader/OgreMeshTool
+        if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+            cmd.append('-l')
+            cmd.append(str(config.get('LOD_LEVELS')))
+            
+            cmd.append('-d')
+            cmd.append(str(config.get('LOD_DISTANCE')))
+
+            cmd.append('-p')
+            cmd.append(str(config.get('LOD_PERCENT')))
+
         # Finally, specify input file
         cmd.append(infile)
-
-        # Open log file to replace old logging feature that the new tool dropped
-        # The log file will be created along side the exported mesh
-        if config.get('EXPORT_ENABLE_LOGGING'):
-            logfile_path, name = os.path.split(infile)
-            logfile = open('%s/OgreMeshTool.log' %logfile_path, 'w')
-            logfile.write('%s\n' %cmd)
-
+        
         # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
         # otherwise it will complain about missing render system (missing plugins_tools.cfg)
         exe_path, name = os.path.split(exe)
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, cwd=exe_path)
-        if config.get('EXPORT_ENABLE_LOGGING'):
-            for line in proc.stdout:
-                logfile.write(line)
-        proc.wait()
+        output, error = proc.communicate()
 
-        # Close log file
+        # Open log file to replace old logging feature that the new tool dropped
+        # The log file will be created alongside the exported mesh
         if config.get('EXPORT_ENABLE_LOGGING'):
-            logfile.close()
+            logfile_path, name = os.path.split(infile)
+            logfile = os.path.join(logfile_path, 'OgreMeshTool.log')
+        
+            with open(logfile, 'w') as log:
+                log.write(output)
 
         # Check converter status
-        assert proc.returncode == 0, "OgreMeshTool failed"
+        #assert proc.returncode == 0, "OgreMeshTool failed"
+        if proc.returncode != 0:
+            logger.error("OgreMeshTool finished with non-zero status, check OgreMeshTool.log")
+            logger.info(" ".join(cmd))
+            Report.errors.append("OgreMeshTool finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
 
 def image_magick( image, origin_filepath, target_filepath ):
     exe = config.get('IMAGE_MAGICK_CONVERT')
@@ -220,7 +318,7 @@ def find_bone_index( ob, arm, groupidx): # sometimes the groups are out of order
             if bone.name == vg.name:
                 return i-j
     else:
-        logger.warn('Object vertex groups not in sync with armature', ob, arm, groupidx)
+        logger.warn('<%s> Object vertex groups (%s) not in sync with armature: %s', ob.name, groupidx, arm.name)
 
 def mesh_is_smooth( mesh ):
     for face in mesh.tessfaces:
@@ -371,7 +469,7 @@ def get_parent_matrix( ob, objects ):
             return get_parent_matrix(ob.parent, objects)
 
 def merge_group( group ):
-    logger.info('--------------- merge group ->', group.name )
+    logger.info('+ Merge Group: %s' % group.name )
     copies = []
     for ob in group.objects:
         if ob.type == 'MESH':
@@ -416,7 +514,7 @@ def merge( objects ):
     for ob in bpy.context.selected_objects:
         ob.select_set(False)
     for ob in objects:
-        logger.info('\t' + ob.name)
+        logger.info('  - %s' % ob.name)
         ob.select = True
         assert not ob.library
     #2.8update
@@ -434,7 +532,7 @@ def get_merge_group( ob, prefix='merge.' ):
         #    return
         return m[0]
     elif m:
-        logger.warn('An object can not be in two merge groups at the same time', ob)
+        logger.warn('An object can not be in two merge groups at the same time: %s' % ob.name)
         return
 
 def wordwrap( txt ):

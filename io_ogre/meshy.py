@@ -95,7 +95,7 @@ class OGREMESH_OT_preview(bpy.types.Operator):
             else:
                 subprocess.Popen([CONFIG['MESH_PREVIEWER'], 'C:\\tmp\\preview.mesh'] )
         except:
-            Report.messages.append('ERROR: Viewer not found at "%s"' % CONFIG['MESH_PREVIEWER'])
+            Report.errors.append('Viewer not found at "%s"' % CONFIG['MESH_PREVIEWER'])
 
         Report.show()
         return {'FINISHED'}
