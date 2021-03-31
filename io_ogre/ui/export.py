@@ -66,7 +66,7 @@ class _OgreCommonExport_(object):
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
-
+        
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
@@ -173,18 +173,22 @@ class _OgreCommonExport_(object):
         
         # Add a file handler to all Logger instances
         if config.get('EXPORT_ENABLE_LOGGING') == True:
-            log_file = ("%s\\blender2ogre.log" % target_path)
+            log_file = ("%s/blender2ogre.log" % target_path)
             logger.info("Writing log file to: %s" % log_file)
 
             file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
-            file_formatter = logging.Formatter(fmt='%(asctime)s [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+            
+            # Show the python file name from where each log message originated
+            SHOW_LOG_NAME = False
+            
+            if SHOW_LOG_NAME:
+                file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+            else:
+                file_formatter = logging.Formatter(fmt='%(asctime)s [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-            # Uncomment the following line to get the python module name in the logging
-            #file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
             file_handler.setFormatter(file_formatter)
 
             for logger_name in logging.Logger.manager.loggerDict.keys():
-                #print("Attach handler to %s" % logger_name)
                 logging.getLogger(logger_name).addHandler(file_handler)
 
         logger.info("Target_path: %s" % target_path)
@@ -225,12 +229,12 @@ class _OgreCommonExport_(object):
         items=config.AXIS_MODES,
         name='Swap Axis',
         description='Axis swapping mode',
-        default= config.get('SWAP_AXIS'))
+        default=config.get('SWAP_AXIS'))
     EX_V2_MESH_TOOL_EXPORT_VERSION = EnumProperty(
         items=config.MESH_EXPORT_VERSIONS,
         name='Mesh Export Version',
         description='Specify Ogre version format to write',
-        default=config.get('MESH_TOOL_EXPORT_VERSION') )
+        default=config.get('MESH_TOOL_EXPORT_VERSION'))
     
     # Scene
     EX_SCENE = BoolProperty(

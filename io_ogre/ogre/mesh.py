@@ -93,7 +93,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         with open(target_file, 'w') as f:
             f.flush()
     except Exception as e:
-        show_dialog("Invalid mesh object name: " + obj_name)
+        show_dialog("Invalid mesh object name: %s" % obj_name)
         return
 
     with open(target_file, 'w') as f:
@@ -153,10 +153,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         _face_indices_ = []
         numverts = 0
 
+        # Create bmesh to help obtain custom vertex normals
         bm = bmesh.new()
         if mesh.has_custom_normals:
             mesh.calc_normals_split()
-            # Create bmesh to help obtain custom vertex normals
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
         else:
@@ -425,6 +425,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                     # Check min vertice count and that the vertice count got reduced from last iteration
                     lod_mesh_vertices = len(lod_mesh.vertices)
+                    
                     if lod_mesh_vertices < lod_min_vertice_count:
                         logger.info('- LOD level: %s, vertice count: %s too small. Ignoring LOD.' % (level, lod_mesh_vertices))
                         break
@@ -454,7 +455,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     logger.info('- Generating: %s LOD meshes. Original: vertices %s, faces: %s' % (len(lod_generated), len(mesh.vertices), len(mesh.tessfaces)))
                     for lod in lod_generated:
                         ratio_percent = round(lod['ratio'] * 100.0, 0)
-                        logger.info("> Writing LOD %s for distance %s and ratio %s/100, with %s vertices, %s faces" % (lod['level'], lod['distance'], str(ratio_percent), len(lod['mesh'].vertices), len(lod['mesh'].tessfaces)))
+                        logger.info("- Writing LOD %s for distance %s and ratio %s/100, with %s vertices, %s faces" % (lod['level'], lod['distance'], str(ratio_percent), len(lod['mesh'].vertices), len(lod['mesh'].tessfaces)))
                         lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
                         lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
                         dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, tangents, isLOD=True)

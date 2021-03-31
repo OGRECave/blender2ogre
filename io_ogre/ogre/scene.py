@@ -484,8 +484,8 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                         break
                 if collisionFile:
                     mesh_collision_files[ ob.data.name ] = collisionFile
-                    mesh.dot_mesh(child, target_path, force_name='%s_collision_%s' % (prefix, ob.data.name) )
-                    skeleton.dot_skeleton(child, target_path)
+                    mesh.dot_mesh(child, path, force_name='%s_collision_%s' % (prefix, ob.data.name) )
+                    skeleton.dot_skeleton(child, path)
 
         if collisionPrim:
             e.setAttribute('collisionPrim', collisionPrim )

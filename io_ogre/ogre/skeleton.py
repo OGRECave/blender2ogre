@@ -14,7 +14,7 @@ if "bpy" in locals():
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.
-import bpy, mathutils, logging
+import bpy, mathutils, logging, time
 from .. import config
 from ..report import Report
 from ..xml import RDocument
@@ -43,11 +43,19 @@ def dot_skeleton(obj, path, **kwargs):
         name = kwargs.get('force_name') or obj.data.name
         name = util.clean_object_name(name)
         xmlfile = join(path, '%s.skeleton.xml' % name)
+        
+        logger.info('* Generating: %s.skeleton.xml' % name)
+
+        start = time.time()
+       
         with open(xmlfile, 'wb') as fd:
             fd.write( bytes(skel.to_xml(),'utf-8') )
 
         if kwargs.get('invoke_xml_converter', True):
             util.xml_convert( xmlfile )
+            
+        logger.info('- Done at %s seconds' % util.timer_diff_str(start))
+            
         return name + '.skeleton'
 
     return None
@@ -88,7 +96,7 @@ class Bone(object):
         self._inverse_total_trans_pose = pose.inverted()
         # calculate difference to parent bone
         if self.parent:
-            pose = self.parent._inverse_total_trans_pose* pose
+            pose = self.parent._inverse_total_trans_pose * pose
         elif self.fixUpAxis:
             pose = self.flipMat * pose
         else:
@@ -314,9 +322,9 @@ class Skeleton(object):
 
     def __init__(self, ob ):
         if ob.location.x != 0 or ob.location.y != 0 or ob.location.z != 0:
-            Report.warnings.append('ERROR: Mesh (%s): is offset from Armature - zero transform is required' % ob.name)
+            Report.warnings.append('Mesh (%s): is offset from Armature - zero transform is required' % ob.name)
         if ob.scale.x != 1 or ob.scale.y != 1 or ob.scale.z != 1:
-            Report.warnings.append('ERROR: Mesh (%s): has been scaled - scale(1,1,1) is required' % ob.name)
+            Report.warnings.append('Mesh (%s): has been scaled - scale(1,1,1) is required' % ob.name)
 
         self.object = ob
         self.bones = []
@@ -340,7 +348,7 @@ class Skeleton(object):
         #self.object_space_transformation = e.to_matrix().to_4x4()
         x,y,z = arm.matrix_local.to_euler()
         if x != 0 or y != 0 or z != 0:
-            Report.warnings.append('ERROR: Armature: %s is rotated - (rotation is ignored)' % arm.name)
+            Report.warnings.append('Armature: %s is rotated - (rotation is ignored)' % arm.name)
 
         ## setup bones for Ogre format ##
         for b in self.bones:

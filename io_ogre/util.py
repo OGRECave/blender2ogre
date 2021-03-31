@@ -99,23 +99,6 @@ def lod_create(infile):
 
     cmd = [exe]
 
-#Usage: OgreMeshUpgrader [opts] sourcefile [destfile]
-#-i             = Interactive mode, prompt for options
-#-autogen       = Generate autoconfigured LOD. No more LOD options needed!
-#-l lodlevels   = number of LOD levels
-#-d loddist     = distance increment to reduce LOD
-#-p lodpercent  = Percentage triangle reduction amount per LOD
-#-f lodnumtris  = Fixed vertex reduction per LOD
-#-e         = DON'T generate edge lists (for stencil shadows)
-#-t         = Generate tangents (for normal mapping)
-#-td [uvw|tangent]
-#           = Tangent vertex semantic destination (default tangent)
-#-ts [3|4]      = Tangent size (3 or 4 components, 4 includes parity, default 3)
-#-tm            = Split tangent vertices at UV mirror points
-#-tr            = Split tangent vertices where basis is rotated > 90 degrees
-#-r         = DON'T reorganise buffers to recommended format
-#-d3d       = Convert to argb colour format
-
     cmd.append('-l')
     cmd.append(str(config.get('LOD_LEVELS')))
     
@@ -151,8 +134,6 @@ def lod_create(infile):
         # If this OgreMeshUpgrader does not have -log then use python to write the output of stdout to a log file
         with open(logfile, 'w') as log:
             log.write(output)
-
-    #assert proc.returncode == 0, "OgreMeshUpgrader failed"
     
     if proc.returncode != 0:
         logger.warn("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
@@ -232,7 +213,12 @@ def xml_convert(infile, has_uvs=False):
         cmd.append(infile)
 
         ret = subprocess.call(cmd)
-        assert ret == 0, "OgreXMLConverter failed"
+
+        # Instead of asserting, report an error
+        if ret != 0:
+            logger.error("OgreXMLConverter returned with non-zero status, check OgreXMLConverter.log")
+            logger.info(" ".join(cmd))
+            Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
     else:
         # Convert to v2 format if required
         cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
@@ -250,7 +236,7 @@ def xml_convert(infile, has_uvs=False):
 
         # Finally, specify input file
         cmd.append(infile)
-
+        
         # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
         # otherwise it will complain about missing render system (missing plugins_tools.cfg)
         exe_path, name = os.path.split(exe)
@@ -267,7 +253,10 @@ def xml_convert(infile, has_uvs=False):
                 log.write(output)
 
         # Check converter status
-        assert proc.returncode == 0, "OgreMeshTool failed"
+        if proc.returncode != 0:
+            logger.error("OgreMeshTool finished with non-zero status, check OgreMeshTool.log")
+            logger.info(" ".join(cmd))
+            Report.errors.append("OgreMeshTool finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
 
 def image_magick( texture, origin_filepath, target_filepath ):
     exe = config.get('IMAGE_MAGICK_CONVERT')
@@ -402,7 +391,7 @@ def texture_image_path(tex):
         image_filepath = bpy.path.abspath(tex.image.filepath, libpath)
     else:
         if tex.image.packed_file:
-            return tex.image.name+".png"
+            return tex.image.name + ".png"
 
         return bpy.path.abspath( tex.image.filepath )
 
