@@ -43,8 +43,8 @@ def auto_register(register):
     yield from export.auto_register(register)
     yield from helper.auto_register(register)
 
-    if register and config.get('interface_toggle'):
-        OGRE_OP_interface_toggle.toggle(True)
+    if register and config.get('INTERFACE_TOGGLE'):
+        OP_interface_toggle.toggle(True)
 
 """
 General purpose ui elements
@@ -62,11 +62,11 @@ class OGRE_OP_interface_toggle(bpy.types.Operator):
         return True
 
     def invoke(self, context, event):
-        show = config.get('interface_toggle')
+        show = config.get('INTERFACE_TOGGLE')
         print("toggle invoked:", show)
         print(dir(event))
         self.toggle(not show)
-        config.update(interface_toggle=not show)
+        config.update(INTERFACE_TOGGLE=not show)
         return {'FINISHED'}
 
     @classmethod
@@ -85,7 +85,7 @@ class OGRE_HT_toggle_ogre(bpy.types.Header):
 
     def draw(self, context):
         layout = self.layout
-        show = config.get('interface_toggle')
+        show = config.get('INTERFACE_TOGGLE')
         icon = 'CHECKBOX_DEHLT'
         if show:
             icon = 'CHECKBOX_HLT'

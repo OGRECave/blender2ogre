@@ -64,7 +64,7 @@ _CONFIG_DEFAULTS_ALL = {
     'GENERATE_EDGE_LISTS' : False,
     'GENERATE_TANGENTS' : "0",
     'OPTIMISE_ANIMATIONS' : True,
-    'interface_toggle': False,
+    'INTERFACE_TOGGLE': False,
     'OPTIMISE_VERTEX_BUFFERS' : True,
     'OPTIMISE_VERTEX_BUFFERS_OPTIONS' : 'puqs',
     
@@ -72,6 +72,7 @@ _CONFIG_DEFAULTS_ALL = {
     'LOD_LEVELS' : 0,
     'LOD_DISTANCE' : 300,
     'LOD_PERCENT' : 40,
+    'LOD_MESH_TOOLS' : False,
     
     # Pose Animation
     'SHAPE_ANIMATIONS' : True,
@@ -85,14 +86,15 @@ _CONFIG_DEFAULTS_ALL = {
     'TUNDRA_STREAMING' : True
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
 
 ''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
     Ogre tools and Tundra from various default folders. Also consider making a installer that
     ships Ogre cmd line tools to ease the setup steps for end users. '''
 
 _CONFIG_DEFAULTS_WINDOWS = {
-    'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXmlConverter.exe',
+    'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXMLConverter.exe',
+    'OGRETOOLS_MESH_UPGRADER' : 'C:\\OgreCommandLineTools\\OgreMeshUpgrader.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'TUNDRA_ROOT' : 'C:\\Tundra2',
     'MESH_PREVIEWER' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
@@ -106,6 +108,7 @@ _CONFIG_DEFAULTS_UNIX = {
     # just trust the env PATH variable
     'IMAGE_MAGICK_CONVERT' : 'convert',
     'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
+    'OGRETOOLS_MESH_UPGRADER' : 'OgreMeshUpgrader',
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'TUNDRA_ROOT' : '~/Tundra2',
     'MESH_PREVIEWER' : 'ogre-meshviewer',
@@ -160,10 +163,16 @@ def load_config():
             registry_key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r'Software\blender2ogre', 0, winreg.KEY_READ)
             exe_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
             if exe_install_dir != "":
-                # OgreXmlConverter
+                # OgreXMLConverter
+                if os.path.isfile(exe_install_dir + "OgreXMLConverter.exe"):
+                    logger.info ("Using OgreXMLConverter from install path: %sOgreXMLConverter.exe" % exe_install_dir)
+                    config_dict['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXMLConverter.exe"
+
+                # OgreMeshUpgrader
                 if os.path.isfile(exe_install_dir + "OgreXmlConverter.exe"):
-                    logger.info ("Using OgreXmlConverter from install path: %sOgreXmlConverter.exe" % exe_install_dir)
-                    config_dict['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXmlConverter.exe"
+                    logger.info ("Using OgreMeshUpgrader from install path: %sOgreMeshUpgrader.exe" % exe_install_dir)
+                    config_dict['OGRETOOLS_MESH_UPGRADER'] = exe_install_dir + "OgreMeshUpgrader.exe"
+
                 # Run auto updater as silent. Notifies user if there is a new version out.
                 # This will not show any UI if there are no update and will go to network
                 # only once per 2 days so it wont be spending much resources either.
