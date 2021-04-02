@@ -29,7 +29,7 @@ class ReportSingleton(object):
 
     def report(self):
         r = ['Report:']
-        ex = ['Extended Report:']
+        ex = ['\nExtended Report:']
         if self.errors:
             r.append( '  ERRORS:' )
             for a in self.errors: r.append( '    - %s' %a )

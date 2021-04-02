@@ -29,6 +29,7 @@ _CONFIG_DEFAULTS_ALL = {
     # General
     'SWAP_AXIS' : 'xyz', # ogre standard is 'xz-y', but swapping is currently broken
     'MESH_TOOL_EXPORT_VERSION' : 'v2',
+    'XML_DELETE' : True,
     
     # Scene
     'SCENE' : True,

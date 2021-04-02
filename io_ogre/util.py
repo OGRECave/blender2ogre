@@ -220,6 +220,12 @@ def xml_convert(infile, has_uvs=False):
             logger.error("OgreXMLConverter returned with non-zero status, check OgreXMLConverter.log")
             logger.info(" ".join(cmd))
             Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
+        
+        # Clean up .xml file after successful conversion
+        if ret == 0 and config.get('XML_DELETE') == True:
+            logger.info("Removing generated xml file after conversion: %s" % infile)
+            os.remove(infile)
+        
     else:
         # Convert to v2 format if required
         cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
@@ -259,6 +265,11 @@ def xml_convert(infile, has_uvs=False):
             logger.error("OgreMeshTool finished with non-zero status, check OgreMeshTool.log")
             logger.info(" ".join(cmd))
             Report.errors.append("OgreMeshTool finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
+
+        # Clean up .xml file after successful conversion
+        if proc.returncode == 0 and config.get('XML_DELETE') == True:
+            logger.info("Removing generated xml file after conversion: %s" % infile)
+            os.remove(infile)
 
 def image_magick( image, origin_filepath, target_filepath ):
     exe = config.get('IMAGE_MAGICK_CONVERT')
