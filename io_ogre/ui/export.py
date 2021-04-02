@@ -90,7 +90,7 @@ class _OgreCommonExport_(object):
         
         # Options associated with each section
         section_options = {
-            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_EXPORT_VERSION"], 
+            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_EXPORT_VERSION", "EX_XML_DELETE"], 
             "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS"], 
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
@@ -235,6 +235,10 @@ class _OgreCommonExport_(object):
         name='Mesh Export Version',
         description='Specify Ogre version format to write',
         default=config.get('MESH_TOOL_EXPORT_VERSION')) = {}
+    EX_XML_DELETE : BoolProperty(
+        name="Clean up xml files",
+        description="Remove the generated xml files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finish successfully)",
+        default=config.get('XML_DELETE')) = {}
     
     # Scene
     EX_SCENE : BoolProperty(
@@ -319,7 +323,7 @@ class _OgreCommonExport_(object):
         name="Export Meshes (overwrite)",
         description="Export meshes (overwrite existing files)",
         default=config.get('MESH_OVERWRITE')) = {}
-        
+
     # This is actually implemented as if EX_ARRAY=True always, there is not an actual choice possible
     #EX_ARRAY : BoolProperty(
     #    name="Optimise Arrays",
