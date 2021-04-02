@@ -515,7 +515,7 @@ def merge( objects ):
         ob.select_set(False)
     for ob in objects:
         logger.info('  - %s' % ob.name)
-        ob.select = True
+        ob.select_set(True)
         assert not ob.library
     #2.8update
     bpy.context.view_layer.objects.active = ob
