@@ -25,8 +25,8 @@ logger = logging.getLogger('skeleton')
 
 def dot_skeleton(obj, path, **kwargs):
     """
-    create the .skeleton file for this object. This is only possible if the object
-    has an armature attached.
+    Create the .skeleton file for this object. 
+    This is only possible if the object has an armature attached.
 
     obj: the blender object
     path: the path where to save this to. Never None and must exist.
@@ -223,7 +223,7 @@ class Keyframe:
         
 # Bone_Track
 # Encapsulates all of the key information for an individual bone within a single animation,
-# and srores that information as XML.
+# and stores that information as XML.
 class Bone_Track:
     def __init__(self, bone):
         self.bone = bone
