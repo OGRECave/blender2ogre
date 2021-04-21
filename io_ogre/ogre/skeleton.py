@@ -25,8 +25,8 @@ logger = logging.getLogger('skeleton')
 
 def dot_skeleton(obj, path, **kwargs):
     """
-    create the .skeleton file for this object. This is only possible if the object
-    has an armature attached.
+    Create the .skeleton file for this object. 
+    This is only possible if the object has an armature attached.
 
     obj: the blender object
     path: the path where to save this to. Never None and must exist.

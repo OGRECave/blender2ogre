@@ -38,6 +38,8 @@ _CONFIG_DEFAULTS_ALL = {
     #'EXPORT_USER' : True,
     'FORCE_CAMERA' : True,
     'FORCE_LAMPS' : True,
+    'NODE_ANIMATION' : True,
+    #'NODE_KEYFRAMES' : False,
     
     # Materials
     'MATERIALS' : True,
