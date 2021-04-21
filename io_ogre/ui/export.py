@@ -91,7 +91,7 @@ class _OgreCommonExport_(object):
         # Options associated with each section
         section_options = {
             "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_EXPORT_VERSION", "EX_XML_DELETE"], 
-            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS"], 
+            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"], 
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
             "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
@@ -265,6 +265,17 @@ class _OgreCommonExport_(object):
         name="Force Lamps",
         description="Export all Lamps",
         default=config.get('FORCE_LAMPS')) = {}
+    EX_NODE_ANIMATION : BoolProperty(
+        name="Export Node Animations",
+        description="Export Node Animations, these are animations of the objects properties like position, rotation and scale",
+        default=config.get('NODE_ANIMATION')) = {}
+#    EX_NODE_KEYFRAMES : BoolProperty(
+#        name="Only write Node Keyframes",
+#        description="""The default behaviour when exporting Node Animations is to write every keyframe.
+#Select this option if you want to have more control of the Node Animation in your Ogre application
+#Don't select this option if you have any fine tuning of the F-Curves in Blender, since they won't get exported.
+#NOTE: Node Animations based on the 'Follow Path' constraint will most likely fail with this option set to True.""",
+#        default=config.get('NODE_KEYFRAMES')) = {}
     
     # Materials
     EX_MATERIALS : BoolProperty(

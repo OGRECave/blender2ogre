@@ -5,6 +5,8 @@ if "bpy" in locals():
     import importlib
     if "material" in locals():
         importlib.reload(material)
+    if "node_anim" in locals():
+        importlib.reload(node_anim)
     if "mesh" in locals():
         importlib.reload(mesh)
     if "skeleton" in locals():
@@ -23,6 +25,7 @@ if "bpy" in locals():
 import bpy, mathutils, os, getpass, math
 from os.path import join
 from . import material
+from . import node_anim
 from . import mesh
 from . import skeleton
 from .. import bl_info
@@ -53,6 +56,12 @@ def dot_scene(path, scene_name=None):
 
     logger.info("* Processing Scene: %s, path: %s" % (scene_name, path))
     prefix = scene_name
+
+    # If an object has an animation, then we want to export the position at the first frame (with the object at rest)
+    # Otherwise the objects position will be at an arbitrary place if current frame is different from frame_start
+    frame_start = bpy.context.scene.frame_start
+    frame_current = bpy.context.scene.frame_current
+    bpy.context.scene.frame_set(frame_start)
 
     # Nodes (objects) - gather because macros will change selection state
     objects = []
@@ -196,6 +205,9 @@ def dot_scene(path, scene_name=None):
         #bpy.context.collection.objects.unlink( ob )
         bpy.data.objects.remove(ob)
 
+    # Restore the scene previous frame position
+    bpy.context.scene.frame_set(frame_current)
+
 class _WrapLogic(object):
     SwapName = { 'frame_property' : 'animation' } # custom name hacks
 
@@ -311,47 +323,48 @@ def _mesh_entity_helper(doc, ob, o):
             _property_helper(doc, user, propname, propvalue)
 
 def _ogre_node_helper( doc, ob, prefix='', pos=None, rot=None, scl=None ):
+
+    # Get the object transform matrix
     mat = ob.matrix_local
 
     o = doc.createElement('node')
-    o.setAttribute('name',prefix+ob.name)
-    p = doc.createElement('position')
-    q = doc.createElement('rotation')       #('quaternion')
-    s = doc.createElement('scale')
-    for n in (p,q,s):
-        o.appendChild(n)
+    o.setAttribute('name', prefix + ob.name)
 
     if pos:
         v = swap(pos)
     else:
         v = swap( mat.to_translation() )
-    p.setAttribute('x', '%6f'%v.x)
-    p.setAttribute('y', '%6f'%v.y)
-    p.setAttribute('z', '%6f'%v.z)
+    p = doc.createElement('position')
+    p.setAttribute('x', '%6f' % v.x)
+    p.setAttribute('y', '%6f' % v.y)
+    p.setAttribute('z', '%6f' % v.z)
+    o.appendChild(p)
 
     if rot:
         v = swap(rot)
     else:
         v = swap( mat.to_quaternion() )
-    q.setAttribute('qx', '%6f'%v.x)
-    q.setAttribute('qy', '%6f'%v.y)
-    q.setAttribute('qz', '%6f'%v.z)
-    q.setAttribute('qw','%6f'%v.w)
+    q = doc.createElement('rotation')   #('quaternion')
+    q.setAttribute('qx', '%6f' % v.x)
+    q.setAttribute('qy', '%6f' % v.y)
+    q.setAttribute('qz', '%6f' % v.z)
+    q.setAttribute('qw', '%6f' % v.w)
+    o.appendChild(q)
 
-    if scl:        # this should not be used
+    if scl:     # this should not be used
         v = swap(scl)
         x=abs(v.x); y=abs(v.y); z=abs(v.z)
-        s.setAttribute('x', '%6f'%x)
-        s.setAttribute('y', '%6f'%y)
-        s.setAttribute('z', '%6f'%z)
-    else:        # scale is different in Ogre from blender - rotation is removed
+    else:       # scale is different in Ogre from blender - rotation is removed
         ri = mat.to_quaternion().inverted().to_matrix()
         scale = ri.to_4x4() @ mat
         v = swap( scale.to_scale() )
         x=abs(v.x); y=abs(v.y); z=abs(v.z)
-        s.setAttribute('x', '%6f'%x)
-        s.setAttribute('y', '%6f'%y)
-        s.setAttribute('z', '%6f'%z)
+    s = doc.createElement('scale')
+    s.setAttribute('x', '%6f' % x)
+    s.setAttribute('y', '%6f' % y)
+    s.setAttribute('z', '%6f' % z)
+    o.appendChild(s)
+
     return o
 
 def ogre_document(materials):
@@ -393,25 +406,25 @@ def ogre_document(materials):
         _c = [ ('colourBackground', world.color)]
         for ctag, color in _c:
             a = doc.createElement(ctag); environ.appendChild( a )
-            a.setAttribute('r', '%s'%color.r)
-            a.setAttribute('g', '%s'%color.g)
-            a.setAttribute('b', '%s'%color.b)
+            a.setAttribute('r', '%3f' % color.r)
+            a.setAttribute('g', '%3f' % color.g)
+            a.setAttribute('b', '%3f' % color.b)
 
     if world and world.mist_settings.use_mist:
         a = doc.createElement('fog'); environ.appendChild( a )
-        a.setAttribute('linearStart', '%s'%world.mist_settings.start )
+        a.setAttribute('linearStart', '%6f' % world.mist_settings.start )
         mist_falloff = world.mist_settings.falloff
         if mist_falloff == 'QUADRATIC': a.setAttribute('mode', 'exp')    # on DTD spec (none | exp | exp2 | linear)
         elif mist_falloff == 'LINEAR': a.setAttribute('mode', 'linear')
         else: a.setAttribute('mode', 'exp2')
         #a.setAttribute('mode', world.mist_settings.falloff.lower() )    # not on DTD spec
-        a.setAttribute('linearEnd', '%s' %(world.mist_settings.start+world.mist_settings.depth))
+        a.setAttribute('linearEnd', '%6f' % (world.mist_settings.start + world.mist_settings.depth))
         a.setAttribute('expDensity', world.mist_settings.intensity)
 
         c = doc.createElement('colourDiffuse'); a.appendChild( c )
-        c.setAttribute('r', '%s'%color.r)
-        c.setAttribute('g', '%s'%color.g)
-        c.setAttribute('b', '%s'%color.b)
+        c.setAttribute('r', '%3f' % color.r)
+        c.setAttribute('g', '%3f' % color.g)
+        c.setAttribute('b', '%3f' % color.b)
 
     return doc
 
@@ -559,13 +572,13 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             # fov in radians - like OgreMax - requested by cyrfer
             fov = math.radians( fovY*180.0/math.pi )
             c.setAttribute('projectionType', "perspective")
-            c.setAttribute('fov', '%s'%fov)
+            c.setAttribute('fov', '%6f' % fov)
         else: # ob.data.type == "ORTHO":
             c.setAttribute('projectionType', "orthographic")
-            c.setAttribute('orthoScale', '%s'%ob.data.ortho_scale)
+            c.setAttribute('orthoScale', '%6f' % ob.data.ortho_scale)
         a = doc.createElement('clipping'); c.appendChild( a )
-        a.setAttribute('near', '%s' %ob.data.clip_start)    # requested by cyrfer
-        a.setAttribute('far', '%s' %ob.data.clip_end)
+        a.setAttribute('near', '%6f' % ob.data.clip_start)    # requested by cyrfer
+        a.setAttribute('far', '%6f' % ob.data.clip_end)
 
     elif ob.type == 'LAMP' and ob.data.type in 'POINT SPOT SUN'.split():
         Report.lights.append( ob.name )
@@ -584,15 +597,15 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
         if ob.data.use_diffuse:
             a = doc.createElement('colourDiffuse'); l.appendChild( a )
-            a.setAttribute('r', '%s'%ob.data.color.r)
-            a.setAttribute('g', '%s'%ob.data.color.g)
-            a.setAttribute('b', '%s'%ob.data.color.b)
+            a.setAttribute('r', '%3f' % ob.data.color.r)
+            a.setAttribute('g', '%3f' % ob.data.color.g)
+            a.setAttribute('b', '%3f' % ob.data.color.b)
 
         if ob.data.use_specular:
             a = doc.createElement('colourSpecular'); l.appendChild( a )
-            a.setAttribute('r', '%s'%ob.data.color.r)
-            a.setAttribute('g', '%s'%ob.data.color.g)
-            a.setAttribute('b', '%s'%ob.data.color.b)
+            a.setAttribute('r', '%3f' % ob.data.color.r)
+            a.setAttribute('g', '%3f' % ob.data.color.g)
+            a.setAttribute('b', '%3f' % ob.data.color.b)
 
         if ob.data.type == 'SPOT':
             a = doc.createElement('lightRange')
@@ -602,11 +615,15 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             a.setAttribute('falloff','1.0')
 
         a = doc.createElement('lightAttenuation'); l.appendChild( a )
-        a.setAttribute('range', '5000' )            # is this an Ogre constant?
-        a.setAttribute('constant', '1.0')        # TODO support quadratic light
-        a.setAttribute('linear', '%s'%(1.0/ob.data.distance))
+        a.setAttribute('range', '5000' )        # is this an Ogre constant?
+        a.setAttribute('constant', '1.0')       # TODO support quadratic light
+        a.setAttribute('linear', '%6f' % (1.0 / ob.data.distance))
         a.setAttribute('quadratic', '0.0')
 
+    # Node Animation
+    if config.get('NODE_ANIMATION'):
+        node_anim.dot_nodeanim(ob, doc, o)
+    
     for child in ob.children:
         dot_scene_node_export( child,
             path, doc = doc, rex = rex,
@@ -618,4 +635,3 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             objects=objects,
             xmlparent=o
         )
-
