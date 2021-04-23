@@ -13,7 +13,8 @@
 	- [Console Export](#console-export)
 	- [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
 	- [Exporting Particle Systems](#exporting-particle-systems)
-	- [Creating Shape (or Pose) Animations](#creating-shape-animations)
+	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
+	- [Exporting Node Animations](#exporting-node-animations)
  - [About](#about)
  - [Authors](#authors)
 
@@ -149,11 +150,15 @@ material none {
 A common technique for laying out random objects on a scene in Blender is to use the Particle System. 
 Check out the [Particle System README](ParticleSystem.md) to see how to create and export a scene where the trees, foliage and rocks are distributed randomly using a particle system.
 
-### Creating Shape Animations
+### Exporting Shape Animations
 ![shape-animations4.png](images/shape-animations4.png)
 
 Shape (or Pose) Animations allow animating different poses, a technique commonly used to do face animations.
 Check out the [Shape Animations](ShapeAnimations.md) tutorial to see how to create some poses and animate them. Then you can use `blender2ogre` to export the poses and animations into a `.mesh` file.
+
+### Exporting Node Animations
+Node Animations are a way to have scripted node animations in your Ogre application.
+Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
 
 ## About
 
