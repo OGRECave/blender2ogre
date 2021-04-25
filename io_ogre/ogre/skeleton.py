@@ -223,7 +223,7 @@ class Keyframe:
         
 # Bone_Track
 # Encapsulates all of the key information for an individual bone within a single animation,
-# and srores that information as XML.
+# and stores that information as XML.
 class Bone_Track:
     def __init__(self, bone):
         self.bone = bone
