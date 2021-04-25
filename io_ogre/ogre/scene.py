@@ -565,7 +565,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             else:
                 logger.warn("<%s> Particle System %s is not supported for export (should be of type: 'Hair' and render_type: 'Object')" % (ob.name, partsys.name))
                 Report.warnings.append("Object \"%s\" has Particle System: \"%s\" not supported for export (should be of type: 'Hair' and render_type: 'Object')" % (ob.name, partsys.name))
-        
+
     elif ob.type == 'CAMERA':
         Report.cameras.append( ob.name )
         c = doc.createElement('camera')

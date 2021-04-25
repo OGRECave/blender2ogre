@@ -361,9 +361,9 @@ class Skeleton(object):
                 b.compute_rest()
                 loc,rot,scl = b.ogre_rest_matrix.decompose()
                 #if loc.x or loc.y or loc.z:
-                #    Report.warnings.append('ERROR: root bone has non-zero transform (location offset)')
+                #    Report.errors.append('Root bone has non-zero transform (location offset)')
                 #if rot.w > ep or rot.x > ep or rot.y > ep or rot.z < 1.0-ep:
-                #    Report.warnings.append('ERROR: root bone has non-zero transform (rotation offset)')
+                #    Report.errors.append('Root bone has non-zero transform (rotation offset)')
                 self.roots.append( b )
 
     def write_animation( self, arm, actionName, frameBegin, frameEnd, doc, parentElement ):
