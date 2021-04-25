@@ -83,7 +83,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         for mod in rem: copy.modifiers.remove( mod )
     else:
         copy = ob
-    
+
     # bake mesh
     mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")
 

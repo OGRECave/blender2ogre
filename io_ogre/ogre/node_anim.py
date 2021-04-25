@@ -38,6 +38,11 @@ def dot_nodeanim(ob, doc, xmlnode):
     doc: the parent xml node to attach the animation data
     """
 
+    # Do not process node animations for Armatures (to avoid setting spurious rotations on the armature which causes problems with SeletalAnimation)
+    # To have a node animation in combination with an Armature, it should be parented to an Empty and have the Empty animated
+    if ob.type == 'ARMATURE':
+        return
+
     anim = ob.animation_data
     
     if anim is None or anim.nla_tracks is None:
@@ -109,6 +114,7 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
     
     initial_location = mathutils.Vector((0, 0, 0))
     initial_rotation = mathutils.Quaternion((1, 0, 0, 0))
+    initial_scale = mathutils.Vector((1, 1, 1))
     
     frames = range(int(frame_start), int(frame_end) + 1)
     
@@ -126,13 +132,20 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
         
         translation = mathutils.Vector((0, 0, 0))
         rotation_quat = mathutils.Quaternion((1, 0, 0, 0))
+        scale = mathutils.Vector((1, 1, 1))
 
         if frame == frame_start:
             initial_location = util.swap( ob.matrix_local.to_translation() )
             initial_rotation = util.swap( ob.matrix_local.to_quaternion() )
+            initial_scale = calc_scale( ob.matrix_local )
+
         else:
             translation = util.swap( ob.matrix_local.to_translation() ) - initial_location
             rotation_quat = initial_rotation.rotation_difference( util.swap( ob.matrix_local.to_quaternion() ) )
+            current_scale = calc_scale( ob.matrix_local )
+            scale.x = current_scale.x / initial_scale.x
+            scale.y = current_scale.y / initial_scale.y
+            scale.z = current_scale.z / initial_scale.z
         
         t = doc.createElement('position')
         t.setAttribute("x", '%6f' % translation.x)
@@ -148,17 +161,20 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
         kf.appendChild(q)
         
         s = doc.createElement('scale')
-        # Scale is different in Ogre from blender - rotation is removed
-        ri = ob.matrix_local.to_quaternion().inverted().to_matrix()
-        scale = ri.to_4x4() * ob.matrix_local
-        v = util.swap( scale.to_scale() )
-        x=abs(v.x); y=abs(v.y); z=abs(v.z)
-        s.setAttribute("x", '%6f' % x)
-        s.setAttribute("y", '%6f' % y)
-        s.setAttribute("z", '%6f' % z)
+        s.setAttribute("x", '%6f' % scale.x)
+        s.setAttribute("y", '%6f' % scale.y)
+        s.setAttribute("z", '%6f' % scale.z)
         kf.appendChild(s)
         
     bpy.context.scene.frame_set(frame_current)
+
+def calc_scale(matrix_local):
+    # Scale is different in Ogre from blender - rotation is removed
+    ri = matrix_local.to_quaternion().inverted().to_matrix()
+    scale = ri.to_4x4() * matrix_local
+    v = util.swap( scale.to_scale() )
+    
+    return mathutils.Vector((abs(v.x), abs(v.y), abs(v.z)))
 
 def get_keyframes(action):
 
