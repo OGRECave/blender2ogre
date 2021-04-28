@@ -4,7 +4,7 @@
 ## Introduction
 It is possible to export some animated properties of objects in Blender, that is: location, rotation and scale.
 
-This results in what is called SceneNode Animation (https://ogrecave.github.io/ogre/api/1.12/_animation.html#SceneNode-Animation) in Ogre.
+This results in what is called SceneNode Animation (https://ogrecave.github.io/ogre/api/latest/_animation.html#SceneNode-Animation) in Ogre.
 
 This kind of SceneNode animation is very useful to animate the movement of a camera, a character patrolling in a game and any other kind of animation one can think of.
 
@@ -174,8 +174,8 @@ Consult the Ogre manual for further information:
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_manager.html
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_animation_state.html
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_node.html
- - https://ogrecave.github.io/ogre/api/1.12/class_ogre_1_1_controller_manager.html
- - https://ogrecave.github.io/ogre/api/1.12/class_ogre_1_1_controller.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller_manager.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller.html
 
 ## Troubleshooting
 Some tips for troubleshooting:
