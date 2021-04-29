@@ -58,16 +58,27 @@ Ogre::SceneNode* cubeNode = mSceneMgr->getRootSceneNode()->createChildSceneNode(
 cubeNode->attachObject(cube);
 ```
 
-Get the AnimationState, enable it and set the starting position
+Get the AnimationState, enable it and set the starting time position
 ```
-mAnimationState = cube->getAnimationState("KeyAction");
-mAnimationState->setEnabled(true);
-mAnimationState->setTimePosition(0);
-```
-
-Then you need to `addTime()` to the `AnimationState` somewhere in `frameRenderingQueued(const Ogre::FrameEvent& evt)` or your engine loop.
-```
-mAnimationState->addTime(evt.timeSinceLastFrame);
+auto animationState = cube->getAnimationState("KeyAction");
+animationState->setEnabled(true);
+animationState->setTimePosition(0);
 ```
 
-For more information, please take a look at section [Vertex-Animation](https://ogrecave.github.io/ogre/api/1.12/_animation.html#Vertex-Animation) in the manual.
+Then you need to `addTime()` to the *AnimationState*, we will use a controller for that.
+```
+auto& controllerMgr = Ogre::ControllerManager::getSingleton();
+
+// Create a controller to pass the frame time to the Animation State, otherwise the animation won't play
+// (this is a better method than using animationState->addTime() in your main loop)
+controllerMgr.createFrameTimePassthroughController(Ogre::AnimationStateControllerValue::create(animationState, true));
+```
+
+For more information, please take a look at section [Vertex-Animation](https://ogrecave.github.io/ogre/api/latest/_animation.html#Vertex-Animation) in the manual.
+
+And also consult the Ogre API manual:
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_manager.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_animation_state.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_node.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller_manager.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller.html
