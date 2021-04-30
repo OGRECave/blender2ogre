@@ -33,12 +33,10 @@ The following versions of blender have been tested. It might also work with olde
 For OGRE v2.1 meshes, use OgreMeshTool from Ogre 2 build for `OGRETOOLS_XML_CONVERTER`
 
 ## Updating to new versions ##
-
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
 [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/config/scripts/blender2ogre.pickle` and restart blender.
 
 ## Video Tutorials
-
 * [General Usage](http://www.youtube.com/watch?feature=player_embedded&v=3EpwEsB0_kk)
 * [Animations](http://www.youtube.com/watch?feature=player_embedded&v=5oVM0Lmeb68)
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
@@ -46,12 +44,10 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 ## Additional Features
 
 ### Merge Objects on export
-
 You might have hundrets of objects, which you want to keep separate but have them in one `.mesh` on export.
 For this create a new group (Ctrl+G) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the group.
 
 ### External OGRE Materials
-
 You might already have some materials in OGRE that you do not want to export.
 Prefix them with `extern.<yourname>` and the sub entity will have the material name set,
 but the material is not exported. The following material 'vertexcolor' can be defined in
@@ -60,7 +56,6 @@ your OGRE project:
 ![extern-material.png](images/extern-material.png)
 
 ### Console Export
-
 You might have several blender files in your project you want to export to Ogre. Do this by hand? NO! You can do better! After all, you have build scripts to compile your source code? Why not export your files automated?
 Here is how you can export a scene with blender2ogre. Take a look at [io_ogre/console.py](io_ogre/console.py). You might want to write your own script for your project to export individual objects.
 
@@ -89,7 +84,6 @@ abc.scene  Cube.mesh  Cube.mesh.xml  Material.material
 ```
 
 ### Exporting Custom Vertex Groups
-
 As shown in the picture below, you can now export SubEntities that contain
 a user defined amount of faces.
 
@@ -145,6 +139,13 @@ material none {
 }
 ```
 
+### Exporting Skeletal Animations
+![skeletal-animations.png](images/skeletal-animations.png)
+
+Skeletal Animation refers to the technique of using bones to deform a mesh as if the mesh were the skin.
+This kind of animation is commonly used to animate characters in videogames.
+Check out the [Skeletal Animations README](SkeletalAnimation.md) to see how to create and export an animated mesh.
+
 ### Exporting Particle Systems
 ![particle-system5.png](images/particle-system5.png)
 
@@ -162,14 +163,12 @@ Node Animations are a way to have scripted node animations in your Ogre applicat
 Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
 
 ## About
-
 [The original version of this](https://bitbucket.org/iboshkov/blender2ogre) was a *single* monolithic Python file.
 This is not maintainable, and contains a tremendous amount of bugs. There was the need to export blender model to ogre from
 the console, thus I rewrote the whole script and split it into several files.
 It has been well tested on linux 64-bit and should work with others.
 
 ## Authors
-
 This Blender addon was made possible by the following list of people. Anyone can contribute to the project by sending bug reports and feature requests [here](https://github.com/OGRECave/blender2ogre/issues). Naturally the most welcome contribution is actual code via [pull requests](https://github.com/OGRECave/blender2ogre/pulls). If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. So that there is no overlap with other developers or the overall roadmap.
  
 * [Brett](http://pyppet.blogspot.fi/)
@@ -186,4 +185,3 @@ This Blender addon was made possible by the following list of people. Anyone can
 Additionally the following companies have supported/sponsored the development efforts.
 
 * [Adminotech Ltd.](http://www.meshmoon.com/)
-
