@@ -162,7 +162,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bm.verts.ensure_lookup_table()
         else:
             bm.from_mesh(mesh)
-        
+
         # Ogre only supports triangles
         bmesh_return = bmesh.ops.triangulate(bm, faces=bm.faces)
         bm.to_mesh(mesh)
@@ -592,7 +592,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                     if config.get('SHAPE_NORMALS'):
                         n = _remap_normals_[ vidx ]
-                        
+
                         if smooth:
                             pn = mathutils.Vector( [snormals[ v.index * 3 + 0 ], snormals[ v.index * 3 + 1 ], snormals[ v.index * 3 + 2 ]] )
                         else:
