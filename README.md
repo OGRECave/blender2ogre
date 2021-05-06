@@ -12,6 +12,7 @@
 	- [External OGRE Materials](#external-ogre-materials)
 	- [Console Export](#console-export)
 	- [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
+	- [Exporting Skeletal Animations](#exporting-skeletal-animations)
 	- [Exporting Particle Systems](#exporting-particle-systems)
 	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
 	- [Exporting Node Animations](#exporting-node-animations)

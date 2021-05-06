@@ -110,7 +110,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc = SimpleSaxWriter(f, 'mesh', {})
 
         # Very ugly, have to replace number of vertices later
-        doc.start_tag('sharedgeometry ', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
+        doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
 
         logger.info('* Writing shared geometry')
 
@@ -160,6 +160,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         _remap_verts_ = []
         _remap_normals_ = []
         _face_indices_ = []
+
         numverts = 0
 
         # Create bmesh to help obtain custom vertex normals
@@ -172,8 +173,17 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bm.from_mesh(mesh)
 
         # Ogre only supports triangles
-        bmesh.ops.triangulate(bm, faces=bm.faces)
+        bmesh_return = bmesh.ops.triangulate(bm, faces=bm.faces)
         bm.to_mesh(mesh)
+        
+        # Map the original face indices to the tesselated ones
+        face_map = bmesh_return['face_map']
+        
+        _tess_polygon_face_map_ = {}
+        
+        for tess_face in face_map:
+            #print("tess_face.index : %s <---> polygon_face.index : %s" % (tess_face.index, face_map[tess_face].index))
+            _tess_polygon_face_map_[tess_face.index] = face_map[tess_face].index
 
         # Vertex colors
         vertex_color_lookup = VertexColorLookup(mesh)
@@ -181,9 +191,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if tangents:
             mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
 
-        progressScale = 1.0 / (len(mesh.polygons) - 1)
+        progressScale = 1.0 / len(mesh.polygons)
+        
+        # Process mesh after triangulation
         for F in mesh.polygons:
-            percent = F.index * progressScale
+            percent = (F.index + 1) * progressScale
             sys.stdout.write( "\r + Faces [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
             sys.stdout.flush()
             
@@ -222,9 +234,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 vert_uvs = []
                 if dotextures:
                     for layer in mesh.uv_layers:
-                        vert_uvs.append(layer.data[loop_idx].uv)
-                    """for layer in uvtris[ tidx ]:
-                        vert_uvs.append(layer[ vidx ])"""
+                        vert_uvs.append( layer.data[ loop_idx ].uv )
 
                 ''' Check if we already exported that vertex with same normal, do not export in that case,
                     (flat shading in blender seems to work with face normals, so we copy each flat face'
@@ -257,8 +267,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 numverts += 1
                 _remap_verts_.append( v )
                 _remap_normals_.append( n )
-                _face_indices_.append( F.index )
-
+                
+                # Use mapping from tesselated face to polygon face if the mapping exists
+                if F.index in _tess_polygon_face_map_:
+                    _face_indices_.append( _tess_polygon_face_map_[F.index] )
+                else:
+                    _face_indices_.append( F.index )
+                
                 x,y,z = swap(v.co)        # xz-y is correct!
 
                 doc.start_tag('vertex', {})
@@ -592,12 +607,18 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                     if config.get('SHAPE_NORMALS'):
                         n = _remap_normals_[ vidx ]
+
                         if smooth:
-                            pn = mathutils.Vector( [snormals[ v.index * 3 ], snormals[ v.index * 3 + 1], snormals[ v.index * 3 + 2]] )
+                            pn = mathutils.Vector( [snormals[ v.index * 3 + 0 ], snormals[ v.index * 3 + 1 ], snormals[ v.index * 3 + 2 ]] )
                         else:
                             vindex = _face_indices_[ vidx ]
-                            pn = mathutils.Vector( [snormals[ vindex * 3 ], snormals[ vindex * 3 + 1], snormals[ vindex * 3 + 2]] )
-                        nx,ny,nz = swap( pn - n )
+                            
+                            pn = mathutils.Vector( [snormals[ vindex * 3 + 0 ], snormals[ vindex * 3 + 1 ], snormals[ vindex * 3 + 2 ]] )
+
+                        if mesh.has_custom_normals:
+                            nx,ny,nz = n
+                        else:
+                            nx,ny,nz = swap( pn )
 
                     #for i,p in enumerate( skey.data ):
                     #x,y,z = p.co - ob.data.vertices[i].co
