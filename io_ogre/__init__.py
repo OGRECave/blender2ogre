@@ -17,7 +17,7 @@
 bl_info = {
     "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg",
-    "version": (0, 7, 3),
+    "version": (0, 7, 4),
     "blender": (2, 7, 5),
     "location": "File > Export...",
     "description": "Export to Ogre xml and binary formats",
