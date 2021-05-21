@@ -91,6 +91,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     # bake mesh
     mesh = copy.to_mesh()    # collaspe
     mesh.update()
+    # Blender by default does not calculate these. 
+    # When querying the quads/tris of the object blender would crash if calc_tessface was not updated
     mesh.calc_loop_triangles()
 
     Report.meshes.append( obj_name )
@@ -114,7 +116,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         logger.info('* Writing shared geometry')
 
-        if not mesh.uv_layers.active:
+        # Textures
+        dotextures = False
+        if mesh.uv_layers.active:
+            dotextures = True
+        else:
             tangents = 0
 
         doc.start_tag('vertexbuffer', {
@@ -123,7 +129,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 'tangents': str(bool(tangents)),
                 'tangent_dimensions': str(tangents),
                 'colours_diffuse' : str(bool( mesh.vertex_colors )),
-                'texture_coords' : '%s' % len(mesh.uv_layers) if mesh.uv_layers.active else 0
+                'texture_coords' : '%s' % len(mesh.uv_layers) * dotextures
         })
 
         # Materials
@@ -152,9 +158,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         material_faces = []
         for matidx, mat in enumerate(materials):
             material_faces.append([])
-
-        # Textures
-        dotextures = len(mesh.uv_layers) > 0
 
         shared_vertices = {}
         _remap_verts_ = []
@@ -500,12 +503,14 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         # Delete temporary LOD object.
                         # The clone meshes will be deleted later.
                         lod_ob_temp.user_clear()
-                        bpy.data.objects.remove(bpy.data.objects[lod_ob_temp.name], do_unlink=True)
+                        logger.debug("Removing temporary LOD object: %s" % lod_ob_temp.name)
+                        bpy.data.objects.remove(lod_ob_temp, do_unlink=True)
                         del lod_ob_temp
 
                     doc.end_tag('levelofdetail')
 
             # Delete temporary LOD object
+            logger.debug("Removing temporary LOD object: %s" % ob_copy.name)
             bpy.data.objects.remove(ob_copy, do_unlink=True)
             del ob_copy
 
@@ -513,6 +518,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             bpy.context.evaluated_depsgraph_get().update()
             for mesh_iter in ob_copy_meshes:
                 mesh_iter.user_clear()
+                logger.debug("Removing temporary LOD mesh: %s" % mesh_iter.name)
                 bpy.data.meshes.remove(mesh_iter)
                 del mesh_iter
             ob_copy_meshes = []
@@ -686,10 +692,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         ## Clean up and save
         if cleanup:
+			#bpy.context.collection.objects.unlink(copy)
             copy.user_clear()
+            logger.debug("Removing temporary object: %s" % copy.name)
             bpy.data.objects.remove(copy)
             del copy
-            del mesh
+
         del _remap_verts_
         del _remap_normals_
         del _face_indices_
@@ -735,7 +743,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
 def triangle_list_in_group(mesh, shared_vertices, group_index):
     faces = []
-    for face in mesh.data.loop_triangles: 
+    for face in mesh.data.loop_triangles:
         vertices = [mesh.data.vertices[v] for v in face.vertices]
         match_group = lambda g, v: g in [x.group for x in v.groups]
         all_in_group = all([match_group(group_index, v) for v in vertices])

@@ -398,13 +398,6 @@ def objects_merge_materials(objs):
             materials.add(mat)
     return materials
 
-def should_export(obj):
-    """
-    Tells if that object should be exported,
-    according to its visibility and the configuration
-    """
-    return config.get("EXPORT_HIDDEN") or obj in bpy.context.visible_objects
-
 def indent( level, *args ):
     if not args:
         return '    ' * level
@@ -482,23 +475,28 @@ def get_parent_matrix( ob, objects ):
 def merge_group( group ):
     logger.info('+ Merge Group: %s' % group.name )
     copies = []
+    copies_meshes = []
     for ob in group.objects:
         if ob.type == 'MESH':
-            o2 = ob.copy(); copies.append( o2 )
-            #BQfix needed? o2.data = bpy.data.meshes.new_from_object(o2)
+            o2 = ob.copy()
+            copies.append( o2 )
+            o2.data = bpy.data.meshes.new_from_object( o2 )
+            copies_meshes.append( o2.data )
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             bpy.context.scene.collection.objects.link( o2 ) #; o2.select = True
 
     name = group.name[len("merge."):] if group.name != "merge." else "mergeGroup"
 
-    #BQfix for .data.name being read-only
-    copies[len(copies) - 1].data.name = name
-
     merged = merge( copies )
     merged.name = name
-    #merged.data.name = name #2.8 not renaming, readonly?
-    #print('.data.name: ', merged.data.name )
+    merged.data.name = name #2.8 not renaming, readonly?
+
+    # Clean up orphan meshes
+    for copy_mesh in copies_meshes:
+        if copy_mesh.name != name:
+            logger.debug("Removing temporary mesh: %s" % copy_mesh.name)
+            bpy.data.meshes.remove(copy_mesh)
 
     return merged
 
@@ -513,11 +511,11 @@ def merge_objects( objects, name='_temp_', transform=None ):
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             if transform:
-                o2.matrix_world =  transform @ o2.matrix_local
+                o2.matrix_world = transform @ o2.matrix_local
             bpy.context.scene.collection.objects.link( o2 ) #; o2.select_set(True)
     merged = merge( copies )
     merged.name = name
-    #merged.data.name = name #2.8 not renaming, readonly?
+    merged.data.name = name #2.8 not renaming, readonly?
 
     return merged
 
@@ -531,6 +529,7 @@ def merge( objects ):
     #2.8update
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.join()
+    
     return bpy.context.active_object
 
 def get_merge_group( ob, prefix='merge.' ):

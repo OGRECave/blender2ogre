@@ -70,7 +70,7 @@ def dot_scene(path, scene_name=None):
     for ob in bpy.context.scene.objects:
         if ob.subcollision:
             continue
-        if not util.should_export(ob):
+        if not (config.get("EXPORT_HIDDEN") or obj in bpy.context.visible_objects):
             continue
         if config.get("SELECTED_ONLY") and not ob.select_get():
             if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
@@ -199,11 +199,13 @@ def dot_scene(path, scene_name=None):
             fd.write(bytes(data,'utf-8'))
         logger.info("- Exported Ogre Scene: %s " % target_scene_file)
 
+    # Remove temporary objects/meshes
     for ob in temps:
+        logger.debug("Removing temporary mesh: %s" % ob.data.name)
+        bpy.data.meshes.remove(ob.data)
         #BQfix for 2.8 unable to find merged object in collection
-        #bpy.context.scene.objects.unlink( ob )
         #bpy.context.collection.objects.unlink( ob )
-        bpy.data.objects.remove(ob)
+        #bpy.data.objects.remove(ob, do_unlink=True)
 
     # Restore the scene previous frame position
     bpy.context.scene.frame_set(frame_current)
@@ -453,8 +455,8 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         ob.data.calc_loop_triangles()
         # if it has no faces at all, the object itself will not be exported, BUT 
         # it might have children
-        logger.info("Vertices: %s" % len(ob.data.vertices))
-        logger.info("Loop triangles: %s" % len(ob.data.loop_triangles))
+        logger.info("  - Vertices: %s" % len(ob.data.vertices))
+        logger.info("  - Loop triangles: %s" % len(ob.data.loop_triangles))
 
     if ob.type == 'MESH' and len(ob.data.loop_triangles):
         collisionFile = None
