@@ -199,10 +199,13 @@ def dot_scene(path, scene_name=None):
             fd.write(bytes(data,'utf-8'))
         logger.info("- Exported Ogre Scene: %s " % target_scene_file)
 
-    # Remove temporal objects
+    # Remove temporary objects/meshes
     for ob in temps:
+        logger.debug("Removing temporary mesh: %s" % ob.data.name)
         bpy.data.meshes.remove(ob.data)
-        bpy.data.objects.remove(ob)
+        logger.debug("& Removing temporal object: %s" % ob.name)
+        bpy.data.objects.remove(ob, do_unlink=True)
+        #bpy.context.scene.objects.unlink( ob )
 
     # Restore the scene previous frame position
     bpy.context.scene.frame_set(frame_current)
@@ -465,6 +468,8 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         ob.data.update(calc_tessface=True)
         # if it has no faces at all, the object itself will not be exported, BUT
         # it might have children
+        logger.info("  - Vertices: %s" % len(ob.data.vertices))
+        logger.info("  - Loop triangles: %s" % len(ob.data.tessfaces))
 
     if ob.type == 'MESH' and len(ob.data.tessfaces):
         collisionFile = None

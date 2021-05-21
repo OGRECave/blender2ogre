@@ -64,14 +64,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     start = time.time()
 
-    # blender per default does not calculate these. when querying the quads/tris
-    # of the object blender would crash if calc_tessface was not updated
-    ob.data.update(calc_tessface=True)
-
-    Report.meshes.append( obj_name )
-    Report.faces += len( ob.data.tessfaces )
-    Report.orig_vertices += len( ob.data.vertices )
-
     cleanup = False
     if ob.modifiers:
         cleanup = True
@@ -86,6 +78,14 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     # bake mesh
     mesh = copy.to_mesh(bpy.context.scene, True, "PREVIEW")
+    mesh.update()
+    # Blender by default does not calculate these. 
+    # When querying the quads/tris of the object blender would crash if calc_tessface was not updated
+    ob.data.update(calc_tessface=True)
+
+    Report.meshes.append( obj_name )
+    Report.faces += len( ob.data.tessfaces )
+    Report.orig_vertices += len( ob.data.vertices )
 
     logger.info('* Generating: %s.mesh.xml' % obj_name)
 
@@ -435,7 +435,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 lod_current_vertice_count = len(mesh.vertices)
                 lod_min_vertice_count = 12
 
-                for level in range(lod_levels+1)[1:]:
+                for level in range(lod_levels + 1)[1:]:
                     decimate.ratio = lod_current_ratio
                     lod_mesh = ob_copy.to_mesh(scene = bpy.context.scene, apply_modifiers = True, settings = 'PREVIEW')
                     ob_copy_meshes.append(lod_mesh)
@@ -486,18 +486,21 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         # Delete temporary LOD object.
                         # The clone meshes will be deleted later.
                         lod_ob_temp.user_clear()
-                        bpy.data.objects.remove(bpy.data.objects[lod_ob_temp.name], do_unlink=True)
+                        logger.debug("Removing temporary LOD object: %s" % lod_ob_temp.name)
+                        bpy.data.objects.remove(lod_ob_temp, do_unlink=True)
                         del lod_ob_temp
 
                     doc.end_tag('levelofdetail')
 
             # Delete temporary LOD object
+            logger.debug("Removing temporary LOD object: %s" % ob_copy.name)
             bpy.data.objects.remove(ob_copy, do_unlink=True)
             del ob_copy
 
             # Delete temporary data/mesh objects
             for mesh_iter in ob_copy_meshes:
                 mesh_iter.user_clear()
+                logger.debug("Removing temporary LOD mesh: %s" % mesh_iter.name)
                 bpy.data.meshes.remove(mesh_iter)
                 del mesh_iter
             ob_copy_meshes = []
@@ -670,6 +673,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 logger.info('- Done at %s seconds' % timer_diff_str(start))
 
         ## Clean up and save
+        logger.debug("Removing temporary mesh: %s" % ob.data.name)
         mesh.user_clear()
         bpy.data.meshes.remove(mesh)
         del mesh
@@ -677,6 +681,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if cleanup:
             #bpy.context.scene.objects.unlink(copy)
             copy.user_clear()
+            logger.debug("Removing temporary object: %s" % copy.name)
             bpy.data.objects.remove(copy)
             del copy
 
