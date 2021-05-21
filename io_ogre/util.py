@@ -493,10 +493,13 @@ def get_parent_matrix( ob, objects ):
 def merge_group( group ):
     logger.info('+ Merge Group: %s' % group.name )
     copies = []
+    copies_meshes = []
     for ob in group.objects:
         if ob.type == 'MESH':
-            o2 = ob.copy(); copies.append( o2 )
+            o2 = ob.copy()
+            copies.append( o2 )
             o2.data = o2.to_mesh(bpy.context.scene, True, "PREVIEW") # collaspe modifiers
+            copies_meshes.append( o2.data )
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             bpy.context.scene.objects.link( o2 ) #; o2.select = True
@@ -508,10 +511,11 @@ def merge_group( group ):
     merged.data.name = name
 
     # Clean up orphan meshes
-    for copy in copies:
-        if copy.name != name:
-            bpy.data.meshes.remove(copy.data)
-    
+    for copy_mesh in copies_meshes:
+        if copy_mesh.name != name:
+            logger.debug("Removing temporary mesh: %s" % copy_mesh.name)
+            bpy.data.meshes.remove(copy_mesh)
+
     return merged
 
 def merge_objects( objects, name='_temp_', transform=None ):
@@ -525,11 +529,12 @@ def merge_objects( objects, name='_temp_', transform=None ):
             while o2.modifiers:
                 o2.modifiers.remove( o2.modifiers[0] )
             if transform:
-                o2.matrix_world =  transform * o2.matrix_local
+                o2.matrix_world = transform * o2.matrix_local
             bpy.context.scene.objects.link( o2 ) #; o2.select = True
     merged = merge( copies )
     merged.name = name
     merged.data.name = name
+
     return merged
 
 def merge( objects ):
