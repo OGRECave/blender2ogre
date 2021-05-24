@@ -181,22 +181,22 @@ def xml_convert(infile, has_uvs=False):
 
     cmd = [exe]
 
-    if config.get('EXTREMITY_POINTS') > 0 and version < (2,1,0):
+    if config.get('EXTREMITY_POINTS') > 0 and converter_type == "OgreXMLConverter":
         cmd.append('-x')
         cmd.append(config.get('EXTREMITY_POINTS'))
 
-    if version < (1,10,0) or version >= (2,1,0):
+    if version < (1,10,0) or converter_type == "OgreMeshTool":
         if not config.get('GENERATE_EDGE_LISTS'):
             cmd.append('-e')
 
-    if config.get('OPTIMISE_VERTEX_BUFFERS') and version >= (2,1,0):
+    if config.get('OPTIMISE_VERTEX_BUFFERS') and converter_type == "OgreMeshTool":
         cmd.append('-O')
         cmd.append(config.get('OPTIMISE_VERTEX_BUFFERS_OPTIONS'))
 
     if not config.get('OPTIMISE_ANIMATIONS'):
         cmd.append('-o')
 
-    if version < (2,1,0):
+    if converter_type == "OgreXMLConverter":
         # Use quiet mode by default (comment this if you want more debug info out)
         cmd.append('-q')
 
