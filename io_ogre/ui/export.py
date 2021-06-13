@@ -16,6 +16,8 @@ if "bpy" in locals():
         importlib.reload(scene)
     if "material" in locals():
         importlib.reload(material)
+    if "report" in locals():
+        importlib.reload(report)
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.
@@ -90,7 +92,7 @@ class _OgreCommonExport_(object):
         
         # Options associated with each section
         section_options = {
-            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_EXPORT_VERSION", "EX_XML_DELETE"], 
+            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"], 
             "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_EXPORT_USER", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"], 
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
@@ -98,7 +100,7 @@ class _OgreCommonExport_(object):
             "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
             "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"], 
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
-            "Logging" : ["EX_Vx_EXPORT_ENABLE_LOGGING"]
+            "Logging" : ["EX_Vx_ENABLE_LOGGING"]
         }
         
         for section in sections:
@@ -172,7 +174,7 @@ class _OgreCommonExport_(object):
         file_handler = None
         
         # Add a file handler to all Logger instances
-        if config.get('EXPORT_ENABLE_LOGGING') == True:
+        if config.get('ENABLE_LOGGING') == True:
             log_file = ("%s/blender2ogre.log" % target_path)
             logger.info("Writing log file to: %s" % log_file)
 
@@ -199,7 +201,7 @@ class _OgreCommonExport_(object):
         Report.show()
 
         # Flush and close all logging file handlers
-        if config.get('EXPORT_ENABLE_LOGGING') == True:
+        if config.get('ENABLE_LOGGING') == True:
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logger_instance = logging.getLogger(logger_name)
                     
@@ -230,11 +232,11 @@ class _OgreCommonExport_(object):
         name='Swap Axis',
         description='Axis swapping mode',
         default=config.get('SWAP_AXIS'))
-    EX_V2_MESH_TOOL_EXPORT_VERSION = EnumProperty(
-        items=config.MESH_EXPORT_VERSIONS,
+    EX_V2_MESH_TOOL_VERSION = EnumProperty(
+        items=config.MESH_TOOL_VERSIONS,
         name='Mesh Export Version',
         description='Specify Ogre version format to write',
-        default=config.get('MESH_TOOL_EXPORT_VERSION'))
+        default=config.get('MESH_TOOL_VERSION'))
     EX_XML_DELETE = BoolProperty(
         name="Clean up xml files",
         description="Remove the generated xml files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finish successfully)",
@@ -410,10 +412,10 @@ Blenders decimate does LOD by collapsing vertices, which can result in a visuall
         default=config.get('SHAPE_NORMALS'))
     
     # Logging
-    EX_Vx_EXPORT_ENABLE_LOGGING = BoolProperty(
+    EX_Vx_ENABLE_LOGGING = BoolProperty(
         name="Write Exporter Logs",
         description="Write Log file to the output directory (blender2ogre.log)",
-        default=config.get('EXPORT_ENABLE_LOGGING'))
+        default=config.get('ENABLE_LOGGING'))
     
     # It seems that it is not possible to exclude DEBUG when selecting a log level
     #EX_Vx_DEBUG_LOGGING = BoolProperty(

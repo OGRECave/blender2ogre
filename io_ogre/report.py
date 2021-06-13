@@ -26,6 +26,7 @@ class ReportSingleton(object):
         self.errors = []
         self.messages = []
         self.paths = []
+        self.importing = False
 
     def report(self):
         r = ['Report:']
@@ -48,11 +49,16 @@ class ReportSingleton(object):
             for a in self.paths: r.append( '    - %s' %a )
 
         if self.vertices:
-            r.append( '  Original Vertices: %s' %self.orig_vertices)
-            r.append( '  Exported Vertices: %s' %self.vertices )
-            r.append( '  Original Faces: %s' %self.faces )
-            r.append( '  Exported Triangles: %s' %self.triangles )
-            ## TODO report file sizes, meshes and textures
+            action_name = "Exported"
+            if self.importing:
+                action_name = "Imported"
+
+            r.append( '  Original Vertices: %s' % self.orig_vertices )
+            r.append( '  %s Vertices: %s' % (action_name, self.vertices) )
+            r.append( '  Original Faces: %s' % self.faces )
+            r.append( '  %s Triangles: %s' % (action_name, self.triangles) )
+        
+        ## TODO report file sizes, meshes and textures
 
         for tag in 'meshes lights cameras armatures armature_animations shape_animations materials textures'.split():
             attr = getattr(self, tag)

@@ -164,6 +164,82 @@ def detect_converter_type():
         return "OgreMeshTool"
     return "unknown"
 
+def mesh_convert(infile):
+    # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
+    # We should show how to configure the converter location in config panel or tell the default path.
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+
+    converter_type = detect_converter_type()
+    if converter_type == "OgreXMLConverter":
+        version = xml_converter_version()
+    elif converter_type == "OgreMeshTool":
+        version = mesh_tool_version()
+    elif converter_type == "unknown":
+        logger.warn("Cannot find suitable OgreXMLConverter or OgreMeshTool executable")
+        Report.warnings.append("Cannot find suitable OgreXMLConverter or OgreMeshTool executable, binary mesh files won't be generated")
+        return False
+
+    cmd = [exe]
+
+    if converter_type == "OgreXMLConverter":
+        # Use quiet mode by default (comment this if you want more debug info out)
+        cmd.append('-q')
+
+        # use ubyte4_norm colour type
+        if version >= (1, 12, 7):
+            cmd.append('-byte')
+
+        # Put logfile into output directory
+        logfile_path, name = os.path.split(infile)
+        cmd.append('-log')
+        cmd.append(os.path.join(logfile_path, 'OgreXMLConverter.log'))
+
+        # Finally, specify input file
+        cmd.append(infile)
+
+        ret = subprocess.call(cmd)
+
+        # Instead of asserting, report an error
+        if ret != 0:
+            logger.error("OgreXMLConverter returned with non-zero status, check OgreXMLConverter.log")
+            logger.info(" ".join(cmd))
+            Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), unable to proceed" % name)
+            return False
+        else:
+            return True
+        
+    else:
+        # Convert to v2 format if required
+        cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
+
+        # Finally, specify input file
+        cmd.append(infile)
+        
+        # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
+        # otherwise it will complain about missing render system (missing plugins_tools.cfg)
+        exe_path, name = os.path.split(exe)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, cwd=exe_path)
+        output, error = proc.communicate()
+
+        # Open log file to replace old logging feature that the new tool dropped
+        # The log file will be created alongside the exported mesh
+        if config.get('ENABLE_LOGGING'):
+            logfile_path, name = os.path.split(infile)
+            logfile = os.path.join(logfile_path, 'OgreMeshTool.log')
+        
+            with open(logfile, 'w') as log:
+                log.write(output)
+
+        # Check converter status
+        if proc.returncode != 0:
+            logger.error("OgreMeshTool finished with non-zero status, check OgreMeshTool.log")
+            logger.info(" ".join(cmd))
+            Report.errors.append("OgreMeshTool finished with non-zero status converting mesh: (%s), unable to proceed" % name)
+            return False
+        else:
+            return True
+
+
 def xml_convert(infile, has_uvs=False):
     # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
     # We should show how to configure the converter location in config panel or tell the default path.
@@ -251,7 +327,7 @@ def xml_convert(infile, has_uvs=False):
 
         # Open log file to replace old logging feature that the new tool dropped
         # The log file will be created alongside the exported mesh
-        if config.get('EXPORT_ENABLE_LOGGING'):
+        if config.get('ENABLE_LOGGING'):
             logfile_path, name = os.path.split(infile)
             logfile = os.path.join(logfile_path, 'OgreMeshTool.log')
         
