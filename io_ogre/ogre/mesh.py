@@ -1,6 +1,22 @@
 import os, time, sys, logging
 import bmesh
 import mathutils
+
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    # ...so we need to reload our submodule(s) using importlib
+    import importlib
+    if "report" in locals():
+        importlib.reload(report)
+    if "material" in locals():
+        importlib.reload(material)
+    if "util" in locals():
+        importlib.reload(util)
+    if "xml" in locals():
+        importlib.reload(xml)
+    if "skeleton.Skeleton" in locals():
+        importlib.reload(skeleton.Skeleton)
+
 from ..report import Report
 from ..util import *
 from ..xml import *
@@ -195,12 +211,17 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
 
         progressScale = 1.0 / len(mesh.polygons)
+        bpy.context.window_manager.progress_begin(0, 100)
         
         # Process mesh after triangulation
         for F in mesh.polygons:
+            # Update progress in console
             percent = (F.index + 1) * progressScale
             sys.stdout.write( "\r + Faces [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
             sys.stdout.flush()
+            
+            # Update progress through Blender cursor
+            bpy.context.window_manager.progress_update(percent)
             
             smooth = F.use_smooth
             tri = (F.vertices[0], F.vertices[1], F.vertices[2])
@@ -321,7 +342,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
 
-        print("")
+        sys.stdout.write("")
+
         logger.info('- Done at %s seconds' % timer_diff_str(start))
         logger.info('* Writing submeshes')
 

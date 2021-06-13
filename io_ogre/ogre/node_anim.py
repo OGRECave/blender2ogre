@@ -44,7 +44,7 @@ def dot_nodeanim(ob, doc, xmlnode):
         return
 
     anim = ob.animation_data
-    
+
     if anim is None or anim.nla_tracks is None:
         return
 
@@ -109,15 +109,15 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
     a.setAttribute("rotationInterpolationMode", "linear")
     a.setAttribute("length", '%6f' % ((frame_end) / _fps))
     aa.appendChild(a)
-    
+
     frame_current = bpy.context.scene.frame_current
     
     initial_location = mathutils.Vector((0, 0, 0))
     initial_rotation = mathutils.Quaternion((1, 0, 0, 0))
     initial_scale = mathutils.Vector((1, 1, 1))
-    
+
     frames = range(int(frame_start), int(frame_end) + 1)
-    
+
     # If NODE_KEYFRAMES is True, then use only the keyframes to export the animation
     #if config.get('NODE_KEYFRAMES'):
     #    frames = get_keyframes(action)
@@ -129,7 +129,7 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
         a.appendChild(kf)
 
         bpy.context.scene.frame_set(frame)
-        
+
         translation = mathutils.Vector((0, 0, 0))
         rotation_quat = mathutils.Quaternion((1, 0, 0, 0))
         scale = mathutils.Vector((1, 1, 1))
@@ -146,26 +146,26 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
             scale.x = current_scale.x / initial_scale.x
             scale.y = current_scale.y / initial_scale.y
             scale.z = current_scale.z / initial_scale.z
-        
+
         t = doc.createElement('position')
         t.setAttribute("x", '%6f' % translation.x)
         t.setAttribute("y", '%6f' % translation.y)
         t.setAttribute("z", '%6f' % translation.z)
         kf.appendChild(t)
-        
+
         q = doc.createElement('rotation')
         q.setAttribute("qw", '%6f' % rotation_quat.w)
         q.setAttribute("qx", '%6f' % rotation_quat.x)
         q.setAttribute("qy", '%6f' % rotation_quat.y)
         q.setAttribute("qz", '%6f' % rotation_quat.z)
         kf.appendChild(q)
-        
+
         s = doc.createElement('scale')
         s.setAttribute("x", '%6f' % scale.x)
         s.setAttribute("y", '%6f' % scale.y)
         s.setAttribute("z", '%6f' % scale.z)
         kf.appendChild(s)
-        
+
     bpy.context.scene.frame_set(frame_current)
 
 def calc_scale(matrix_local):
@@ -173,19 +173,19 @@ def calc_scale(matrix_local):
     ri = matrix_local.to_quaternion().inverted().to_matrix()
     scale = ri.to_4x4() * matrix_local
     v = util.swap( scale.to_scale() )
-    
+
     return mathutils.Vector((abs(v.x), abs(v.y), abs(v.z)))
 
 def get_keyframes(action):
 
     keyframes = {}
-    
+
     for fcurve in action.fcurves:
 
         for keyframe in fcurve.keyframe_points:
-            
+
             frame, value = keyframe.co
-            
+
             # Add Keyframe if it does not exist
             if frame not in keyframes:
                 keyframes[frame] = frame

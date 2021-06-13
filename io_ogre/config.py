@@ -10,7 +10,7 @@ AXIS_MODES =  [
     ('-xzy', '-xzy', 'non standard'),
 ]
 
-MESH_EXPORT_VERSIONS = [
+MESH_TOOL_VERSIONS = [
     ('v1', 'v1', 'Export the mesh as a v1 object'),
     ('v2', 'v2', 'Export the mesh as a v2 object')
 ]
@@ -18,7 +18,7 @@ MESH_EXPORT_VERSIONS = [
 TANGENT_MODES =  [
     ('0', 'none', 'do not export'),
     ('3', 'generate', 'generate'),
-    ('4', 'with parity', 'generate with parity'),
+    ('4', 'with parity', 'generate with parity')
 ]
 
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
@@ -28,7 +28,7 @@ CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 _CONFIG_DEFAULTS_ALL = {
     # General
     'SWAP_AXIS' : 'xyz', # ogre standard is 'xz-y', but swapping is currently broken
-    'MESH_TOOL_EXPORT_VERSION' : 'v2',
+    'MESH_TOOL_VERSION' : 'v2',
     'XML_DELETE' : True,
     
     # Scene
@@ -82,11 +82,20 @@ _CONFIG_DEFAULTS_ALL = {
     'SHAPE_NORMALS' : True,
     
     # Logging
-    'EXPORT_ENABLE_LOGGING' : False,
+    'ENABLE_LOGGING' : False,
     #'DEBUG_LOGGING' : False,
     'SHOW_LOG_NAME' : False,
     
-    'TUNDRA_STREAMING' : True
+    # Tundra
+    'TUNDRA_STREAMING' : True,
+    
+    # Import
+    'IMPORT_NORMALS' : True,
+    'MERGE_SUBMESHES' : True,
+    'IMPORT_ANIMATIONS' : True,
+    'ROUND_FRAMES' : True,
+    'USE_SELECTED_SKELETON' : True,
+    'IMPORT_SHAPEKEYS' : True   
 }
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
@@ -210,7 +219,6 @@ def load_config():
 CONFIG = load_config()
 
 def get(name, default=None):
-
     global CONFIG
     if name in CONFIG:
         return CONFIG[name]
@@ -225,7 +233,7 @@ def update(**kwargs):
 
 def save_config():
     global CONFIG
-    #for key in CONFIG: print( '%s =   %s' %(key, CONFIG[key]) )
+    #for key in CONFIG: print( '%s = %s' %(key, CONFIG[key]) )
     if os.path.isdir( CONFIG_PATH ):
         try:
             with open( CONFIG_FILEPATH, 'wb' ) as f:
@@ -236,8 +244,6 @@ def save_config():
         logger.error('Config directory %s does not exist' % CONFIG_PATH)
 
 def update_from_addon_preference(context):
-
-    #addon_preferences = context.user_preferences.addons["io_ogre"].preferences
     addon_preferences = context.preferences.addons["io_ogre"].preferences
 
     for key in _CONFIG_TAGS_:
