@@ -6,22 +6,25 @@ if "bpy" in locals():
     import importlib
     if "config" in locals():
         importlib.reload(config)
-    if "report.Report" in locals():
-        importlib.reload(report.Report)
+    if "report" in locals():
+        importlib.reload(report)
     if "material" in locals():
         importlib.reload(material)
+    if "importer" in locals():
+        importlib.reload(importer)
     if "export" in locals():
         importlib.reload(export)
     if "helper" in locals():
         importlib.reload(helper)
-    if "meshy.OGREMESH_OT_preview" in locals():
-        importlib.reload(meshy.OGREMESH_OT_preview)
+    if "meshy" in locals():
+        importlib.reload(meshy)
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.
 from .. import config
 from ..report import Report
 from . import material
+from . import importer
 from . import export
 from . import helper
 from ..meshy import OGREMESH_OT_preview
@@ -32,6 +35,7 @@ def auto_register(register):
     yield MT_mini_report
     yield OGREMESH_OT_preview
 
+    yield from importer.auto_register(register)
     yield from export.auto_register(register)
     yield from helper.auto_register(register)
 

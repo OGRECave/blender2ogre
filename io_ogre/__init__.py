@@ -15,12 +15,12 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 bl_info = {
-    "name": "OGRE Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
-    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg",
+    "name": "OGRE Importer-Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
+    "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg, Guillermo Ojea Quintana",
     "version": (0, 7, 4),
     "blender": (2, 7, 5),
-    "location": "File > Export...",
-    "description": "Export to Ogre xml and binary formats",
+    "location": "File > Import and Export...",
+    "description": "Import and Export to and from Ogre xml and binary formats",
     "wiki_url": "https://github.com/OGRECave/blender2ogre",
     "tracker_url": "https://github.com/OGRECave/blender2ogre/issues",
     "category": "Import-Export"
