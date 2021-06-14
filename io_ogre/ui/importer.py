@@ -75,7 +75,7 @@ class _OgreCommonImport_(object):
         
         # Icons to use for the sections
         section_icons = {
-            "General" : "WORLD", "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "Shape Keys" : "POSE_DATA", "Logging" : "TEXT"
+            "General" : "WORLD", "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "Shape Keys" : "ANIM_DATA", "Logging" : "TEXT"
         }
         
         # Options associated with each section

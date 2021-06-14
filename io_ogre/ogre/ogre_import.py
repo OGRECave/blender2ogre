@@ -794,7 +794,7 @@ def bCreateMesh(meshData, folder, name, filepath):
     # TODO: Try to merge everything into the armature object
     if config.get('MERGE_SUBMESHES') == True:
         bpy.ops.object.join()
-        ob = bpy.context.scene.objects.active
+        ob = bpy.context.view_layer.objects.active
         ob.name = name
         ob.data.name = name
 
@@ -1290,10 +1290,10 @@ def load(filepath):
         skeletonFile = xGetSkeletonLink(xDocMeshData, folder)
 
         # Use selected skeleton
-        selectedSkeleton = context.active_object \
+        selectedSkeleton = bpy.context.active_object \
             if (config.get('USE_SELECTED_SKELETON')
-                and context.active_object
-                and context.active_object.type == 'ARMATURE') else None
+                and bpy.context.active_object
+                and bpy.context.active_object.type == 'ARMATURE') else None
         if selectedSkeleton:
             map = getBoneNameMapFromArmature(selectedSkeleton)
             if map:
