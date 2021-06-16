@@ -29,7 +29,7 @@ The following versions of blender have been tested. It might also work with olde
 
 * Blender 2.7x
 * Blender 2.6x
-* **Blender 2.8x: use master branch**
+* **Blender 2.8x: [use master branch](https://github.com/OGRECave/blender2ogre)**
 
 For OGRE v2.1 meshes, use OgreMeshTool from Ogre 2 build for `OGRETOOLS_XML_CONVERTER`
 
@@ -47,6 +47,13 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 ### Merge Objects on export
 You might have hundrets of objects, which you want to keep separate but have them in one `.mesh` on export.
 For this create a new group (Ctrl+G) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the group.
+
+> **NOTE:** The origin of the resulting merged object will be that of the *last* object you added to the group (although when reloading the blend file, this order will be lost).
+
+In order to have control over the precise location of where the merged objects origin will be, use the `dupli_offset` property of the Groups.
+Setting any value other than the default `(0, 0, 0)` will result in a mesh with the origin set to that value. For example:
+
+![dupli-offset.png](images/dupli-offset.png)
 
 ### External OGRE Materials
 You might already have some materials in OGRE that you do not want to export.
@@ -157,7 +164,8 @@ Check out the [Particle System README](ParticleSystem.md) to see how to create a
 ![shape-animations4.png](images/shape-animations4.png)
 
 Shape (or Pose) Animations allow animating different poses, a technique commonly used to do face animations.
-Check out the [Shape Animations](ShapeAnimations.md) tutorial to see how to create some poses and animate them. Then you can use `blender2ogre` to export the poses and animations into a `.mesh` file.
+Check out the [Shape Animations](ShapeAnimations.md) tutorial to see how to create some poses and animate them. 
+Then you can use `blender2ogre` to export the poses and animations into a `.mesh` file.
 
 ### Exporting Node Animations
 Node Animations are a way to have scripted node animations in your Ogre application.
@@ -170,7 +178,11 @@ the console, thus I rewrote the whole script and split it into several files.
 It has been well tested on linux 64-bit and should work with others.
 
 ## Authors
-This Blender addon was made possible by the following list of people. Anyone can contribute to the project by sending bug reports and feature requests [here](https://github.com/OGRECave/blender2ogre/issues). Naturally the most welcome contribution is actual code via [pull requests](https://github.com/OGRECave/blender2ogre/pulls). If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. So that there is no overlap with other developers or the overall roadmap.
+This Blender addon was made possible by the following list of people. 
+Anyone can contribute to the project by sending bug reports and feature requests [here](https://github.com/OGRECave/blender2ogre/issues). 
+Naturally the most welcome contribution is actual code via [pull requests](https://github.com/OGRECave/blender2ogre/pulls). 
+If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. 
+So that there is no overlap with other developers or the overall roadmap.
  
 * [Brett](http://pyppet.blogspot.fi/)
 * S. Rombauts
@@ -182,6 +194,8 @@ This Blender addon was made possible by the following list of people. Anyone can
 * vax456
 * Sybren Stüvel
 * [Richard Plangger](https://bitbucket.org/plan_rich)
+* [Pavel Rojtberg](https://www.rojtberg.net)
+* [Guillermo Ojea Quintana](https://github.com/sercero)
 
 Additionally the following companies have supported/sponsored the development efforts.
 

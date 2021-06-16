@@ -173,12 +173,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         # Create bmesh to help obtain custom vertex normals
         bm = bmesh.new()
         if mesh.has_custom_normals:
-            logger.debug(" * Mesh has custom normals")
+            logger.debug("* Mesh has custom normals")
             mesh.calc_normals_split()
             bm.from_mesh(mesh)
             bm.verts.ensure_lookup_table()
         else:
-            logger.debug(" * Mesh has NO custom normals")
+            logger.debug("* Mesh has NO custom normals")
             bm.from_mesh(mesh)
 
         # Ogre only supports triangles
@@ -332,7 +332,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
 
-        sys.stdout.write("")
+        sys.stdout.write("\n")
 
         logger.info('- Done at %s seconds' % timer_diff_str(start))
         logger.info('* Writing submeshes')
