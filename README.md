@@ -58,10 +58,10 @@ As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated in
 
 ### Merge Objects on export
 You might have hundrets of objects, which you want to keep separate but have them in one `.mesh` on export.
-For this create a new group (Ctrl+G) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the group.
+For this create a new collection (M) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the collection.
 
-> **NOTE:** The origin of the resulting merged object will be that of the *last* object you added to the group (although when reloading the blend file, this order will be lost).
-In order to have control over the precise location of where the merged objects origin will be, use the `dupli_offset` property of the Groups.
+> **NOTE:** The origin of the resulting merged object will be that of the *last* object you added to the collection (although when reloading the blend file, this order will be lost).
+In order to have control over the precise location of where the merged objects origin will be, use the `dupli_offset` property of the collection.
 Setting any value other than the default `(0, 0, 0)` will result in a mesh with the origin set to that value. For example:
 
 ![dupli-offset.png](images/dupli-offset.png)
@@ -182,7 +182,7 @@ Node Animations are a way to have scripted node animations in your Ogre applicat
 Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
 
 ## About
-[The original version of this](https://bitbucket.org/iboshkov/blender2ogre) was a *single* monolithic Python file.
+[The original version of this](https://code.google.com/archive/p/blender2ogre/) was a *single* monolithic Python file.
 This is not maintainable, and contains a tremendous amount of bugs. There was the need to export blender model to ogre from
 the console, thus I rewrote the whole script and split it into several files.
 It has been well tested on linux 64-bit and should work with others.
