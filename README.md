@@ -7,6 +7,7 @@
  - [Installing](#installing)
  - [Updating to new versions](#updating-to-new-versions)
  - [Video Tutorials](#video-tutorials)
+ - [Importing meshes](#importing-meshes)
  - [Additional Features](#additional-features)
 	- [Merge Objects on export](#merge-objects-on-export)
 	- [External OGRE Materials](#external-ogre-materials)
@@ -42,6 +43,17 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [Animations](http://www.youtube.com/watch?feature=player_embedded&v=5oVM0Lmeb68)
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
 
+## Importing meshes
+As of `blender2ogre` version *0.7.4*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
+ - Import mesh from `.xml` as well as `.mesh` files
+ - Option to be able to merge imported submeshes or keep them separate
+ - Parsing/Conversion of materials into Blender (not great, but most matching properties have been considered)
+ - Importing of Poses
+ - Importing of Skeletons work for the most part, but Ogre skeletons conventions are not like Blenders (see: [How to get bone's vector and bone's length?](https://forums.ogre3d.org/viewtopic.php?t=49689))
+ - Importing of Animations work, but depend on the skeleton which sometimes doesn't get correctly imported
+
+> **NOTE:** Orientation of the imported mesh is assumed to be `xz-y` (Ogre default), the `blender2ogre` Axis Swapping option does not work for the importing process.
+
 ## Additional Features
 
 ### Merge Objects on export
@@ -57,17 +69,17 @@ Setting any value other than the default `(0, 0, 0)` will result in a mesh with 
 
 ### External OGRE Materials
 You might already have some materials in OGRE that you do not want to export.
-Prefix them with `extern.<yourname>` and the sub entity will have the material name set,
-but the material is not exported. The following material 'vertexcolor' can be defined in
-your OGRE project:
+Prefix them with `extern.<yourname>` and the sub entity will have the material name set, but the material is not exported. 
+The following material 'vertexcolor' can be defined in your OGRE project:
 
 ![extern-material.png](images/extern-material.png)
 
 ### Console Export
-You might have several blender files in your project you want to export to Ogre. Do this by hand? NO! You can do better! After all, you have build scripts to compile your source code? Why not export your files automated?
+You might have several blender files in your project you want to export to Ogre. 
+Do this by hand? NO! You can do better! After all, you have build scripts to compile your source code? Why not export your files automated?
 Here is how you can export a scene with blender2ogre. Take a look at [io_ogre/console.py](io_ogre/console.py). You might want to write your own script for your project to export individual objects.
 
-```bash
+```
 $ cd blender2ogre
 $ blender -b examples/vertex-colored.blend --python io_ogre/console.py -- /tmp/blender 'scene abc'
 Processing Scene - abc
@@ -97,9 +109,7 @@ a user defined amount of faces.
 
 ![blender-vertex-group.png](images/blender-vertex-group.png)
 
-You simply call your vertex group with the
-prefix `ogre.vertex.group.<yourname>` and access it in Ogre similar to
-the following:
+You simply call your vertex group with the prefix `ogre.vertex.group.<yourname>` and access it in Ogre similar to the following:
 
 ```cpp
 void example(const Ogre::Entity * entity)
