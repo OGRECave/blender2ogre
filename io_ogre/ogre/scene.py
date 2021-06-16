@@ -145,12 +145,23 @@ def dot_scene(path, scene_name=None):
     for rem in mobjects:
         if rem in objects:
             objects.remove( rem )
-            exported_meshes.append(rem.data.name)
+            exported_meshes.append( rem.data.name )
 
     for group in mgroups:
         merged = merge_group( group )
         objects.append( merged )
         temps.append( merged )
+
+        # If user has set an offset for the dupli_group, then use that to set the origin of the merged objects
+        if group.instance_offset != mathutils.Vector((0.0, 0.0, 0.0)):
+            logger.info("Change origin of merged object %s to: %s" % ( merged.name, group.instance_offset ))
+            
+            # Use the 3D cursor to set the object origin
+            merged.select_set(True)
+            saved_location = bpy.context.scene.cursor.location  # Save 3D cursor location
+            bpy.context.scene.cursor.location = group.instance_offset
+            bpy.ops.object.origin_set(type='ORIGIN_CURSOR')     # Set the origin on the current object to the 3D cursor location
+            bpy.context.scene.cursor.location = saved_location  # Set 3D cursor location back to the stored location
 
     # Gather roots because ogredotscene supports parents and children
     def _flatten( _c, _f ):
