@@ -132,9 +132,16 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         logger.info('* Writing shared geometry')
 
+        # Print a warning if there are no UV Maps created for the object
+        # and the user requested to have tangents generated 
+        # (they won't be without a UV Map)
+        if int(config.get("GENERATE_TANGENTS")) != 0 and len(mesh.uv_layers) == 0:
+            logger.warning("No UV Maps were created for this object: <%s>, tangents won't be exported." % ob.name)
+            Report.warnings.append( 'Object "%s" has no UV Maps, tangents won\'t be exported.' % ob.name )
+        
         # Textures
         dotextures = False
-        if mesh.uv_layers.active:
+        if mesh.uv_layers:
             dotextures = True
         else:
             tangents = 0

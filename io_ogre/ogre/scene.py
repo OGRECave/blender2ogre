@@ -297,6 +297,14 @@ def _property_helper(doc, user, propname, propvalue):
     prop.setAttribute('data', str(propvalue))
     prop.setAttribute('type', type(propvalue).__name__)
 
+def _mesh_instance_helper(e, ob, type):
+    group = get_merge_group( ob, type )
+    
+    # The 'static' / 'instanced' attribute indicates that the mesh will be instanced with either static geometry or instancing
+    # The static geometry / instancing manager name is given by the group: (static | instancing).MyGroup
+    if group != None:
+        e.setAttribute( type, group.name[len(type + "."):] )
+
 def _mesh_entity_helper(doc, ob, o):
     user = doc.createElement('userData')
     o.appendChild(user)
@@ -408,7 +416,7 @@ def ogre_document(materials):
     for mat in materials:
         item = doc.createElement('item')
         extern.appendChild( item )
-        item.setAttribute('type','material')
+        item.setAttribute('type', 'material')
         a = doc.createElement('file')
         item.appendChild( a )
         a.setAttribute('name', '%s.material'%material.material_name(mat))
@@ -477,17 +485,14 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if ob.data.name in mesh_collision_files:
             collisionFile = mesh_collision_files[ ob.data.name ]
         
-        # Print a warning if there are no UV Maps created for the object
-        # and the user requested to have tangents generated 
-        # (they won't be without a UV Map)
-        if int(config.get("GENERATE_TANGENTS")) != 0 and len(ob.data.uv_layers) == 0:
-            logger.warning("No UV Maps were created for this object: <%s>, tangents won't be exported." % ob.name)
-            Report.warnings.append( 'Object "%s" has no UV Maps, tangents won\'t be exported.' % ob.name )
-
         e = doc.createElement('entity')
         o.appendChild(e); e.setAttribute('name', ob.name)
         prefix = ''
         e.setAttribute('meshFile', '%s%s.mesh' % (prefix, clean_object_name(ob.data.name)) )
+        
+        # Set the instancing attribute if the object belongs to the correct group
+        _mesh_instance_helper(e, ob, "static")
+        _mesh_instance_helper(e, ob, "instanced")
 
         if not collisionPrim and not collisionFile:
                 for child in ob.children:
@@ -529,18 +534,25 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                     Report.warnings.append("Object \"%s\" has unsupported array-modifier mode, must be of 'Constant Offset' type" % ob.name)
                     continue
                 else:
-                    #v = ob.matrix_world.to_translation()
                     newvecs = []
                     for prev in vecs:
-                        for i in range( mod.count-1 ):
-                            v = prev + mod.constant_offset_displace
+                        for i in range( mod.count - 1 ):
+                            count = len(vecs + newvecs)
+                            
+                            v = prev + (i + 1) * mod.constant_offset_displace
+                            
                             newvecs.append( v )
-                            ao = _ogre_node_helper( doc, ob, prefix='_array_%s_'%len(vecs+newvecs), pos=v )
+                            ao = _ogre_node_helper( doc, ob, prefix='_array_%s_' % count, pos=v )
                             xmlparent.appendChild(ao)
 
                             e = doc.createElement('entity')
-                            ao.appendChild(e); e.setAttribute('name', ob.data.name)
+                            ao.appendChild(e)
+                            e.setAttribute('name', '_array_%s_%s' % (count, ob.data.name))
                             e.setAttribute('meshFile', '%s.mesh' % clean_object_name(ob.data.name))
+
+                            # Set the instancing attribute if the object belongs to the correct group
+                            _mesh_instance_helper(e, ob, "static")
+                            _mesh_instance_helper(e, ob, "instanced")
 
                             if collisionPrim: e.setAttribute('collisionPrim', collisionPrim )
                             elif collisionFile: e.setAttribute('collisionFile', collisionFile )
@@ -563,6 +575,11 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                     e = doc.createElement('entity')
                     ao.appendChild(e); e.setAttribute('name', ('%s_particle_%s_%s' % (clean_object_name(ob.data.name), index, clean_object_name(dupob.data.name))))
                     e.setAttribute('meshFile', '%s.mesh' % clean_object_name(dupob.data.name))
+                    
+                    # Set the instancing attribute if the object belongs to the correct group
+                    _mesh_instance_helper(e, dupob, "static")
+                    _mesh_instance_helper(e, dupob, "instanced")
+                    
                     index += 1
             else:
                 logger.warn("<%s> Particle System %s is not supported for export (should be of type: 'Hair' and render_type: 'Object')" % (ob.name, partsys.name))
@@ -579,11 +596,11 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if ob.data.type == "PERSP":
             fovY = 0.0
             if (sx*aspx > sy*aspy):
-                fovY = 2*math.atan(sy*aspy*16.0/(ob.data.lens*sx*aspx))
+                fovY = 2 * math.atan(sy * aspy * 16.0 / (ob.data.lens * sx * aspx))
             else:
-                fovY = 2*math.atan(16.0/ob.data.lens)
+                fovY = 2 * math.atan(16.0 / ob.data.lens)
             # fov in radians - like OgreMax - requested by cyrfer
-            fov = math.radians( fovY*180.0/math.pi )
+            fov = math.radians( fovY * 180.0 / math.pi )
             c.setAttribute('projectionType', "perspective")
             c.setAttribute('fov', '%6f' % fov)
         else: # ob.data.type == "ORTHO":

@@ -66,6 +66,13 @@ Setting any value other than the default `(0, 0, 0)` will result in a mesh with 
 
 ![dupli-offset.png](images/dupli-offset.png)
 
+### Instancing and DotScene Plugin
+As of OGRE 1.13 a new feature has been added to the DotScene Plugin where it now accepts the static / instanced keywords for entities.
+(for more information read the [DotScene Plugin README](https://github.com/sercero/ogre/blob/master/PlugIns/DotScene/README.md)).
+
+To use this feature create a new collection (M) names as `static.<Group Name>` or `instanced.<Instance Manager Name>` and blender2ogre will automatically add the corresponding attribute to the exported entities in the Scene.
+This feature goes hand in hand with [Exporting Particle Systems](#exporting-particle-systems) to create vegetation, debris and other static objects in your scene.
+
 ### External OGRE Materials
 You might already have some materials in OGRE that you do not want to export.
 Prefix them with `extern.<yourname>` and the sub entity will have the material name set, but the material is not exported. 
