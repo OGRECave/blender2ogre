@@ -606,18 +606,19 @@ def merge( objects ):
     
     return bpy.context.active_object
 
-def get_merge_group( ob, prefix='merge.' ):
+def get_merge_group( ob, prefix='merge' ):
     m = []
     for grp in ob.users_collection:
-        if grp.name.lower().startswith(prefix): m.append( grp )
+        if grp.name.lower().startswith(prefix + "."):
+            m.append( grp )
     if len(m)==1:
         #if ob.data.users != 1:
-        #    logger.warn( 'An instance can not be in a merge group' )
+        #    logger.warn( 'An instance cannot be in a merge group' )
         #    return
         return m[0]
     elif m:
-        logger.warn('An object can not be in two merge groups at the same time: %s' % ob.name)
-        return
+        logger.warn('Object %s in two %s groups at the same time' % (ob.name, prefix))
+        return None
 
 def wordwrap( txt ):
     r = ['']
