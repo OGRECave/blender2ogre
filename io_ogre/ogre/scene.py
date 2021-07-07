@@ -70,7 +70,7 @@ def dot_scene(path, scene_name=None):
     for ob in bpy.context.scene.objects:
         if ob.subcollision:
             continue
-        if not (config.get("EXPORT_HIDDEN") or obj in bpy.context.visible_objects):
+        if not (config.get("EXPORT_HIDDEN") or ob in bpy.context.visible_objects):
             continue
         if config.get("SELECTED_ONLY") and not ob.select_get():
             if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
@@ -414,6 +414,7 @@ def ogre_document(materials):
 
     # Extern files
     for mat in materials:
+        if mat is None: continue
         item = doc.createElement('item')
         extern.appendChild( item )
         item.setAttribute('type', 'material')
