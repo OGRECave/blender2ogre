@@ -90,6 +90,7 @@ class OGREMESH_OT_preview(bpy.types.Operator):
         if merged: context.scene.objects.unlink( merged )
 
         try:
+            os.environ["OGRE_MIN_LOGLEVEL"] = "3" # only warnings and up
             if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.platform.startswith('freebsd'):
                 subprocess.Popen([CONFIG['MESH_PREVIEWER'], path + '/preview.mesh'])
             else:
