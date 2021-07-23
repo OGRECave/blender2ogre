@@ -285,7 +285,7 @@ class OgreMaterialGenerator(object):
 
     def copy_texture(self, image):
         origin_filepath = image.filepath
-        target_filepath = split(origin_filepath)[1]
+        target_filepath = split(origin_filepath or image.name)[1]
         target_filepath = self.change_ext(target_filepath, image)
         target_filepath = join(self.target_path, target_filepath)
         
@@ -294,7 +294,7 @@ class OgreMaterialGenerator(object):
             image.filepath = target_filepath
             image.save()
             image.filepath = origin_filepath
-            logger.info("Copy (%s)", origin_filepath)
+            logger.info("Write (%s)", target_filepath)
         else:
             image_filepath = bpy.path.abspath(image.filepath, library=image.library)
             image_filepath = os.path.normpath(image_filepath)
