@@ -413,6 +413,7 @@ def ogre_document(materials):
 
     # Extern files
     for mat in materials:
+        if mat is None: continue
         item = doc.createElement('item')
         extern.appendChild( item )
         item.setAttribute('type', 'material')
