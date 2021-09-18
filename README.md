@@ -10,7 +10,7 @@
  - [Exporting Meshes](#exporting-meshes)
 	- [Ogre Mesh](#ogre-mesh-v1)
 	- [OgreNext Mesh](#ogrenext-mesh-v2)
-  - [Output Filenames](#output-filenames)
+ 	- [Output Filenames](#output-filenames)
  - [Importing Meshes](#importing-meshes)
  - [Additional Features](#additional-features)
 	- [Merge Objects on export](#merge-objects-on-export)
