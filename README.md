@@ -10,6 +10,7 @@
  - [Exporting Meshes](#exporting-meshes)
 	- [Ogre Mesh](#ogre-mesh-v1)
 	- [OgreNext Mesh](#ogrenext-mesh-v2)
+  - [Output Filenames](#output-filenames)
  - [Importing Meshes](#importing-meshes)
  - [Additional Features](#additional-features)
 	- [Merge Objects on export](#merge-objects-on-export)
@@ -72,6 +73,14 @@ If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the
 You can check the arguments passed to `OgreMeshTool.exe` in the Blender console. (`Window Menu > Toggle System Console`)
 
 Blender will export the material format in a Ogre (V1) format. This is not compatible with OgreNext (V2.*). You should manually convert them to a material.json file. See the [Ogre Wiki: HLMS Materials](https://wiki.ogre3d.org/HLMS+Materials) for more information.
+
+#### Output Filenames
+The output file names are determined as per the following:
+![Experter output filenames example.png](images/Readme-ExportFilename-Example1.png)
+* If the collection name (Yellow box 1) **doesn't** have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Red box 3]`. In this example: **CubeBig.mesh**
+* If the collection name (Yellow box 1) **does** have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Yellow box 1, minus the 'merge.' prefix ]`. In this example: CubeMerge.mesh
+* The material filename is taken from the export dialogue filename text box at location `[Red box 2]` with the file extension ".material" added to the end.
+* The material definition names are taken from the material names in the Scene Collection Node `[Red box 4]`. In this example: CubeMaterial
 
 ## Importing Meshes
 As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
