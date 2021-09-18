@@ -210,7 +210,7 @@ def mesh_convert(infile):
         
     else:
         # Convert to v2 format if required
-        cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
+        cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
 
         # Finally, specify input file
         cmd.append(infile)
@@ -265,6 +265,11 @@ def xml_convert(infile, has_uvs=False):
         if not config.get('GENERATE_EDGE_LISTS'):
             cmd.append('-e')
 
+    if config.get('GENERATE_TANGENTS') != "0" and converter_type == "OgreMeshTool":
+        cmd.append('-t')
+        cmd.append('-ts')
+        cmd.append(str(config.get('GENERATE_TANGENTS')))
+
     if config.get('OPTIMISE_VERTEX_BUFFERS') and converter_type == "OgreMeshTool":
         cmd.append('-O')
         cmd.append(config.get('OPTIMISE_VERTEX_BUFFERS_OPTIONS'))
@@ -318,7 +323,10 @@ def xml_convert(infile, has_uvs=False):
 
         # Finally, specify input file
         cmd.append(infile)
-        
+
+        # Log command to console
+        logger.info("Converting mesh from XML to binary: %s" % " ".join(cmd))
+
         # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
         # otherwise it will complain about missing render system (missing plugins_tools.cfg)
         exe_path, name = os.path.split(exe)
@@ -760,4 +768,3 @@ class IndentedWriter(object):
 
     def line(self, text):
         return self.write(text + "\n")
-

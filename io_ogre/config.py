@@ -18,7 +18,7 @@ MESH_TOOL_VERSIONS = [
 TANGENT_MODES =  [
     ('0', 'none', 'do not export'),
     ('3', 'generate', 'generate'),
-    ('4', 'with parity', 'generate with parity')
+    ('4', 'generate with parity', 'generate with parity')
 ]
 
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
@@ -95,7 +95,7 @@ _CONFIG_DEFAULTS_ALL = {
     'IMPORT_ANIMATIONS' : True,
     'ROUND_FRAMES' : True,
     'USE_SELECTED_SKELETON' : True,
-    'IMPORT_SHAPEKEYS' : True   
+    'IMPORT_SHAPEKEYS' : True
 }
 
 _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
