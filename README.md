@@ -55,7 +55,7 @@ To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If th
 #### Ogre Mesh (V1)
 If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
 
-#### OgreNext Mesh (V2./*)
+#### OgreNext Mesh (V2.\*)
 If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2.) mesh format. If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following parameters are a good start point to get a model exported to an Ogre mesh:
 * General
   - Mesh export version: v2
