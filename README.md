@@ -47,11 +47,13 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [Animations](http://www.youtube.com/watch?feature=player_embedded&v=5oVM0Lmeb68)
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
 
-## Exporting meshes
+## Exporting Meshes
 To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the menu button is greyed out, the select the object to export from the blender Node tree (Scene collections). 
 
+### Ogre Mesh
 If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
 
+### OgreNext Mesh
 If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2.) mesh format. If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following combinations of arguments are a good start point to get a model exported to a mesh:
 * General
   - Mesh export version: v2
@@ -71,7 +73,7 @@ You can check the arguments passed to `OgreMeshTool.exe` in the Blender console.
 
 Blender will export the material format in a Ogre (V1) format. This is not compatible with OgreNext (V2.*). You should manually convert them to a material.json file. See the [Ogre Wiki: HLMS Materials](https://wiki.ogre3d.org/HLMS+Materials) for more information.
 
-## Importing meshes
+## Importing Meshes
 As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
  - Import mesh from `.xml` as well as `.mesh` files
  - Option to be able to merge imported submeshes or keep them separate
