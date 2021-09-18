@@ -7,6 +7,7 @@
  - [Installing](#installing)
  - [Updating to new versions](#updating-to-new-versions)
  - [Video Tutorials](#video-tutorials)
+ - [Exporting meshes](#exporting-meshes)
  - [Importing meshes](#importing-meshes)
  - [Additional Features](#additional-features)
 	- [Merge Objects on export](#merge-objects-on-export)
@@ -21,18 +22,21 @@
  - [Authors](#authors)
 
 ## Installing
-Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
-Note on Windows: you have to set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) prior to the first run.  
-After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. 
-Remember to save as default if you want the addon to be enabled after you exit your Blender.  
-Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
+1. Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
+  i. Windows = %USERPROFILE%\AppData\Roaming\Blender Foundation\Blender\[VERSION]\scripts\addons
 
-The following versions of blender have been tested.
+2. Set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) (Line 108) prior to the first run.
+   i. If you want to export meshes for Ogre (v1): Then this path should point to `OgreXMLConverter.exe`. This file can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
+  ii. If you want to export meshes for OgreNext (v2.*): Then this path should point to `OgreMeshTool.exe`. This file can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
 
+3. Enable the addon in Blender
+   i. Version 2.9: `Edit menu > Preferences > Add-ons`. Search for `ogre` and click the box up the top left.
+  ii. Version 2.7: `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender. Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
+
+The following versions of blender have been tested:
+* Blender 2.9x (partially tested. Exporting meshes & materials works)
 * Blender 2.8x
 * **for Blender 2.7x: [see 2.7x-support branch](https://github.com/OGRECave/blender2ogre/tree/2.7x-support)**
-
-For OGRE v2.1 meshes, use OgreMeshTool from Ogre 2 build for `OGRETOOLS_XML_CONVERTER`
 
 ## Updating to new versions ##
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
@@ -42,6 +46,19 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [General Usage](http://www.youtube.com/watch?feature=player_embedded&v=3EpwEsB0_kk)
 * [Animations](http://www.youtube.com/watch?feature=player_embedded&v=5oVM0Lmeb68)
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
+
+## Exporting meshes
+To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the selection is greyed out, the select the object to export from the blender Node tree (Scene collections). 
+
+If you have `OGRETOOLS_XML_CONVERTER` set to a `OgreXMLConverter.exe` path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
+
+If you have `OGRETOOLS_XML_CONVERTER` set to a `OgreMeshTool.exe` path, then the export dialogue will display options relevant for the OgreNext (v2) mesh format. If you do want to export in the OgreNext (v2.*) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following combinations of parameters are recommended by the `OgreMeshTool.exe` help screen:
+* Recommended params for modern DESKTOP (with normal mapping): **OgreMeshTool -e -t -ts 4 -O puqs sourcefile [destfile]**
+* Recommended params for GLES2 (with normal mapping): **OgreMeshTool -e -t -ts 4 -O qs sourcefile [destfile]**
+* Recommended params for modern DESKTOP (without normal mapping): **OgreMeshTool -e -O puqs sourcefile [destfile]**
+* Recommended params for GLES2 (w/out normal mapping): **OgreMeshTool -e -O qs sourcefile [destfile]**
+You can check the arguments passed to `OgreMeshTool.exe` in the Blender console. (`Window Menu > Toggle System Console`)
+As of 18/09/2021, Blender will export the material format in a Ogre (V1) format. This is not compatible with OgreNext (V2.*). You will need to manually convert them to a material.json file.
 
 ## Importing meshes
 As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
