@@ -31,13 +31,10 @@
   - If you want to export meshes for Ogre (v1): Then this path should point to `OgreXMLConverter.exe`. This file can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
   - If you want to export meshes for OgreNext (v2.*): Then this path should point to `OgreMeshTool.exe`. This file can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
 
-3. Enable the addon in Blender
-  - Version 2.9: `Edit menu > Preferences > Add-ons`. Search for `ogre` and click the box up the top left.
-  - Version 2.8: `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender. Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
-
+3. Enable the addon in Blender. `Edit menu > Preferences > Add-ons`. Search for `ogre` and click the box up the top left.
+  
 The following versions of blender have been tested:
-* Blender 2.9x (partially tested. Exporting meshes & materials works)
-* Blender 2.8x
+* Blender 2.80+
 * **for Blender 2.7x: [see 2.7x-support branch](https://github.com/OGRECave/blender2ogre/tree/2.7x-support)**
 
 ## Updating to new versions ##
@@ -55,7 +52,7 @@ To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If th
 #### Ogre Mesh (V1)
 If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
 
-#### OgreNext Mesh (V2./*)
+#### OgreNext Mesh (V2.\*)
 If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2.) mesh format. If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following parameters are a good start point to get a model exported to an Ogre mesh:
 * General
   - Mesh export version: v2
