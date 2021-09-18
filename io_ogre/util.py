@@ -303,7 +303,7 @@ def xml_convert(infile, has_uvs=False):
         
     else:
         # Convert to v2 format if required
-        cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
+        cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
 
         # If requested by the user, generate LOD levels through OgreMeshUpgrader/OgreMeshTool
         if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
