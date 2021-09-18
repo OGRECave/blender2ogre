@@ -77,10 +77,10 @@ Blender will export the material format in a Ogre (V1) format. This is not compa
 #### Output Filenames
 The output file names are determined as per the following:
 ![Experter output filenames example.png](images/Readme-ExportFilename-Example1.png)
-* If the collection name (Yellow box 1) **doesn't** have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Red box 3]`. In this example: **CubeBig.mesh**
-* If the collection name (Yellow box 1) **does** have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Yellow box 1, minus the 'merge.' prefix ]`. In this example: CubeMerge.mesh
-* The material filename is taken from the export dialogue filename text box at location `[Red box 2]` with the file extension ".material" added to the end.
-* The material definition names are taken from the material names in the Scene Collection Node `[Red box 4]`. In this example: CubeMaterial
+* If the collection name (Yellow box 1) *doesn't* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Red box 3]`. In this example: **CubeBig.mesh**
+* If the collection name (Yellow box 1) *does* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Yellow box 1, minus the 'merge.' prefix ]`. In this example: **CubeMerge.mesh**
+* The material filename is taken from the export dialogue filename text box at location `[Red box 2]`. The ".material" file extension is automatically added. In this example the output material name would be: **CubeSmall.material**
+* The material definition names are taken from the material names in the Scene Collection Node `[Red box 4]`. In this example: **CubeMaterial**
 
 ## Importing Meshes
 As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
