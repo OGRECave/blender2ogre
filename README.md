@@ -48,14 +48,27 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
 
 ## Exporting meshes
-To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the selection is greyed out, the select the object to export from the blender Node tree (Scene collections). 
+To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the menu button is greyed out, the select the object to export from the blender Node tree (Scene collections). 
 
-If you have `OGRETOOLS_XML_CONVERTER` set to a `OgreXMLConverter.exe` path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
+If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
 
-If you have `OGRETOOLS_XML_CONVERTER` set to a `OgreMeshTool.exe` path, then the export dialogue will display options relevant for the OgreNext (v2.) mesh format. If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following combinations of parameters are recommended by the `OgreMeshTool.exe` help screen:
-* Recommended params for modern DESKTOP (with normal mapping): **OgreMeshTool -e -t -ts 4 -O puqs sourcefile [destfile]
-* Recommended params for modern DESKTOP (without normal mapping): **OgreMeshTool -e -O puqs sourcefile [destfile]
+If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2.) mesh format. If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following combinations of arguments are a good start point to get a model exported to a mesh:
+* General
+  - Mesh export version: v2
+* Materials
+  - Export materials: ticked
+* Armature
+  - Armature animation: ticked
+* Mesh
+  - Export mesh: ticked
+  - Edge lists: un-ticked
+  - If your model's materials contain normal mapping:
+    - Tangents: "generate with parity"
+  - Else Tangents: "none"
+  - Optimise Vertex buffers for shaders: ticked
+  - Vertex buffer options: puqs
 You can check the arguments passed to `OgreMeshTool.exe` in the Blender console. (`Window Menu > Toggle System Console`)
+
 Blender will export the material format in a Ogre (V1) format. This is not compatible with OgreNext (V2.*). You should manually convert them to a material.json file. See the [Ogre Wiki: HLMS Materials](https://wiki.ogre3d.org/HLMS+Materials) for more information.
 
 ## Importing meshes
