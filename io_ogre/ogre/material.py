@@ -391,6 +391,13 @@ def load_user_materials():
     # I think this is soley used for realxtend... the config of USER_MATERIAL
     # points to a subdirectory of tundra by default. In this case all parsing
     # can be moved to the tundra subfolder
+    
+    # Exit this function if the path is empty. Allows 'USER_MATERIALS' to be blank and not affect anything.
+    # If 'USER_MATERIALS' is something too broad like "C:\\" it recursively scans and will crash when it
+    # hits directories it doesn't have access too
+    if config.get('USER_MATERIALS') == '':
+        return
+        
     if os.path.isdir( config.get('USER_MATERIALS') ):
         scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
         for prog in progs:

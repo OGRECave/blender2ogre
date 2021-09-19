@@ -20,6 +20,7 @@
 	- [Exporting Particle Systems](#exporting-particle-systems)
 	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
 	- [Exporting Node Animations](#exporting-node-animations)
+  - [Mesh Previewer](#mesh-previewer)
  - [About](#about)
  - [Authors](#authors)
 
@@ -27,10 +28,13 @@
 1. Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
   - Windows = %USERPROFILE%\AppData\Roaming\Blender Foundation\Blender\[VERSION]\scripts\addons
 
-2. Set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) (Line 108) prior to the first run.
-  - If you want to export meshes for Ogre (v1): Then this path should point to `OgreXMLConverter.exe`. This file can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
-  - If you want to export meshes for OgreNext (v2.*): Then this path should point to `OgreMeshTool.exe`. This file can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
-
+2. Configure the plugin by editing [io_ogre/config.py](io_ogre/config.py) prior to the first run.
+  - Set the correct path to `OGRETOOLS_XML_CONVERTER` (Line 105) 
+    - If you want to export meshes for Ogre (v1): Then this path should point to `OgreXMLConverter.exe`. This file can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
+    - If you want to export meshes for OgreNext (v2.*): Then this path should point to `OgreMeshTool.exe`. This file can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
+  - **[OPTIONAL]** Set the correct path to `MESH_PREVIEWER` (Line 108) to a path pointed to `ogre-meshviewer.bat` from . This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)      
+  - Make sure that `USER_MATERIALS` isn't set to a directory like "C:\\\". The path is scanned recursively and will crash when it hits paths it doesn't have permissions for.
+  
 3. Enable the addon in Blender
   - Version 2.9: `Edit menu > Preferences > Add-ons`. Search for `ogre` and click the box up the top left.
   - Version 2.8: `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender. Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
@@ -220,6 +224,14 @@ Then you can use `blender2ogre` to export the poses and animations into a `.mesh
 ### Exporting Node Animations
 Node Animations are a way to have scripted node animations in your Ogre application.
 Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
+
+### Mesh Previewer
+If `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) is set to a valid path, a button will appear allowing you to preview your mesh in Ogre3D. If the button isn't there, the path is invalid.
+
+This button only works for Ogre (V1) meshes.
+
+The button is located here:
+![Preview mesh button location](images/Readme-MeshPreviewButtonLocation.png)
 
 ## About
 [The original version of this](https://code.google.com/archive/p/blender2ogre/) was a *single* monolithic Python file.

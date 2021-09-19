@@ -15,7 +15,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 bl_info = {
-    "name": "OGRE Importer-Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
+    "name": "OGRE Importer-Exporter (.scene, .mesh, .skeleton)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg, Guillermo Ojea Quintana",
     "version": (0, 8, 2),
     "blender": (2, 80, 0),
@@ -114,6 +114,7 @@ def register():
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='[%(levelname)5s] %(message)s', datefmt='%H:%M:%S')
 
     logging.info('Starting io_ogre %s', bl_info["version"])
+    
     # The UI modules define auto_register functions that
     # return classes that should be loaded by the plugin
     for clazz in ui.auto_register(True):

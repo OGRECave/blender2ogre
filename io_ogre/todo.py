@@ -36,6 +36,7 @@ class PANEL_Object(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
+        return True
         
     def draw(self, context):
         ob = context.active_object
