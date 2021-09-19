@@ -120,20 +120,6 @@ class OGRE_HT_info_header(bpy.types.Header):
         #    row = layout.row(align=True)
         #    op = row.operator( 'jmonkey.preview', text='', icon='MONKEY' )
 
-        # TODO
-        #if _USE_TUNDRA_:
-        #    row = layout.row(align=True)
-        #    op = row.operator( 'tundra.preview', text='', icon='WORLD' )
-        #    if TundraSingleton:
-        #        op = row.operator( 'tundra.preview', text='', icon='META_CUBE' )
-        #        op.EX_SCENE = False
-        #        if not TundraSingleton.physics:
-        #            op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
-        #        else:
-        #            op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
-        #        op = row.operator( 'tundra.toggle_physics_debug', text='', icon='MOD_PHYSICS' )
-        #        op = row.operator( 'tundra.exit', text='', icon='CANCEL' )
-
         add_preview_button(self, context)
 
         #row = layout.row(align=True)

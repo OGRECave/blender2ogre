@@ -80,12 +80,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         default=config.CONFIG['OGRETOOLS_MESH_MAGICK'],
         update=apply_preferences_to_config
     )
-    TUNDRA_ROOT : bpy.props.StringProperty(
-        name="TUNDRA_ROOT",
-        subtype='FILE_PATH',
-        default=config.CONFIG['TUNDRA_ROOT'],
-        update=apply_preferences_to_config
-    )
     MESH_PREVIEWER : bpy.props.StringProperty(
         name="MESH_PREVIEWER",
         subtype='FILE_PATH',
@@ -110,7 +104,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "OGRETOOLS_XML_CONVERTER")
         layout.prop(self, "OGRETOOLS_MESH_UPGRADER")
         layout.prop(self, "OGRETOOLS_MESH_MAGICK")
-        layout.prop(self, "TUNDRA_ROOT")
         layout.prop(self, "MESH_PREVIEWER")
         layout.prop(self, "IMAGE_MAGICK_CONVERT")
         layout.prop(self, "USER_MATERIALS")
