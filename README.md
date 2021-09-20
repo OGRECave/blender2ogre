@@ -3,14 +3,15 @@
 * License: [GNU LGPL](http://www.gnu.org/licenses/lgpl.html)
 * [Ogre forum thread](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
 
+**This versions requires Blender 2.8+.** For Blender 2.7x: [use the 2.7x-support branch](https://github.com/OGRECave/blender2ogre/tree/2.7x-support)
+
 ## Index
  - [Installing](#installing)
  - [Updating to new versions](#updating-to-new-versions)
  - [Video Tutorials](#video-tutorials)
  - [Exporting Meshes](#exporting-meshes)
-	- [Ogre Mesh](#ogre-mesh-v1)
-	- [OgreNext Mesh](#ogrenext-mesh-v2)
- 	- [Output Filenames](#output-filenames)
+   	- [Output Filenames](#output-filenames)
+	- [OgreNext Tips](#ogrenext-tips)
  - [Importing Meshes](#importing-meshes)
  - [Additional Features](#additional-features)
 	- [Merge Objects on export](#merge-objects-on-export)
@@ -21,22 +22,19 @@
 	- [Exporting Particle Systems](#exporting-particle-systems)
 	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
 	- [Exporting Node Animations](#exporting-node-animations)
+ 	- [Mesh Previewer](#mesh-previewer)
  - [About](#about)
  - [Authors](#authors)
 
 ## Installing
 1. Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
-  - Windows = %USERPROFILE%\AppData\Roaming\Blender Foundation\Blender\[VERSION]\scripts\addons
-
-2. Set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) (Line 108) prior to the first run.
-  - If you want to export meshes for Ogre (v1): Then this path should point to `OgreXMLConverter.exe`. This file can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
-  - If you want to export meshes for OgreNext (v2.*): Then this path should point to `OgreMeshTool.exe`. This file can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
-
-3. Enable the addon in Blender. `Edit menu > Preferences > Add-ons`. Search for `ogre` and click the box up the top left.
-  
-The following versions of blender have been tested:
-* Blender 2.80+
-* **for Blender 2.7x: [see 2.7x-support branch](https://github.com/OGRECave/blender2ogre/tree/2.7x-support)**
+2. Configure the plugin by editing [io_ogre/config.py](io_ogre/config.py) prior to the first run.
+	- Set the correct path to `OGRETOOLS_XML_CONVERTER` (Line 105) 
+		- for Ogre (v1): path should point to `OgreXMLConverter.exe`. This can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
+		- for OgreNext (v2): path should point to `OgreMeshTool.exe`. This can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
+	- *OPTIONAL* Set `MESH_PREVIEWER` (Line 108) to a path pointed to `ogre-meshviewer.bat`. This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)      
+  	- Make sure that `USER_MATERIALS` isn't set to a directory like "C:\\\". The addon scans this path recursively and will crash when it hits a path it doesn't have permissions for.
+3. Enable the addon in Blender: `Edit menu > Preferences > Add-ons`. Search for `'ogre'` and click the box up the top left.
 
 ## Updating to new versions ##
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
@@ -48,13 +46,22 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
 
 ## Exporting Meshes
-To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the menu button is greyed out, the select the object to export from the blender Node tree (Scene collections). 
+To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the menu button is greyed out, the select the object to export from the blender Node tree (Scene collections) first. 
 
-#### Ogre Mesh (V1)
-If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
+- If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
+- If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2) mesh format. 
 
-#### OgreNext Mesh (V2.\*)
-If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2.) mesh format. If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following parameters are a good start point to get a model exported to an Ogre mesh:
+#### Output Filenames
+The output file names are determined as per the following:
+![Output filenames example](images/Readme-ExportFilename-Example1.png)
+* If the collection name (Yellow box 1) *doesn't* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Red box 3]`. In this example: **CubeBig.mesh**
+* If the collection name (Yellow box 1) *does* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Yellow box 1, minus the 'merge.' prefix ]`. In this example: **CubeMerge.mesh**
+	- For more information on merging see the heading: [Merge Objects on export](#merge-objects-on-export)
+* The material filename is taken from the export dialogue filename text box at location `[Red box 2]`. The ".material" file extension is automatically added. In this example the output material name would be: **CubeSmall.material**
+* The material definition names are taken from the material names in the Scene Collection Node `[Red box 4]`. In this example: **CubeMaterial**
+
+#### OgreNext tips
+If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following parameters are a good start point to get a model exported to an Ogre mesh:
 * General
   - Mesh export version: v2
 * Materials
@@ -68,19 +75,11 @@ If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the
     - Tangents: "generate with parity"
     - Else Tangents: "none"
   - Optimise Vertex buffers for shaders: ticked
-  - Vertex buffer options: puqs
+  - Vertex buffer options: **puqs**
 
 You can check the arguments passed to `OgreMeshTool.exe` in the Blender console. (`Window Menu > Toggle System Console`)
 
 Blender will export the material format in a Ogre (V1) format. This is not compatible with OgreNext (V2.*). You should manually convert them to a material.json file. See the [Ogre Wiki: HLMS Materials](https://wiki.ogre3d.org/HLMS+Materials) for more information.
-
-#### Output Filenames
-The output file names are determined as per the following:
-![Experter output filenames example.png](images/Readme-ExportFilename-Example1.png)
-* If the collection name (Yellow box 1) *doesn't* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Red box 3]`. In this example: **CubeBig.mesh**
-* If the collection name (Yellow box 1) *does* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Yellow box 1, minus the 'merge.' prefix ]`. In this example: **CubeMerge.mesh**
-* The material filename is taken from the export dialogue filename text box at location `[Red box 2]`. The ".material" file extension is automatically added. In this example the output material name would be: **CubeSmall.material**
-* The material definition names are taken from the material names in the Scene Collection Node `[Red box 4]`. In this example: **CubeMaterial**
 
 ## Importing Meshes
 As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
@@ -226,6 +225,13 @@ Then you can use `blender2ogre` to export the poses and animations into a `.mesh
 ### Exporting Node Animations
 Node Animations are a way to have scripted node animations in your Ogre application.
 Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
+
+### Mesh Previewer
+If `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) is set to a valid path, a button will appear allowing you to preview your mesh in Ogre3D. If the button isn't there, the path is invalid. This button only works for Ogre (V1) meshes.
+The button is located here:
+
+![Preview mesh button location](images/Readme-MeshPreviewButtonLocation.png)
+
 
 ## About
 [The original version of this](https://code.google.com/archive/p/blender2ogre/) was a *single* monolithic Python file.

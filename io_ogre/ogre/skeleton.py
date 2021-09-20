@@ -67,9 +67,9 @@ class Bone(object):
             self.fixUpAxis = False
         else:
             self.fixUpAxis = True
-            if config.get('SWAP_AXIS') == '-xzy':      # Tundra 1.x
+            if config.get('SWAP_AXIS') == '-xzy':      # 1.x
                 self.flipMat = mathutils.Matrix(((-1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
-            elif config.get('SWAP_AXIS') == 'xz-y':    # Tundra 2.x current generation
+            elif config.get('SWAP_AXIS') == 'xz-y':    # 2.x current generation
                 #self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,1,0,0),(0,0,0,1)))
                 self.flipMat = mathutils.Matrix(((1,0,0,0),(0,0,1,0),(0,-1,0,0),(0,0,0,1))) # thanks to Waruck
             else:

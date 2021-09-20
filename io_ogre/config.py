@@ -86,9 +86,6 @@ _CONFIG_DEFAULTS_ALL = {
     #'DEBUG_LOGGING' : False,
     'SHOW_LOG_NAME' : False,
     
-    # Tundra
-    'TUNDRA_STREAMING' : True,
-    
     # Import
     'IMPORT_NORMALS' : True,
     'MERGE_SUBMESHES' : True,
@@ -98,21 +95,20 @@ _CONFIG_DEFAULTS_ALL = {
     'IMPORT_SHAPEKEYS' : True
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_MAGICK MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS'.split()
 
 ''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
-    Ogre tools and Tundra from various default folders. Also consider making a installer that
+    Ogre tools from various default folders. Also consider making a installer that
     ships Ogre cmd line tools to ease the setup steps for end users. '''
 
 _CONFIG_DEFAULTS_WINDOWS = {
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXMLConverter.exe',
     'OGRETOOLS_MESH_UPGRADER' : 'C:\\OgreCommandLineTools\\OgreMeshUpgrader.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
-    'TUNDRA_ROOT' : 'C:\\Tundra2',
-    'MESH_PREVIEWER' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
+    'MESH_PREVIEWER' : 'C:\\OgreTools\\ogre-meshviewer\\ogre-meshviewer.bat',
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
-    'USER_MATERIALS' : 'C:\\Tundra2\\media\\materials',
-    'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs'
+    'USER_MATERIALS' : '',
+    'SHADER_PROGRAMS' : 'C:\\'
 }
 
 _CONFIG_DEFAULTS_UNIX = {
@@ -122,10 +118,9 @@ _CONFIG_DEFAULTS_UNIX = {
     'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
     'OGRETOOLS_MESH_UPGRADER' : 'OgreMeshUpgrader',
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
-    'TUNDRA_ROOT' : '~/Tundra2',
     'MESH_PREVIEWER' : 'ogre-meshviewer',
-    'USER_MATERIALS' : '~/Tundra2/media/materials',
-    'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
+    'USER_MATERIALS' : '',
+    'SHADER_PROGRAMS' : '~/',
     #'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
     #'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
 }

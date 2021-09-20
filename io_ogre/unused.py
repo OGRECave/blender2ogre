@@ -172,7 +172,6 @@ class JmonkeyPreviewOp( _OgreCommonExport_, bpy.types.Operator ):
         if context.active_object: return True
 
     def invoke(self, context, event):
-        global TundraSingleton
         path = '/tmp/preview.scene'
         self.ogre_export( path, context )
         JmonkeyPipe( path )

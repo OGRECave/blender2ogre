@@ -62,10 +62,6 @@ Installing:
 
         4. Install an mesh viewer (OgreMeshViewer or OgreMeshy)
             * If your using 64bit Windows, put OgreMeshy to C:\\OgreMeshy
-
-        5. realXtend Tundra
-            * For latest Tundra releases see http://code.google.com/p/realxtend-naali/downloads/list
-              - You may need to tweak the config to tell your Tundra path or install to C:\Tundra2
 """
 
 @ogredoc
@@ -148,12 +144,5 @@ Known Issues:
         (Any modifier that changes the vertex count is bad with shape anim or armature anim)
     . never rename the nodes created by enabling Ogre-Material-Layers
     . never rename collision proxy meshes created by the Collision Panel
-    . lighting in Tundra is not excatly the same as in Blender
-Tundra Streaming:
-    . only supports streaming transform of up to 10 objects selected objects
-    . the 3D view must be shown at the time you open Tundra
-    . the same 3D view must be visible to stream data to Tundra
-    . only position and scale are updated, a bug on the Tundra side prevents rotation update
-    . animation playback is broken if you rename your NLA strips after opening Tundra
 '''
 
