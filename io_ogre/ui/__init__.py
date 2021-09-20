@@ -21,6 +21,7 @@ if "bpy" in locals():
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.
+import os
 from .. import config
 from ..report import Report
 from . import material
@@ -28,6 +29,7 @@ from . import importer
 from . import export
 from . import helper
 from ..meshy import OGREMESH_OT_preview
+from os.path import exists
 
 def add_preview_button(self, context):
     layout = self.layout
@@ -41,14 +43,21 @@ def auto_register(register):
     yield OGRE_MT_mini_report
     yield OGREMESH_OT_preview
 
-    bpy.types.VIEW3D_PT_tools_active.append(add_preview_button)
+    # 2021/09/19 - oldmanauz: I don't think this is the proper way to do this
+    # bpy.types.VIEW3D_PT_tools_active doesn't exist in the documentation here: https://docs.blender.org/api/current/bpy.types.html
+    # does this mean it is poorly supported, undefined or depreciated?
+    # Possible solution for future implemtation: bpy.utils.register_tool() & bpy.types.WorkSpaceTool;
+    if register and os.path.exists(config.get('MESH_PREVIEWER')):        
+        bpy.types.VIEW3D_PT_tools_active.append(add_preview_button) # Add the button if the addon is being enabled and the MESH_PREVIEWER path is valid
+    elif not register and os.path.exists(config.get('MESH_PREVIEWER')):
+        bpy.types.VIEW3D_PT_tools_active.remove(add_preview_button) # Remove the button if the addon is being disbaled and the MESH_PREVIEWER path is valid (Assumes that the button is only added if MESH_PREVIEWER was valid)
 
     yield from importer.auto_register(register)
     yield from export.auto_register(register)
     yield from helper.auto_register(register)
 
     if register and config.get('INTERFACE_TOGGLE'):
-        OP_interface_toggle.toggle(True)
+        OGRE_OP_interface_toggle.toggle(True)
 
 """
 General purpose ui elements
@@ -119,20 +128,6 @@ class OGRE_HT_info_header(bpy.types.Header):
         #if _USE_JMONKEY_:
         #    row = layout.row(align=True)
         #    op = row.operator( 'jmonkey.preview', text='', icon='MONKEY' )
-
-        # TODO
-        #if _USE_TUNDRA_:
-        #    row = layout.row(align=True)
-        #    op = row.operator( 'tundra.preview', text='', icon='WORLD' )
-        #    if TundraSingleton:
-        #        op = row.operator( 'tundra.preview', text='', icon='META_CUBE' )
-        #        op.EX_SCENE = False
-        #        if not TundraSingleton.physics:
-        #            op = row.operator( 'tundra.start_physics', text='', icon='PLAY' )
-        #        else:
-        #            op = row.operator( 'tundra.stop_physics', text='', icon='PAUSE' )
-        #        op = row.operator( 'tundra.toggle_physics_debug', text='', icon='MOD_PHYSICS' )
-        #        op = row.operator( 'tundra.exit', text='', icon='CANCEL' )
 
         add_preview_button(self, context)
 

@@ -6,8 +6,8 @@ from .ogre.mesh import dot_mesh
 from .ogre.material import dot_materials
 from .util import objects_merge_materials, merge_objects
 
-## mesh previewer
-
+## This class is called when the "Preview Mesh" button is pressed. It opens the Ogre mesh previewer
+## The button is created int ui/__init__.py > auto_register() function.
 class OGREMESH_OT_preview(bpy.types.Operator):
     '''helper to open ogremesh'''
     bl_idname = 'ogremesh.preview'

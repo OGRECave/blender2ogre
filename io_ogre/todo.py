@@ -1,7 +1,4 @@
 
-# TODO TUNDRA def export_menu_func_realxtend(self, context):
-#    op = self.layout.operator(INFO_OT_createRealxtendExport.bl_idname, text="realXtend Tundra (.txml and .mesh)")
-
 ## Blender world panel options for EC_SkyX creation
 ## todo: EC_SkyX has changes a bit lately, see that
 ## all these options are still correct and valid
@@ -39,10 +36,8 @@ class PANEL_Object(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        _USE_TUNDRA_ = False # TODO
-        if _USE_TUNDRA_ and context.active_object:
-            return True
-
+        return True
+        
     def draw(self, context):
         ob = context.active_object
         layout = self.layout
@@ -92,10 +87,6 @@ class PANEL_MultiResLOD(bpy.types.Panel):
         box.prop( ob, 'use_multires_lod' )
         if ob.use_multires_lod:
             box.prop( ob, 'multires_lod_range' )
-
-''' todo: Update the nonsense C:\Tundra2 paths from defaul config and fix this doc.
-    Additionally point to some doc how to build opengl only version on windows if that really is needed and
-    remove the old Tundra 7z link. '''
 
 @UI
 class PANEL_node_editor_ui_extra( bpy.types.Panel ):
