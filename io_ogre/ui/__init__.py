@@ -47,9 +47,9 @@ def auto_register(register):
     # bpy.types.VIEW3D_PT_tools_active doesn't exist in the documentation here: https://docs.blender.org/api/current/bpy.types.html
     # does this mean it is poorly supported, undefined or depreciated?
     # Possible solution for future implemtation: bpy.utils.register_tool() & bpy.types.WorkSpaceTool;
-    if register and os.path.exists(config.get('MESH_PREVIEWER')):        
+    if register:        
         bpy.types.VIEW3D_PT_tools_active.append(add_preview_button) # Add the button if the addon is being enabled and the MESH_PREVIEWER path is valid
-    elif not register and os.path.exists(config.get('MESH_PREVIEWER')):
+    else:
         bpy.types.VIEW3D_PT_tools_active.remove(add_preview_button) # Remove the button if the addon is being disbaled and the MESH_PREVIEWER path is valid (Assumes that the button is only added if MESH_PREVIEWER was valid)
 
     yield from importer.auto_register(register)
