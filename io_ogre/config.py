@@ -119,7 +119,7 @@ _CONFIG_DEFAULTS_UNIX = {
     'OGRETOOLS_MESH_UPGRADER' : 'OgreMeshUpgrader',
     'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'MESH_PREVIEWER' : 'ogre-meshviewer',
-    'USER_MATERIALS' : '~/',
+    'USER_MATERIALS' : '',
     'SHADER_PROGRAMS' : '~/',
     #'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
     #'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
