@@ -55,6 +55,7 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
 
     def apply_preferences_to_config(self, context):
         config.update_from_addon_preference(context)
+        ui.update_meshpreview_button_visibility(True)
 
     IMAGE_MAGICK_CONVERT : bpy.props.StringProperty(
         name="IMAGE_MAGICK_CONVERT",
@@ -127,6 +128,11 @@ def register():
 
 def unregister():
     logging.info('Unloading io_ogre %s', bl_info["version"])
+    
+    # Save the config
+    config.save_config()
+    
+    # Unregister classes
     for clazz in ui.auto_register(False):
         bpy.utils.unregister_class(clazz)
 

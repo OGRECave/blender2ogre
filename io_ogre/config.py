@@ -105,7 +105,7 @@ _CONFIG_DEFAULTS_WINDOWS = {
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXMLConverter.exe',
     'OGRETOOLS_MESH_UPGRADER' : 'C:\\OgreCommandLineTools\\OgreMeshUpgrader.exe',
     'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
-    'MESH_PREVIEWER' : 'C:\\OgreTools\\ogre-meshviewer\\ogre-meshviewer.bat',
+    'MESH_PREVIEWER' : 'ogre-meshviewer.bat',
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
     'USER_MATERIALS' : '',
     'SHADER_PROGRAMS' : 'C:\\'
@@ -142,6 +142,7 @@ if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.
 def load_config():
     config_dict = {}
 
+    # Check if the config file exists and load it
     if os.path.isfile( CONFIG_FILEPATH ):
         try:
             with open( CONFIG_FILEPATH, 'rb' ) as f:
@@ -149,10 +150,12 @@ def load_config():
         except:
             logger.error('Can not read config from %s' % CONFIG_FILEPATH)
 
+    # Load default values from _CONFIG_DEFAULTS_ALL if they don't exist after loading config from file
     for tag in _CONFIG_DEFAULTS_ALL:
         if tag not in config_dict:
             config_dict[ tag ] = _CONFIG_DEFAULTS_ALL[ tag ]
 
+    # Load default values from _CONFIG_DEFAULTS_WINDOWS or _CONFIG_DEFAULTS_UNIX if they don't exist after loading config from file
     for tag in _CONFIG_TAGS_:
         if tag not in config_dict:
             if sys.platform.startswith('win'):
@@ -162,32 +165,6 @@ def load_config():
             else:
                 logger.error('Unknown platform: %s' % sys.platform)
                 assert 0
-
-    try:
-        if sys.platform.startswith('win'):
-            import winreg
-            # Find the blender2ogre install path from windows registry
-            registry_key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r'Software\blender2ogre', 0, winreg.KEY_READ)
-            exe_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
-            if exe_install_dir != "":
-                # OgreXMLConverter
-                if os.path.isfile(exe_install_dir + "OgreXMLConverter.exe"):
-                    logger.info ("Using OgreXMLConverter from install path: %sOgreXMLConverter.exe" % exe_install_dir)
-                    config_dict['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXMLConverter.exe"
-
-                # OgreMeshUpgrader
-                if os.path.isfile(exe_install_dir + "OgreXmlConverter.exe"):
-                    logger.info ("Using OgreMeshUpgrader from install path: %sOgreMeshUpgrader.exe" % exe_install_dir)
-                    config_dict['OGRETOOLS_MESH_UPGRADER'] = exe_install_dir + "OgreMeshUpgrader.exe"
-
-                # Run auto updater as silent. Notifies user if there is a new version out.
-                # This will not show any UI if there are no update and will go to network
-                # only once per 2 days so it wont be spending much resources either.
-                # todo: Move this to a more appropriate place than load_config()
-                if os.path.isfile(exe_install_dir + "check-for-updates.exe"):
-                    subprocess.Popen([exe_install_dir + "check-for-updates.exe", "/silent"])
-    except Exception as e:
-        logger.error("Exception while reading windows registry: %s" % e)
 
     # Setup temp hidden RNA to expose the file paths
     for tag in _CONFIG_TAGS_:
@@ -211,6 +188,7 @@ def load_config():
 
     return config_dict
 
+# Global CONFIG dictionary
 CONFIG = load_config()
 
 def get(name, default=None):
