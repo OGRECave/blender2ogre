@@ -21,7 +21,7 @@ if "bpy" in locals():
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.
-import os
+import shutil
 from .. import config
 from ..report import Report
 from . import material
@@ -30,6 +30,30 @@ from . import export
 from . import helper
 from ..meshy import OGREMESH_OT_preview
 from os.path import exists
+
+# Variable to visibility state of the mesh preview button is displayed
+meshpreviewButtonDisplayed = False
+
+# Function to update the visibility state of the Ogre mesh preview button. Only shows if 'MESH_PREVIEWER' points to a valid path
+def update_meshpreview_button_visibility(show):
+    global meshpreviewButtonDisplayed
+
+    if show:
+        meshpreviewerExists = shutil.which(config.get('MESH_PREVIEWER')) is not None # Check `MESH_PREVIEWER` path is valid. Should check PATH environment variables as well
+        if meshpreviewerExists:        
+            if not meshpreviewButtonDisplayed:
+                # 19/09/2021 - oldmanauz: I don't think this is the proper way to do this. bpy.types.VIEW3D_PT_tools_active doesn't exist in the documentation here: https://docs.blender.org/api/current/bpy.types.html
+                # Does this mean it is poorly supported, undefined or depreciated? Possible solution for future implemtation: bpy.utils.register_tool() & bpy.types.WorkSpaceTool;
+                bpy.types.VIEW3D_PT_tools_active.append(add_preview_button)
+                meshpreviewButtonDisplayed = True
+        else:
+            if meshpreviewButtonDisplayed:
+                bpy.types.VIEW3D_PT_tools_active.remove(add_preview_button)
+                meshpreviewButtonDisplayed = False
+                
+    elif not show and meshpreviewButtonDisplayed:
+        bpy.types.VIEW3D_PT_tools_active.remove(add_preview_button)
+        meshpreviewButtonDisplayed = False
 
 def add_preview_button(self, context):
     layout = self.layout
@@ -43,15 +67,9 @@ def auto_register(register):
     yield OGRE_MT_mini_report
     yield OGREMESH_OT_preview
 
-    # 2021/09/19 - oldmanauz: I don't think this is the proper way to do this
-    # bpy.types.VIEW3D_PT_tools_active doesn't exist in the documentation here: https://docs.blender.org/api/current/bpy.types.html
-    # does this mean it is poorly supported, undefined or depreciated?
-    # Possible solution for future implemtation: bpy.utils.register_tool() & bpy.types.WorkSpaceTool;
-    if register:        
-        bpy.types.VIEW3D_PT_tools_active.append(add_preview_button) # Add the button if the addon is being enabled and the MESH_PREVIEWER path is valid
-    else:
-        bpy.types.VIEW3D_PT_tools_active.remove(add_preview_button) # Remove the button if the addon is being disbaled and the MESH_PREVIEWER path is valid (Assumes that the button is only added if MESH_PREVIEWER was valid)
-
+    # Tries to show the Ogre mesh preview button
+    update_meshpreview_button_visibility(register)    
+    
     yield from importer.auto_register(register)
     yield from export.auto_register(register)
     yield from helper.auto_register(register)
