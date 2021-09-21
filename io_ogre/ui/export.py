@@ -197,6 +197,7 @@ class _OgreCommonExport_(object):
         logger.info("Target_file_name: %s" % target_file_name)
         logger.debug("Target_file_name_no_ext: %s" % target_file_name_no_ext)
 
+        # Start exporting the elements in the scene
         scene.dot_scene(target_path, target_file_name_no_ext)
         Report.show()
 

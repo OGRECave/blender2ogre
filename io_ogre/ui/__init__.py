@@ -8,14 +8,10 @@ if "bpy" in locals():
         importlib.reload(config)
     if "report" in locals():
         importlib.reload(report)
-    if "material" in locals():
-        importlib.reload(material)
     if "importer" in locals():
         importlib.reload(importer)
     if "export" in locals():
         importlib.reload(export)
-    if "helper" in locals():
-        importlib.reload(helper)
     if "meshy" in locals():
         importlib.reload(meshy)
 
@@ -24,10 +20,8 @@ if "bpy" in locals():
 import shutil
 from .. import config
 from ..report import Report
-from . import material
 from . import importer
 from . import export
-from . import helper
 from ..meshy import OGREMESH_OT_preview
 from os.path import exists
 
@@ -62,8 +56,8 @@ def add_preview_button(self, context):
         op.mesh = True
 
 def auto_register(register):
-    yield OGRE_HT_toggle_ogre
-    yield OGRE_OP_interface_toggle
+    #yield OGRE_HT_toggle_ogre #
+    #yield OGRE_OP_interface_toggle
     yield OGRE_MT_mini_report
     yield OGREMESH_OT_preview
 
@@ -72,55 +66,13 @@ def auto_register(register):
     
     yield from importer.auto_register(register)
     yield from export.auto_register(register)
-    yield from helper.auto_register(register)
 
-    if register and config.get('INTERFACE_TOGGLE'):
-        OGRE_OP_interface_toggle.toggle(True)
+    #if register and config.get('INTERFACE_TOGGLE'):
+        #OGRE_OP_interface_toggle.toggle(True)
 
 """
 General purpose ui elements
 """
-
-# FILE | RENDER | ... | OGRE |x| <-- check box
-class OGRE_OP_interface_toggle(bpy.types.Operator):
-    '''Toggle Ogre UI'''
-    bl_idname = "ogre.toggle_interface"
-    bl_label = "Ogre UI"
-    bl_options = {'REGISTER'}
-
-    @classmethod
-    def poll(cls, context):
-        return True
-
-    def invoke(self, context, event):
-        show = config.get('INTERFACE_TOGGLE')
-        print("toggle invoked:", show)
-        print(dir(event))
-        self.toggle(not show)
-        config.update(INTERFACE_TOGGLE=not show)
-        return {'FINISHED'}
-
-    @classmethod
-    def toggle(self, show):
-        class_func = bpy.utils.register_class
-        if not show:
-            class_func = bpy.utils.unregister_class
-
-        class_func(OGRE_HT_info_header)
-
-        for clazz in material.ogre_register(show):
-            class_func(clazz)
-
-class OGRE_HT_toggle_ogre(bpy.types.Header):
-    bl_space_type = 'INFO'
-
-    def draw(self, context):
-        layout = self.layout
-        show = config.get('INTERFACE_TOGGLE')
-        icon = 'CHECKBOX_DEHLT'
-        if show:
-            icon = 'CHECKBOX_HLT'
-        op = layout.operator('ogre.toggle_interface', text='Ogre', icon=icon)
 
 class OGRE_MT_mini_report(bpy.types.Menu):
     bl_label = "Mini-Report | (see console for full report)"
@@ -129,72 +81,4 @@ class OGRE_MT_mini_report(bpy.types.Menu):
         txt = Report.report()
         for line in txt.splitlines():
             layout.label(text=line)
-
-class OGRE_HT_info_header(bpy.types.Header):
-    bl_space_type = 'INFO'
-    def draw(self, context):
-        layout = self.layout
-        wm = context.window_manager
-        window = context.window
-        scene = context.scene
-        rd = scene.render
-        ob = context.active_object
-        screen = context.screen
-
-        #layout.separator()
-
-        #if _USE_JMONKEY_:
-        #    row = layout.row(align=True)
-        #    op = row.operator( 'jmonkey.preview', text='', icon='MONKEY' )
-
-        add_preview_button(self, context)
-
-        #row = layout.row(align=True)
-        #sub = row.row(align=True)
-        #sub.menu("INFO_MT_file")
-        #sub.menu("INFO_MT_add")
-        # TODO GAME if rd.use_game_engine: sub.menu("INFO_MT_game")
-        # TODO GAME else: sub.menu("INFO_MT_render")
-
-        row = layout.row(align=False); row.scale_x = 1.25
-        #row.menu("INFO_MT_instances", icon='NODETREE', text='')
-        #row.menu("INFO_MT_groups", icon='GROUP', text='')
-
-        #layout.template_header()
-        if not context.area.show_menus:
-            if window.screen.show_fullscreen: 
-                layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
-            else:
-                layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
-            layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
-
-            #layout.separator()
-            #layout.template_running_jobs()
-            #layout.template_reports_banner()
-            #layout.separator()
-            if rd.has_multiple_engines: layout.prop(rd, "engine", text="")
-
-            #layout.label(text=scene.statistics())
-            layout.menu( "INFO_MT_help" )
-        else:
-            #layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
-
-            if ob:
-                row = layout.row(align=True)
-                row.prop( ob, 'name', text='' )
-                row.prop( ob, 'draw_type', text='' )
-                row.prop( ob, 'show_x_ray', text='' )
-                row = layout.row()
-                row.scale_y = 0.75; row.scale_x = 0.9
-                row.prop( ob, 'layers', text='' )
-
-            layout.separator()
-            row = layout.row(align=True); row.scale_x = 1.1
-            row.prop(scene.game_settings, 'material_mode', text='')
-            row.prop(scene, 'camera', text='')
-
-            layout.menu( 'MT_preview_material_text', icon='TEXT', text='' )
-
-            layout.menu( "OGRE_MT_ogre_docs" )
-            layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
 
