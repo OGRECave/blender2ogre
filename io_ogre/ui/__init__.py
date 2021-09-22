@@ -12,8 +12,8 @@ if "bpy" in locals():
         importlib.reload(importer)
     if "export" in locals():
         importlib.reload(export)
-    if "meshy" in locals():
-        importlib.reload(meshy)
+    if "mesh_preview" in locals():
+        importlib.reload(mesh_preview)
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.
@@ -22,7 +22,7 @@ from .. import config
 from ..report import Report
 from . import importer
 from . import export
-from ..meshy import OGREMESH_OT_preview
+from ..mesh_preview import OGREMESH_OT_preview
 from os.path import exists
 
 # Variable to visibility state of the mesh preview button is displayed
@@ -56,8 +56,6 @@ def add_preview_button(self, context):
         op.mesh = True
 
 def auto_register(register):
-    #yield OGRE_HT_toggle_ogre #
-    #yield OGRE_OP_interface_toggle
     yield OGRE_MT_mini_report
     yield OGREMESH_OT_preview
 
@@ -66,9 +64,6 @@ def auto_register(register):
     
     yield from importer.auto_register(register)
     yield from export.auto_register(register)
-
-    #if register and config.get('INTERFACE_TOGGLE'):
-        #OGRE_OP_interface_toggle.toggle(True)
 
 """
 General purpose ui elements

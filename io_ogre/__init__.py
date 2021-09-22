@@ -75,12 +75,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         default=config.CONFIG['OGRETOOLS_MESH_UPGRADER'],
         update=apply_preferences_to_config
     )
-    OGRETOOLS_MESH_MAGICK : bpy.props.StringProperty(
-        name="OGRETOOLS_MESH_MAGICK",
-        subtype='FILE_PATH',
-        default=config.CONFIG['OGRETOOLS_MESH_MAGICK'],
-        update=apply_preferences_to_config
-    )
     MESH_PREVIEWER : bpy.props.StringProperty(
         name="MESH_PREVIEWER",
         subtype='FILE_PATH',
@@ -104,7 +98,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout = self.layout
         layout.prop(self, "OGRETOOLS_XML_CONVERTER")
         layout.prop(self, "OGRETOOLS_MESH_UPGRADER")
-        layout.prop(self, "OGRETOOLS_MESH_MAGICK")
         layout.prop(self, "MESH_PREVIEWER")
         layout.prop(self, "IMAGE_MAGICK_CONVERT")
         layout.prop(self, "USER_MATERIALS")

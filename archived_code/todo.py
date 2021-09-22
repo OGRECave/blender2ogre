@@ -1,3 +1,5 @@
+## Archived on the 22/09/2021
+## Original todo.py lived at io_ogre/todo.py
 
 ## Blender world panel options for EC_SkyX creation
 ## todo: EC_SkyX has changes a bit lately, see that

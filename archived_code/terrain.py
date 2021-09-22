@@ -1,3 +1,6 @@
+## Archived on the 22/09/2021
+## Original terrain.py lived at io_ogre/terrain.py
+
 import bpy
 
 def _get_proxy_decimate_mod( ob ):
