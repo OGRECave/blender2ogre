@@ -1,3 +1,5 @@
+## Archived on the 22/09/2021
+## Original game_logic.py lived at io_ogre/game_logic.py
 
 _game_logic_intro_doc_ = '''
 Hijacking the BGE
