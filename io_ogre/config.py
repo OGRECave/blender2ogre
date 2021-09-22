@@ -95,7 +95,7 @@ _CONFIG_DEFAULTS_ALL = {
     'IMPORT_SHAPEKEYS' : True
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_MAGICK MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS'.split()
 
 ''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
     Ogre tools from various default folders. Also consider making a installer that
@@ -104,7 +104,6 @@ _CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_
 _CONFIG_DEFAULTS_WINDOWS = {
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXMLConverter.exe',
     'OGRETOOLS_MESH_UPGRADER' : 'C:\\OgreCommandLineTools\\OgreMeshUpgrader.exe',
-    'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
     'MESH_PREVIEWER' : 'ogre-meshviewer.bat',
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
     'USER_MATERIALS' : '',
@@ -117,7 +116,6 @@ _CONFIG_DEFAULTS_UNIX = {
     'IMAGE_MAGICK_CONVERT' : 'convert',
     'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
     'OGRETOOLS_MESH_UPGRADER' : 'OgreMeshUpgrader',
-    'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
     'MESH_PREVIEWER' : 'ogre-meshviewer',
     'USER_MATERIALS' : '',
     'SHADER_PROGRAMS' : '~/',
