@@ -1,3 +1,6 @@
+# Code that handles the "Ogre Mesh Preview" button
+# Exports current model to temp folder and loads Ogre viewer from commandline
+
 import bpy, sys, os, subprocess, logging
 from bpy.props import BoolProperty
 from .report import Report
