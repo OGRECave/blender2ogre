@@ -7,7 +7,8 @@ class ReportSingleton(object):
         self.reset()
 
     def show(self):
-        bpy.ops.wm.call_menu( name='OGRE_MT_mini_report' )
+        if not bpy.app.background:
+            bpy.ops.wm.call_menu( name='OGRE_MT_mini_report' )
 
     def reset(self):
         self.materials = []
