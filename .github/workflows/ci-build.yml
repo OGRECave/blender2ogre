@@ -1,0 +1,24 @@
+name: CI Build
+on: 
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+jobs:
+  linux:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y blender ogre-1.12-tools
+    - uses: actions/checkout@v2
+    - name: Test
+      run: |
+        mkdir -p ~/.config/blender/2.82/scripts/addons/
+        ln -s `pwd`/io_ogre ~/.config/blender/2.82/scripts/addons/
+        blender -b --python test/run.py
+        # verify that files were created
+        test -f test.scene
+        test -f Cube.mesh
+        test -f Material.material
