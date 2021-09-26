@@ -119,33 +119,11 @@ The following material 'vertexcolor' can be defined in your OGRE project:
 ![extern-material.png](images/extern-material.png)
 
 ### Console Export
-You might have several blender files in your project you want to export to Ogre. Do this by hand? NO! You can do better! 
-After all, you have build scripts to compile your source code? Why not export your files automated?
-Here is how you can export a scene with blender2ogre. Take a look at [io_ogre/console.py](io_ogre/console.py). 
-You might want to write your own script for your project to export individual objects.
+You might have several blender files in your project you want to export to Ogre. Do this by hand? NO! You can do better!
+Here is how you can export a scene with blender2ogre.
 
-```
-$ cd blender2ogre
-$ blender -b examples/vertex-colored.blend --python io_ogre/console.py -- /tmp/blender 'scene abc'
-Processing Scene - abc
-  Processing Materials
-      - Exporting root node: Lamp.002
-      - Exporting root node: Lamp.001
-      - Exporting root node: cube
-      - Generating: Cube.mesh.xml
-      - Writing shared geometry
-        Done at 0.00 seconds
-      - Writing submeshes
-        Done at 0.00 seconds
-      - Created .mesh.xml at 0.00 seconds
-INFO:root:      - Created .mesh in total time 0.53 seconds
-      - Exporting root node: Lamp
-      - Exporting root node: Camera
-  Exported Ogre Scene: /tmp/blender/abc.scene
-
-Blender quit
-$ ls /tmp/blender
-abc.scene  Cube.mesh  Cube.mesh.xml  Material.material
+```sh
+blender test.blend -b --python-expr "import bpy;bpy.ops.ogre.export(filepath='test.scene')"
 ```
 
 ### Exporting Custom Vertex Groups
