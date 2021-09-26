@@ -17,8 +17,9 @@ jobs:
       run: |
         mkdir -p ~/.config/blender/2.82/scripts/addons/
         ln -s `pwd`/io_ogre ~/.config/blender/2.82/scripts/addons/
-        blender -b --python test/run.py
+        blender examples/armature-test.blend -b --python test/run.py
         # verify that files were created
         test -f test.scene
         test -f Cube.mesh
+        test -f Cube.skeleton
         test -f Material.material
