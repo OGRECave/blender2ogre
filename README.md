@@ -28,13 +28,13 @@
 
 ## Installing
 1. Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
-2. Configure the plugin by editing [io_ogre/config.py](io_ogre/config.py) prior to the first run.
-	- Set the correct path to `OGRETOOLS_XML_CONVERTER` (Line 105) 
+2. Enable the addon in Blender: `Edit menu > Preferences > Add-ons`. Search for `'ogre'` and click the box up the top left.
+3. Configure the plugin prior to the first run.
+	- Set the correct path to `OGRETOOLS_XML_CONVERTER` 
 		- for Ogre (v1): path should point to `OgreXMLConverter.exe`. This can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
 		- for OgreNext (v2): path should point to `OgreMeshTool.exe`. This can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
-	- *OPTIONAL* Set `MESH_PREVIEWER` (Line 108) to a path pointed to `ogre-meshviewer.bat`. This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)      
+	- *OPTIONAL* Set `MESH_PREVIEWER` to a path pointed to `ogre-meshviewer.bat`. This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)      
   	- Make sure that `USER_MATERIALS` isn't set to a directory like "C:\\\". The addon scans this path recursively and will crash when it hits a path it doesn't have permissions for.
-3. Enable the addon in Blender: `Edit menu > Preferences > Add-ons`. Search for `'ogre'` and click the box up the top left.
 
 ## Updating to new versions ##
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
@@ -205,7 +205,7 @@ Node Animations are a way to have scripted node animations in your Ogre applicat
 Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
 
 ### Mesh Previewer
-If `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) is set to a valid path, a button will appear allowing you to preview your mesh in Ogre3D. If the button isn't there, the path is invalid. This button only works for Ogre (V1) meshes.
+If `MESH_PREVIEWER` is set, a button will appear allowing you to preview your mesh in Ogre3D. If the button isn't there, the path is invalid. This only works for Ogre (V1) meshes.
 The button is located here:
 
 ![Preview mesh button location](images/Readme-MeshPreviewButtonLocation.png)
@@ -224,6 +224,7 @@ Naturally the most welcome contribution is actual code via [pull requests](https
 If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. 
 So that there is no overlap with other developers or the overall roadmap.
  
+* [Git Contributors](https://github.com/OGRECave/blender2ogre/graphs/contributors)
 * [Brett](http://pyppet.blogspot.fi/)
 * S. Rombauts
 * F00bar
@@ -233,9 +234,6 @@ So that there is no overlap with other developers or the overall roadmap.
 * [Jonne Nauha](https://bitbucket.org/jonnenauha) aka Pforce
 * vax456
 * Sybren Stüvel
-* [Richard Plangger](https://bitbucket.org/plan_rich)
-* [Pavel Rojtberg](https://www.rojtberg.net)
-* [Guillermo Ojea Quintana](https://github.com/sercero)
 
 Additionally the following companies have supported/sponsored the development efforts.
 
