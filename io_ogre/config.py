@@ -58,6 +58,7 @@ _CONFIG_DEFAULTS_ALL = {
     'OGRE_INHERIT_SCALE' : False,
     'ARMATURE_ANIMATION' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
+    'ONLY_KEYFRAMES' : False,
 
     # Mesh
     'MESH' : True,

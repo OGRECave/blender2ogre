@@ -60,8 +60,11 @@ So what the exporter does is go frame by frame and have Blender calculate the bo
 This means that your animation in Ogre has a keyframe for every single frame from the start of the animation to the end.
 As a result of this setting IM_SPLINE for frame interpolation in Ogre would make no difference and might even slow down the skeletal animation.
 
+If you only require key frames exported, then make sure the "Only Keyframes" option is ticked in the exporter properties.
+
 ## Exporter Options:
  - *EX_ARMATURE_ANIMATION* (Armature Animation) : Export armature animations (updates the .skeleton file), enable this option to export the armature animations.
+ - *EX_ONLY_KEYFRAMES* (Only Keyframes) : Exports only the key frames. Influences that Inverse Kinematics, Drivers and modified F-Curves have on the animation will be lost.
  - *EX_ONLY_DEFORMABLE_BONES* (Only Deformable Bones) : Only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. NOTE: Any bone with deformable children/descendants will be output as well
  - *EX_ONLY_KEYFRAMED_BONES* (Only Keyframed Bones) : Only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis
  - *EX_OGRE_INHERIT_SCALE* (OGRE Inherit Scale) : Whether the OGRE bones have the 'inherit scale' flag on. If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.

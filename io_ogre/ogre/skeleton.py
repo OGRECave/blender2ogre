@@ -23,6 +23,8 @@ from os.path import join
 
 logger = logging.getLogger('skeleton')
 
+# Function exports the Ogre .skeleton file
+# Called from ogre/scene.py > dot_scene_node_export() function
 def dot_skeleton(obj, path, **kwargs):
     """
     Create the .skeleton file for this object. 
@@ -374,12 +376,32 @@ class Skeleton(object):
             if bone.shouldOutput:
                 bone_tracks.append( Bone_Track(bone) )
             bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
-        for frame in range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step):#thanks to Vesa
+        
+        # Only export keyframes (Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves)
+        key_frame_numbers = [] # Holds a list of keyframes
+        if config.get('ONLY_KEYFRAMES'):
+            action = bpy.data.actions[actionName] # actionName is the animation name (NLAtrack child)
+            # loops through all channels on the f-curve --> Code taken from: https://blender.stackexchange.com/questions/8387/how-to-get-keyframe-data-from-python
+            for fcu in action.fcurves:
+                for keyframe in fcu.keyframe_points: # Loops through all the keyframes in the channel
+                    kf = keyframe.co[0] # key frame number
+                    if kf not in key_frame_numbers: # only add the key frames in once
+                        key_frame_numbers.append(kf)
+            
+        # By default, export keyframes over the begin-end range so that the exported animation will be affected by Inverse Kinematics, Drivers and modified F-Curves
+        # frame_step is [( # of frames / FPS ) / # of frames ] -- I think
+        frame_range = range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step) #thanks to Vesa
+        if config.get('ONLY_KEYFRAMES'): # Modify frame range so only key frames are exported
+            frame_range = key_frame_numbers
+        
+        # Add keyframes to export
+        for frame in frame_range:
             bpy.context.scene.frame_set(frame)
             for bone in self.roots:
                 bone.update()
             for track in bone_tracks:
                 track.add_keyframe((frame - frameBegin) / _fps)
+        
         # check to see if any animation tracks would be output
         animationFound = False
         for track in bone_tracks:
@@ -392,8 +414,15 @@ class Skeleton(object):
         parentElement.appendChild( anim )
         tracks = doc.createElement('tracks')
         anim.appendChild( tracks )
-        Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]' %(arm.name, actionName, frameBegin, frameEnd) )
-
+        
+        # Report and log
+        suffix_text = ''
+        if config.get('ONLY_KEYFRAMES'):
+            suffix_text = ' - Key frames: ' + str(key_frame_numbers)
+            logger.info('+ %s Key frames: %s' %(actionName,str(key_frame_numbers)))            
+        Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]%s' %(arm.name, actionName, frameBegin, frameEnd,suffix_text) )        
+            
+        # Write stuff to skeleton.xml file
         anim.setAttribute('name', actionName)                       # USE the action name
         anim.setAttribute('length', '%6f' %( (frameEnd - frameBegin)/_fps ) )
 
@@ -460,6 +489,10 @@ class Skeleton(object):
             if not len( arm.animation_data.nla_tracks ):
                 Report.warnings.append('You must assign an NLA strip to armature (%s) that defines the start and end frames' % arm.name)
 
+            # Log to console
+            if config.get('ONLY_KEYFRAMES'):
+                logger.info('+ Only exporting keyframes')
+                            
             actions = {}  # actions by name
             # the only thing NLA is used for is to gather the names of the actions
             # it doesn't matter if the actions are all in the same NLA track or in different tracks
