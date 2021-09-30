@@ -96,7 +96,7 @@ class _OgreCommonExport_(object):
             "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"], 
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
-            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
+            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
             "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
             "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"], 
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
@@ -165,7 +165,7 @@ class _OgreCommonExport_(object):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
 
-        print ("_" * 80)
+        print ("_" * 80,"\n")
         
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
@@ -311,6 +311,10 @@ class _OgreCommonExport_(object):
         name="Armature Animation",
         description="Export armature animations (updates the .skeleton file)",
         default=config.get('ARMATURE_ANIMATION')) = {}
+    EX_ONLY_KEYFRAMES : BoolProperty(
+        name="Only Keyframes",
+        description="Only export keyframes.\nNOTE: Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves",
+        default=config.get('ONLY_KEYFRAMES')) = {}
     EX_ONLY_DEFORMABLE_BONES : BoolProperty(
         name="Only Deformable Bones",
         description="Only exports bones that are deformable. Useful for hiding IK-Bones used in Blender.\nNOTE: Any bone with deformable children/descendants will be output as well",
