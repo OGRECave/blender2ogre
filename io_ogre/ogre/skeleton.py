@@ -377,22 +377,20 @@ class Skeleton(object):
                 bone_tracks.append( Bone_Track(bone) )
             bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
         
-        # Only export keyframes (Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves)
-        key_frame_numbers = [] # Holds a list of keyframes
-        if config.get('ONLY_KEYFRAMES'):
+        # Decide keyframes to export:
+        # ONLY keyframes (Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves)
+        # OR export keyframe each frame over animation range (Exported animation will be affected by Inverse Kinematics, Drivers and modified F-Curves)
+        if config.get('ONLY_KEYFRAMES'): # Only keyframes 
+            frame_range = [] # Holds a list of keyframes for export
             action = bpy.data.actions[actionName] # actionName is the animation name (NLAtrack child)
             # loops through all channels on the f-curve --> Code taken from: https://blender.stackexchange.com/questions/8387/how-to-get-keyframe-data-from-python
             for fcu in action.fcurves:
                 for keyframe in fcu.keyframe_points: # Loops through all the keyframes in the channel
                     kf = keyframe.co[0] # key frame number
-                    if kf not in key_frame_numbers: # only add the key frames in once
-                        key_frame_numbers.append(kf)
-            
-        # By default, export keyframes over the begin-end range so that the exported animation will be affected by Inverse Kinematics, Drivers and modified F-Curves
-        # frame_step is [( # of frames / FPS ) / # of frames ] -- I think
-        frame_range = range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step) #thanks to Vesa
-        if config.get('ONLY_KEYFRAMES'): # Modify frame range so only key frames are exported
-            frame_range = key_frame_numbers
+                    if kf not in frame_range: # only add the key frames in once. Keyframes repeat in different channels
+                        frame_range.append(kf)
+        else: # Keyframes each frame
+            frame_range = range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step) #thanks to Vesa, NOTE: frame_step is [( # of frames / FPS ) / # of frames ] -- I think??
         
         # Add keyframes to export
         for frame in frame_range:
@@ -402,7 +400,7 @@ class Skeleton(object):
             for track in bone_tracks:
                 track.add_keyframe((frame - frameBegin) / _fps)
         
-        # check to see if any animation tracks would be output
+        # Check to see if any animation tracks would be output
         animationFound = False
         for track in bone_tracks:
             if track.is_pos_animated() or track.is_rot_animated() or track.is_scale_animated():
