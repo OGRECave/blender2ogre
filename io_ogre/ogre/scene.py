@@ -614,7 +614,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         a.setAttribute('near', '%6f' % ob.data.clip_start)    # requested by cyrfer
         a.setAttribute('far', '%6f' % ob.data.clip_end)
 
-    elif ob.type == 'LAMP' and ob.data.type in 'POINT SPOT SUN'.split():
+    elif ob.type == 'LIGHT' and ob.data.type in 'POINT SPOT SUN'.split():
         Report.lights.append( ob.name )
         l = doc.createElement('light')
         o.appendChild(l)
@@ -628,23 +628,33 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
         l.setAttribute('name', ob.name )
         l.setAttribute('powerScale', str(ob.data.energy))
+        
+        blender_version = bpy.app.version_string.split(".")
+        blender_ver_major = int(blender_version[0])
+        blender_ver_minor = int(blender_version[1])
+        
+        if (blender_ver_major == 2 and blender_ver_minor >= 93) or (blender_ver_major >= 3):
+            a = doc.createElement('colourDiffuse'); l.appendChild(a)
+            a.setAttribute('r', '%3f' % (ob.data.color.r * ob.data.diffuse_factor))
+            a.setAttribute('g', '%3f' % (ob.data.color.g * ob.data.diffuse_factor))
+            a.setAttribute('b', '%3f' % (ob.data.color.b * ob.data.diffuse_factor))
 
-        if ob.data.use_diffuse:
-            a = doc.createElement('colourDiffuse'); l.appendChild( a )
+        else:
+            a = doc.createElement('colourDiffuse'); l.appendChild(a)
             a.setAttribute('r', '%3f' % ob.data.color.r)
             a.setAttribute('g', '%3f' % ob.data.color.g)
             a.setAttribute('b', '%3f' % ob.data.color.b)
 
-        if ob.data.use_specular:
-            a = doc.createElement('colourSpecular'); l.appendChild( a )
-            a.setAttribute('r', '%3f' % ob.data.color.r)
-            a.setAttribute('g', '%3f' % ob.data.color.g)
-            a.setAttribute('b', '%3f' % ob.data.color.b)
+        if ob.data.specular_factor > 0:
+            a = doc.createElement('colourSpecular'); l.appendChild(a)
+            a.setAttribute('r', '%3f' % (ob.data.color.r * ob.data.specular_factor))
+            a.setAttribute('g', '%3f' % (ob.data.color.g * ob.data.specular_factor))
+            a.setAttribute('b', '%3f' % (ob.data.color.b * ob.data.specular_factor))
 
         if ob.data.type == 'SPOT':
             a = doc.createElement('lightRange')
             l.appendChild(a)
-            a.setAttribute('inner',str( ob.data.spot_size*(1.0-ob.data.spot_blend) ))
+            a.setAttribute('inner',str( ob.data.spot_size * (1.0 - ob.data.spot_blend)))
             a.setAttribute('outer',str(ob.data.spot_size))
             a.setAttribute('falloff','1.0')
 
