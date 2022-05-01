@@ -45,6 +45,7 @@ _CONFIG_DEFAULTS_ALL = {
     'MATERIALS' : True,
     'COPY_SHADER_PROGRAMS' : True,
     'SEPARATE_MATERIALS' : True,
+    'USE_FFP_PARAMETERS': False,
     
     # Textures
     'MAX_TEXTURE_SIZE' : 4096,

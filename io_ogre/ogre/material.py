@@ -187,16 +187,22 @@ class OgreMaterialGenerator(object):
                     self.w.iword('cull_hardware none').nl()
                     self.w.iword('depth_write off').nl()
 
-            # arbitrary bad translation from PBR to Blinn Phong
-            # derive proportions from metallic
-            bf = 1.0 - mat_wrapper.metallic
-            mf = max(0.04, mat_wrapper.metallic)
-            # derive specular color
-            sc = mathutils.Color(color[:3]) * mf + (1.0 - mf) * mathutils.Color((1, 1, 1)) * (1.0 - mat_wrapper.roughness)
-            si = (1.0 - mat_wrapper.roughness) * 128
+            if config.get('USE_FFP_PARAMETERS'):
+                # arbitrary bad translation from PBR to Blinn Phong
+                # derive proportions from metallic
+                bf = 1.0 - mat_wrapper.metallic
+                mf = max(0.04, mat_wrapper.metallic)
+                # derive specular color
+                sc = mathutils.Color(color[:3]) * mf + (1.0 - mf) * mathutils.Color((1, 1, 1)) * (1.0 - mat_wrapper.roughness)
+                si = (1.0 - mat_wrapper.roughness) * 128
 
-            self.w.iword('diffuse').round(color[0]*bf).round(color[1]*bf).round(color[2]*bf).round(alpha).nl()
-            self.w.iword('specular').round(sc[0]).round(sc[1]).round(sc[2]).round(alpha).round(si, 3).nl()
+                self.w.iword('diffuse').round(color[0]*bf).round(color[1]*bf).round(color[2]*bf).round(alpha).nl()
+                self.w.iword('specular').round(sc[0]).round(sc[1]).round(sc[2]).round(alpha).round(si, 3).nl()
+            else:
+                self.w.iword('diffuse').round(color[0]).round(color[1]).round(color[2]).round(alpha).nl()
+                self.w.iword('specular').round(mat_wrapper.metallic).round(mat_wrapper.roughness).real(0).real(0).real(0).nl()
+                with self.w.iword('rtshader_system').embed():
+                    self.w.iline('lighting_stage metal_roughness').nl()
 
             for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
                 if name.startswith('ogre_') and name != 'ogre_parent_material':
