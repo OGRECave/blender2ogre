@@ -60,7 +60,6 @@ class CreateMaterialLayerOperator(bpy.types.Operator):
         nodes = shader.get_or_create_material_passes( mat )
         node = nodes[ self.INDEX ]
         node.material = bpy.data.materials.new( name='%s.LAYER%s'%(mat.name,self.INDEX) )
-        node.material.use_fixed_pipeline = False
         node.material.offset_z = (self.INDEX*2) + 2     # nudge each pass by 2
         return {'FINISHED'}
 
