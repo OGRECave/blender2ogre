@@ -254,7 +254,12 @@ class OgreMaterialGenerator(object):
         if key == "normalmap_texture":
             with self.w.iword('rtshader_system').embed():
                 self.w.iword('lighting_stage normal_map').word(filename).nl()
+                self.w.iword('texturing_stage late_add_blend').nl()
                 return
+        
+        if not key in ("base_color_texture", "emission_color_texture"):
+            self.w.iword('// dont know how to export:').word(key).word(filename).nl()
+            return
 
         with self.w.iword('texture_unit').embed():
             self.w.iword('texture').word(filename).nl()
