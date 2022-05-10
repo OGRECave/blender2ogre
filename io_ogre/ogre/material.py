@@ -208,7 +208,8 @@ class OgreMaterialGenerator(object):
                 self.w.iword('diffuse').round(color[0]).round(color[1]).round(color[2]).round(alpha).nl()
                 self.w.iword('specular').round(mat_wrapper.metallic).round(mat_wrapper.roughness).real(0).real(0).real(0).nl()
                 with self.w.iword('rtshader_system').embed():
-                    self.w.iline('lighting_stage metal_roughness').nl()
+                    self.w.iline('lighting_stage metal_roughness')
+                    self.w.iline('texturing_stage late_add_blend')
 
             for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
                 if name.startswith('ogre_') and name != 'ogre_parent_material':
@@ -254,7 +255,6 @@ class OgreMaterialGenerator(object):
         if key == "normalmap_texture":
             with self.w.iword('rtshader_system').embed():
                 self.w.iword('lighting_stage normal_map').word(filename).nl()
-                self.w.iword('texturing_stage late_add_blend').nl()
                 return
         
         if not key in ("base_color_texture", "emission_color_texture"):
