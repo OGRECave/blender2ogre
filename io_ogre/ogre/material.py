@@ -206,7 +206,7 @@ class OgreMaterialGenerator(object):
                 self.w.iword('specular').round(sc[0]).round(sc[1]).round(sc[2]).round(alpha).round(si, 3).nl()
             else:
                 self.w.iword('diffuse').round(color[0]).round(color[1]).round(color[2]).round(alpha).nl()
-                self.w.iword('specular').round(mat_wrapper.metallic).round(mat_wrapper.roughness).real(0).real(0).real(0).nl()
+                self.w.iword('specular').round(mat_wrapper.roughness).round(mat_wrapper.metallic).real(0).real(0).real(0).nl()
                 with self.w.iword('rtshader_system').embed():
                     self.w.iline('lighting_stage metal_roughness')
                     self.w.iline('texturing_stage late_add_blend')
