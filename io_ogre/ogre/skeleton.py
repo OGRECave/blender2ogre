@@ -386,7 +386,7 @@ class Skeleton(object):
             # loops through all channels on the f-curve --> Code taken from: https://blender.stackexchange.com/questions/8387/how-to-get-keyframe-data-from-python
             for fcu in action.fcurves:
                 for keyframe in fcu.keyframe_points: # Loops through all the keyframes in the channel
-                    kf = keyframe.co[0] # key frame number
+                    kf = int(keyframe.co[0]) # key frame number
                     if kf not in frame_range: # only add the key frames in once. Keyframes repeat in different channels
                         frame_range.append(kf)
         else: # Keyframes each frame
@@ -416,8 +416,8 @@ class Skeleton(object):
         # Report and log
         suffix_text = ''
         if config.get('ONLY_KEYFRAMES'):
-            suffix_text = ' - Key frames: ' + str(key_frame_numbers)
-            logger.info('+ %s Key frames: %s' %(actionName,str(key_frame_numbers)))            
+            suffix_text = ' - Key frames: ' + str(frame_range)
+            logger.info('+ %s Key frames: %s' %(actionName,str(frame_range)))            
         Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]%s' %(arm.name, actionName, frameBegin, frameEnd,suffix_text) )        
             
         # Write stuff to skeleton.xml file
@@ -499,6 +499,9 @@ class Skeleton(object):
 
                 for strip in nla.strips:
                     action = strip.action
+                    if action is None:
+                        logger.error("NLA strip '%s' has no action" % strip.name)
+                        continue
                     actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end]
                     logger.info('  - Action name: %s' % action.name)
                     logger.info('  -  Strip name: %s' % strip.name)
