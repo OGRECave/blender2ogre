@@ -629,11 +629,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         l.setAttribute('name', ob.name )
         l.setAttribute('powerScale', str(ob.data.energy))
         
-        blender_version = bpy.app.version_string.split(".")
-        blender_ver_major = int(blender_version[0])
-        blender_ver_minor = int(blender_version[1])
-        
-        if (blender_ver_major == 2 and blender_ver_minor >= 93) or (blender_ver_major >= 3):
+        if (bpy.app.version[0] == 2 and bpy.app.version[1] >= 93) or (bpy.app.version[0] >= 3):
             a = doc.createElement('colourDiffuse'); l.appendChild(a)
             a.setAttribute('r', '%3f' % (ob.data.color.r * ob.data.diffuse_factor))
             a.setAttribute('g', '%3f' % (ob.data.color.g * ob.data.diffuse_factor))
