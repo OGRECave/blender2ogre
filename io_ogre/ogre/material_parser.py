@@ -179,13 +179,13 @@ class ScriptLexer:
                             lexeme += c
 
             elif state == VAR:
-                if isNewline(c):
+                if self.isNewline(c):
                     self.setToken(lexeme, line, tokens)
                     lexeme = c
                     self.setToken(lexeme, line, tokens)
                     state = READY
 
-                elif isWhitespace(c):
+                elif self.isWhitespace(c):
                     self.setToken(lexeme, line, tokens)
                     state = READY
 
