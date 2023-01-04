@@ -787,6 +787,8 @@ def bCreateMesh(meshData, folder, name, filepath):
             obj.rotation_axis_angle = arm.rotation_axis_angle
             obj.rotation_quaternion = arm.rotation_quaternion
 
+    bpy.ops.object.select_all(action='DESELECT')
+
     # Temporarily select all imported objects
     for subOb in subObjs:
         subOb.select_set(True)
@@ -1017,8 +1019,10 @@ def bCreateSubMeshes(meshData, meshName):
         me.polygons.add(FaceLength)
         for i in range(VertLength):
             me.vertices[i].co = verts[i]
-            if hasNormals:
-                me.vertices[i].normal = Vector((normals[i][0],normals[i][1],normals[i][2]))
+            # NOTE: Doesn't work in Blender 3.2+ and this wasn't needed anyway.
+            # Even the Blender official .OBJ importer uses Custom Split Normals when importing normals
+            #if hasNormals:
+                #me.vertices[i].normal = Vector((normals[i][0],normals[i][1],normals[i][2]))
 
         #me.vertices[VertLength].co = verts[0]
         for i in range(FaceLength):
@@ -1174,19 +1178,9 @@ def bCreateSubMeshes(meshData, meshName):
         me.update(calc_edges=True)
         me.use_auto_smooth = True
 
-        Report.orig_vertices = len( me.vertices )
-        Report.faces += len( me.polygons )
-
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.mesh.remove_doubles(threshold=0.001)
-        bpy.ops.object.editmode_toggle()
- 
-        Report.triangles += len( me.polygons )
-        Report.vertices += len( me.vertices )
-
         # Try to set custom normals
         if hasNormals:
-            noChange = len(me.loops) == len(faces)*3
+            noChange = len(me.loops) == len(faces) * 3
             if not noChange:
                 logger.debug('Removed %s faces' % (len(faces) - len(me.loops) / 3))
             split = []
@@ -1201,7 +1195,18 @@ def bCreateSubMeshes(meshData, meshName):
                 me.normals_split_custom_set(split)
             else:
                 Report.warnings.append("Failed to import mesh normals")
-                logger.warning('Failed to import mesh normals %s / %s', (polyIndex, len(me.polygons)))
+                logger.warning('Failed to import mesh normals %s / %s' % (polyIndex, str(len(me.polygons))))
+
+        Report.orig_vertices = len( me.vertices )
+        Report.faces += len( me.polygons )
+
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.mesh.remove_doubles(threshold=0.001)
+        #bpy.ops.mesh.tris_convert_to_quads()
+        bpy.ops.object.editmode_toggle()
+
+        Report.triangles += len( me.polygons )
+        Report.vertices += len( me.vertices )
 
         allObjects.append(ob)
 
@@ -1317,7 +1322,7 @@ def load(filepath):
                     if config.get('IMPORT_ANIMATIONS'):
                         fps = xAnalyseFPS(xDocSkeletonData)
                         if(fps and config.get('ROUND_FRAMES')):
-                            logger.info("Setting FPS to", fps)
+                            logger.info(" * Setting FPS to %s" % fps)
                             bpy.context.scene.render.fps = fps
                         xCollectAnimations(meshData, xDocSkeletonData)
 
