@@ -66,6 +66,19 @@ class _OgreCommonExport_(object):
                 # todo: isn't the key missing the "EX_" prefix?
                 setattr(self,key,value)
 
+        if not self.filepath:
+            blend_filepath = context.blend_data.filepath
+            if not blend_filepath:
+                blend_filepath = "blender2ogre"
+            else:
+                blend_filepath = os.path.splitext(blend_filepath)[0]
+
+            self.filepath = blend_filepath + ".scene"
+
+        logger.debug("Context.blend_data: %s" % context.blend_data.filepath)
+        logger.debug("Context.scene.name: %s" % context.scene.name)
+        logger.debug("Self.filepath: %s" % self.filepath)
+
         wm = context.window_manager
         fs = wm.fileselect_add(self)
         
@@ -128,30 +141,8 @@ class _OgreCommonExport_(object):
               "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
               "Export XML mesh - do NOT automatically convert .xml to .mesh file. You MUST run converter mesh manually.")
 
-        logger.debug("Context.blend_data: %s" % context.blend_data.filepath)
-        logger.debug("Context.scene.name: %s" % context.scene.name)
-        logger.debug("Self.filepath: %s" % self.filepath)
-        logger.debug("Self.last_export_path: %s" % self.last_export_path)
-
         # Load addonPreference in CONFIG
         config.update_from_addon_preference(context)
-
-        # Resolve path from opened .blend if available. 
-        # Normally it's not if blender was opened with "Recover Last Session".
-        # After export is done once, remember that path when re-exporting.
-        if not self.last_export_path:
-            # First export during this blender run
-            if context.blend_data.filepath != "":
-                path, name = os.path.split(context.blend_data.filepath)
-                self.last_export_path = os.path.join(path, name.split('.')[0])
-
-        if not self.last_export_path:
-            self.last_export_path = os.path.expanduser("~")
-
-        if self.filepath == "" or not self.filepath:
-            self.filepath = "blender2ogre"
-
-        logger.debug("Self.filepath: %s" % self.filepath)
 
         kw = {}
         for name in dir(_OgreCommonExport_):
