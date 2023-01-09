@@ -48,8 +48,6 @@ def menu_func(self, context):
 
 class _OgreCommonExport_(object):
 
-    last_export_path = None
-
     @classmethod
     def poll(cls, context):
         if context.active_object and context.mode != 'EDIT_MESH':

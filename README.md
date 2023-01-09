@@ -10,7 +10,6 @@
  - [Updating to new versions](#updating-to-new-versions)
  - [Video Tutorials](#video-tutorials)
  - [Exporting Meshes](#exporting-meshes)
-   	- [Output Filenames](#output-filenames)
 	- [OgreNext Tips](#ogrenext-tips)
  - [Importing Meshes](#importing-meshes)
  - [Additional Features](#additional-features)
@@ -50,15 +49,6 @@ To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If th
 
 - If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
 - If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2) mesh format. 
-
-#### Output Filenames
-The output file names are determined as per the following:
-![Output filenames example](images/Readme-ExportFilename-Example1.png)
-* If the collection name (Yellow box 1) *doesn't* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Red box 3]`. In this example: **CubeBig.mesh**
-* If the collection name (Yellow box 1) *does* have the prefix "merge." then the mesh filename is taken from the Scene Collection Node at location `[Yellow box 1, minus the 'merge.' prefix ]`. In this example: **CubeMerge.mesh**
-	- For more information on merging see the heading: [Merge Objects on export](#merge-objects-on-export)
-* The material filename is taken from the export dialogue filename text box at location `[Red box 2]`. The ".material" file extension is automatically added. In this example the output material name would be: **CubeSmall.material**
-* The material definition names are taken from the material names in the Scene Collection Node `[Red box 4]`. In this example: **CubeMaterial**
 
 #### OgreNext tips
 If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following parameters are a good start point to get a model exported to an Ogre mesh:
