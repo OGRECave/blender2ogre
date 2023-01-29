@@ -5,9 +5,9 @@ from bpy.props import *
 logger = logging.getLogger('config')
 
 AXIS_MODES =  [
-    ('xyz', 'xyz', 'no swapping'),
-    ('xz-y', 'xz-y', 'ogre standard'),
-    ('-xzy', '-xzy', 'non standard'),
+    ('xyz', 'xyz', 'No Axis swapping'),
+    ('xz-y', 'xz-y', 'Ogre standard'),
+    ('-xzy', '-xzy', 'Non standard'),
 ]
 
 MESH_TOOL_VERSIONS = [
@@ -16,9 +16,9 @@ MESH_TOOL_VERSIONS = [
 ]
 
 TANGENT_MODES =  [
-    ('0', 'none', 'do not export'),
-    ('3', 'generate', 'generate'),
-    ('4', 'generate with parity', 'generate with parity')
+    ('0', 'none', 'Do not export tangents'),
+    ('3', 'generate', 'Generate tangents'),
+    ('4', 'generate with parity', 'Generate with parity')
 ]
 
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)

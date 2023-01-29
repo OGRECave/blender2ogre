@@ -36,7 +36,7 @@ class VertexColorLookup:
         color_names = ["col", "color"]
         alpha_names = ["a", "alpha"]
 
-        if len(self.mesh.vertex_colors):
+        if len(self.mesh.vertex_colors) > 0:
             for key, colors in self.mesh.vertex_colors.items():
                 if (self.__colors is None) and (key.lower() in color_names):
                     self.__colors = colors
@@ -138,7 +138,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         if int(config.get("GENERATE_TANGENTS")) != 0 and len(mesh.uv_layers) == 0:
             logger.warning("No UV Maps were created for this object: <%s>, tangents won't be exported." % ob.name)
             Report.warnings.append( 'Object "%s" has no UV Maps, tangents won\'t be exported.' % ob.name )
-        
+
         # Textures
         dotextures = False
         if mesh.uv_layers:
@@ -184,21 +184,19 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         shared_vertices = {}
         _remap_verts_ = []
-        _remap_normals_ = []
         _face_indices_ = []
 
         numverts = 0
 
         # Create bmesh to help obtain custom vertex normals
         bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bm.verts.ensure_lookup_table()
+
         if mesh.has_custom_normals:
             logger.debug("* Mesh has custom normals")
-            mesh.calc_normals_split()
-            bm.from_mesh(mesh)
-            bm.verts.ensure_lookup_table()
         else:
             logger.debug("* Mesh has NO custom normals")
-            bm.from_mesh(mesh)
 
         # Ogre only supports triangles
         bmesh_return = bmesh.ops.triangulate(bm, faces=bm.faces)
@@ -206,58 +204,43 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         
         # Map the original face indices to the tesselated ones
         face_map = bmesh_return['face_map']
-        
+
         _tess_polygon_face_map_ = {}
-        
+
         for tess_face in face_map:
-            #print("tess_face.index : %s <---> polygon_face.index : %s" % (tess_face.index, face_map[tess_face].index))
+            #print("tess_face.index[%s] <---> polygon_face.index[%s]" % (tess_face.index, face_map[tess_face].index))
             _tess_polygon_face_map_[tess_face.index] = face_map[tess_face].index
 
         # Vertex colors
         vertex_color_lookup = VertexColorLookup(mesh)
 
-        if tangents:
+        if tangents != 0:
             mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
+        else:
+            # calc_tangents() already calculates split normals for us
+            mesh.calc_normals_split()
 
         progressScale = 1.0 / len(mesh.polygons)
         bpy.context.window_manager.progress_begin(0, 100)
-        
+
         # Process mesh after triangulation
         for F in mesh.polygons:
             # Update progress in console
             percent = (F.index + 1) * progressScale
             sys.stdout.write( "\r + Faces [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
             sys.stdout.flush()
-            
+
             # Update progress through Blender cursor
             bpy.context.window_manager.progress_update(percent)
-            
-            smooth = F.use_smooth
+
             tri = (F.vertices[0], F.vertices[1], F.vertices[2])
             face = []
             for loop_idx, idx in zip(F.loop_indices, tri):
                 v = mesh.vertices[ idx ]
 
-                if smooth:
-                    n = mathutils.Vector()
-                    if mesh.has_custom_normals:
-                        for loop in bm.verts[idx].link_loops:
-                            n += mesh.loops[loop.index].normal
-                        n.normalize()
-                        nx,ny,nz = swap( n )
-                    # when no custom normals or mesh.loops[...].normal is zero vector
-                    # use normal vector from vertex
-                    if n.length_squared == 0:
-                        nx,ny,nz = swap( v.normal ) # fixed june 17th 2011
-                        n = mathutils.Vector( [nx, ny, nz] )
-                elif tangents:
-                    nx,ny,nz = swap( mesh.loops[ loop_idx ].normal )
-                    n = mathutils.Vector( [nx, ny, nz] )
-                else:
-                    nx,ny,nz = swap( F.normal )
-                    n = mathutils.Vector( [nx, ny, nz] )
+                nx,ny,nz = swap( mesh.loops[ loop_idx ].normal )
 
-                if tangents:
+                if tangents != 0:
                     tx,ty,tz = swap( mesh.loops[ loop_idx ].tangent )
                     tw = mesh.loops[ loop_idx ].bitangent_sign
 
@@ -283,7 +266,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         if vert == vert2:
                             face.append(vert2.ogre_vidx)
                             alreadyExported = True
-                            #print(idx,numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "already exported")
+                            #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "already exported")
                             break
                     if not alreadyExported:
                         face.append(vert.ogre_vidx)
@@ -299,14 +282,14 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
                 numverts += 1
                 _remap_verts_.append( v )
-                _remap_normals_.append( n )
                 
                 # Use mapping from tesselated face to polygon face if the mapping exists
-                if F.index in _tess_polygon_face_map_:
-                    _face_indices_.append( _tess_polygon_face_map_[F.index] )
-                else:
-                    _face_indices_.append( F.index )
-                
+                #if F.index in _tess_polygon_face_map_:
+                #    _face_indices_.append( _tess_polygon_face_map_[F.index] )
+                #else:
+                #    _face_indices_.append( F.index )
+                _face_indices_.append( F.index )
+
                 x,y,z = swap(v.co)        # xz-y is correct!
 
                 doc.start_tag('vertex', {})
@@ -322,7 +305,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         'z' : '%6f' % nz
                 })
 
-                if tangents:
+                if tangents != 0:
                     doc.leaf_tag('tangent', {
                             'x' : '%6f' % tx,
                             'y' : '%6f' % ty,
@@ -358,7 +341,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         doc.start_tag('submeshes', {})
         for matidx, (mat_name, extern, mat) in enumerate(materials):
-            if not len(material_faces[matidx]):
+            if len(material_faces[matidx]) == 0:
                 Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (obj_name, mat_name) )
                 continue # fixes corrupt unused materials
 
@@ -520,7 +503,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                     logger.info('- Generating: %s LOD meshes. Original: vertices %s, faces: %s' % (len(lod_generated), len(mesh.vertices), len(mesh.loop_triangles)))
                     for lod in lod_generated:
                         ratio_percent = round(lod['ratio'] * 100.0, 0)
-                        logger.info("- Writing LOD %s for distance %s and ratio %s/100, with %s vertices, %s faces" % (lod['level'], lod['distance'], str(ratio_percent), len(lod['mesh'].vertices), len(lod['mesh'].loop_triangles)))
+                        logger.info("- Writing LOD %s for distance %s and ratio %s/100, with %s vertices, %s faces" % 
+                            (lod['level'], lod['distance'], str(ratio_percent), len(lod['mesh'].vertices), len(lod['mesh'].loop_triangles)))
                         lod_ob_temp = bpy.data.objects.new(obj_name, lod['mesh'])
                         lod_ob_temp.data.name = obj_name + '_LOD_' + str(lod['level'])
                         dot_mesh(lod_ob_temp, path, lod_ob_temp.data.name, ignore_shape_animation, normals, tangents, isLOD=True)
@@ -609,13 +593,16 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             doc.end_tag('boneassignments')
 
         # Updated June3 2011 - shape animation works
-        if config.get('SHAPE_ANIMATIONS') and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks):
+        if config.get('SHAPE_ANIMATIONS') and mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 0:
             logger.info('* Writing shape keys')
 
             doc.start_tag('poses', {})
-            for sidx, skey in enumerate(ob.data.shape_keys.key_blocks):
-                if sidx == 0: continue
-                if len(skey.data) != len( mesh.vertices ):
+            for sidx, skey in enumerate(mesh.shape_keys.key_blocks):
+                # Skip the basis Shape Key
+                if sidx == 0:
+                    continue
+
+                if len(skey.data) != len( ob.data.vertices ):
                     failure = 'FAILED to save shape animation - you can not use a modifier that changes the vertex count! '
                     failure += '[ mesh : %s ]' % mesh.name
                     Report.warnings.append( failure )
@@ -630,37 +617,41 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         'target' : 'mesh'
                 })
 
-                snormals = None
+                normals_data = skey.normals_split_get()
+                # Separate normals_split_get() data into 3-tuples
+                snormals = tuple(normals_data[i:i + 3] for i in range(0, len(normals_data), 3))
+                shape_data = skey.data
 
-                if config.get('SHAPE_NORMALS'):
-                    if smooth:
-                        snormals = skey.normals_vertex_get()
-                    else:
-                        snormals = skey.normals_polygon_get()
+                # Create mapping between objects original mesh (polygons,vertices) and normals from "normals_split_get()"
+                normal_idx = 0
+                _remap_normals_ = {}
+                for poly in ob.data.polygons:
+                    for loop_idx in poly.loop_indices:
+                        vertex_idx = ob.data.loops[loop_idx].vertex_index
+                        _remap_normals_[(poly.index,vertex_idx)] = normal_idx
+                        normal_idx = normal_idx + 1
 
+                # Go through _remap_verts_ (array of vertices that are going into OGRE mesh)
                 for vidx, v in enumerate(_remap_verts_):
                     pv = skey.data[ v.index ]
                     x,y,z = swap( pv.co - v.co )
 
                     if config.get('SHAPE_NORMALS'):
-                        n = _remap_normals_[ vidx ]
+                        vertex_idx = v.index
 
-                        if smooth:
-                            pn = mathutils.Vector( [snormals[ v.index * 3 + 0 ], snormals[ v.index * 3 + 1 ], snormals[ v.index * 3 + 2 ]] )
+                        # Try to get original polygon loop index (before tesselation)
+                        if _face_indices_[vidx] in _tess_polygon_face_map_:
+                            loop_idx = _tess_polygon_face_map_[_face_indices_[vidx]]
+                        # If not in _tess_polygon_face_map_, then we can get the original
                         else:
-                            vindex = _face_indices_[ vidx ]
-                            
-                            pn = mathutils.Vector( [snormals[ vindex * 3 + 0 ], snormals[ vindex * 3 + 1 ], snormals[ vindex * 3 + 2 ]] )
+                            loop_idx = _face_indices_[vidx]
 
-                        if mesh.has_custom_normals:
-                            nx,ny,nz = n
-                        else:
-                            nx,ny,nz = swap( pn )
+                        # Index of normal into snormals array
+                        normal_idx = _remap_normals_[(loop_idx, vertex_idx)]
 
-                    #for i,p in enumerate( skey.data ):
-                    #x,y,z = p.co - ob.data.vertices[i].co
-                    #x,y,z = swap( ob.data.vertices[i].co - p.co )
-                    #if x==.0 and y==.0 and z==.0: continue        # the older exporter optimized this way, is it safe?
+                        pn = mathutils.Vector( snormals[normal_idx] )
+                        nx,ny,nz = swap( pn )
+
                     if config.get('SHAPE_NORMALS'):
                         doc.leaf_tag('poseoffset', {
                                 'x' : '%6f' % x,
@@ -669,25 +660,26 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                                 'nx' : '%6f' % nx,
                                 'ny' : '%6f' % ny,
                                 'nz' : '%6f' % nz,
-                                'index' : str(vidx)     # is this required?
+                                'index' : str(vidx)
                         })
                     else:
                         doc.leaf_tag('poseoffset', {
                                 'x' : '%6f' % x,
                                 'y' : '%6f' % y,
                                 'z' : '%6f' % z,
-                                'index' : str(vidx)     # is this required?
+                                'index' : str(vidx)
                         })
+
                 doc.end_tag('pose')
             doc.end_tag('poses')
 
             logger.info('- Done at %s seconds' % timer_diff_str(start))
 
-            if ob.data.shape_keys.animation_data and len(ob.data.shape_keys.animation_data.nla_tracks):
+            if mesh.shape_keys.animation_data and len(mesh.shape_keys.animation_data.nla_tracks) > 0:
                 logger.info('* Writing shape animations')
                 doc.start_tag('animations', {})
                 _fps = float( bpy.context.scene.render.fps )
-                for nla in ob.data.shape_keys.animation_data.nla_tracks:
+                for nla in mesh.shape_keys.animation_data.nla_tracks:
                     for idx, strip in enumerate(nla.strips):
                         doc.start_tag('animation', {
                                 'name' : strip.name,
@@ -707,7 +699,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             doc.start_tag('keyframe', {
                                     'time' : str((frame-strip.frame_start)/_fps)
                             })
-                            for sidx, skey in enumerate( ob.data.shape_keys.key_blocks ):
+                            for sidx, skey in enumerate( mesh.shape_keys.key_blocks ):
                                 if sidx == 0: continue
                                 doc.leaf_tag('poseref', {
                                         'poseindex' : str(sidx-1),
@@ -728,6 +720,10 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             logger.debug("Removing temporary object: %s" % copy.name)
             bpy.data.objects.remove(copy)
             del copy
+
+        # Release BMesh resources
+        bm.free()
+        del bm
 
         del _remap_verts_
         del _remap_normals_
