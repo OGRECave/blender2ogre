@@ -670,6 +670,8 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                                 'index' : str(vidx)
                         })
 
+                del _remap_normals_
+
                 doc.end_tag('pose')
             doc.end_tag('poses')
 
@@ -726,7 +728,6 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         del bm
 
         del _remap_verts_
-        del _remap_normals_
         del _face_indices_
         doc.close() # reported by Reyn
         f.close()
