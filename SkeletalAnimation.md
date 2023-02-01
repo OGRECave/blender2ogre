@@ -116,6 +116,20 @@ Some useful tips to avoid problems or diagnose issues:
  - Remember to add your actions as NLA strips, otherwise they won't be recognized by the exporter.
  - If you're using IK bones, you need to keyframe the bones it is affecting as well otherwise the animation won't work in Ogre.
 
+## Human Top+Base Animations
+It is common for humanoid models to separate animations into top and bottom animations, 
+that is for example to have a running animation separated into the legs animation (Base) and the torso + head animation (Top).
+The objective is that if there is another animation (shooting an arrow, for example which involves only the Top bones) 
+then it is possible to combine the animations: `RunningBase` and `ShootingTop` to have the character running and shooting arrows at the same time.
+
+One good example of this comes with the Ogre SDK: Sinbad.zip. The Sinbad model has a `RunBase` and `RunTop` running animations.
+Both animations have to be performed at the same time in order for the Sinbad character model to run using both arms and legs.
+
+To achieve this requires on the Blender side creating the `RunningBase` and `RunningTop` animations, 
+and for each one to *only* have keyframes the bones that correspond to the Top or Base of the model.
+
+
+
 ## Random Tips from the forum
 Here are gathered some tips lifted from the forum: [Blender26 Ogre Exporter](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
 
