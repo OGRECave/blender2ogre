@@ -15,10 +15,10 @@ To make this tutorial simple the Animation is going to be applied only to the de
 To see a better representation of face animations, take a look at [this](examples/shape-animation.blend) example.
 
 Create a new scene in Blender and split it into two, in the second view select `Dope Sheet` and `Shape Key Editor`.
-![shape-animations1.png](images/shape-animations1.png)
+![shape-animations1.png](images/shape-anim/shape-animations1.png)
 
 Select the default cube and go to the `Vertex` or `Data` tab. Under `Shape Keys` press the `+` button three times to create three Shape Keys.
-![shape-animations2.png](images/shape-animations2.png)
+![shape-animations2.png](images/shape-anim/shape-animations2.png)
 
 The Basis is the base shape and the other shape keys are going to be the poses that we apply over the base.
 
@@ -31,7 +31,7 @@ Then select `Key 2` and press again `s`, write 0.5 and `Enter` to scale the cube
 Now you have three shapes to animate.
 
 Go into `Object Mode` by pressing tab and in the bottom you should see that the current frame is 1.
-![shape-animations3.png](images/shape-animations3.png)
+![shape-animations3.png](images/shape-anim/shape-animations3.png)
 
 Select `Key 1` and in `value` set it all the way to 1.
 
@@ -46,7 +46,7 @@ Now, set the current frame to 60 and repeat the above process but setting `value
 Set the `End` frame to 60 and press play to see the cube changing size. Of course this is a simple animation but with some imagination something much more complex can be achieved like face animations.
 
 Last but not least in order for the `blender2ogre` add-on to properly export the animation it is necessary to turn it into an NLA Track, select the `Push Down` button next to the action name.
-![shape-animations1.png](images/shape-animations1.png)
+![shape-animations1.png](images/shape-anim/shape-animations1.png)
 
 You can now go into the `NLA Editor` view and change the name of the NLA Track that name is the one that is going to be exported.
 
