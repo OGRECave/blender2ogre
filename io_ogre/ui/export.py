@@ -103,14 +103,14 @@ class _OgreCommonExport_(object):
         
         # Options associated with each section
         section_options = {
-            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"], 
-            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"], 
-            "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"], 
-            "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
-            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
-            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
-            "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"], 
-            "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
+            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"],
+            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"],
+            "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
+            "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
+            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
+            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"],
+            "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"],
+            "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"],
             "Logging" : ["EX_Vx_ENABLE_LOGGING"]
         }
         
@@ -165,7 +165,7 @@ class _OgreCommonExport_(object):
         # Add a file handler to all Logger instances
         if config.get('ENABLE_LOGGING') == True:
             log_file = ("%s/blender2ogre.log" % target_path)
-            logger.info("Writing log file to: %s" % log_file)
+            logger.info("* Writing log file to: %s" % log_file)
 
             file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
             
@@ -182,9 +182,17 @@ class _OgreCommonExport_(object):
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logging.getLogger(logger_name).addHandler(file_handler)
 
-        logger.info("Target_path: %s" % target_path)
-        logger.info("Target_file_name: %s" % target_file_name)
-        logger.debug("Target_file_name_no_ext: %s" % target_file_name_no_ext)
+        logger.info("* Target path: %s" % target_path)
+        logger.info("* Target file name: %s" % target_file_name)
+        logger.debug("* Target file name (no ext): %s" % target_file_name_no_ext)
+
+        # https://blender.stackexchange.com/questions/45528/how-to-get-blenders-version-number-from-python
+        logger.info("* Blender version: %s (%s; %s)" % (bpy.app.version_string, bpy.app.version_cycle, bpy.app.build_platform.decode('UTF-8')))
+        logger.debug(" + Binary Path: %s" % bpy.app.binary_path)
+        logger.debug(" + Build Date: %s %s" % (bpy.app.build_date.decode('UTF-8'), bpy.app.build_time.decode('UTF-8')))
+        logger.debug(" + Build Hash: %s" % bpy.app.build_hash.decode('UTF-8'))
+        logger.debug(" + Build Branch: %s" % bpy.app.build_branch.decode('UTF-8'))
+        logger.debug(" + Build Platform: %s" % bpy.app.build_platform.decode('UTF-8'))
 
         # Start exporting the elements in the scene
         scene.dot_scene(target_path, target_file_name_no_ext)
@@ -335,11 +343,10 @@ class _OgreCommonExport_(object):
         description="Export meshes (overwrite existing files)",
         default=config.get('MESH_OVERWRITE')) = {}
 
-    # This is actually implemented as if EX_ARRAY=True always, there is not an actual choice possible
-    #EX_ARRAY : BoolProperty(
-    #    name="Optimise Arrays",
-    #    description="Optimise array modifiers as instances (constant offset only)",
-    #    default=config.get('ARRAY')) = {}
+    EX_ARRAY : BoolProperty(
+        name="Optimise Arrays",
+        description="Optimise array modifiers as instances (constant offset only)",
+        default=config.get('ARRAY')) = {}
     
     EX_V1_EXTREMITY_POINTS : IntProperty(
         name="Extremity Points",
