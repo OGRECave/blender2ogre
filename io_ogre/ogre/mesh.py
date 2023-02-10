@@ -341,7 +341,15 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
                 doc.end_tag('vertex')
 
             append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
-            material_faces[F.material_index].append(face)
+
+            try:
+                material_faces[F.material_index].append(face)
+            except:
+                failure = 'FAILED to assign material to face - you might be using a Boolean Modifier between objects with different materials!'
+                failure += '[ mesh : %s ]' % mesh.name
+                Report.warnings.append( failure )
+                logger.error( failure )
+                break
 
         Report.vertices += numverts
 
