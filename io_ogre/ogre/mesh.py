@@ -66,7 +66,7 @@ class VertexColorLookup:
         return color
 
 
-def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=4, isLOD=False, **kwargs):
+def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=4, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
 
@@ -92,21 +92,35 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     start = time.time()
 
-    cleanup = False
-    if ob.modifiers:
-        cleanup = True
-        copy = ob.copy()
+    if ob.modifiers != None:
+        # Disable Armature and Array modifiers before `to_mesh()` collapse
+        # NOTE: We need to disable the modifiers on the original object itself, we'll enable them again later
+        # If we try to remove the unwanted modifiers from the copy object, then none of the modifiers will be applied when doing `to_mesh()`
+
+        # If we want to optimise array modifiers as instances, then the Array Modifier should be disabled
+        if config.get("ARRAY") == True:
+            disable_mods = ['ARMATURE', 'ARRAY']
+        else:
+            disable_mods = ['ARMATURE']
+
+        for mod in ob.modifiers:
+            if mod.type in disable_mods and mod.show_viewport == True:
+                logger.debug("Disabling Modifier: %s" % mod.name)
+                mod.show_viewport = False
+
+        # Without this, modifiers won't be applied by `to_mesh()`
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        object_eval = ob.evaluated_get(depsgraph)
+
+        copy = object_eval.copy()
         #bpy.context.scene.collection.objects.link(copy)
-        rem = []
-        for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
-            if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
-        for mod in rem: copy.modifiers.remove( mod )
     else:
         copy = ob
 
     # bake mesh
-    mesh = copy.to_mesh()    # collaspe
+    mesh = copy.to_mesh()
     mesh.update()
+
     # Blender by default does not calculate these. 
     # When querying the quads/tris of the object blender would crash if calc_tessface was not updated
     mesh.calc_loop_triangles()
@@ -199,7 +213,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             logger.debug("* Mesh has NO custom normals")
 
         # Ogre only supports triangles
-        bmesh_return = bmesh.ops.triangulate(bm, faces=bm.faces)
+        bmesh_return = bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='FIXED')
         bm.to_mesh(mesh)
         
         # Map the original face indices to the tesselated ones
@@ -716,12 +730,18 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 logger.info('- Done at %s seconds' % timer_diff_str(start))
 
         ## Clean up and save
-        if cleanup:
+        if ob.modifiers != None:
 			#bpy.context.collection.objects.unlink(copy)
             copy.user_clear()
             logger.debug("Removing temporary object: %s" % copy.name)
             bpy.data.objects.remove(copy)
             del copy
+
+            # Reenable disabled modifiers
+            for mod in ob.modifiers:
+                if mod.type in disable_mods and mod.show_viewport == False:
+                    logger.debug("Enabling Modifier: %s" % mod.name)
+                    mod.show_viewport = True
 
         # Release BMesh resources
         bm.free()

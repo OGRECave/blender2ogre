@@ -528,7 +528,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         # Deal with Array modifier
         vecs = [ ob.matrix_world.to_translation() ]
         for mod in ob.modifiers:
-            if mod.type == 'ARRAY':
+            if config.get("ARRAY") == True and mod.type == 'ARRAY':
                 if mod.fit_type != 'FIXED_COUNT':
                     logger.warning("<%s> Unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
                     Report.warnings.append("Object \"%s\" has unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
