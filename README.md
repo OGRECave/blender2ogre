@@ -3,37 +3,38 @@
 * License: [GNU LGPL](http://www.gnu.org/licenses/lgpl.html)
 * [Ogre forum thread](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
 
+**This versions requires Blender 2.8+.** For Blender 2.7x: [use the 2.7x-support branch](https://github.com/OGRECave/blender2ogre/tree/2.7x-support)
+
 ## Index
  - [Installing](#installing)
  - [Updating to new versions](#updating-to-new-versions)
  - [Video Tutorials](#video-tutorials)
- - [Importing meshes](#importing-meshes)
+ - [Exporting Meshes](#exporting-meshes)
+	- [OgreNext Tips](#ogrenext-tips)
+ - [Importing Meshes](#importing-meshes)
  - [Additional Features](#additional-features)
 	- [Merge Objects on export](#merge-objects-on-export)
-	- [Instancing and DotScene Plugin](#instancing-and-dotscene-plugin)
 	- [External OGRE Materials](#external-ogre-materials)
 	- [Console Export](#console-export)
 	- [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
+	- [Exporting Custom Normals](#exporting-custom-normals)
 	- [Exporting Skeletal Animations](#exporting-skeletal-animations)
 	- [Exporting Particle Systems](#exporting-particle-systems)
 	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
 	- [Exporting Node Animations](#exporting-node-animations)
+ 	- [Mesh Previewer](#mesh-previewer)
  - [About](#about)
  - [Authors](#authors)
 
 ## Installing
-Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
-Note on Windows: you have to set the correct path to `OGRETOOLS_XML_CONVERTER` in [io_ogre/config.py](io_ogre/config.py) prior to the first run.  
-After installing the addon enable it in Blender from `User Preferences > Add-Ons > Import-Export` (CTRL+ALT+U). Search for `ogre` and check the box on the right. Remember to save as default if you want the addon to be enabled after you exit your Blender.  
-Integrated help docs will be shown in the upper right hand toolbar, replacing blender's normal `Help` menu, read them for assistance.
-
-The following versions of blender have been tested. It might also work with older versions of Blender.
-
-* Blender 2.7x
-* Blender 2.6x
-* **Blender 2.8x: [use master branch](https://github.com/OGRECave/blender2ogre)**
-
-For OGRE v2.1 meshes, use OgreMeshTool from Ogre 2 build for `OGRETOOLS_XML_CONVERTER`
+1. Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
+2. Enable the addon in Blender: `Edit menu > Preferences > Add-ons`. Search for `'ogre'` and click the box up the top left.
+3. Configure the plugin prior to the first run.
+	- Set the correct path to `OGRETOOLS_XML_CONVERTER` 
+		- for Ogre (v1): path should point to `OgreXMLConverter.exe`. This can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
+		- for OgreNext (v2): path should point to `OgreMeshTool.exe`. This can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
+	- *OPTIONAL* Set `MESH_PREVIEWER` to a path pointed to `ogre-meshviewer.bat`. This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)      
+  	- Make sure that `USER_MATERIALS` isn't set to a directory like "C:\\\". The addon scans this path recursively and will crash when it hits a path it doesn't have permissions for.
 
 ## Updating to new versions ##
 If you are upgrading from a previous version of blender2ogre, and having problems, you may want to delete your old .pickle config file from
@@ -44,11 +45,43 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [Animations](http://www.youtube.com/watch?feature=player_embedded&v=5oVM0Lmeb68)
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
 
-## Importing meshes
-As of `blender2ogre` version *0.7.4*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
+## Exporting Meshes
+To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the menu button is greyed out, the select the object to export from the blender Node tree (Scene collections) first. 
+
+- If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
+- If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2) mesh format. 
+
+### Mesh triangulation issues
+![Cube with broken shading](images/triangulate/broken-shading.png)
+
+If you are seeing some issues with the mesh triangulation (like visible triangles in your shading), check the [Mesh Triangulation README](MeshTriangulation.md) to learn more about the subject and how to workaround it.
+
+### OgreNext tips
+If you do want to export in the OgreNext (v2.) format, make sure in the `Export dialogue > General Settings > Mesh Export Version` is set to V2. The following parameters are a good start point to get a model exported to an Ogre mesh:
+* General
+  - Mesh export version: v2
+* Materials
+  - Export materials: ticked
+* Armature
+  - Armature animation: ticked
+* Mesh
+  - Export mesh: ticked
+  - Edge lists: un-ticked
+  - If your model's materials contain normal mapping:
+    - Tangents: "generate with parity"
+    - Else Tangents: "none"
+  - Optimise Vertex buffers for shaders: ticked
+  - Vertex buffer options: **puqs**
+
+You can check the arguments passed to `OgreMeshTool.exe` in the Blender console. (`Window Menu > Toggle System Console`)
+
+Blender will export the material format in a Ogre (V1) format. This is not compatible with OgreNext (V2.*). You should manually convert them to a material.json file. See the [Ogre Wiki: HLMS Materials](https://wiki.ogre3d.org/HLMS+Materials) for more information.
+
+## Importing Meshes
+As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
  - Import mesh from `.xml` as well as `.mesh` files
  - Option to be able to merge imported submeshes or keep them separate
- - Parsing/Conversion of materials into Blender (not great, but most matching properties have been considered)
+ - Parsing/Conversion of materials into Blender (just create a Principled BSDF material and add a texture with the proper UV mapping)
  - Importing of Poses
  - Importing of Skeletons work for the most part, but Ogre skeletons conventions are not like Blenders (see: [How to get bone's vector and bone's length?](https://forums.ogre3d.org/viewtopic.php?t=49689))
  - Importing of Animations work, but depend on the skeleton which sometimes doesn't get correctly imported
@@ -59,11 +92,10 @@ As of `blender2ogre` version *0.7.4*, the Kenshi Importer has been integrated in
 
 ### Merge Objects on export
 You might have hundrets of objects, which you want to keep separate but have them in one `.mesh` on export.
-For this create a new group (Ctrl+G) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the group.
+For this create a new collection (M) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the collection.
 
-> **NOTE:** The origin of the resulting merged object will be that of the *last* object you added to the group (although when reloading the blend file, this order will be lost).
-
-In order to have control over the precise location of where the merged objects origin will be, use the `dupli_offset` property of the Groups.
+> **NOTE:** The origin of the resulting merged object will be that of the *last* object you added to the collection (although when reloading the blend file, this order will be lost).
+In order to have control over the precise location of where the merged objects origin will be, use the `dupli_offset` property of the collection.
 Setting any value other than the default `(0, 0, 0)` will result in a mesh with the origin set to that value. For example:
 
 ![dupli-offset.png](images/dupli-offset.png)
@@ -72,7 +104,7 @@ Setting any value other than the default `(0, 0, 0)` will result in a mesh with 
 As of OGRE 1.13 a new feature has been added to the DotScene Plugin where it now accepts the static / instanced keywords for entities.
 (for more information read the [DotScene Plugin README](https://github.com/OGRECave/ogre/blob/master/PlugIns/DotScene/README.md)).
 
-To use this feature create a new group (Ctrl+G) named as `static.<Group Name>` or `instanced.<Instance Manager Name>` and blender2ogre will automatically add the corresponding attribute to the exported entities in the Scene.
+To use this feature create a new collection (M) names as `static.<Group Name>` or `instanced.<Instance Manager Name>` and blender2ogre will automatically add the corresponding attribute to the exported entities in the Scene.
 This feature goes hand in hand with [Exporting Particle Systems](#exporting-particle-systems) to create vegetation, debris and other static objects in your scene.
 
 ### External OGRE Materials
@@ -83,41 +115,20 @@ The following material 'vertexcolor' can be defined in your OGRE project:
 ![extern-material.png](images/extern-material.png)
 
 ### Console Export
-You might have several blender files in your project you want to export to Ogre. 
-Do this by hand? NO! You can do better! After all, you have build scripts to compile your source code? Why not export your files automated?
-Here is how you can export a scene with blender2ogre. Take a look at [io_ogre/console.py](io_ogre/console.py). You might want to write your own script for your project to export individual objects.
+You might have several blender files in your project you want to export to Ogre. Do this by hand? NO! You can do better!
+Here is how you can export a scene with blender2ogre.
 
-```
-$ cd blender2ogre
-$ blender -b examples/vertex-colored.blend --python io_ogre/console.py -- /tmp/blender 'scene abc'
-Processing Scene - abc
-  Processing Materials
-      - Exporting root node: Lamp.002
-      - Exporting root node: Lamp.001
-      - Exporting root node: cube
-      - Generating: Cube.mesh.xml
-      - Writing shared geometry
-        Done at 0.00 seconds
-      - Writing submeshes
-        Done at 0.00 seconds
-      - Created .mesh.xml at 0.00 seconds
-INFO:root:      - Created .mesh in total time 0.53 seconds
-      - Exporting root node: Lamp
-      - Exporting root node: Camera
-  Exported Ogre Scene: /tmp/blender/abc.scene
-
-Blender quit
-$ ls /tmp/blender
-abc.scene  Cube.mesh  Cube.mesh.xml  Material.material
+```sh
+blender test.blend -b --python-expr "import bpy;bpy.ops.ogre.export(filepath='test.scene')"
 ```
 
 ### Exporting Custom Vertex Groups
-As shown in the picture below, you can now export SubEntities that contain
-a user defined amount of faces.
+As shown in the picture below, you can now export SubEntities that contain a user defined amount of faces.
 
 ![blender-vertex-group.png](images/blender-vertex-group.png)
 
-You simply call your vertex group with the prefix `ogre.vertex.group.<yourname>` and access it in Ogre similar to the following:
+You simply call your vertex group with the
+prefix `ogre.vertex.group.<yourname>` and access it in Ogre similar to the following:
 
 ```cpp
 void example(const Ogre::Entity * entity)
@@ -165,6 +176,14 @@ material none {
 }
 ```
 
+### Exporting Custom Normals
+![Cube with Filled Edges](images/normals/fillet-edges.png)
+
+Custom Split Normals is a way to tweak the mesh shading by pointing normals towards directions other than the default, auto-computed ones.
+It is mostly used in game development, where it helps counterbalance some issues generated by low-poly objects 
+(the most common examples are low-poly trees, bushes, grass, etc. and the ‘rounded’ corners).
+Check out the [Custom Normals README](CustomSplitNormals.md) to learn more about Custom Normals in Blender.
+
 ### Exporting Skeletal Animations
 ![skeletal-animations.png](images/skeletal-animations.png)
 
@@ -173,13 +192,13 @@ This kind of animation is commonly used to animate characters in videogames.
 Check out the [Skeletal Animations README](SkeletalAnimation.md) to see how to create and export an animated mesh.
 
 ### Exporting Particle Systems
-![particle-system5.png](images/particle-system5.png)
+![particle-system5.png](images/particle-sys/particle-system5.png)
 
 A common technique for laying out random objects on a scene in Blender is to use the Particle System. 
 Check out the [Particle System README](ParticleSystem.md) to see how to create and export a scene where the trees, foliage and rocks are distributed randomly using a particle system.
 
 ### Exporting Shape Animations
-![shape-animations4.png](images/shape-animations4.png)
+![shape-animations4.png](images/shape-anim/shape-animations4.png)
 
 Shape (or Pose) Animations allow animating different poses, a technique commonly used to do face animations.
 Check out the [Shape Animations](ShapeAnimations.md) tutorial to see how to create some poses and animate them. 
@@ -189,8 +208,15 @@ Then you can use `blender2ogre` to export the poses and animations into a `.mesh
 Node Animations are a way to have scripted node animations in your Ogre application.
 Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
 
+### Mesh Previewer
+If `MESH_PREVIEWER` is set, a button will appear allowing you to preview your mesh in Ogre3D. If the button isn't there, the path is invalid. This only works for Ogre (V1) meshes.
+The button is located here:
+
+![Preview mesh button location](images/Readme-MeshPreviewButtonLocation.png)
+
+
 ## About
-[The original version of this](https://bitbucket.org/iboshkov/blender2ogre) was a *single* monolithic Python file.
+[The original version of this](https://code.google.com/archive/p/blender2ogre/) was a *single* monolithic Python file.
 This is not maintainable, and contains a tremendous amount of bugs. There was the need to export blender model to ogre from
 the console, thus I rewrote the whole script and split it into several files.
 It has been well tested on linux 64-bit and should work with others.
@@ -199,9 +225,10 @@ It has been well tested on linux 64-bit and should work with others.
 This Blender addon was made possible by the following list of people. 
 Anyone can contribute to the project by sending bug reports and feature requests [here](https://github.com/OGRECave/blender2ogre/issues). 
 Naturally the most welcome contribution is actual code via [pull requests](https://github.com/OGRECave/blender2ogre/pulls). 
-If you are planning to implement something "big", it's a good practise to discuss it in the issue tracker first with other authors. 
+If you are planning to implement something "big", it's a good practice to discuss it in the issue tracker first with other authors.
 So that there is no overlap with other developers or the overall roadmap.
  
+* [Git Contributors](https://github.com/OGRECave/blender2ogre/graphs/contributors)
 * [Brett](http://pyppet.blogspot.fi/)
 * S. Rombauts
 * F00bar
@@ -211,9 +238,6 @@ So that there is no overlap with other developers or the overall roadmap.
 * [Jonne Nauha](https://bitbucket.org/jonnenauha) aka Pforce
 * vax456
 * Sybren Stüvel
-* [Richard Plangger](https://bitbucket.org/plan_rich)
-* [Pavel Rojtberg](https://www.rojtberg.net)
-* [Guillermo Ojea Quintana](https://github.com/sercero)
 
 Additionally the following companies have supported/sponsored the development efforts.
 

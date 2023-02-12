@@ -210,7 +210,7 @@ def mesh_convert(infile):
         
     else:
         # Convert to v2 format if required
-        cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
+        cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
 
         # Finally, specify input file
         cmd.append(infile)
@@ -265,6 +265,11 @@ def xml_convert(infile, has_uvs=False):
         if not config.get('GENERATE_EDGE_LISTS'):
             cmd.append('-e')
 
+    if config.get('GENERATE_TANGENTS') != "0" and converter_type == "OgreMeshTool":
+        cmd.append('-t')
+        cmd.append('-ts')
+        cmd.append(str(config.get('GENERATE_TANGENTS')))
+
     if config.get('OPTIMISE_VERTEX_BUFFERS') and converter_type == "OgreMeshTool":
         cmd.append('-O')
         cmd.append(config.get('OPTIMISE_VERTEX_BUFFERS_OPTIONS'))
@@ -303,7 +308,7 @@ def xml_convert(infile, has_uvs=False):
         
     else:
         # Convert to v2 format if required
-        cmd.append('-%s' %config.get('MESH_TOOL_EXPORT_VERSION'))
+        cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
 
         # If requested by the user, generate LOD levels through OgreMeshUpgrader/OgreMeshTool
         if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
@@ -318,7 +323,10 @@ def xml_convert(infile, has_uvs=False):
 
         # Finally, specify input file
         cmd.append(infile)
-        
+
+        # Log command to console
+        logger.info("Converting mesh from XML to binary: %s" % " ".join(cmd))
+
         # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
         # otherwise it will complain about missing render system (missing plugins_tools.cfg)
         exe_path, name = os.path.split(exe)
@@ -622,6 +630,7 @@ def merge( objects ):
         assert not ob.library
     bpy.context.scene.objects.active = ob
     bpy.ops.object.join()
+    
     return bpy.context.active_object
 
 def get_merge_group( ob, prefix='merge' ):
@@ -745,7 +754,15 @@ class IndentedWriter(object):
 
     def integer(self, i):
         return self.word(str(i))
-
+    
+    def round(self, f, p=6):
+        """
+        Adds a rounded float
+        f: float value
+        p: precision
+        """
+        return self.word(str(round(f, p)))
+    
     def nl(self):
         self.write("\n")
         return self
@@ -755,17 +772,16 @@ class IndentedWriter(object):
         return self
 
     def word(self, text):
-        return self.write(str(text)).write(" ")
+        return self.write(" ").write(str(text))
 
     def iwrite(self, text):
         return self.indent().write(str(text))
 
     def iword(self, text):
-        return self.indent().word(text)
+        return self.indent().write(str(text))
 
     def iline(self, text):
         return self.indent().line(text)
 
     def line(self, text):
         return self.write(text + "\n")
-

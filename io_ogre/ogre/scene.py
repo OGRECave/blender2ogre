@@ -39,6 +39,7 @@ from .mesh import *
 
 logger = logging.getLogger('scene')
 
+# Called by io_ogre/ui/exporter.py to start exporting the scene
 def dot_scene(path, scene_name=None):
     """
     path: string - target path to save the scene file and related files to
@@ -195,6 +196,7 @@ def dot_scene(path, scene_name=None):
     mesh_collision_prims = {}
     mesh_collision_files = {}
 
+    # Export the objects in the scene
     for root in roots:
         logger.info("* Exporting root node: %s " % root.name)
         dot_scene_node_export(root, path = path, doc = doc,
@@ -207,6 +209,7 @@ def dot_scene(path, scene_name=None):
             xmlparent = doc._scene_nodes
         )
 
+    # Create the .scene file
     if config.get('SCENE'):
         data = doc.toprettyxml()
         with open(target_scene_file, 'wb') as fd:

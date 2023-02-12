@@ -124,7 +124,7 @@ logger = logging.getLogger('ogre_import')
 
 # Script internal options:
 SHOW_IMPORT_DUMPS = False
-SHOW_IMPORT_TRACE = False   # 
+SHOW_IMPORT_TRACE = False
 MIN_BONE_LENGTH = 0.00001	# Prevent automatic removal of bones
 
 # Default blender version of script
@@ -191,7 +191,7 @@ def xCollectVertexData(data):
     vertices = []
     normals = []
     vertexcolors = []
-    
+
     for vb in data.childNodes:
         if vb.localName == 'vertexbuffer':
             if vb.hasAttribute('positions'):
@@ -241,7 +241,7 @@ def xCollectVertexData(data):
                     if len(uvcoords) > 0:
                         uvcoordset.append(uvcoords)
                 vertexdata['uvsets'] = uvcoordset
-    
+
     return vertexdata
 
 
@@ -323,7 +323,7 @@ def xCollectBoneAssignments(meshData, xmldoc):
                 VGNew = VG
             verti = int(vg.getAttributeNode('vertexindex').value)
             weight = float(vg.getAttributeNode('weight').value)
-            # logger.debug("bone=%s, vert=%s, weight=%s" % (VGNew, verti, weight))
+            #logger.debug("bone=%s, vert=%s, weight=%s" % (VGNew, verti, weight))
             VertexGroups[VGNew].append([verti, weight])
 
     return VertexGroups
@@ -331,10 +331,11 @@ def xCollectBoneAssignments(meshData, xmldoc):
 
 def xCollectPoseData(meshData, xmldoc):
     logger.info("* Collecting pose data...")
-    
+
     poses = xmldoc.getElementsByTagName('pose')
     if(len(poses) > 0):
         meshData['poses'] = []
+
     for pose in poses:
         name = pose.getAttribute('name')
         target = pose.getAttribute('target')
@@ -369,7 +370,7 @@ def xGetSkeletonLink(xmldoc, folder):
     return skeletonFile
 
 
-# def xCollectBoneData(meshData, xDoc, name, folder):
+#def xCollectBoneData(meshData, xDoc, name, folder):
 def xCollectBoneData(meshData, xDoc):
     logger.info("* Collecting bone data...")
     
@@ -423,7 +424,7 @@ def xCollectBoneData(meshData, xDoc):
 
     # Update Ogre bones with rotation matrices
     calcBoneRotations(OGRE_Bones)
-    
+
     return OGRE_Bones
 
 
@@ -508,6 +509,7 @@ def calcBoneHeadPositions(BonesData):
 
         BonesData[key]['posHAS'] = posh
         #print("SetBonesASPositions: bone=%s, posHAS=%s" % (key, posh))
+
 
 def calcBoneRotations(BonesDic):
     objDic = {}
@@ -638,7 +640,7 @@ def xAnalyseFPS(xDoc):
 
 def xCollectAnimations(meshData, xDoc):
     logger.info("* Collecting animation data...")
-    
+
     if 'animations' not in meshData:
         meshData['animations'] = {}
     for container in xDoc.getElementsByTagName('animations'):
@@ -697,7 +699,7 @@ def bCreateAnimations(meshData):
 
     if 'animations' in meshData:
         logger.info("+ Creating animations...")
-        
+
         rig = meshData['rig']
         rig.animation_data_create()
         animdata = rig.animation_data
@@ -757,7 +759,9 @@ def bCreateAnimations(meshData):
             track.mute = True
             track.strips.new(name, 0, action)
 
-###############################################################################
+
+## =========================================================================================== ##
+
 
 def bCreateMesh(meshData, folder, name, filepath):
     if 'skeleton' in meshData:
@@ -780,6 +784,8 @@ def bCreateMesh(meshData, folder, name, filepath):
             obj.rotation_euler = arm.rotation_euler
             obj.rotation_axis_angle = arm.rotation_axis_angle
             obj.rotation_quaternion = arm.rotation_quaternion
+
+    bpy.ops.object.select_all(action='DESELECT')
 
     # Temporarily select all imported objects
     for subOb in subObjs:
@@ -972,6 +978,7 @@ def bMergeVertices(subMesh):
 def bCreateSubMeshes(meshData, meshName):
     allObjects = []
     submeshes = meshData['submeshes']
+    scene = bpy.context.scene
 
     for subMeshIndex in range(len(submeshes)):
         subMeshData = submeshes[subMeshIndex]
@@ -983,10 +990,10 @@ def bCreateSubMeshes(meshData, meshName):
         ob = bpy.data.objects.new(subMeshName, me)
 
         # Link object to scene
-        scn = bpy.context.scene
-        scn.objects.link(ob)
-        scn.objects.active = ob
-        scn.update()
+        scene = bpy.context.scene
+        scene.objects.link(ob)
+        scene.objects.active = ob
+        scene.update()
 
         # Check for submesh geometry, or take the shared one
         if 'geometry' in subMeshData.keys():
@@ -1252,7 +1259,7 @@ def bCreateSubMeshes(meshData, meshName):
 
         # Try to set custom normals
         if hasNormals:
-            noChange = len(me.loops) == len(faces)*3
+            noChange = len(me.loops) == len(faces) * 3
             if not noChange:
                 logger.debug('Removed %s faces' % (len(faces) - len(me.loops) / 3))
             split = []
@@ -1364,10 +1371,10 @@ def load(filepath):
         skeletonFile = xGetSkeletonLink(xDocMeshData, folder)
 
         # Use selected skeleton
-        selectedSkeleton = context.active_object \
+        selectedSkeleton = bpy.context.active_object \
             if (config.get('USE_SELECTED_SKELETON')
-                and context.active_object
-                and context.active_object.type == 'ARMATURE') else None
+                and bpy.context.active_object
+                and bpy.context.active_object.type == 'ARMATURE') else None
         if selectedSkeleton:
             map = getBoneNameMapFromArmature(selectedSkeleton)
             if map:
@@ -1391,7 +1398,7 @@ def load(filepath):
                     if config.get('IMPORT_ANIMATIONS'):
                         fps = xAnalyseFPS(xDocSkeletonData)
                         if(fps and config.get('ROUND_FRAMES')):
-                            logger.info("Setting FPS to", fps)
+                            logger.info(" * Setting FPS to %s" % fps)
                             bpy.context.scene.render.fps = fps
                         xCollectAnimations(meshData, xDocSkeletonData)
 

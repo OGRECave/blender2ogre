@@ -5,9 +5,9 @@ from bpy.props import *
 logger = logging.getLogger('config')
 
 AXIS_MODES =  [
-    ('xyz', 'xyz', 'no swapping'),
-    ('xz-y', 'xz-y', 'ogre standard'),
-    ('-xzy', '-xzy', 'non standard'),
+    ('xyz', 'xyz', 'No Axis swapping'),
+    ('xz-y', 'xz-y', 'Ogre standard'),
+    ('-xzy', '-xzy', 'Non standard'),
 ]
 
 MESH_TOOL_VERSIONS = [
@@ -16,9 +16,9 @@ MESH_TOOL_VERSIONS = [
 ]
 
 TANGENT_MODES =  [
-    ('0', 'none', 'do not export'),
-    ('3', 'generate', 'generate'),
-    ('4', 'with parity', 'generate with parity')
+    ('0', 'none', 'Do not export tangents'),
+    ('3', 'generate', 'Generate tangents'),
+    ('4', 'generate with parity', 'Generate with parity')
 ]
 
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
@@ -58,6 +58,7 @@ _CONFIG_DEFAULTS_ALL = {
     'OGRE_INHERIT_SCALE' : False,
     'ARMATURE_ANIMATION' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
+    'ONLY_KEYFRAMES' : False,
 
     # Mesh
     'MESH' : True,
@@ -86,33 +87,28 @@ _CONFIG_DEFAULTS_ALL = {
     #'DEBUG_LOGGING' : False,
     'SHOW_LOG_NAME' : False,
     
-    # Tundra
-    'TUNDRA_STREAMING' : True,
-    
     # Import
     'IMPORT_NORMALS' : True,
     'MERGE_SUBMESHES' : True,
     'IMPORT_ANIMATIONS' : True,
     'ROUND_FRAMES' : True,
     'USE_SELECTED_SKELETON' : True,
-    'IMPORT_SHAPEKEYS' : True   
+    'IMPORT_SHAPEKEYS' : True
 }
 
-_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER OGRETOOLS_MESH_MAGICK TUNDRA_ROOT MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS TUNDRA_STREAMING'.split()
+_CONFIG_TAGS_ = 'OGRETOOLS_XML_CONVERTER OGRETOOLS_MESH_UPGRADER MESH_PREVIEWER IMAGE_MAGICK_CONVERT USER_MATERIALS SHADER_PROGRAMS'.split()
 
 ''' todo: Change pretty much all of these windows ones. Make a smarter way of detecting
-    Ogre tools and Tundra from various default folders. Also consider making a installer that
+    Ogre tools from various default folders. Also consider making a installer that
     ships Ogre cmd line tools to ease the setup steps for end users. '''
 
 _CONFIG_DEFAULTS_WINDOWS = {
     'OGRETOOLS_XML_CONVERTER' : 'C:\\OgreCommandLineTools\\OgreXMLConverter.exe',
     'OGRETOOLS_MESH_UPGRADER' : 'C:\\OgreCommandLineTools\\OgreMeshUpgrader.exe',
-    'OGRETOOLS_MESH_MAGICK' : 'C:\\OgreCommandLineTools\\MeshMagick.exe',
-    'TUNDRA_ROOT' : 'C:\\Tundra2',
-    'MESH_PREVIEWER' : 'C:\\OgreMeshy\\Ogre Meshy.exe',
+    'MESH_PREVIEWER' : 'ogre-meshviewer.bat',
     'IMAGE_MAGICK_CONVERT' : 'C:\\Program Files\\ImageMagick\\convert.exe',
-    'USER_MATERIALS' : 'C:\\Tundra2\\media\\materials',
-    'SHADER_PROGRAMS' : 'C:\\Tundra2\\media\\materials\\programs'
+    'USER_MATERIALS' : '',
+    'SHADER_PROGRAMS' : 'C:\\'
 }
 
 _CONFIG_DEFAULTS_UNIX = {
@@ -121,11 +117,9 @@ _CONFIG_DEFAULTS_UNIX = {
     'IMAGE_MAGICK_CONVERT' : 'convert',
     'OGRETOOLS_XML_CONVERTER' : 'OgreXMLConverter',
     'OGRETOOLS_MESH_UPGRADER' : 'OgreMeshUpgrader',
-    'OGRETOOLS_MESH_MAGICK' : '/usr/local/bin/MeshMagick',
-    'TUNDRA_ROOT' : '~/Tundra2',
     'MESH_PREVIEWER' : 'ogre-meshviewer',
-    'USER_MATERIALS' : '~/Tundra2/media/materials',
-    'SHADER_PROGRAMS' : '~/Tundra2/media/materials/programs',
+    'USER_MATERIALS' : '',
+    'SHADER_PROGRAMS' : '~/',
     #'USER_MATERIALS' : '~/ogre_src_v1-7-3/Samples/Media/materials',
     #'SHADER_PROGRAMS' : '~/ogre_src_v1-7-3/Samples/Media/materials/programs',
 }
@@ -147,6 +141,7 @@ if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.
 def load_config():
     config_dict = {}
 
+    # Check if the config file exists and load it
     if os.path.isfile( CONFIG_FILEPATH ):
         try:
             with open( CONFIG_FILEPATH, 'rb' ) as f:
@@ -154,10 +149,12 @@ def load_config():
         except:
             logger.error('Can not read config from %s' % CONFIG_FILEPATH)
 
+    # Load default values from _CONFIG_DEFAULTS_ALL if they don't exist after loading config from file
     for tag in _CONFIG_DEFAULTS_ALL:
         if tag not in config_dict:
             config_dict[ tag ] = _CONFIG_DEFAULTS_ALL[ tag ]
 
+    # Load default values from _CONFIG_DEFAULTS_WINDOWS or _CONFIG_DEFAULTS_UNIX if they don't exist after loading config from file
     for tag in _CONFIG_TAGS_:
         if tag not in config_dict:
             if sys.platform.startswith('win'):
@@ -167,32 +164,6 @@ def load_config():
             else:
                 logger.error('Unknown platform: %s' % sys.platform)
                 assert 0
-
-    try:
-        if sys.platform.startswith('win'):
-            import winreg
-            # Find the blender2ogre install path from windows registry
-            registry_key = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, r'Software\blender2ogre', 0, winreg.KEY_READ)
-            exe_install_dir = winreg.QueryValueEx(registry_key, "Path")[0]
-            if exe_install_dir != "":
-                # OgreXMLConverter
-                if os.path.isfile(exe_install_dir + "OgreXMLConverter.exe"):
-                    logger.info ("Using OgreXMLConverter from install path: %sOgreXMLConverter.exe" % exe_install_dir)
-                    config_dict['OGRETOOLS_XML_CONVERTER'] = exe_install_dir + "OgreXMLConverter.exe"
-
-                # OgreMeshUpgrader
-                if os.path.isfile(exe_install_dir + "OgreXmlConverter.exe"):
-                    logger.info ("Using OgreMeshUpgrader from install path: %sOgreMeshUpgrader.exe" % exe_install_dir)
-                    config_dict['OGRETOOLS_MESH_UPGRADER'] = exe_install_dir + "OgreMeshUpgrader.exe"
-
-                # Run auto updater as silent. Notifies user if there is a new version out.
-                # This will not show any UI if there are no update and will go to network
-                # only once per 2 days so it wont be spending much resources either.
-                # todo: Move this to a more appropriate place than load_config()
-                if os.path.isfile(exe_install_dir + "check-for-updates.exe"):
-                    subprocess.Popen([exe_install_dir + "check-for-updates.exe", "/silent"])
-    except Exception as e:
-        logger.error("Exception while reading windows registry: %s" % e)
 
     # Setup temp hidden RNA to expose the file paths
     for tag in _CONFIG_TAGS_:
@@ -216,6 +187,7 @@ def load_config():
 
     return config_dict
 
+# Global CONFIG dictionary
 CONFIG = load_config()
 
 def get(name, default=None):
