@@ -48,8 +48,6 @@ def menu_func(self, context):
 
 class _OgreCommonExport_(object):
 
-    last_export_path = None
-
     @classmethod
     def poll(cls, context):
         if context.active_object and context.mode != 'EDIT_MESH':
@@ -65,6 +63,19 @@ class _OgreCommonExport_(object):
             if getattr(self, "EX_" + key, None) or getattr(self, "EX_Vx_" + key, None) or getattr(self, "EX_V1_" + key, None) or getattr(self, "EX_V2_" + key, None):
                 # todo: isn't the key missing the "EX_" prefix?
                 setattr(self,key,value)
+
+        if not self.filepath:
+            blend_filepath = context.blend_data.filepath
+            if not blend_filepath:
+                blend_filepath = "blender2ogre"
+            else:
+                blend_filepath = os.path.splitext(blend_filepath)[0]
+
+            self.filepath = blend_filepath + ".scene"
+
+        logger.debug("Context.blend_data: %s" % context.blend_data.filepath)
+        logger.debug("Context.scene.name: %s" % context.scene.name)
+        logger.debug("Self.filepath: %s" % self.filepath)
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
@@ -86,7 +97,7 @@ class _OgreCommonExport_(object):
         section_icons = {
             "General" : "WORLD", "Scene" : "SCENE_DATA", 
             "Materials" : "MATERIAL", "Textures" : "TEXTURE", 
-            "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "LOD" : "LATTICE_DATA", "Shape Animation" : "POSE_DATA", 
+            "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "LOD" : "LATTICE_DATA", "Shape Animation" : "POSE_HLT", 
             "Logging" : "TEXT"
         }
         
@@ -96,8 +107,8 @@ class _OgreCommonExport_(object):
             "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_EXPORT_USER", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"], 
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
-            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
-            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
+            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
+            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
             "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"], 
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
             "Logging" : ["EX_Vx_ENABLE_LOGGING"]
@@ -128,30 +139,8 @@ class _OgreCommonExport_(object):
               "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
               "Export XML mesh - do NOT automatically convert .xml to .mesh file. You MUST run converter mesh manually.")
 
-        logger.debug("Context.blend_data: %s" % context.blend_data.filepath)
-        logger.debug("Context.scene.name: %s" % context.scene.name)
-        logger.debug("Self.filepath: %s" % self.filepath)
-        logger.debug("Self.last_export_path: %s" % self.last_export_path)
-
         # Load addonPreference in CONFIG
         config.update_from_addon_preference(context)
-
-        # Resolve path from opened .blend if available. 
-        # Normally it's not if blender was opened with "Recover Last Session".
-        # After export is done once, remember that path when re-exporting.
-        if not self.last_export_path:
-            # First export during this blender run
-            if context.blend_data.filepath != "":
-                path, name = os.path.split(context.blend_data.filepath)
-                self.last_export_path = os.path.join(path, name.split('.')[0])
-
-        if not self.last_export_path:
-            self.last_export_path = os.path.expanduser("~")
-
-        if self.filepath == "" or not self.filepath:
-            self.filepath = "blender2ogre"
-
-        logger.debug("Self.filepath: %s" % self.filepath)
 
         kw = {}
         for name in dir(_OgreCommonExport_):
@@ -165,7 +154,7 @@ class _OgreCommonExport_(object):
                 kw[ name[3:] ] = getattr(self,name)
         config.update(**kw)
 
-        print ("_" * 80)
+        print ("_" * 80,"\n")
         
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
@@ -197,6 +186,7 @@ class _OgreCommonExport_(object):
         logger.info("Target_file_name: %s" % target_file_name)
         logger.debug("Target_file_name_no_ext: %s" % target_file_name_no_ext)
 
+        # Start exporting the elements in the scene
         scene.dot_scene(target_path, target_file_name_no_ext)
         Report.show()
 

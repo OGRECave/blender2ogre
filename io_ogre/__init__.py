@@ -15,7 +15,7 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 bl_info = {
-    "name": "OGRE Importer-Exporter (.scene, .mesh, .skeleton) and RealXtend (.txml)",
+    "name": "OGRE Importer-Exporter (.scene, .mesh, .skeleton)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg, Guillermo Ojea Quintana",
     "version": (0, 7, 5),
     "blender": (2, 7, 5),
@@ -74,18 +74,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         default=config.CONFIG['OGRETOOLS_MESH_UPGRADER'],
         update=apply_preferences_to_config
     )
-    OGRETOOLS_MESH_MAGICK = bpy.props.StringProperty(
-        name="OGRETOOLS_MESH_MAGICK",
-        subtype='FILE_PATH',
-        default=config.CONFIG['OGRETOOLS_MESH_MAGICK'],
-        update=apply_preferences_to_config
-    )
-    TUNDRA_ROOT = bpy.props.StringProperty(
-        name="TUNDRA_ROOT",
-        subtype='FILE_PATH',
-        default=config.CONFIG['TUNDRA_ROOT'],
-        update=apply_preferences_to_config
-    )
     MESH_PREVIEWER = bpy.props.StringProperty(
         name="MESH_PREVIEWER",
         subtype='FILE_PATH',
@@ -109,8 +97,6 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout = self.layout
         layout.prop(self, "OGRETOOLS_XML_CONVERTER")
         layout.prop(self, "OGRETOOLS_MESH_UPGRADER")
-        layout.prop(self, "OGRETOOLS_MESH_MAGICK")
-        layout.prop(self, "TUNDRA_ROOT")
         layout.prop(self, "MESH_PREVIEWER")
         layout.prop(self, "IMAGE_MAGICK_CONVERT")
         layout.prop(self, "USER_MATERIALS")
@@ -133,6 +119,11 @@ def register():
 
 def unregister():
     logging.info('Unloading io_ogre %s', bl_info["version"])
+    
+    # Save the config
+    config.save_config()
+    
+    # Unregister classes
     for clazz in ui.auto_register(False):
         bpy.utils.unregister_class(clazz)
 

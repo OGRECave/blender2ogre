@@ -60,8 +60,11 @@ So what the exporter does is go frame by frame and have Blender calculate the bo
 This means that your animation in Ogre has a keyframe for every single frame from the start of the animation to the end.
 As a result of this setting IM_SPLINE for frame interpolation in Ogre would make no difference and might even slow down the skeletal animation.
 
+If you only require key frames exported, then make sure the "Only Keyframes" option is ticked in the exporter properties.
+
 ## Exporter Options:
  - *EX_ARMATURE_ANIMATION* (Armature Animation) : Export armature animations (updates the .skeleton file), enable this option to export the armature animations.
+ - *EX_ONLY_KEYFRAMES* (Only Keyframes) : Exports only the key frames. Influences that Inverse Kinematics, Drivers and modified F-Curves have on the animation will be lost.
  - *EX_ONLY_DEFORMABLE_BONES* (Only Deformable Bones) : Only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. NOTE: Any bone with deformable children/descendants will be output as well
  - *EX_ONLY_KEYFRAMED_BONES* (Only Keyframed Bones) : Only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis
  - *EX_OGRE_INHERIT_SCALE* (OGRE Inherit Scale) : Whether the OGRE bones have the 'inherit scale' flag on. If the animation has scale in it, the exported animation needs to be adjusted to account for the state of the inherit-scale flag in OGRE.
@@ -112,6 +115,20 @@ Some useful tips to avoid problems or diagnose issues:
  - Before parenting a mesh to an armature remember to apply location, rotation and scale to avoid problems.
  - Remember to add your actions as NLA strips, otherwise they won't be recognized by the exporter.
  - If you're using IK bones, you need to keyframe the bones it is affecting as well otherwise the animation won't work in Ogre.
+
+## Human Top+Base Animations
+It is common for humanoid models to separate animations into top and bottom animations, 
+that is for example to have a running animation separated into the legs animation (Base) and the torso + head animation (Top).
+The objective is that if there is another animation (shooting an arrow, for example which involves only the Top bones) 
+then it is possible to combine the animations: `RunningBase` and `ShootingTop` to have the character running and shooting arrows at the same time.
+
+One good example of this comes with the Ogre SDK: Sinbad.zip. The Sinbad model has a `RunBase` and `RunTop` running animations.
+Both animations have to be performed at the same time in order for the Sinbad character model to run using both arms and legs.
+
+To achieve this requires on the Blender side creating the `RunningBase` and `RunningTop` animations, 
+and for each one to *only* have keyframes the bones that correspond to the Top or Base of the model.
+
+
 
 ## Random Tips from the forum
 Here are gathered some tips lifted from the forum: [Blender26 Ogre Exporter](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
