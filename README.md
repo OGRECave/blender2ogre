@@ -3,7 +3,7 @@
 * License: [GNU LGPL](http://www.gnu.org/licenses/lgpl.html)
 * [Ogre forum thread](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
 
-**This versions requires Blender 2.8+.** For Blender 2.7x: [use the 2.7x-support branch](https://github.com/OGRECave/blender2ogre/tree/2.7x-support)
+**This version is for Blender 2.7x.** For Blender 2.8+: [use the master branch](https://github.com/OGRECave/blender2ogre/tree/master)
 
 ## Index
  - [Installing](#installing)
@@ -46,7 +46,9 @@ If you are upgrading from a previous version of blender2ogre, and having problem
 * [Meshmoon: Video and text instructions how to install and use blender2ogre addon](http://doc.meshmoon.com/index.html?page=from-blender-to-meshmoon-part-1)
 
 ## Exporting Meshes
-To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`. If the menu button is greyed out, the select the object to export from the blender Node tree (Scene collections) first. 
+To export a blender model: `File Menu > Export > Ogre3D (.scene & .mesh)`.
+
+If the menu button is greyed out (or you get this error: `RuntimeError: Operator bpy.ops.ogre.export.poll() failed, context is incorrect`), then make sure there is an active object selection in the blender Node tree first. The active object selection is when there is an object with a yellow outline (in contrast to the orange outline of the passive selected objects)
 
 - If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreXMLConverter.exe" path, then the export dialogue will display options relevant for the Ogre (v1) mesh format.
 - If you have `OGRETOOLS_XML_CONVERTER` set to a "OgreMeshTool.exe" path, then the export dialogue will display options relevant for the OgreNext (v2) mesh format. 
@@ -78,10 +80,10 @@ You can check the arguments passed to `OgreMeshTool.exe` in the Blender console.
 Blender will export the material format in a Ogre (V1) format. This is not compatible with OgreNext (V2.*). You should manually convert them to a material.json file. See the [Ogre Wiki: HLMS Materials](https://wiki.ogre3d.org/HLMS+Materials) for more information.
 
 ## Importing Meshes
-As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
+As of `blender2ogre` version *0.7.4*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
  - Import mesh from `.xml` as well as `.mesh` files
  - Option to be able to merge imported submeshes or keep them separate
- - Parsing/Conversion of materials into Blender (just create a Principled BSDF material and add a texture with the proper UV mapping)
+ - Parsing/Conversion of materials into Blender (not great, but most matching properties have been considered)
  - Importing of Poses
  - Importing of Skeletons work for the most part, but Ogre skeletons conventions are not like Blenders (see: [How to get bone's vector and bone's length?](https://forums.ogre3d.org/viewtopic.php?t=49689))
  - Importing of Animations work, but depend on the skeleton which sometimes doesn't get correctly imported
@@ -91,20 +93,19 @@ As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated in
 ## Additional Features
 
 ### Merge Objects on export
-You might have hundrets of objects, which you want to keep separate but have them in one `.mesh` on export.
+You might have hundreds of objects, which you want to keep separate but have them in one `.mesh` on export.
 For this create a new collection (M) named as `merge.<yourname>`. The output will be a single `<yourname>.mesh` file. Alternatively link the collection.
 
-> **NOTE:** The origin of the resulting merged object will be that of the *last* object you added to the collection (although when reloading the blend file, this order will be lost).
-In order to have control over the precise location of where the merged objects origin will be, use the `dupli_offset` property of the collection.
-Setting any value other than the default `(0, 0, 0)` will result in a mesh with the origin set to that value. For example:
+> **NOTE:** The origin of the resulting merged object will be that of the *last* object you added to the selection, that is the active selected object (although when reloading the blend file, this order will be lost).
 
-![dupli-offset.png](images/dupli-offset.png)
+![Add to Group](images/add-to-group.png)
 
 ### Instancing and DotScene Plugin
 As of OGRE 1.13 a new feature has been added to the DotScene Plugin where it now accepts the static / instanced keywords for entities.
 (for more information read the [DotScene Plugin README](https://github.com/OGRECave/ogre/blob/master/PlugIns/DotScene/README.md)).
 
-To use this feature create a new collection (M) names as `static.<Group Name>` or `instanced.<Instance Manager Name>` and blender2ogre will automatically add the corresponding attribute to the exported entities in the Scene.
+To use this feature create a new group (Ctrl+G) named as `static.<Group Name>` or `instanced.<Instance Manager Name>` and blender2ogre will automatically add the corresponding attribute to the exported entities in the Scene.
+
 This feature goes hand in hand with [Exporting Particle Systems](#exporting-particle-systems) to create vegetation, debris and other static objects in your scene.
 
 ### External OGRE Materials
@@ -212,7 +213,7 @@ Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create
 If `MESH_PREVIEWER` is set, a button will appear allowing you to preview your mesh in Ogre3D. If the button isn't there, the path is invalid. This only works for Ogre (V1) meshes.
 The button is located here:
 
-![Preview mesh button location](images/Readme-MeshPreviewButtonLocation.png)
+![Preview mesh button location](images/mesh-preview-button.png)
 
 
 ## About
