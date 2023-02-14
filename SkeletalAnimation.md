@@ -1,6 +1,18 @@
 
 # Exporting Skeletal Animations
 
+## Index
+ - [Introduction](#introduction)
+ - [Creating a basic rig](#creating-a-basic-rig)
+ - [How does the exporter work?](#how-does-the-exporter-work-)
+ - [Smooth Corrective Modifier](#smooth-corrective-modifier)
+ - [Exporter Options](#exporter-options)
+ - [Using Skeletal Animations in Ogre](#using-skeletal-animations-in-ogre)
+ - [Tips/Troubleshooting](#tips-troubleshooting)
+ - [Human Top+Base Animations](#human-top-base-animations)
+ - [Random Tips from the forum](#random-tips-from-the-forum)
+ - [Automation](#automation)
+
 ## Introduction
 Skeletal Animation refers to the technique of using bones to deform a mesh as if the mesh were the skin.
 The bones deform different parts of the mesh based on vertex weights that specify how much any bone should influence a certain part of the mesh.
@@ -58,11 +70,16 @@ It is advisable to try an export your model at every step of the process of maki
 In order to accomodate for complex animations with Inverse Kinematics, Drivers and modified F-Curves the exporter cannot simply export the Keyframes to Ogre because all the influcences of these modifiers would be lost.
 So what the exporter does is go frame by frame and have Blender calculate the bones transforms and export that information to the skeleton.xml file.
 This means that your animation in Ogre has a keyframe for every single frame from the start of the animation to the end.
-As a result of this setting IM_SPLINE for frame interpolation in Ogre would make no difference and might even slow down the skeletal animation.
+As a result of this setting `IM_SPLINE` for frame interpolation in Ogre would make no difference and might even slow down the skeletal animation.
 
 If you only require key frames exported, then make sure the "Only Keyframes" option is ticked in the exporter properties.
 
-## Exporter Options:
+## Smooth Corrective Modifier
+https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/corrective_smooth.html
+The Smooth Corrective modifier is used to reduce highly distorted areas of a mesh by smoothing the deformations.
+This is typically useful after an Armature modifier, where distortion around joints may be hard to avoid, even with careful weight painting.
+
+## Exporter Options
  - *EX_ARMATURE_ANIMATION* (Armature Animation) : Export armature animations (updates the .skeleton file), enable this option to export the armature animations.
  - *EX_ONLY_KEYFRAMES* (Only Keyframes) : Exports only the key frames. Influences that Inverse Kinematics, Drivers and modified F-Curves have on the animation will be lost.
  - *EX_ONLY_DEFORMABLE_BONES* (Only Deformable Bones) : Only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. NOTE: Any bone with deformable children/descendants will be output as well
@@ -110,7 +127,7 @@ And also consult the Ogre API manual:
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller.html
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_skeleton.html
 
-## Tips / Troubleshooting
+## Tips/Troubleshooting
 Some useful tips to avoid problems or diagnose issues:
  - Before parenting a mesh to an armature remember to apply location, rotation and scale to avoid problems.
  - Remember to add your actions as NLA strips, otherwise they won't be recognized by the exporter.
@@ -127,8 +144,6 @@ Both animations have to be performed at the same time in order for the Sinbad ch
 
 To achieve this requires on the Blender side creating the `RunningBase` and `RunningTop` animations, 
 and for each one to *only* have keyframes the bones that correspond to the Top or Base of the model.
-
-
 
 ## Random Tips from the forum
 Here are gathered some tips lifted from the forum: [Blender26 Ogre Exporter](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
@@ -149,7 +164,6 @@ The standard way of attaching equipment to a character is to attach it to a bone
 The blender2ogre exporter exports one skeleton for each mesh that is a child of an armature, if you have a character with different sets of clothing then you will have a base mesh with only the skin and meshes for the clothing/armor. All these meshes will be children of the same Armature with the same actions applied to all of them. That means that when exporting the Armature, every one of these meshes will be exported with their own .skeleton which takes time for many actions. So the recommendation is to have one .blend file with the Armature and the clothing sets and another .blend file with all the actions and only the base mesh to export. Then when you have all these meshes exported you need to modify them with meshmagick to change the skeleton name to a common one. Then in Ogre use `Ogre::Entity::shareSkeletonInstanceWith( Entity* entity )` to have the clothes animated at the same time as the base mesh, giving the illusion that the character has actual clothing.
 
 Another recommendation regarding clothes: it is usual that in some poses the base mesh (skin) might get on top of the clothes which is undesired, one solution to this problem is to use shape keys to make the base model thinner and apply the shape key when the character has the clothes on since the shape won't be visible. Another option is to use the `Mask` modifier: create a vertex group for every part of the base mesh that will be visible with clothes on (like arms, head and ankles perhaps) and select that vertex group as the mask. With the mask active only those parts of the mesh will be exported.
-
 
 ## Automation
 You might get excited animating your models and ending up with a lot of actions that have no corresponding NLA Track.
