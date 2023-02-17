@@ -10,10 +10,10 @@
 ## Introduction
 A common technique for creating face animations is to use Poses or Shapes for the different phonemes that the character should go through when talking.
 
-In this tutorial we are going to explore how to create a couple poses and animate them.
+In this tutorial, we are going to explore how to create a couple of poses and animate them.
 
 Terminology:
- - *Shape Keys*: a certain pose defined in Blender. This pose can be blended with other poses in different degrees to achieve new poses
+ - *Shape Keys*: a certain pose defined in Blender. This pose can be blended with other poses to different degrees to achieve new poses
 
 ## Set up
 To make this tutorial simple, the Animation is going to be applied only to the default cube.
@@ -36,7 +36,7 @@ Then select `Key 2` and press again `s`, write 0.5 and `Enter` to scale the cube
 
 Now you have three shapes to animate.
 
-Go into `Object Mode` by pressing tab and in the bottom you should see that the current frame is 1.
+Go into `Object Mode` by pressing tab and at the bottom you should see that the current frame is 1.
 ![shape-animations3.png](images/shape-anim/shape-animations3.png)
 
 Select `Key 1` and in `value` set it all the way to 1.
@@ -49,9 +49,9 @@ You should see in the `Dope Sheet` view that now there is a new "Key Action", pr
 
 Now, set the current frame to 60 and repeat the above process but setting `value` to 0 for `Key 1` and 1 for `Key 2`, remember to insert the keyframes (the `value`s should turn yellow).
 
-Set the `End` frame to 60 and press play to see the cube changing size. Of course this is a simple animation but with some imagination something much more complex can be achieved like face animations.
+Set the `End` frame to 60 and press play to see the cube changing size. Of course, this is a simple animation but with some imagination, something much more complex can be achieved like face animations.
 
-Last but not least in order for the `blender2ogre` add-on to properly export the animation it is necessary to turn it into an NLA Track, select the `Push Down` button next to the action name.
+Last but not least for the `blender2ogre` add-on to properly export the animation it is necessary to turn it into an NLA Track, and select the `Push Down` button next to the action name.
 ![shape-animations1.png](images/shape-anim/shape-animations1.png)
 
 You can now go into the `NLA Editor` view and change the name of the NLA Track that name is the one that is going to be exported.
@@ -60,14 +60,14 @@ You can now go into the `NLA Editor` view and change the name of the NLA Track t
 [How to Bake Modifier Animation in Blender / 1. Wave Modifier Animation to Shape Keys!](https://www.youtube.com/watch?v=KMIkOhTSP1U)
 https://docs.blender.org/manual/en/latest/addons/import_export/shape_mdd.html
 
-Blender is able to perform some complex vertex animations (`Wave Modifier` being an example).
-However it is not possible to just export these animations into OGRE directly.
-But there is a trick to bake these animations into Shape Key Animations and then it is possible to export into OGRE.
+Blender can perform some complex vertex animations (`Wave Modifier` being an example).
+However, it is not possible to just export these animations into OGRE directly.
+But there is a trick to baking these animations into Shape Key Animations and then it is possible to export into OGRE.
 The trick consists of exporting the animation using the `NewTek MDD` format and then importing it, the resulting mesh will have the vertex animations baked as a Shape Key Animation
 
 > NOTE: Care must be taken if the animation has too many frames since there will be one Shape Key for every frame and that makes the exported mesh heavier.
 
-The steps are the following (example using `Wave Modifier`):
+The steps are the following (for example using `Wave Modifier`):
 1) Add a plane mesh (Shift-A -> Mesh -> Plane), then enter `Edit Mode` (Tab) and subdivide the mesh (Ctrl-E -> Subdivide) 5 times so the `Wave Modifier` has some geometry to work with
 2) Set the object shading to smooth (Object -> Shade Smooth)
 3) Add the `Wave Modifier` to the "Plane" Object and rename the "Plane" to "Wave"
@@ -82,7 +82,7 @@ The steps are the following (example using `Wave Modifier`):
 Now the duplicate object "Wave2" has a number of Shape Keys, each for every frame that was exported in step 6b)
 Besides a new action `KeyAction` is created, which you can see in the `Shape Key Editor` of the `Dope Sheet` (Shift-F12)
 10) Now to get blender2ogre to export the animation we need to create a NLA track, go to the `Animation` and in the upper left corner change the view to `Nonlinear Animation`
-11) Perform a push-down of the animation towards an NLA Track
+11) Perform a push-down of the animation toward an NLA Track
 12) Set the name of the NLA Track, which will be the name of the Shape/Pose Animation in OGRE
 13) Now use `blender2ogre` to export the animation, make sure the option `SHAPE_ANIMATIONS` is set to `True`
 

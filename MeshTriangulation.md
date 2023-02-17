@@ -1,7 +1,7 @@
 
 # Mesh Triangulation
 
-While Blender is able to create meshes featuring triangles, quads and n-gons, OGRE3D being a realtime rendering engine deals only with triangles.
+While Blender can create meshes featuring triangles, quads and n-gons, OGRE3D being a realtime rendering engine deals only with triangles.
 That means that blender2ogre needs to perform a process of mesh triangulation to export the meshes.
 Sometimes this triangulation process leads to some problems described here.
 
@@ -16,7 +16,7 @@ Sometimes this triangulation process leads to some problems described here.
 ## Non-coplanar Faces
 The first problem happens when during the process of creating a mesh an artist ends up with faces that are not coplanar.
 This means that the vertices of the face are not all on the same plane.
-For a triangle the vertices are always on the same plane, but for quads and n-gons that is not necesarily true.
+For a triangle, the vertices are always on the same plane, but for quads and n-gons that is not necessarily true.
 
 When a mesh has non-coplanar faces, the resulting triangulated mesh looks different than the original.
 
@@ -28,7 +28,7 @@ Suzanne without triangulation | Suzanne with `Triangulate` modifier
 
 Blender has tools to detect this type of problems in the mesh analysis section of the Viewport Overlays.
 
-Select the object, then go into `Edit Mode` and in the upper right corner there is an `Overlays` menu.
+Select the object, then go into `Edit Mode` and in the upper right corner, there is an `Overlays` menu.
 
 ![Viewport Overlays](images/triangulate/viewport-overlays.png)
 
@@ -71,7 +71,7 @@ The fix is to avoid using non-coplanar faces or trying to fix them when they app
 ## Custom Normals
 Bugs reported to https://developer.blender.org
  - [Triangulate modifier breaks custom normals](https://developer.blender.org/T61942)
- - [Triangulate faces sometimes produces degenerate triangle faces](https://developer.blender.org/T103913)
+ - [Triangulate faces sometimes produce degenerate triangle faces](https://developer.blender.org/T103913)
  - [Triangulate non-planar faces with "beauty" method produces faces that point in different directions](https://developer.blender.org/T85402)
  - [Shading is broken with Custom Normals + Triangulate Modifier](https://developer.blender.org/T104244)
 
@@ -81,11 +81,11 @@ So be careful when using Custom Normals (that is modifying normas by using some 
 
 One way to check if the exported object will look good is to add `Triangulate` modifier with quad method `Fixed`, if the shading looks wrong compared to removing the modifier then it will look wrong in OGRE as well since the exporter is using Blenders triangulation code to perform the calculations.
 
-For example, this cube has had a `Bevel` modifer and a `Weighted Normals` modifier applied, then we add a `Triangulate` modifier and the result is that there are visible triangles in the shading of the cube.
+For example, this cube has had a `Bevel` modifier and a `Weighted Normals` modifier applied, then we add a `Triangulate` modifier and the result is that there are visible triangles in the shading of the cube.
 
 Cube without triangulation | Cube with triangulation
 :-------------------------:|:-------------------------:
 ![Cube without triangulation](images/triangulate/beveled-cube.png) | ![Cube with triangulation](images/triangulate/beveled-broken-cube.png)
 
-> NOTE: Until this is fixed, in order for the Fillet Edges to look correct in the exported Mesh you have to create a copy of the object, apply the modifiers then go into `Edit Mode` and perform a manual triangulation of the Mesh (Face -> Triangulate Faces or Ctrl-T)
+> NOTE: Until this is fixed, for the Fillet Edges to look correct in the exported Mesh you have to create a copy of the object, apply the modifiers then go into `Edit Mode` and perform a manual triangulation of the Mesh (Face -> Triangulate Faces or Ctrl-T)
 

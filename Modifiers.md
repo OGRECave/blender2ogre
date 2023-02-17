@@ -5,11 +5,11 @@ With modifiers, you can perform many effects automatically that would otherwise 
 (such as subdivision surfaces) and without affecting the base geometry of your object.
 
 `blender2ogre` supports exporting meshes with modifiers, but not all modifiers are supported.
-Also some modifiers have special treament (Array and Armature), please check the corresponding sections
+Also, some modifiers have special treatment (Array and Armature), please check the corresponding sections
 
-> NOTE: Support for modifiers is *best effort*, in most cases the modifiers habe been tested individually and not all combinations have been tried.
+> NOTE: Support for modifiers is *best effort*, in most cases the modifiers have been tested individually and not all combinations have been tried.
 
-> **WARNING**: Beware of using Modifiers that increase the vertex o poly count of the models when exporting (like Subdivision Surface) since the exported mesh might not be very optimal for realtime rendering. Retopology is adviced in these cases to improve render times.
+> **WARNING**: Beware of using Modifiers that increase the vertex o poly count of the models when exporting (like Subdivision Surface) since the exported mesh might not be very optimal for realtime rendering. Retopology is advised in these cases to improve render times.
 
 ## Index
  - [Documentation](#documentation)
@@ -48,9 +48,9 @@ Modifier | Supported | Notes
 [Geometry Nodes](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/geometry_nodes.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK with the proper geometry
 [Mask](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/mask.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK with applied mask
 [Mirror](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/mirror.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK with applied mirroring
-[Multiresolution](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/multiresolution.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK, the `Level Viewport` parameter should be more than 0, otherwise the base mesh will be exported. Also this potentially exports an insane amount of geometry, you might want to do a retopology and use normal maps to bake the details.
+[Multiresolution](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/multiresolution.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK, the `Level Viewport` parameter should be more than 0, otherwise the base mesh will be exported. Also, this potentially exports an insane amount of geometry, you might want to do a retopology and use normal maps to bake the details.
 [Remesh](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/remesh.html) | ![Supported*](images/modifiers/warning.png) | Mesh exports OK, but UV Maps are removed from the Mesh
-[Screw](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/screw.html) | ![Supported*](images/modifiers/warning.png) | Mesh exports OK, but base object has to be a mesh otherwise nothing is exported
+[Screw](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/screw.html) | ![Supported*](images/modifiers/warning.png) | Mesh exports OK, but the base object has to be a mesh otherwise nothing is exported
 [Skin](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/skin.html) | ![Supported*](images/modifiers/warning.png) | Mesh exports OK, but UV Maps are removed from the Mesh
 [Solidify](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/solidify.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK with thickness added
 [Subdivision Surface](https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/subdivision_surface.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK, as with the `Multiresolution Modifier` beware of the vertex count of the exported mesh (which affects performance).
@@ -77,7 +77,7 @@ Modifier | Supported | Notes
 [Surface Deform](https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/surface_deform.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK
 [Volume Displace](https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/volume_displace.html) | ![Not Supported](images/modifiers/fail.png) | Only works on volumes, not meshes
 [Warp](https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/warp.html) | ![Supported](images/modifiers/ok.png) | Mesh exports OK
-[Wave](https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/wave.html) | ![Supported*](images/modifiers/warning.png) | Mesh exports OK, but only the first frame there is no motion. In order to bake the animation, consult [xxx]
+[Wave](https://docs.blender.org/manual/en/latest/modeling/modifiers/deform/wave.html) | ![Supported*](images/modifiers/warning.png) | Mesh exports OK, but only in the first frame there is no motion. To bake the animation, consult [xxx]
 
 ## Array Modifier
 This modifier as well as the `Armature Modifier` get their special section because they are treated differently by `blender2ogre`.
@@ -88,9 +88,9 @@ However the case of the `Array Modifier` is different, since the presence of thi
 What happens is that in `scene.py` (which creates the .scene output) the `Array Modifier` is used to place instances of the mesh in positions indicated by the modifier.
 This means that the exported mesh appearance is not modified by the `Array Modifier`, but only its placement in the scene.
 
-As a result there is only one copy of the mesh in the scene that is repeated many times, which could lead to a performance increase if using instancing.
+As a result, there is only one copy of the mesh in the scene that is repeated many times, which could lead to a performance increase if using instancing.
 
-> NOTE: To disable this behaviour and have the `Array Modifier` be applied to the mesh directly, then set the option: `ARRAY` to true in the mesh options
+> NOTE: To disable this behavior and have the `Array Modifier` be applied to the mesh directly, then set the option: `ARRAY` to true in the mesh options
 
 ## Boolean Modifier
 This modifier works well and is in principle fully supported, but you might get this error when exporting meshes with the `Boolean Modifier`:
@@ -100,7 +100,6 @@ FAILED to assign material to face - you might be using a Boolean Modifier betwee
 
 The issue here is that `blender2ogre` has a problem when the two objects that make contact to perform the boolean operation don't have the same material assigned to the faces which enter into contact.
 
-To solve this you need to assign the same material to the faces wich are in contact, this might be as simple as assigning a Material to the whole secondary object or having to do something more complex like assigning the same material to the faces that come into contact by entering `Edit Mode` and assigning the material by hand to each face.
+To solve this you need to assign the same material to the faces which are in contact, this might be as simple as assigning a Material to the whole secondary object or having to do something more complex like assigning the same material to the faces that come into contact by entering `Edit Mode` and assigning the material by hand to each face.
 
-As a last resort it is also possible to make a copy by hand of the object, apply the `Boolean Modifier` and export that mesh.
-
+As a last resort, it is also possible to make a copy by hand of the object by applying the `Boolean Modifier` and exporting that mesh.
