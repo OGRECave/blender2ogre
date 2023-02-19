@@ -100,7 +100,7 @@ class _OgreCommonExport_(object):
             "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "LOD" : "LATTICE_DATA", "Shape Animation" : "POSE_HLT", 
             "Logging" : "TEXT"
         }
-        
+
         # Options associated with each section
         section_options = {
             "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"],
@@ -111,9 +111,9 @@ class _OgreCommonExport_(object):
             "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"],
             "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"],
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"],
-            "Logging" : ["EX_Vx_ENABLE_LOGGING"]
+            "Logging" : ["EX_Vx_ENABLE_LOGGING", "EX_Vx_DEBUG_LOGGING"]
         }
-        
+
         for section in sections:
             row = layout.row()
             box = row.box()
@@ -130,7 +130,7 @@ class _OgreCommonExport_(object):
                         box.prop(self, prop)
                 elif prop.startswith('EX_'):
                     box.prop(self, prop)
-        
+
     def execute(self, context):
         # Add warinng about missing XML converter
         Report.reset()
@@ -155,23 +155,23 @@ class _OgreCommonExport_(object):
         config.update(**kw)
 
         print ("_" * 80,"\n")
-        
+
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
         file_handler = None
-        
+
         # Add a file handler to all Logger instances
         if config.get('ENABLE_LOGGING') == True:
             log_file = ("%s/blender2ogre.log" % target_path)
             logger.info("* Writing log file to: %s" % log_file)
 
             file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
-            
+
             # Show the python file name from where each log message originated
             SHOW_LOG_NAME = False
-            
+
             if SHOW_LOG_NAME:
                 file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
             else:
@@ -179,8 +179,14 @@ class _OgreCommonExport_(object):
 
             file_handler.setFormatter(file_formatter)
 
+            if config.get('DEBUG_LOGGING') == True:
+                level = logging.DEBUG
+            else:
+                level = logging.INFO
+
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logging.getLogger(logger_name).addHandler(file_handler)
+                logging.getLogger(logger_name).setLevel(level)
 
         logger.info("* Target path: %s" % target_path)
         logger.info("* Target file name: %s" % target_file_name)
@@ -201,10 +207,7 @@ class _OgreCommonExport_(object):
         # Flush and close all logging file handlers
         if config.get('ENABLE_LOGGING') == True:
             for logger_name in logging.Logger.manager.loggerDict.keys():
-                logger_instance = logging.getLogger(logger_name)
-                    
-                # Remove handlers
-                logger_instance.handlers.clear()
+                logging.getLogger(logger_name).handlers.clear()
             
             file_handler.flush()
             file_handler.close()
@@ -356,8 +359,8 @@ For some meshes with transparent materials (partial transparency) this can be us
         min=0, max=65536,
         default=config.get('EXTREMITY_POINTS')) = {}
     EX_Vx_GENERATE_EDGE_LISTS : BoolProperty(
-        name="Edge Lists",
-        description="Generate edge lists (for stencil shadows)",
+        name="Generate Edge Lists",
+        description="Generate Edge Lists (for Stencil Shadows)",
         default=config.get('GENERATE_EDGE_LISTS')) = {}
     EX_GENERATE_TANGENTS : EnumProperty(
         items=config.TANGENT_MODES,
@@ -423,10 +426,10 @@ Blenders decimate does LOD by collapsing vertices, which can result in a visuall
         default=config.get('ENABLE_LOGGING')) = {}
     
     # It seems that it is not possible to exclude DEBUG when selecting a log level
-    #EX_Vx_DEBUG_LOGGING : BoolProperty(
-    #    name="Debug Logging",
-    #    description="Whether to show DEBUG log messages",
-    #    default=config.get('DEBUG_LOGGING')) = {}
+    EX_Vx_DEBUG_LOGGING : BoolProperty(
+        name="Debug Logging",
+        description="Whether to show DEBUG log messages",
+        default=config.get('DEBUG_LOGGING')) = {}
     
     # It was decided to make this an option that is not user-facing
     #EX_Vx_SHOW_LOG_NAME : BoolProperty(
