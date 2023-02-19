@@ -67,20 +67,28 @@ def mesh_tool_parameters():
 def mesh_tool_version():
     return mesh_tool_parameters()[1]
 
-# Calls OgreMeshUpgrader to generate the LOD levels
-def lod_create(infile):
+# Calls OgreMeshUpgrader to perform:
+# - Edge List / LOD generation
+# - Optimize vertex buffers for shaders
+def mesh_upgrade_tool(infile):
     exe = config.get('OGRETOOLS_MESH_UPGRADER')
 
     # OgreMeshUpgrader only works in tandem with OgreXMLConverter, which are both Ogre v1.x tools.
-    # For Ogre v2.x we will use OgreMeshTool to generate the LODs
+    # For Ogre v2.x we will use OgreMeshTool, which can perform the same operations
     if detect_converter_type() != "OgreXMLConverter":
         return
     
     output_path, filename = os.path.split(infile)
     
     if not os.path.exists(infile):
-        logger.warn("Cannot find file mesh file: %s, unable to generate LOD" % filename)
-        Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
+        logger.warn("Cannot find file mesh file: %s, unable run OgreMeshUpgrader" % filename)
+
+        if config.get('LOD_MESH_TOOLS') == True:
+            Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
+
+        if config.get('GENERATE_EDGE_LISTS') == True:
+            Report.warnings.append("OgreMeshUpgrader failed, Edge Lists will not be generated for this mesh: %s" % filename)
+
         return
     
     # Extract converter type from its output
@@ -91,25 +99,27 @@ def lod_create(infile):
         output = output.decode('utf-8')
     except:
         output = ""
-    
+
     # Check to see if the executable is actually OgreMeshUpgrader
     if output.find("OgreMeshUpgrader") == -1:
-        logger.warn("Cannot find suitable OgreMeshUpgrader executable, unable to generate LOD")
+        logger.warn("Cannot find suitable OgreMeshUpgrader executable, unable to generate LODs / Edge Lists / Vertex buffer optimization")
         return
 
     cmd = [exe]
 
-    cmd.append('-l')
-    cmd.append(str(config.get('LOD_LEVELS')))
-    
-    cmd.append('-d')
-    cmd.append(str(config.get('LOD_DISTANCE')))
+    if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+        cmd.append('-l')
+        cmd.append(str(config.get('LOD_LEVELS')))
 
-    cmd.append('-p')
-    cmd.append(str(config.get('LOD_PERCENT')))
+        cmd.append('-d')
+        cmd.append(str(config.get('LOD_DISTANCE')))
 
-    # Edge lists should be generated (or not) by mesh.py, not OgreMeshUpgrader
-    cmd.append('-e')
+        cmd.append('-p')
+        cmd.append(str(config.get('LOD_PERCENT')))
+
+    # Don't generate Edge Lists (-e = DON'T generate edge lists (for stencil shadows))
+    if config.get('GENERATE_EDGE_LISTS') == False:
+        cmd.append('-e')
 
     # Put logfile into output directory
     use_logger = False
@@ -124,10 +134,15 @@ def lod_create(infile):
     # Finally, specify input file
     cmd.append(infile)
 
-    logger.info("* Generating %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
+    if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+        logger.info("* Generating %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
+
+    if config.get('GENERATE_EDGE_LISTS') == True:
+        logger.info("* Generating Edge Lists for mesh: %s" % filename)
 
     # First try to execute with the -log option
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    logger.debug("%s" % " ".join(cmd))
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
     output, error = proc.communicate()
 
     if use_logger == False:
@@ -136,13 +151,23 @@ def lod_create(infile):
             log.write(output)
     
     if proc.returncode != 0:
-        logger.warn("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
-        Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
+        logger.warn("OgreMeshUpgrader failed, LODs / Edge Lists / Vertex buffer optimizations will not be generated for this mesh: %s" % filename)
+
+        if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+            Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
+
+        if config.get('GENERATE_EDGE_LISTS') == True:
+            Report.warnings.append("OgreMeshUpgrader failed, Edge Lists will not be generated for this mesh: %s" % filename)
+
         if error != None:
             logger.error(error)
         logger.warn(output)
     else:
-        logger.info("- Generated %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
+        if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+            logger.info("- Generated %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
+
+        if config.get('GENERATE_EDGE_LISTS') == True:
+            logger.info("- Generated Edge Lists for mesh: %s" % filename)
 
 
 def detect_converter_type():
@@ -218,6 +243,7 @@ def mesh_convert(infile):
         # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
         # otherwise it will complain about missing render system (missing plugins_tools.cfg)
         exe_path, name = os.path.split(exe)
+        logger.debug("%s" % " ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, cwd=exe_path)
         output, error = proc.communicate()
 
@@ -261,9 +287,10 @@ def xml_convert(infile, has_uvs=False):
         cmd.append('-x')
         cmd.append(config.get('EXTREMITY_POINTS'))
 
-    if version < (1,10,0) or converter_type == "OgreMeshTool":
-        if not config.get('GENERATE_EDGE_LISTS'):
-            cmd.append('-e')
+    # OgreMeshTool (OGRE v2): -e = DON'T generate edge lists (for stencil shadows)
+    # OgreXMLConverter (OGRE < 1.10): -e = DON'T generate edge lists (for stencil shadows)
+    if config.get('GENERATE_EDGE_LISTS') == False and (version < (1,10,0) or converter_type == "OgreMeshTool"):
+        cmd.append('-e')
 
     if config.get('GENERATE_TANGENTS') != "0" and converter_type == "OgreMeshTool":
         cmd.append('-t')
@@ -293,16 +320,18 @@ def xml_convert(infile, has_uvs=False):
         # Finally, specify input file
         cmd.append(infile)
 
-        ret = subprocess.call(cmd)
+        logger.debug("%s" % " ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        output, error = proc.communicate()
 
         # Instead of asserting, report an error
-        if ret != 0:
+        if proc.returncode != 0:
             logger.error("OgreXMLConverter returned with non-zero status, check OgreXMLConverter.log")
             logger.info(" ".join(cmd))
             Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
         
         # Clean up .xml file after successful conversion
-        if ret == 0 and config.get('XML_DELETE') == True:
+        if proc.returncode == 0 and config.get('XML_DELETE') == True:
             logger.info("Removing generated xml file after conversion: %s" % infile)
             os.remove(infile)
         
@@ -330,6 +359,7 @@ def xml_convert(infile, has_uvs=False):
         # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
         # otherwise it will complain about missing render system (missing plugins_tools.cfg)
         exe_path, name = os.path.split(exe)
+        logger.debug("%s" % " ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, cwd=exe_path)
         output, error = proc.communicate()
 

@@ -737,15 +737,17 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
                 doc.end_tag('animations')
                 logger.info('- Done at %s seconds' % timer_diff_str(start))
 
-        ## Clean up and save
-        if ob.modifiers != None:
-			#bpy.context.collection.objects.unlink(copy)
+        ## If we made a copy of the object, clean it up
+        if ob != copy:
+            #bpy.context.collection.objects.unlink(copy)    # Blender 2.7x
+            #bpy.context.scene.collection.objects.unlink(copy)  # Blender 2.8+
             copy.user_clear()
             logger.debug("Removing temporary object: %s" % copy.name)
             bpy.data.objects.remove(copy)
             del copy
 
-            # Reenable disabled modifiers
+        # Reenable disabled modifiers
+        if ob.modifiers != None:
             for mod in ob.modifiers:
                 if mod.type in disable_mods and mod.show_viewport == False:
                     logger.debug("Enabling Modifier: %s" % mod.name)
@@ -779,10 +781,11 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, timer_diff_str(start)))
 
-    # If requested by the user, generate LOD levels through OgreMeshUpgrader
-    if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+    # If requested by the user, generate LOD levels / Edge Lists / Vertex buffer optimization through OgreMeshUpgrader
+    if ((config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True) or
+        (config.get('GENERATE_EDGE_LISTS') == True)):
         target_mesh_file = os.path.join(path, '%s.mesh' % obj_name )
-        util.lod_create(target_mesh_file)
+        util.mesh_upgrade_tool(target_mesh_file)
     
     # Note that exporting the skeleton does not happen here anymore
     # It was moved to the function dot_skeleton in its own module (skeleton.py)

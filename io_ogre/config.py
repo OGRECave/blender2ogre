@@ -85,8 +85,8 @@ _CONFIG_DEFAULTS_ALL = {
     
     # Logging
     'ENABLE_LOGGING' : False,
-    #'DEBUG_LOGGING' : False,
-    'SHOW_LOG_NAME' : False,
+    'DEBUG_LOGGING' : False,
+    #'SHOW_LOG_NAME' : False,
     
     # Import
     'IMPORT_NORMALS' : True,
