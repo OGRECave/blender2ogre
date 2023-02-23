@@ -60,6 +60,7 @@ _CONFIG_DEFAULTS_ALL = {
     'ARMATURE_ANIMATION' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
     'ONLY_KEYFRAMES' : False,
+    'SHARED_ARMATURE' : False,
 
     # Mesh
     'MESH' : True,
