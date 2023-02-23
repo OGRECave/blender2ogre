@@ -107,7 +107,7 @@ class _OgreCommonExport_(object):
             "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"],
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
-            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
+            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_SHARED_ARMATURE", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
             "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"],
             "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"],
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"],
@@ -132,8 +132,9 @@ class _OgreCommonExport_(object):
                     box.prop(self, prop)
 
     def execute(self, context):
-        # Add warinng about missing XML converter
         Report.reset()
+
+        # Add warning about missing XML converter
         if self.converter == "unknown":
             Report.errors.append(
               "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
@@ -315,6 +316,10 @@ class _OgreCommonExport_(object):
         name="Armature Animation",
         description="Export armature animations (updates the .skeleton file)",
         default=config.get('ARMATURE_ANIMATION')) = {}
+    EX_SHARED_ARMATURE : BoolProperty(
+        name="Shared Armature",
+        description="Export a single .skeleton file for objects that have the same Armature parent (useful for: shareSkeletonInstanceWith())\nNOTE: The name of the .skeleton file will be that of the Armature",
+        default=config.get('SHARED_ARMATURE')) = {}
     EX_ONLY_KEYFRAMES : BoolProperty(
         name="Only Keyframes",
         description="Only export keyframes.\nNOTE: Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves",
@@ -334,7 +339,8 @@ class _OgreCommonExport_(object):
     EX_TRIM_BONE_WEIGHTS : FloatProperty(
         name="Trim Weights",
         description="Ignore bone weights below this value (Ogre supports 4 bones per vertex)",
-        min=0.0, max=0.5, default=config.get('TRIM_BONE_WEIGHTS')) = {}
+        min=0.0, max=0.5,
+        default=config.get('TRIM_BONE_WEIGHTS')) = {}
 
     # Mesh Options
     EX_MESH : BoolProperty(
@@ -345,12 +351,10 @@ class _OgreCommonExport_(object):
         name="Export Meshes (overwrite)",
         description="Export meshes (overwrite existing files)",
         default=config.get('MESH_OVERWRITE')) = {}
-
     EX_ARRAY : BoolProperty(
         name="Optimise Arrays",
         description="Optimise array modifiers as instances (constant offset only)",
         default=config.get('ARRAY')) = {}
-    
     EX_V1_EXTREMITY_POINTS : IntProperty(
         name="Extremity Points",
         description="""Submeshes can have optional 'extremity points' stored with them to allow 
@@ -396,7 +400,8 @@ S - strips the buffers for shadow mapping (consumes less space and memory)""",
     EX_LOD_DISTANCE : IntProperty(
         name="LOD Distance",
         description="Distance increment to reduce LOD",
-        min=0, max=2000, default=config.get('LOD_DISTANCE')) = {}
+        min=0, max=2000,
+        default=config.get('LOD_DISTANCE')) = {}
     EX_LOD_PERCENT : IntProperty(
         name="LOD Percentage",
         description="LOD percentage reduction",

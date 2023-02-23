@@ -14,7 +14,7 @@ if "bpy" in locals():
 
 # This is only relevant on first run, on later reloads those modules
 # are already in locals() and those statements do not do anything.
-import bpy, mathutils, logging, time
+import bpy, mathutils, logging, time, sys
 from .. import config
 from ..report import Report
 from ..xml import RDocument
@@ -35,29 +35,45 @@ def dot_skeleton(obj, path, **kwargs):
     kwargs:
       * force_name - string: force another name. default None
       * invoke_xml_converter - bool: invoke the xml to binary converter. default True
+      * overwrite - bool: wether to overwrite the xml file
+      * exported_armatures - array: list of already exported armatures as skeletons
 
     returns None if there is no skeleton exported, or the filename on success
     """
 
     arm = obj.find_armature()
     if arm and config.get('ARMATURE_ANIMATION'):
-        skel = Skeleton( obj )
+        exported_armatures = kwargs.get('exported_armatures')
+
         name = kwargs.get('force_name') or obj.data.name
+        if config.get('SHARED_ARMATURE') == True:
+            name = kwargs.get('force_name') or arm.data.name
         name = util.clean_object_name(name)
+
+        # Lets export the Armature only once
+        if name in exported_armatures:
+            logger.debug("Skip exporting Armature for object: %s" % obj.data.name)
+            return None
+
         xmlfile = join(path, '%s.skeleton.xml' % name)
-        
+
         logger.info('* Generating: %s.skeleton.xml' % name)
 
         start = time.time()
-       
+
+        skel = Skeleton( obj )
+
         with open(xmlfile, 'wb') as fd:
+            logger.debug("Writing Armature to file: %s" % xmlfile)
             fd.write( bytes(skel.to_xml(),'utf-8') )
 
         if kwargs.get('invoke_xml_converter', True):
             util.xml_convert( xmlfile )
-            
+
         logger.info('- Done at %s seconds' % util.timer_diff_str(start))
-            
+
+        exported_armatures.append( name )
+
         return name + '.skeleton'
 
     return None
@@ -390,16 +406,31 @@ class Skeleton(object):
                     if kf not in frame_range: # only add the key frames in once. Keyframes repeat in different channels
                         frame_range.append(kf)
         else: # Keyframes each frame
-            frame_range = range( int(frameBegin), int(frameEnd)+1, bpy.context.scene.frame_step) #thanks to Vesa, NOTE: frame_step is [( # of frames / FPS ) / # of frames ] -- I think??
-        
+            frame_range = range( int(frameBegin), int(frameEnd) + 1, bpy.context.scene.frame_step) #thanks to Vesa, NOTE: frame_step is [( # of frames / FPS ) / # of frames ] -- I think??
+
+        logger.info(" - Exporting action: %s" % actionName)
+
+        # Initialize progress through Blender cursor
+        progressScale = 1.0 / len(frame_range)
+        bpy.context.window_manager.progress_begin(0, 100)
+
         # Add keyframes to export
         for frame in frame_range:
+            percent = (frame - frameBegin + 1) * progressScale
+            sys.stdout.write( "\r + Frames [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
+            sys.stdout.flush()
+
+            # Update progress through Blender cursor
+            bpy.context.window_manager.progress_update(percent)
+
             bpy.context.scene.frame_set(frame)
             for bone in self.roots:
                 bone.update()
             for track in bone_tracks:
                 track.add_keyframe((frame - frameBegin) / _fps)
-        
+
+        sys.stdout.write("\n")
+
         # Check to see if any animation tracks would be output
         animationFound = False
         for track in bone_tracks:
@@ -418,11 +449,11 @@ class Skeleton(object):
         if config.get('ONLY_KEYFRAMES'):
             suffix_text = ' - Key frames: ' + str(frame_range)
             logger.info('+ %s Key frames: %s' %(actionName,str(frame_range)))            
-        Report.armature_animations.append( '%s : %s [start frame=%s  end frame=%s]%s' %(arm.name, actionName, frameBegin, frameEnd,suffix_text) )        
+        Report.armature_animations.append( '%s : %s [start frame=%s end frame=%s]%s' %(arm.name, actionName, frameBegin, frameEnd, suffix_text) )
             
         # Write stuff to skeleton.xml file
-        anim.setAttribute('name', actionName)                       # USE the action name
-        anim.setAttribute('length', '%6f' %( (frameEnd - frameBegin)/_fps ) )
+        anim.setAttribute('name', actionName)   # USE the action name
+        anim.setAttribute('length', '%6f' %( (frameEnd - frameBegin)/ _fps ) )
 
         for track in bone_tracks:
             # will only write a track if there is some kind of animation there

@@ -84,6 +84,12 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     material_prefix = kwargs.get('material_prefix', '')
     overwrite = kwargs.get('overwrite', False)
 
+    # Don't export hidden or unselected objects unless told to
+    if ((config.get("EXPORT_HIDDEN") == False and ob not in bpy.context.visible_objects) or
+        (config.get("SELECTED_ONLY") == True and ob.select_get() == False)):
+        logger.debug("Skip exporting hidden/non-selected object: %s" % ob.data.name)
+        return []
+
     if os.path.isfile(target_file) and not overwrite:
         return []
 
@@ -130,13 +136,15 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     Report.orig_vertices += len( mesh.vertices )
 
     logger.info('* Generating: %s.mesh.xml' % obj_name)
+    logger.info("  - Vertices: %s" % len( mesh.vertices ))
+    logger.info("  - Loop triangles: %s" % len( mesh.loop_triangles ))
 
     try:
         with open(target_file, 'w') as f:
             f.flush()
     except Exception as e:
         show_dialog("Invalid mesh object name: %s" % obj_name)
-        return
+        return []
 
     with open(target_file, 'w') as f:
         doc = SimpleSaxWriter(f, 'mesh', {})
@@ -358,7 +366,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
         sys.stdout.write("\n")
 
-        logger.info('- Done at %s seconds' % timer_diff_str(start))
+        logger.info('- Done at %s seconds' % util.timer_diff_str(start))
         logger.info('* Writing submeshes')
 
         doc.start_tag('submeshes', {})
@@ -433,7 +441,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
             idx += 1
         doc.end_tag('submeshnames')
 
-        logger.info('- Done at %s seconds' % timer_diff_str(start))
+        logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
         # Generate lod levels
         if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == False:
@@ -565,8 +573,13 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
         arm = ob.find_armature()
         if arm:
+            skeleton_name = obj_name
+            if config.get('SHARED_ARMATURE') == True:
+                skeleton_name = arm.data.name
+            skeleton_name = util.clean_object_name(skeleton_name)
+
             doc.leaf_tag('skeletonlink', {
-                    'name' : '%s.skeleton' % obj_name
+                    'name' : '%s.skeleton' % skeleton_name
             })
             doc.start_tag('boneassignments', {})
             boneOutputEnableFromName = {}
@@ -697,7 +710,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
                 doc.end_tag('pose')
             doc.end_tag('poses')
 
-            logger.info('- Done at %s seconds' % timer_diff_str(start))
+            logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
             if mesh.shape_keys.animation_data and len(mesh.shape_keys.animation_data.nla_tracks) > 0:
                 logger.info('* Writing shape animations')
@@ -735,7 +748,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
                         doc.end_tag('tracks')
                         doc.end_tag('animation')
                 doc.end_tag('animations')
-                logger.info('- Done at %s seconds' % timer_diff_str(start))
+                logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
         ## If we made a copy of the object, clean it up
         if ob != copy:
@@ -762,7 +775,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
         doc.close() # reported by Reyn
         f.close()
 
-        logger.info('- Created %s.mesh.xml at %s seconds' % (obj_name, timer_diff_str(start)))
+        logger.info('- Created %s.mesh.xml at %s seconds' % (obj_name, util.timer_diff_str(start)))
 
     # todo: Very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
@@ -779,7 +792,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     # Start .mesh.xml to .mesh convertion tool
     util.xml_convert(target_file, has_uvs=dotextures)
 
-    logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, timer_diff_str(start)))
+    logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, util.timer_diff_str(start)))
 
     # If requested by the user, generate LOD levels / Edge Lists / Vertex buffer optimization through OgreMeshUpgrader
     if ((config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True) or
