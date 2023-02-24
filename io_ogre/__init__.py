@@ -103,10 +103,10 @@ class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, "SHADER_PROGRAMS")      
 
 def register():
-    #logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='[%(levelname)5s] %(message)s', datefmt='%H:%M:%S')
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='[%(levelname)5s] %(message)s', datefmt='%H:%M:%S')
 
     logging.info('Starting io_ogre %s', bl_info["version"])
+
     # The UI modules define auto_register functions that
     # return classes that should be loaded by the plugin
     for clazz in ui.auto_register(True):

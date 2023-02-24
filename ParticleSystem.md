@@ -5,19 +5,19 @@
 A common technique for laying out random objects on a scene in Blender is to use the Particle System. 
 (That is, before Geometry Nodes in Blender 2.92)
 
-In this tutorial we are going to explore how to layout objects in a scene randomly and export that scene for using with OGRE.
+In this tutorial, we are going to explore how to lay out objects in a scene randomly and export that scene for use with OGRE.
 
-This tutorial is based on the ideas showed in this "CG Geek" video:
+This tutorial is based on the ideas shown in this "CG Geek" video:
 [Create Realistic Grass in Blender 2.8 in 15 minutes](https://www.youtube.com/watch?v=-GAm-7_3N6g)
 
 Terminology:
- - *Base Object*: an object with a mesh that represents a terrain or some other form where we want to place random objects on.
+ - *Base Object*: an object with a mesh that represents a terrain or some other form on which we want to place random objects on.
  - *Dupli Objects*: an object with a mesh that represents random objects (like grass, trees, rocks, etc.) that we want to place on the Base object.
 
 The scene in the images is available [here](examples/particle-system.blend), it was made with the A.N.T Landscape Plugin that comes bundled with Blender (River preset) and very simple "Earth" and "Water" materials.
 
 ## Creating and setting up the Particle System
-Select the mesh where you want to place your foliage or debris over (the *Base Object*).
+Select the mesh where you want to place your foliage or debris (the *Base Object*).
 
 Go to the `Particles` tab and click on new to add a new particle system.
 
@@ -25,7 +25,7 @@ Select type: `Hair` and click on `Advanced` to show the advanced options.
 
 By default `Hair Length` is set to 4 which makes the debris show 4 x larger so set the value to 1.
 
-With `Number` it is possible to control the amount of objects that will appear randomly on the mesh surface.
+With `Number` it is possible to control the number of objects that will appear randomly on the mesh surface.
 
 ![particle-system1.png](images/particle-sys/particle-system1.png)
 
@@ -41,20 +41,20 @@ Set `Size` to 1 and choose a `Random Size` value to control the amount of random
 
 ![particle-system3.png](images/particle-sys/particle-system3.png)
 
-At this point you should see the object appearing randomly in the places where there were hair strands.
-But, the objects appear rotated -90 degree over the Y axis.
-In order to solve this it is necessary to rotate the Dupli Object 90 degree over the Y axis to counter this rotation.
+At this point, you should see the object appearing randomly in the places where there were hair strands.
+But, the objects appear rotated -90 degrees over the Y axis.
+To solve this it is necessary to rotate the Dupli Object 90 degrees over the Y-axis to counter this rotation.
 Don't apply this rotation to the Dupli Object, otherwise the `blender2ogre` add-on will export the mesh with this rotation applied.
 The add-on will automatically apply this rotation to the nodes in the exported scene.
 
 Another thing to take into account is that the Dupli Object origin should be at its base, otherwise it will appear to be buried halfway.
 
 ## Extras
-It is also possible to paint certain parts of the Base Objects mesh to modify the *Dupli Objects* density by using weith paint.
+It is also possible to paint certain parts of the Base Objects mesh to modify the *Dupli Objects* density by using weight painting.
 Select the *Base Object*, go into weight paint mode and start painting the areas where you want to increase the *Dupli Objects* density.
 
-Remeber that the *Base Object* should have some tesselation for this to work well, otherwise there might be few vertices to paint.
-One way to tesselate is to go into Edit mode and subdivide, or activate Dynotopo in Sculpt mode.
+Remember that the *Base Object* should have some tesselation for this to work well, otherwise there might be few vertices to paint.
+One way to tesselate is to go into Edit mode and subdivide or activate Dynotopo in Sculpt mode.
 
 After painting the areas go back to the `Particles` tab and in the `Vertex Groups` section choose the vertex group in `Density` and `Length` (the default vertex group is `Default`).
 
@@ -62,7 +62,7 @@ After painting the areas go back to the `Particles` tab and in the `Vertex Group
 
 ## Troubleshooting
 Some tips for troubleshooting:
- - Don't apply the 90 degree rotation on the Y axis to the Dupli Object, that rotation is just to see the object well placed in Blender
+ - Don't apply the 90-degree rotation on the Y axis to the Dupli Object, that rotation is just to see the object well placed in Blender
  - Make sure that the origin of the Dupli Object is centered in the base
  - Apply any scale used on the Dupli and Base Objects
  - Check the logs for any errors or warnings (in Windows: Window > Toggle System Console)

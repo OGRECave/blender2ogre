@@ -54,7 +54,7 @@ class VertexColorLookup:
 
         return (r,g,b,ra)
 
-def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=4, isLOD=False, **kwargs):
+def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=4, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
 
@@ -72,6 +72,12 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     material_prefix = kwargs.get('material_prefix', '')
     overwrite = kwargs.get('overwrite', False)
 
+    # Don't export hidden or unselected objects unless told to
+    if ((config.get("EXPORT_HIDDEN") == False and ob.hide == True) or
+        (config.get("SELECTED_ONLY") == True and ob.select == False)):
+        logger.debug("Skip exporting hidden/non-selected object: %s" % ob.data.name)
+        return []
+
     if os.path.isfile(target_file) and not overwrite:
         return []
 
@@ -80,37 +86,48 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
     start = time.time()
 
-    cleanup = False
-    if ob.modifiers:
-        cleanup = True
+    if ob.modifiers != None:
+        # Disable Armature and Array modifiers before `to_mesh()` collapse
+        # NOTE: We need to disable the modifiers on the original object itself, we'll enable them again later
+        # If we try to remove the unwanted modifiers from the copy object, then none of the modifiers will be applied when doing `to_mesh()`
+
+        # If we want to optimise array modifiers as instances, then the Array Modifier should be disabled
+        if config.get("ARRAY") == True:
+            disable_mods = ['ARMATURE', 'ARRAY']
+        else:
+            disable_mods = ['ARMATURE']
+
+        for mod in ob.modifiers:
+            if mod.type in disable_mods and mod.show_viewport == True:
+                logger.debug("Disabling Modifier: %s" % mod.name)
+                mod.show_viewport = False
+
         copy = ob.copy()
-        #bpy.context.scene.objects.link(copy)
-        rem = []
-        for mod in copy.modifiers:        # remove armature and array modifiers before collaspe
-            if mod.type in 'ARMATURE ARRAY'.split(): rem.append( mod )
-        for mod in rem: copy.modifiers.remove( mod )
     else:
         copy = ob
 
     # bake mesh
     mesh = copy.to_mesh(bpy.context.scene, apply_modifiers=True, settings='PREVIEW')
     mesh.update()
+
     # Blender by default does not calculate these. 
     # When querying the quads/tris of the object blender would crash if calc_tessface was not updated
     ob.data.update(calc_tessface=True)
 
     Report.meshes.append( obj_name )
-    Report.faces += len( ob.data.tessfaces )
-    Report.orig_vertices += len( ob.data.vertices )
+    Report.faces += len( mesh.tessfaces )
+    Report.orig_vertices += len( mesh.vertices )
 
     logger.info('* Generating: %s.mesh.xml' % obj_name)
+    logger.info("  - Vertices: %s" % len( mesh.vertices ))
+    logger.info("  - Loop triangles: %s" % len( mesh.tessfaces ))
 
     try:
         with open(target_file, 'w') as f:
             f.flush()
     except Exception as e:
         show_dialog("Invalid mesh object name: %s" % obj_name)
-        return
+        return []
 
     with open(target_file, 'w') as f:
         doc = SimpleSaxWriter(f, 'mesh', {})
@@ -315,7 +332,15 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 doc.end_tag('vertex')
 
             append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
-            material_faces[F.material_index].append(face)
+
+            try:
+                material_faces[F.material_index].append(face)
+            except:
+                failure = 'FAILED to assign material to face - you might be using a Boolean Modifier between objects with different materials!'
+                failure += '[ mesh : %s ]' % mesh.name
+                Report.warnings.append( failure )
+                logger.error( failure )
+                break
 
         Report.vertices += numverts
 
@@ -324,7 +349,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         sys.stdout.write("\n")
 
-        logger.info('- Done at %s seconds' % timer_diff_str(start))
+        logger.info('- Done at %s seconds' % util.timer_diff_str(start))
         logger.info('* Writing submeshes')
 
         doc.start_tag('submeshes', {})
@@ -399,7 +424,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             idx += 1
         doc.end_tag('submeshnames')
 
-        logger.info('- Done at %s seconds' % timer_diff_str(start))
+        logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
         # Generate lod levels
         if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == False:
@@ -525,8 +550,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
 
         arm = ob.find_armature()
         if arm:
+            skeleton_name = obj_name
+            if config.get('SHARED_ARMATURE') == True:
+                skeleton_name = arm.data.name
+            skeleton_name = util.clean_object_name(skeleton_name)
+
             doc.leaf_tag('skeletonlink', {
-                    'name' : '%s.skeleton' % obj_name
+                    'name' : '%s.skeleton' % skeleton_name
             })
             doc.start_tag('boneassignments', {})
             boneOutputEnableFromName = {}
@@ -575,11 +605,11 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
             doc.end_tag('boneassignments')
 
         # Updated June3 2011 - shape animation works
-        if config.get('SHAPE_ANIMATIONS') and copy.data.shape_keys and len(copy.data.shape_keys.key_blocks) > 0:
+        if config.get('SHAPE_ANIMATIONS') and ob.data.shape_keys and len(ob.data.shape_keys.key_blocks) > 0:
             logger.info('* Writing shape keys')
 
             doc.start_tag('poses', {})
-            for sidx, skey in enumerate(copy.data.shape_keys.key_blocks):
+            for sidx, skey in enumerate(ob.data.shape_keys.key_blocks):
                 # Skip the basis Shape Key
                 if sidx == 0:
                     continue
@@ -657,13 +687,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                 doc.end_tag('pose')
             doc.end_tag('poses')
 
-            logger.info('- Done at %s seconds' % timer_diff_str(start))
+            logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
-            if copy.data.shape_keys.animation_data and len(copy.data.shape_keys.animation_data.nla_tracks) > 0:
+            if ob.data.shape_keys.animation_data and len(ob.data.shape_keys.animation_data.nla_tracks) > 0:
                 logger.info('* Writing shape animations')
                 doc.start_tag('animations', {})
                 _fps = float( bpy.context.scene.render.fps )
-                for nla in copy.data.shape_keys.animation_data.nla_tracks:
+                for nla in ob.data.shape_keys.animation_data.nla_tracks:
                     for idx, strip in enumerate(nla.strips):
                         doc.start_tag('animation', {
                                 'name' : strip.name,
@@ -683,7 +713,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                             doc.start_tag('keyframe', {
                                     'time' : str((frame-strip.frame_start)/_fps)
                             })
-                            for sidx, skey in enumerate( copy.data.shape_keys.key_blocks ):
+                            for sidx, skey in enumerate( ob.data.shape_keys.key_blocks ):
                                 if sidx == 0: continue
                                 doc.leaf_tag('poseref', {
                                         'poseindex' : str(sidx-1),
@@ -695,7 +725,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
                         doc.end_tag('tracks')
                         doc.end_tag('animation')
                 doc.end_tag('animations')
-                logger.info('- Done at %s seconds' % timer_diff_str(start))
+                logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
         ## Clean up and save
         logger.debug("Removing temporary mesh: %s" % ob.data.name)
@@ -703,12 +733,21 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         bpy.data.meshes.remove(mesh)
         del mesh
 
-        if cleanup:
-            #bpy.context.scene.objects.unlink(copy)
+        ## If we made a copy of the object, clean it up
+        if ob != copy:
+            #bpy.context.collection.objects.unlink(copy)    # Blender 2.7x
+            #bpy.context.scene.collection.objects.unlink(copy)  # Blender 2.8+
             copy.user_clear()
             logger.debug("Removing temporary object: %s" % copy.name)
             bpy.data.objects.remove(copy)
             del copy
+
+        # Reenable disabled modifiers
+        if ob.modifiers != None:
+            for mod in ob.modifiers:
+                if mod.type in disable_mods and mod.show_viewport == False:
+                    logger.debug("Enabling Modifier: %s" % mod.name)
+                    mod.show_viewport = True
 
         # Release BMesh resources
         bm.free()
@@ -719,7 +758,7 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
         doc.close() # reported by Reyn
         f.close()
 
-        logger.info('- Created %s.mesh.xml at %s seconds' % (obj_name, timer_diff_str(start)))
+        logger.info('- Created %s.mesh.xml at %s seconds' % (obj_name, util.timer_diff_str(start)))
 
     # todo: Very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
@@ -736,12 +775,13 @@ def dot_mesh( ob, path, force_name=None, ignore_shape_animation=False, normals=T
     # Start .mesh.xml to .mesh convertion tool
     util.xml_convert(target_file, has_uvs=dotextures)
 
-    logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, timer_diff_str(start)))
+    logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, util.timer_diff_str(start)))
 
-    # If requested by the user, generate LOD levels through OgreMeshUpgrader
-    if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+    # If requested by the user, generate LOD levels / Edge Lists / Vertex buffer optimization through OgreMeshUpgrader
+    if ((config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True) or
+        (config.get('GENERATE_EDGE_LISTS') == True)):
         target_mesh_file = os.path.join(path, '%s.mesh' % obj_name )
-        util.lod_create(target_mesh_file)
+        util.mesh_upgrade_tool(target_mesh_file)
     
     # Note that exporting the skeleton does not happen here anymore
     # It was moved to the function dot_skeleton in its own module (skeleton.py)

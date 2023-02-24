@@ -59,6 +59,7 @@ _CONFIG_DEFAULTS_ALL = {
     'ARMATURE_ANIMATION' : True,
     'TRIM_BONE_WEIGHTS' : 0.01,
     'ONLY_KEYFRAMES' : False,
+    'SHARED_ARMATURE' : False,
 
     # Mesh
     'MESH' : True,
@@ -84,8 +85,8 @@ _CONFIG_DEFAULTS_ALL = {
     
     # Logging
     'ENABLE_LOGGING' : False,
-    #'DEBUG_LOGGING' : False,
-    'SHOW_LOG_NAME' : False,
+    'DEBUG_LOGGING' : False,
+    #'SHOW_LOG_NAME' : False,
     
     # Import
     'IMPORT_NORMALS' : True,

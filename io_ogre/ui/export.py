@@ -100,20 +100,20 @@ class _OgreCommonExport_(object):
             "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "LOD" : "LATTICE_DATA", "Shape Animation" : "POSE_HLT", 
             "Logging" : "TEXT"
         }
-        
+
         # Options associated with each section
         section_options = {
-            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"], 
-            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_EXPORT_USER", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"], 
-            "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"], 
-            "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"], 
-            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"], 
-            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"], 
-            "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"], 
-            "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"], 
-            "Logging" : ["EX_Vx_ENABLE_LOGGING"]
+            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"],
+            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_EXPORT_USER", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"],
+            "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS"],
+            "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
+            "Armature" : ["EX_ARMATURE_ANIMATION", "EX_SHARED_ARMATURE", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
+            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"],
+            "LOD" : ["EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT", "EX_LOD_MESH_TOOLS"],
+            "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"],
+            "Logging" : ["EX_Vx_ENABLE_LOGGING", "EX_Vx_DEBUG_LOGGING"]
         }
-        
+
         for section in sections:
             row = layout.row()
             box = row.box()
@@ -130,10 +130,11 @@ class _OgreCommonExport_(object):
                         box.prop(self, prop)
                 elif prop.startswith('EX_'):
                     box.prop(self, prop)
-        
+
     def execute(self, context):
-        # Add warinng about missing XML converter
         Report.reset()
+
+        # Add warning about missing XML converter
         if self.converter == "unknown":
             Report.errors.append(
               "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
@@ -155,23 +156,23 @@ class _OgreCommonExport_(object):
         config.update(**kw)
 
         print ("_" * 80,"\n")
-        
+
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
         file_handler = None
-        
+
         # Add a file handler to all Logger instances
         if config.get('ENABLE_LOGGING') == True:
             log_file = ("%s/blender2ogre.log" % target_path)
-            logger.info("Writing log file to: %s" % log_file)
+            logger.info("* Writing log file to: %s" % log_file)
 
             file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
-            
+
             # Show the python file name from where each log message originated
             SHOW_LOG_NAME = False
-            
+
             if SHOW_LOG_NAME:
                 file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
             else:
@@ -179,12 +180,26 @@ class _OgreCommonExport_(object):
 
             file_handler.setFormatter(file_formatter)
 
+            if config.get('DEBUG_LOGGING') == True:
+                level = logging.DEBUG
+            else:
+                level = logging.INFO
+
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logging.getLogger(logger_name).addHandler(file_handler)
+                logging.getLogger(logger_name).setLevel(level)
 
-        logger.info("Target_path: %s" % target_path)
-        logger.info("Target_file_name: %s" % target_file_name)
-        logger.debug("Target_file_name_no_ext: %s" % target_file_name_no_ext)
+        logger.info("* Target path: %s" % target_path)
+        logger.info("* Target file name: %s" % target_file_name)
+        logger.debug("* Target file name (no ext): %s" % target_file_name_no_ext)
+
+        # https://blender.stackexchange.com/questions/45528/how-to-get-blenders-version-number-from-python
+        logger.info("* Blender version: %s (%s; %s)" % (bpy.app.version_string, bpy.app.version_cycle, bpy.app.build_platform.decode('UTF-8')))
+        logger.debug(" + Binary Path: %s" % bpy.app.binary_path)
+        logger.debug(" + Build Date: %s %s" % (bpy.app.build_date.decode('UTF-8'), bpy.app.build_time.decode('UTF-8')))
+        logger.debug(" + Build Hash: %s" % bpy.app.build_hash.decode('UTF-8'))
+        logger.debug(" + Build Branch: %s" % bpy.app.build_branch.decode('UTF-8'))
+        logger.debug(" + Build Platform: %s" % bpy.app.build_platform.decode('UTF-8'))
 
         # Start exporting the elements in the scene
         scene.dot_scene(target_path, target_file_name_no_ext)
@@ -193,10 +208,7 @@ class _OgreCommonExport_(object):
         # Flush and close all logging file handlers
         if config.get('ENABLE_LOGGING') == True:
             for logger_name in logging.Logger.manager.loggerDict.keys():
-                logger_instance = logging.getLogger(logger_name)
-                    
-                # Remove handlers
-                logger_instance.handlers.clear()
+                logging.getLogger(logger_name).handlers.clear()
             
             file_handler.flush()
             file_handler.close()
@@ -300,6 +312,14 @@ class _OgreCommonExport_(object):
         name="Armature Animation",
         description="Export armature animations (updates the .skeleton file)",
         default=config.get('ARMATURE_ANIMATION'))
+    EX_SHARED_ARMATURE = BoolProperty(
+        name="Shared Armature",
+        description="Export a single .skeleton file for objects that have the same Armature parent (useful for: shareSkeletonInstanceWith())\nNOTE: The name of the .skeleton file will be that of the Armature",
+        default=config.get('SHARED_ARMATURE'))
+    EX_ONLY_KEYFRAMES = BoolProperty(
+        name="Only Keyframes",
+        description="Only export keyframes.\nNOTE: Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves",
+        default=config.get('ONLY_KEYFRAMES'))
     EX_ONLY_DEFORMABLE_BONES = BoolProperty(
         name="Only Deformable Bones",
         description="Only exports bones that are deformable. Useful for hiding IK-Bones used in Blender.\nNOTE: Any bone with deformable children/descendants will be output as well",
@@ -315,7 +335,8 @@ class _OgreCommonExport_(object):
     EX_TRIM_BONE_WEIGHTS = FloatProperty(
         name="Trim Weights",
         description="Ignore bone weights below this value (Ogre supports 4 bones per vertex)",
-        min=0.0, max=0.5, default=config.get('TRIM_BONE_WEIGHTS') )
+        min=0.0, max=0.5,
+        default=config.get('TRIM_BONE_WEIGHTS'))
 
     # Mesh Options
     EX_MESH = BoolProperty(
@@ -327,11 +348,10 @@ class _OgreCommonExport_(object):
         description="Export meshes (overwrite existing files)",
         default=config.get('MESH_OVERWRITE'))
 
-    # This is actually implemented as if EX_ARRAY=True always, there is not an actual choice possible
-    #EX_ARRAY = BoolProperty(
-    #    name="Optimise Arrays",
-    #    description="Optimise array modifiers as instances (constant offset only)",
-    #    default=config.get('ARRAY'))
+    EX_ARRAY = BoolProperty(
+        name="Optimise Arrays",
+        description="Optimise array modifiers as instances (constant offset only)",
+        default=config.get('ARRAY'))
     
     EX_V1_EXTREMITY_POINTS = IntProperty(
         name="Extremity Points",
@@ -342,7 +362,7 @@ For some meshes with transparent materials (partial transparency) this can be us
         default=config.get('EXTREMITY_POINTS'))
     EX_Vx_GENERATE_EDGE_LISTS = BoolProperty(
         name="Edge Lists",
-        description="Generate edge lists (for stencil shadows)",
+        description="Generate Edge Lists (for Stencil Shadows)",
         default=config.get('GENERATE_EDGE_LISTS'))
     EX_GENERATE_TANGENTS = EnumProperty(
         items=config.TANGENT_MODES,
@@ -378,7 +398,8 @@ S - strips the buffers for shadow mapping (consumes less space and memory)""",
     EX_LOD_DISTANCE = IntProperty(
         name="LOD Distance",
         description="Distance increment to reduce LOD",
-        min=0, max=2000, default=config.get('LOD_DISTANCE'))
+        min=0, max=2000,
+        default=config.get('LOD_DISTANCE'))
     EX_LOD_PERCENT = IntProperty(
         name="LOD Percentage",
         description="LOD percentage reduction",
@@ -408,10 +429,10 @@ Blenders decimate does LOD by collapsing vertices, which can result in a visuall
         default=config.get('ENABLE_LOGGING'))
     
     # It seems that it is not possible to exclude DEBUG when selecting a log level
-    #EX_Vx_DEBUG_LOGGING = BoolProperty(
-    #    name="Debug Logging",
-    #    description="Whether to show DEBUG log messages",
-    #    default=config.get('DEBUG_LOGGING'))
+    EX_Vx_DEBUG_LOGGING = BoolProperty(
+        name="Debug Logging",
+        description="Whether to show DEBUG log messages",
+        default=config.get('DEBUG_LOGGING'))
     
     # It was decided to make this an option that is not user-facing
     #EX_Vx_SHOW_LOG_NAME = BoolProperty(

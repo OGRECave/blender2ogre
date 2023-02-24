@@ -849,8 +849,8 @@ def bCreateSkeleton(meshData, name):
             boneObj['OGREID'] = boneData['id']
             logger.debug("BoneID: %s, BoneName: %s" % (boneData['id'], boneName))
 
-        # boneObj.head = boneData['posHAS']
-        # headPos = boneData['posHAS']
+        #boneObj.head = boneData['posHAS']
+        #headPos = boneData['posHAS']
         headPos = boneData['posHAS']
         tailVector = 0
         if len(children) > 0:
@@ -1229,12 +1229,12 @@ def bCreateSubMeshes(meshData, meshName):
                 if(pose['submesh'] == subMeshIndex):
                     if base is None:
                         # Must have base shape
-                        base = ob.shape_key_add('Basis')
+                        base = ob.shape_key_add(name='Basis')
                     name = pose['name']
                     Report.shape_animations.append(name)
                     
                     logger.info('* Creating pose', name)
-                    shape = ob.shape_key_add(name)
+                    shape = ob.shape_key_add(name=name)
                     for vkey in pose['data']:
                         b = base.data[vkey[0]].co
                         me.shape_keys.key_blocks[name].data[vkey[0]].co = [
@@ -1243,19 +1243,6 @@ def bCreateSubMeshes(meshData, meshName):
         # Update mesh with new data
         me.update(calc_edges=True)
         me.use_auto_smooth = True
-
-        Report.orig_vertices = len( me.vertices )
-
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.mesh.remove_doubles(threshold=0.001)
-        bpy.ops.object.editmode_toggle()
-
-        # Update mesh with new data
-        me.update(calc_edges=True, calc_tessface=True)
-
-        Report.faces += len( me.tessfaces )
-        Report.triangles += len( me.tessfaces )
-        Report.vertices += len( me.vertices )
 
         # Try to set custom normals
         if hasNormals:
@@ -1274,7 +1261,18 @@ def bCreateSubMeshes(meshData, meshName):
                 me.normals_split_custom_set(split)
             else:
                 Report.warnings.append("Failed to import mesh normals")
-                logger.warning('Failed to import mesh normals %s / %s', (polyIndex, len(me.polygons)))
+                logger.warning('Failed to import mesh normals %s / %s' % (polyIndex, str(len(me.polygons))))
+
+        Report.orig_vertices = len( me.vertices )
+        Report.faces += len( me.polygons )
+
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.mesh.remove_doubles(threshold=0.001)
+        #bpy.ops.mesh.tris_convert_to_quads()
+        bpy.ops.object.editmode_toggle()
+
+        Report.triangles += len( me.polygons )
+        Report.vertices += len( me.vertices )
 
         allObjects.append(ob)
 
@@ -1357,7 +1355,7 @@ def load(filepath):
                 # Material file
                 pathMaterial = os.path.join(folder, filename)
                 meshMaterials.append(pathMaterial)
-                # logger.info("alternative material file: %s" % pathMaterial)
+                #logger.info("alternative material file: %s" % pathMaterial)
     else:
         meshMaterials.append(pathMaterial)
 
