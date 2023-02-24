@@ -50,6 +50,8 @@ def dot_scene(path, scene_name=None):
     scene_file = scene_name + '.scene'
     target_scene_file = join(path, scene_file)
 
+    start = time.time()
+
     # Create target path if it does not exist
     if not os.path.exists(path):
         logger.info("Creating Directory: %s" % path)
@@ -133,6 +135,7 @@ def dot_scene(path, scene_name=None):
 
     # Track that we don't export same data multiple times
     exported_meshes = []
+    exported_armatures = []
 
     # Find merge groups
     mgroups = []
@@ -204,6 +207,7 @@ def dot_scene(path, scene_name=None):
             meshes = meshes,
             mesh_collision_prims = mesh_collision_prims,
             mesh_collision_files = mesh_collision_files,
+            exported_armatures = exported_armatures,
             prefix = prefix,
             objects = objects,
             xmlparent = doc._scene_nodes
@@ -226,6 +230,8 @@ def dot_scene(path, scene_name=None):
 
     # Restore the scene previous frame position
     bpy.context.scene.frame_set(frame_current)
+
+    logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
 class _WrapLogic(object):
     SwapName = { 'frame_property' : 'animation' } # custom name hacks
@@ -455,8 +461,8 @@ def ogre_document(materials):
 
 # Recursive Node export
 def dot_scene_node_export( ob, path, doc=None, rex=None,
-        exported_meshes=[], meshes=[], mesh_collision_prims={},
-        mesh_collision_files={}, prefix='', objects=[], xmlparent=None ):
+        exported_meshes=[], meshes=[], mesh_collision_prims={}, mesh_collision_files={},
+        exported_armatures=[], prefix='', objects=[], xmlparent=None ):
 
     o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
@@ -494,8 +500,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         ob.data.update(calc_tessface=True)
         # if it has no faces at all, the object itself will not be exported, BUT
         # it might have children
-        logger.info("  - Vertices: %s" % len(ob.data.vertices))
-        logger.info("  - Loop triangles: %s" % len(ob.data.tessfaces))
 
     if ob.type == 'MESH' and len(ob.data.tessfaces):
         collisionFile = None
@@ -542,13 +546,13 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
             tangents = int(config.get("GENERATE_TANGENTS"))
             mesh.dot_mesh(ob, path, overwrite=overwrite, tangents=tangents)
-            skeleton.dot_skeleton(ob, path, overwrite=overwrite)
             exported_meshes.append( ob.data.name )
+            skeleton.dot_skeleton(ob, path, overwrite=overwrite, exported_armatures=exported_armatures)
 
         # Deal with Array modifier
         vecs = [ ob.matrix_world.to_translation() ]
         for mod in ob.modifiers:
-            if mod.type == 'ARRAY':
+            if config.get("ARRAY") == True and mod.type == 'ARRAY':
                 if mod.fit_type != 'FIXED_COUNT':
                     logger.warning("<%s> Unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
                     Report.warnings.append("Object \"%s\" has unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
@@ -682,6 +686,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             meshes = meshes,
             mesh_collision_prims = mesh_collision_prims,
             mesh_collision_files = mesh_collision_files,
+            exported_armatures = exported_armatures,
             prefix = prefix,
             objects=objects,
             xmlparent=o
