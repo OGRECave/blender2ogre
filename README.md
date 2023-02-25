@@ -57,6 +57,8 @@ The active object selection is when there is an object with a yellow outline (in
 - If you have `OGRETOOLS_XML_CONVERTER` set to "OgreXMLConverter.exe" path, then the export dialogue will display options relevant to the Ogre (v1) mesh format.
 - If you have `OGRETOOLS_XML_CONVERTER` set to "OgreMeshTool.exe" path, then the export dialogue will display options relevant to the OgreNext (v2) mesh format.
 
+Check out all the exporter and importer options in the [Options Document](Options.md)
+
 ### Blender Modifiers Support
 Blender has some very useful modifiers, and most of them are supported by `blender2ogre` but not all of them.
 Check out the [Blender Modifiers Support Page](Modifiers.md) to check out the list and also some recommendations about them.

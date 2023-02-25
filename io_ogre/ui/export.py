@@ -231,17 +231,17 @@ class _OgreCommonExport_(object):
     # General
     EX_SWAP_AXIS : EnumProperty(
         items=config.AXIS_MODES,
-        name='Swap Axis',
-        description='Axis swapping mode',
+        name="Swap Axis",
+        description="Axis swapping mode",
         default=config.get('SWAP_AXIS')) = {}
     EX_V2_MESH_TOOL_VERSION : EnumProperty(
         items=config.MESH_TOOL_VERSIONS,
-        name='Mesh Export Version',
-        description='Specify Ogre version format to write',
+        name="Mesh Export Version",
+        description="Specify Ogre version format to write",
         default=config.get('MESH_TOOL_VERSION')) = {}
     EX_XML_DELETE : BoolProperty(
         name="Clean up xml files",
-        description="Remove the generated xml files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finish successfully)",
+        description="Remove the generated xml files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finishes successfully)",
         default=config.get('XML_DELETE')) = {}
     
     # Scene
@@ -288,7 +288,7 @@ class _OgreCommonExport_(object):
         default=config.get('MATERIALS')) = {}
     EX_SEPARATE_MATERIALS : BoolProperty(
         name="Separate Materials",
-        description="Exports a .material for each material\n(rather than putting all materials into a single .material file)",
+        description="Exports a .material file for each material\n(rather than putting all materials into a single .material file)",
         default=config.get('SEPARATE_MATERIALS')) = {}
     EX_COPY_SHADER_PROGRAMS : BoolProperty(
         name="Copy Shader Programs",
@@ -307,8 +307,8 @@ class _OgreCommonExport_(object):
         default=config.get('DDS_MIPS')) = {}
     EX_FORCE_IMAGE_FORMAT : EnumProperty(
         items=material.IMAGE_FORMATS,
-        name='Convert Images',
-        description='Convert all textures to selected image format',
+        name="Convert Images",
+        description="Convert all textures to selected image format",
         default=config.get('FORCE_IMAGE_FORMAT')) = {}
     
     # Armature
