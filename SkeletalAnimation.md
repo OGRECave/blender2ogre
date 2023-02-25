@@ -10,6 +10,9 @@
  - [Using Skeletal Animations in Ogre](#using-skeletal-animations-in-ogre)
  - [Tips/Troubleshooting](#tips-troubleshooting)
  - [Human Top+Base Animations](#human-top-base-animations)
+ - [Character clothing](#character-clothing)
+   - [Shared Skeleton](#shared-skeleton)
+   - [Base Mesh/Skin clipping](#base-mesh-skin-clipping)
  - [Random Tips from the forum](#random-tips-from-the-forum)
  - [Automation](#automation)
 
@@ -81,6 +84,7 @@ This is typically useful after an Armature modifier, where distortion around joi
 
 ## Exporter Options
  - *EX_ARMATURE_ANIMATION* (Armature Animation) : Export armature animations (updates the .skeleton file), enable this option to export the armature animations.
+ - *EX_SHARED_ARMATURE* (Shared Armature) : Export a single .skeleton file for objects that have the same Armature parent (useful for: `shareSkeletonInstanceWith()`). NOTE: The name of the .skeleton file will be that of the Armature",
  - *EX_ONLY_KEYFRAMES* (Only Keyframes) : Exports only the keyframes. Influences that Inverse Kinematics, Drivers and modified F-Curves have on the animation will be lost.
  - *EX_ONLY_DEFORMABLE_BONES* (Only Deformable Bones) : Only exports bones that are deformable. Useful for hiding IK-Bones used in Blender. NOTE: Any bone with deformable children/descendants will be output as well
  - *EX_ONLY_KEYFRAMED_BONES* (Only Keyframed Bones) : Only exports bones that have been keyframed for a given animation. Useful to limit the set of bones on a per-animation basis
@@ -120,11 +124,12 @@ skel->setBlendMode( ANIMBLEND_CUMULATIVE );
 For more information, please take a look at section [Vertex-Animation](https://ogrecave.github.io/ogre/api/latest/_animation.html#Vertex-Animation) in the manual.
 
 And also consult the Ogre API manual:
- - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_manager.html
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_animation_state.html
- - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_node.html
- - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller_manager.html
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_controller_manager.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_entity.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_manager.html
+ - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_scene_node.html
  - https://ogrecave.github.io/ogre/api/latest/class_ogre_1_1_skeleton.html
 
 ## Tips/Troubleshooting
@@ -144,6 +149,34 @@ Both animations have to be performed at the same time for the Sinbad character m
 
 This requires on the Blender side creating the `RunningBase` and `RunningTop` animations, and for each one to *only* have keyframes the bones that correspond to the Top or Base of the model.
 
+## Character clothing
+
+### Shared Skeleton
+If you want your game characters to have clothing a common thing to do is have a base mesh with the Player/Non-Player skin and then sharing the same Armature (or Skeleton) other meshes for the clothing or armor. All these meshes will be children of the same Armature with the same actions applied to all of them.
+
+When exporting the Armature, if you select the option: `EX_SHARED_ARMATURE` (Shared Armature), then `blender2ogre` will export the Armature as a single .skeleton file and all the exported OGRE meshes will use the same Skeleton for their animations. (The normal behaviour is for `blender2ogre` to export one skeleton for each mesh that is a child of the Armature)
+
+Then from you OGRE code use:
+```
+// Share Skeleton
+Ogre::Entity* baseMesh = mSceneMgr->getEntity("Player_Skin");
+Ogre::Entity* shirtMesh = mSceneMgr->getEntity("Player_Shirt")
+shirtMesh->shareSkeletonInstanceWith(baseMesh);
+
+// Attach Entities to Scene Nodes
+Ogre::SceneNode* playerNode = mSceneMgr->getRootSceneNode()->createChildSceneNode("PlayerNode");
+playerNode->attachObject(baseMesh);
+playerNode->attachObject(shirtMesh);
+```
+
+Now, when animating the `baseMesh`, the `shirtMesh` will animate in the same manner, giving the illusion that the character has clothing/armor.
+
+### Base Mesh/Skin clipping
+Usually in some poses or animations, the base mesh (skin) might clip on top of the clothes, which looks pretty bad.
+ - One solution to this problem is to use shape keys to make the base model thinner and apply the shape key when the character has the clothes on since then the shape won't be visible.
+ - Another option is to use the Blender `Mask` modifier: create a vertex group for every part of the base mesh that will be visible with clothes on (like arms, head and ankles perhaps) and select that vertex group as the mask. With the mask active, only those parts of the mesh will be exported.
+ - A third option is to use vertex groups. Create one vertex group for each part of the base mesh/skin that you want to hide and then you can reference these vertex groups within OGRE to hide them. More details in: [Exporting Custom Vertex Groups](README.md#exporting-custom-vertex-groups)
+
 ## Random Tips from the forum
 Here are gathered some tips lifted from the forum: [Blender26 Ogre Exporter](https://forums.ogre3d.org/viewtopic.php?f=8&t=61485)
 
@@ -154,15 +187,11 @@ The editor only exports the local coordinates and ignores any global transformat
 
 "An object is not allowed to be scaled/rotated/translated before export": since I read that, I asked myself whether this would mean that all objects need to be default size and located in the origin, as created by "Add", which would be of somewhat reduced use. As it turned out, that meant the object is not allowed to have any LOCAL transformations to it. For example, instead of having a cube with dimensions (8, 2, 4) and a scale (0.5, 1.5, 2), one needs a cube of dimensions (4, 3, 8 ) and of scale (1, 1, 1). The same for rotation and location. This can be achieved by selecting the object, pressing `Ctrl-A`, and then selecting first "Location", followed by (after pressing `Ctrl-A` again) "Rotation & Scale". By doing so, all local transformations are applied to the object and reset to safe values.
 
-Every time I had a problem with skeletons, I make sure that the mesh and the skeleton has the scale and rotation applied `Ctrl+A` and share the same position (origin in the same pos). For that you can select the skeleton, `Shift+S -> Cursor to selected`, then select the mesh, `Ctrl+Alt+Chift+C -> Origin to 3D Cursor`. Maybe it will mess up the envelope, so maybe is the other way around (first mesh then skeleton).
+Every time you have a problem with skeletons, make sure that the mesh and the skeleton has the scale and rotation applied `Ctrl+A` and share the same position (origin in the same pos). For that you can select the skeleton, `Shift+S -> Cursor to selected`, then select the mesh, `Ctrl+Alt+Chift+C -> Origin to 3D Cursor`. Maybe it will mess up the envelope, so maybe is the other way around (first mesh then skeleton).
 
 In very few cases, it has happened to me that if I apply an armature to a mesh, and later do the reset to that mesh, the animation in Ogre is a complete mess, in those cases what I had to do is unparent all bones from the mesh, erase the automatic Armature modifier in the "Objects Modifiers" window, and erase the Vertex Groups in the "Object Data" window, just mentioned if this happens to you.
 
 The standard way of attaching equipment to a character is to attach it to a bone. Either with a constant offset to an existing bone (maybe the spine) or by creating extra non-deformable bones just for the purpose of attaching equipment to them which then can be moved in your animation to move the attached equipment in any way you like. The Sindbad character for example has extra bones at the sheaths on his back to properly place the swords in them when they are not drawn.
-
-The blender2ogre exporter exports one skeleton for each mesh that is a child of an armature, if you have a character with different sets of clothing then you will have a base mesh with only the skin and meshes for the clothing/armor. All these meshes will be children of the same Armature with the same actions applied to all of them. That means that when exporting the Armature, every one of these meshes will be exported with their own .skeleton which takes time for many actions. So the recommendation is to have one .blend file with the Armature and the clothing sets and another .blend file with all the actions and only the base mesh to export. Then when you have all these meshes exported you need to modify them with meshmagick to change the skeleton name to a common one. Then in Ogre use `Ogre::Entity::shareSkeletonInstanceWith( Entity* entity )` to have the clothes animated at the same time as the base mesh, giving the illusion that the character has actual clothing.
-
-Another recommendation regarding clothes: it is usual that in some poses the base mesh (skin) might get on top of the clothes which is undesired, one solution to this problem is to use shape keys to make the base model thinner and apply the shape key when the character has the clothes on since the shape won't be visible. Another option is to use the `Mask` modifier: create a vertex group for every part of the base mesh that will be visible with clothes on (like arms, head and ankles perhaps) and select that vertex group as the mask. With the mask active only those parts of the mesh will be exported.
 
 ## Automation
 You might get excited animating your models and ending up with a lot of actions that have no corresponding NLA Track.
