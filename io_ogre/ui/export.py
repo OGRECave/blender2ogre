@@ -347,12 +347,10 @@ class _OgreCommonExport_(object):
         name="Export Meshes (overwrite)",
         description="Export meshes (overwrite existing files)",
         default=config.get('MESH_OVERWRITE'))
-
     EX_ARRAY = BoolProperty(
         name="Optimise Arrays",
         description="Optimise array modifiers as instances (constant offset only)",
         default=config.get('ARRAY'))
-    
     EX_V1_EXTREMITY_POINTS = IntProperty(
         name="Extremity Points",
         description="""Submeshes can have optional 'extremity points' stored with them to allow 
