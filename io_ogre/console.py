@@ -35,4 +35,3 @@ if __name__ == "__main__":
     if match:
         scene_name = match.group(1)
         dot_scene(path, scene_name=scene_name)
-

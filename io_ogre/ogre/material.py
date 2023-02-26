@@ -312,7 +312,7 @@ class OgreMaterialGenerator(object):
             # a is a packed png
             ext = splitext(origin_filepath)[1]
             tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
-            slot.texture.image.filepath = tmp_filepath 
+            slot.texture.image.filepath = tmp_filepath
             slot.texture.image.save()
             slot.texture.image.filepath = origin_filepath
             updated_image = True

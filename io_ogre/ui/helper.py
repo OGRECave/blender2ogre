@@ -156,4 +156,3 @@ Tundra Streaming:
     . only position and scale are updated, a bug on the Tundra side prevents rotation update
     . animation playback is broken if you rename your NLA strips after opening Tundra
 '''
-
