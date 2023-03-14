@@ -39,6 +39,13 @@
 	- *OPTIONAL* Set `MESH_PREVIEWER` to a path pointed to `ogre-meshviewer.bat`. This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)      
   	- Make sure that `USER_MATERIALS` isn't set to a directory like "C:\\\". The addon scans this path recursively and will crash when it hits a path it doesn't have permissions for.
 
+> **NOTE**: Installing Blender using Ubuntu Snap package or Fedora Flatpak will lead to the following error: `cp: cannot create directory '/snap/blender/3132/3.4/scripts/addons/io_ogre': Read-only file system
+` (see: [Installing on Ubuntu 20.04 and Blender 3.4.1. #169](https://github.com/OGRECave/blender2ogre/issues/169))
+
+There are two possible solutions:
+ - After downloading the `blender2ogre` repo, uncompress it somwhere and then compress the [io_ogre](io_ogre) folder as a .zip file. Go to `Edit` -> `Preferences (CTRL-ALT-U)` -> `Add-ons` -> `Install...` and then select the file `io_ogre.zip`
+ - Copy the [io_ogre](io_ogre) folder into the folder: `~/.config/blender/2.79b/scripts/addons/` (where 2.79b is the Blender version)
+
 ## Updating to new versions ##
 If you are upgrading from a previous version of blender2ogre and having problems, you may want to delete your old .pickle config file from
 [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/config/scripts/blender2ogre.pickle` and restart blender.
