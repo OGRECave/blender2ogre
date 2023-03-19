@@ -231,13 +231,13 @@ class _OgreCommonExport_(object):
     # General
     EX_SWAP_AXIS : EnumProperty(
         items=config.AXIS_MODES,
-        name="Swap Axis",
-        description="Axis swapping mode",
+        name='Swap Axis',
+        description='Axis swapping mode',
         default=config.get('SWAP_AXIS')) = {}
     EX_V2_MESH_TOOL_VERSION : EnumProperty(
         items=config.MESH_TOOL_VERSIONS,
-        name="Mesh Export Version",
-        description="Specify Ogre version format to write",
+        name='Mesh Export Version',
+        description='Specify Ogre version format to write',
         default=config.get('MESH_TOOL_VERSION')) = {}
     EX_XML_DELETE : BoolProperty(
         name="Clean up xml files",
@@ -251,7 +251,7 @@ class _OgreCommonExport_(object):
         default=config.get('SCENE')) = {}
     EX_SELECTED_ONLY : BoolProperty(
         name="Export Selected Only",
-        description="Export only selected objects",
+        description="Export only selected objects\nTurn on to avoid exporting non-selected stuff",
         default=config.get('SELECTED_ONLY')) = {}
     EX_EXPORT_HIDDEN : BoolProperty(
         name="Export Hidden Also",
@@ -322,7 +322,7 @@ class _OgreCommonExport_(object):
         default=config.get('SHARED_ARMATURE')) = {}
     EX_ONLY_KEYFRAMES : BoolProperty(
         name="Only Keyframes",
-        description="Only export keyframes.\nNOTE: Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves",
+        description="Only export Keyframes.\nNOTE: Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves",
         default=config.get('ONLY_KEYFRAMES')) = {}
     EX_ONLY_DEFORMABLE_BONES : BoolProperty(
         name="Only Deformable Bones",

@@ -74,7 +74,7 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
                 if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
                     generator.copy_textures()
                 fd.write(bytes(material_text+"\n",'utf-8'))
-            
+
             if include_missing:
                 fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
 
@@ -114,7 +114,7 @@ class OgreMaterialGenerator(object):
         "metallic_texture",
         "emission_color_texture"
     ]
-    
+
     def __init__(self, material, target_path, prefix=''):
         self.material = material
         self.target_path = target_path
@@ -179,11 +179,15 @@ class OgreMaterialGenerator(object):
             mat_wrapper = node_shader_utils.PrincipledBSDFWrapper(mat)
             for tex_key in self.TEXTURE_KEYS:
                 texture = getattr(mat_wrapper, tex_key, None)
+                # In the case of the Metallic and Roughness textures, they cannot be obtained using "node_shader_utils"
+                # https://docs.blender.org/manual/en/2.80/addons/io_scene_gltf2.html#metallic-and-roughness
+                if tex_key == 'roughness_texture':
+                    texture = gather_metallic_roughness_texture(mat_wrapper)
                 if texture and texture.image:
                     textures[tex_key] = texture
                     # adds image to the list for later copy
                     self.images.add(texture.image)
-            
+
             color = mat_wrapper.base_color
             alpha = 1.0
             if mat.blend_method != "OPAQUE":
@@ -207,9 +211,7 @@ class OgreMaterialGenerator(object):
             else:
                 self.w.iword('diffuse').round(color[0]).round(color[1]).round(color[2]).round(alpha).nl()
                 self.w.iword('specular').round(mat_wrapper.roughness).round(mat_wrapper.metallic).real(0).real(0).real(0).nl()
-                with self.w.iword('rtshader_system').embed():
-                    self.w.iline('lighting_stage metal_roughness')
-                    self.w.iline('texturing_stage late_add_blend')
+                self.generate_rtshader_system(textures)
 
             for name in dir(mat):   #mat.items() - items returns custom props not pyRNA:
                 if name.startswith('ogre_') and name != 'ogre_parent_material':
@@ -220,7 +222,6 @@ class OgreMaterialGenerator(object):
                         if var: val = 'on'
                         else: val = 'off'
                     self.w.iword(op).word(val).nl()
-            self.w.nl()
 
             if texnodes and usermat.texture_units:
                 for i,name in enumerate(usermat.texture_units_order):
@@ -234,36 +235,70 @@ class OgreMaterialGenerator(object):
                 for key, texture in textures.items():
                     self.generate_texture_unit(key, texture)
 
+    def generate_rtshader_system(self, textures):
+        """
+        Generates the rtshader_system section of a pass.
+
+        textures: dictionary with all the textures
+        """
+        self.w.nl()
+        self.w.iword('// additional maps - requires RTSS').nl()
+
+        with self.w.iword('rtshader_system').embed():
+            for key, texture in textures.items():
+                image = texture.image
+                target_filepath = split(image.filepath or image.name)[1]
+                filename = self.change_ext(target_filepath, image)
+
+                if key == "normalmap_texture":
+                    self.w.iword('lighting_stage normal_map').word(filename).nl()
+                elif key == "roughness_texture":
+                    self.w.iword('lighting_stage metal_roughness texture').word(filename).nl()
+
+            # If there was no 'roughness_texture', this switches the lighting equations from Blinn-Phong to the Cook-Torrance PBR model
+            if 'roughness_texture' not in textures:
+                self.w.iline('lighting_stage metal_roughness')
+
+            if 'emission_color_texture' in textures:
+                self.w.iword('texturing_stage late_add_blend // needed for emissive to work').nl()
+
     def generate_texture_unit(self, key, texture):
         """
         Generates a texture_unit of a pass.
-        
+
         key: key of the texture in the material shader (not used, for normal if needed)
         texture: the material texture
         """
-        src_dir = os.path.dirname(bpy.data.filepath)
+        #src_dir = os.path.dirname(bpy.data.filepath)
         # For target path relative
         # dst_dir = os.path.dirname(self.target_path)
-        dst_dir = src_dir
-        filename = io_utils.path_reference(texture.image.filepath, src_dir, dst_dir, mode='RELATIVE', library=texture.image.library)
+        #dst_dir = src_dir
+        #filename = io_utils.path_reference(texture.image.filepath, src_dir, dst_dir, mode='RELATIVE', library=texture.image.library)
         # Do not use if target path relative
         # filename = repr(filepath)[1:-1]
-        _, filename = split(filename)
-        filename = self.change_ext(filename, texture.image)
+        #_, filename = split(filename)
+        #filename = self.change_ext(filename, texture.image)
 
-        # special case of normal maps
-        if key == "normalmap_texture":
-            with self.w.iword('rtshader_system').embed():
-                self.w.iword('lighting_stage normal_map').word(filename).nl()
-                return
-        
-        if not key in ("base_color_texture", "emission_color_texture"):
-            self.w.iword('// dont know how to export:').word(key).word(filename).nl()
+        # Use same filename as: copy_texture()
+        image = texture.image
+        target_filepath = split(image.filepath or image.name)[1]
+        filename = self.change_ext(target_filepath, image)
+
+        # These textures are processed in generate_rtshader_system()
+        if key in ("normalmap_texture", "roughness_texture"):
             return
+
+        self.w.nl()
+
+        if not key in ("base_color_texture", "emission_color_texture"):
+            self.w.iword('// Don\'t know how to export:').word(key).word(filename).nl()
+            return
+        else:
+            self.w.iword('// -').word(key).nl()
 
         with self.w.iword('texture_unit').embed():
             self.w.iword('texture').word(filename).nl()
-            
+
             exmode = texture.extension
             if exmode in TEXTURE_ADDRESS_MODE:
                 self.w.iword('tex_address_mode').word(TEXTURE_ADDRESS_MODE[exmode]).nl()
@@ -274,7 +309,7 @@ class OgreMaterialGenerator(object):
             x,y = texture.scale[0:2]
             if x != 1 or y != 1:
                 self.w.iword('scale').round(1.0 / x).round(1.0 / y).nl()
-            
+
             if texture.texcoords == 'Reflection':
                 if texture.projection == 'SPHERE':
                     self.w.iline('env_map spherical')
@@ -282,7 +317,7 @@ class OgreMaterialGenerator(object):
                     self.w.iline('env_map planar')
                 else: 
                     logger.warn('Texture: <%s> has a non-UV mapping type (%s) and not picked a proper projection type of: Sphere or Flat' % (texture.name, slot.mapping))
-            
+
             x,y = texture.translation[0:2]
             if x or y:
                 self.w.iword('scroll').round(x).round(y).nl()
@@ -293,7 +328,7 @@ class OgreMaterialGenerator(object):
             btype = 'modulate'
             if key == "emission_color_texture":
                 btype = "add"
-            
+
             self.w.iword('colour_op').word(btype).nl()
 
     def copy_textures(self):
@@ -305,13 +340,13 @@ class OgreMaterialGenerator(object):
         target_filepath = split(origin_filepath or image.name)[1]
         target_filepath = self.change_ext(target_filepath, image)
         target_filepath = join(self.target_path, target_filepath)
-        
+
         if image.packed_file:
             # packed in .blend file, save image as target file
             image.filepath = target_filepath
             image.save()
             image.filepath = origin_filepath
-            logger.info("Write (%s)", target_filepath)
+            logger.info("Writing texture: (%s)", target_filepath)
         else:
             image_filepath = bpy.path.abspath(image.filepath, library=image.library)
             image_filepath = os.path.normpath(image_filepath)
@@ -325,17 +360,17 @@ class OgreMaterialGenerator(object):
                     or src_stat.st_mtime != dst_stat.st_mtime
             else:
                 update = True
-                
+
             if update:
                 if is_image_postprocessed(image):
-                    logger.info("Magick (%s) -> (%s)", image_filepath, target_filepath)
+                    logger.info("ImageMagick: (%s) -> (%s)", image_filepath, target_filepath)
                     util.image_magick(image, image_filepath, target_filepath)
                 else:
                     # copy2 tries to copy all metadata (modification date included), to keep update decision consistent
                     shutil.copy2(image_filepath, target_filepath)
-                    logger.info("Copy (%s)", origin_filepath)
+                    logger.info("Copying image: (%s)", origin_filepath)
             else:
-                logger.info("Skip copy (%s). texture is already up to date.", origin_filepath)
+                logger.info("Skip copying (%s). Texture is already up to date.", origin_filepath)
 
     def get_active_programs(self):
         r = []
@@ -355,7 +390,7 @@ class OgreMaterialGenerator(object):
     def change_ext( self, name, image ):
         name_no_ext, _ = splitext(name)
         if image.file_format != 'NONE':
-            name = name_no_ext + "." + image.file_format
+            name = name_no_ext + "." + image.file_format.lower()
         if config.get('FORCE_IMAGE_FORMAT') != 'NONE':
             name = name_no_ext + "." + config.get('FORCE_IMAGE_FORMAT')
         return name
@@ -364,28 +399,27 @@ class OgreMaterialGenerator(object):
 # * Red flags for users so they can quickly see what they forgot to assign a material to.
 # * Do not crash if no material on object - thats annoying for the user.
 TEXTURE_COLOUR_OP = {
-    'MIX'       :   'modulate',        # Ogre Default - was "replace" but that kills lighting
-    'ADD'     :   'add',
-    'MULTIPLY' : 'modulate',
+    'MIX'       : 'modulate',   # Ogre Default - was "replace" but that kills lighting
+    'ADD'       : 'add',
+    'MULTIPLY'  : 'modulate',
     #'alpha_blend' : '',
 }
 TEXTURE_COLOUR_OP_EX = {
-    'MIX'       :    'blend_manual',
-    'SCREEN': 'modulate_x2',
-    'LIGHTEN': 'modulate_x4',
-    'SUBTRACT': 'subtract',
-    'OVERLAY':    'add_signed',
-    'DIFFERENCE': 'dotproduct',        # best match?
-    'VALUE': 'blend_diffuse_colour',
+    'MIX'       : 'blend_manual',
+    'SCREEN'    : 'modulate_x2',
+    'LIGHTEN'   : 'modulate_x4',
+    'SUBTRACT'  : 'subtract',
+    'OVERLAY'   : 'add_signed',
+    'DIFFERENCE': 'dotproduct', # best match?
+    'VALUE'     : 'blend_diffuse_colour',
 }
 
 TEXTURE_ADDRESS_MODE = {
-    'REPEAT': 'wrap',
-    'EXTEND': 'clamp',
-    'CLIP'  : 'border',
-    'CHECKER' : 'mirror'
+    'REPEAT'    : 'wrap',
+    'EXTEND'    : 'clamp',
+    'CLIP'      : 'border',
+    'CHECKER'   : 'mirror'
 }
-
 
 MISSING_MATERIAL = '''
 material _missing_material_
@@ -405,12 +439,12 @@ material _missing_material_
 '''
 
 def load_user_materials():
-    # I think this is soley used for realxtend... the config of USER_MATERIAL
-    # points to a subdirectory of tundra by default. In this case all parsing
-    # can be moved to the tundra subfolder
+    # I think this is solely used for realXtend...
+    # the config of USER_MATERIAL points to a subdirectory of tundra by default.
+    # In this case all parsing can be moved to the tundra subfolder
     
     # Exit this function if the path is empty. Allows 'USER_MATERIALS' to be blank and not affect anything.
-    # If 'USER_MATERIALS' is something too broad like "C:\\" it recursively scans and will crash when it
+    # If 'USER_MATERIALS' is something too broad like "C:\\" it recursively scans it and might crash if it
     # hits directories it doesn't have access too
     if config.get('USER_MATERIALS') == '':
         return
@@ -514,7 +548,7 @@ class OgreMaterialScript(object):
 
         brace = 0
         self.techniques = techs = []
-        prog = None  # pick up program params
+        prog = None # pick up program params
         tex = None  # pick up texture_unit options, require "texture" ?
         for line in self.data.splitlines():
             #logger.debug( line )
@@ -656,19 +690,19 @@ class MaterialScripts(object):
     def reset_rna(self, callback=None):
         bpy.types.Material.ogre_parent_material = EnumProperty(
             name="Script Inheritence",
-            description='ogre parent material class',
+            description='OGRE parent material class',
             items=self.ENUM_ITEMS,
             #update=callback
         )
 
 IMAGE_FORMATS =  [
-    ('NONE','NONE', 'do not convert image'),
-    ('bmp', 'bmp', 'bitmap format'),
-    ('jpg', 'jpg', 'jpeg format'),
-    ('gif', 'gif', 'gif format'),
-    ('png', 'png', 'png format'),
-    ('tga', 'tga', 'targa format'),
-    ('dds', 'dds', 'dds format'),
+    ('NONE','NONE', 'Do not convert image'),
+    ('bmp', 'bmp', 'Bitmap format'),
+    ('jpg', 'jpg', 'JPEG format'),
+    ('gif', 'gif', 'GIF format'),
+    ('png', 'png', 'PNG format'),
+    ('tga', 'tga', 'Targa format'),
+    ('dds', 'dds', 'DDS format'),
 ]
 
 def is_image_postprocessed( image ):
@@ -694,3 +728,101 @@ def update_parent_material_path( path ):
 
     MaterialScripts.reset_rna( callback=shader.on_change_parent_material )
     return scripts, progs
+
+class ShaderImageTextureWrapper():
+    """
+    This class imitates the namesake Class from the library: node_shader_utils.
+    The objective is that the Metallic Roughness Texture follows the same codepath as the other textures
+    """
+
+    def __init__(self, node_image):
+        self.image = node_image.image
+        self.extension = node_image.extension
+        self.node_image = node_image
+        #self.name = ??
+        self.texcoords = 'UV'
+        self.projection = node_image.projection
+        self.scale = self.get_mapping_input('Scale')
+        self.translation = self.get_mapping_input('Location')
+        self.rotation = self.get_mapping_input('Rotation')
+
+    # Esta funcion obtiene los datos de un nodo de tipo: Mapping
+    def get_mapping_input(self, input):
+        if len(self.node_image.inputs['Vector'].links) > 0:
+            node_mapping = self.node_image.inputs['Vector'].links[0].from_node
+
+            if node_mapping.type == 'MAPPING':
+                return node_mapping.inputs[input].default_value
+            else:
+                logger.warn("Connected node: %s is not of type 'MAPPING'" % node_mapping.name)
+                return None
+        else:
+            return None
+
+def gather_metallic_roughness_texture(mat_wrapper):
+    """
+    For a given material, retrieve the corresponding metallic roughness texture according to glTF2 guidelines.
+    (https://docs.blender.org/manual/en/2.80/addons/io_scene_gltf2.html#metallic-and-roughness)
+    :param blender_material: a blender material for which to get the metallic roughness texture
+    :return: a blender Image
+    """
+    material = mat_wrapper.material
+
+    logger.debug("Getting Metallic roughness texture of material: '%s'" % material.name)
+
+    separate_name = None
+    #image_texture = None
+    node_image = None
+
+    for input_name in ['Roughness', 'Metallic']:
+        logger.debug(" + Processing input: '%s'" % input_name)
+
+        if material.use_nodes == False:
+            logger.warn("Material: '%s' does not use nodes" % material.name)
+            return None
+
+        if 'Principled BSDF' not in  material.node_tree.nodes:
+            logger.warn("Material: '%s' does not have a 'Principled BSDF' node" % material.name)
+            return None
+
+        input = material.node_tree.nodes['Principled BSDF'].inputs[input_name]
+
+        # Check that input is connected to a node
+        if len(input.links) > 0:
+            separate_node = input.links[0].from_node
+        else:
+            logger.warn("%s input is not connected" % input_name)
+            return None
+
+        # Check that connected node is of type 'SEPARATE_COLOR'
+        if separate_node.type not in ['SEPARATE_COLOR', 'SEPRGB']:
+            logger.warn("Connected node '%s' is not of type 'SEPARATE_COLOR'" % separate_node.name)
+            return None
+
+        # Check that both inputs are connected to the same 'SEPARATE_COLOR' node (node names are unique)
+        if separate_name == None:
+            separate_name = separate_node.name
+        elif separate_name != separate_node.name:
+            logger.warn("Connected node '%s' is different between 'Roughness' and 'Metallic' inputs" % separate_node.name)
+            return None
+
+        # Check that 'Roughness' is connected to 'Green' output and 'Metallic' is connected to 'Blue' output
+        if input_name == 'Roughness' and input.links[0].from_socket.name not in ['Green', 'G']:
+            logger.warn("'Roughness' input connected to wrong output of node: '%s'" % separate_node.name)
+            return None
+        elif input_name == 'Metallic' and input.links[0].from_socket.name not in ['Blue', 'B']:
+            logger.warn("'Metallic' input connected to wrong output of node: '%s'" % separate_node.name)
+            return None
+
+        # Check that input is connected to a node
+        if len(separate_node.inputs[0].links) == 0:
+            logger.warn("node '%s' has no input texture" % separate_node.name)
+            return None
+
+        # Get the image texture
+        node_image = separate_node.inputs[0].links[0].from_node
+        if node_image.type != 'TEX_IMAGE':
+            logger.warn("Node connected to '%s' is not of type: 'TEX_IMAGE'" % separate_node.name)
+            return None
+
+    return ShaderImageTextureWrapper(node_image)
