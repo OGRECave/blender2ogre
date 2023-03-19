@@ -10,6 +10,7 @@
  - [Updating to new versions](#updating-to-new-versions)
  - [Video Tutorials](#video-tutorials)
  - [Exporting Meshes](#exporting-meshes)
+    - [Materials](#materials)
     - [Blender Modifiers Support](#blender-modifiers-support)
     - [Mesh triangulation issues](#mesh-triangulation-issues)
 	- [OgreNext Tips](#ogrenext-tips)
@@ -66,6 +67,15 @@ The active object selection is when there is an object with a yellow outline (in
 - If you have `OGRETOOLS_XML_CONVERTER` set to "OgreMeshTool.exe" path, then the export dialogue will display options relevant to the OgreNext (v2) mesh format.
 
 Check out all the exporter and importer options in the [Options Document](Options.md)
+
+### Materials
+Materials are exported as RTSS OGRE 1.x materials (unless "Fixed Function Parameters" is selected).
+The following textures are exported: Base Color, Metallic and Roughness, Normal Map and Emission. Baked Ambient Occlusion is not supported for the moment.
+
+Your material will be best exported if you follow the GLTF2 guidelines: [glTF 2.0 - Exported Materials](https://docs.blender.org/manual/en/2.80/addons/io_scene_gltf2.html#exported-materials).
+Except for the Emission texture, where the Emission input of the Principled BSDF node is used as the Emission texture.
+
+A good example of how the material should be setup for best results is the "Damaged Helmet" model found here: https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/DamagedHelmet
 
 ### Blender Modifiers Support
 Blender has some very useful modifiers, and most of them are supported by `blender2ogre` but not all of them.

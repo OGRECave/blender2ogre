@@ -667,7 +667,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     # Node Animation
     if config.get('NODE_ANIMATION'):
         node_anim.dot_nodeanim(ob, doc, o)
-    
+
     for child in ob.children:
         dot_scene_node_export( child,
             path, doc = doc, rex = rex,
