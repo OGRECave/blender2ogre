@@ -198,7 +198,7 @@ filepath="D:\\tmp\\NormalsExport\\Suzanne.mesh",
 
 # General
 IM_SWAP_AXIS='xz-y',            # Axis swapping mode
-IM_V2_MESH_TOOL_VERSION='',     # Specify Ogre version format to read
+IM_V2_MESH_TOOL_VERSION='v2',   # Specify Ogre version format to read
 IM_XML_DELETE=True,             # Remove the generated xml files after binary conversion.
 
 # Mesh
