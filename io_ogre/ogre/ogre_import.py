@@ -162,6 +162,9 @@ def GetValidBlenderName(name):
     return newname
 
 def xOpenFile(filename):
+    logger.info("* Parsing file: %s ..." % filename)
+    start = time.time()
+
     xml_file = open(filename)
     try:
         xml_doc = minidom.parse(xml_file)
@@ -171,6 +174,9 @@ def xOpenFile(filename):
         Report.errors.append("File %s is not valid XML!" % filename)
         output = 'None'
     xml_file.close()
+
+    logger.info('- Done at %s seconds' % util.timer_diff_str(start))
+
     return output
 
 
@@ -195,7 +201,23 @@ def xCollectVertexData(data):
     for vb in data.childNodes:
         if vb.localName == 'vertexbuffer':
             if vb.hasAttribute('positions'):
+
+                progressScale = 1.0 / len(vb.getElementsByTagName('vertex'))
+                bpy.context.window_manager.progress_begin(0, 100)
+                index = 0
+
                 for vertex in vb.getElementsByTagName('vertex'):
+
+                    # Update progress in console
+                    percent = (index + 1) * progressScale
+                    sys.stdout.write( "\r + Vertices [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
+                    sys.stdout.flush()
+
+                    # Update progress through Blender cursor
+                    bpy.context.window_manager.progress_update(percent)
+
+                    index = index + 1
+
                     for vp in vertex.childNodes:
                         if vp.localName == 'position':
                             x = float(vp.getAttributeNode('x').value)
@@ -203,6 +225,8 @@ def xCollectVertexData(data):
                             z = float(vp.getAttributeNode('y').value)
                             vertices.append([x, y, z])
                 vertexdata['positions'] = vertices
+
+                sys.stdout.write("\n")
 
             if vb.hasAttribute('normals') and config.get('IMPORT_NORMALS'):
                 for vertex in vb.getElementsByTagName('vertex'):
@@ -235,7 +259,7 @@ def xCollectVertexData(data):
                     for vt in vertex.childNodes:
                         if vt.localName == 'texcoord':
                             u = float(vt.getAttributeNode('u').value)
-                            v = -float(vt.getAttributeNode('v').value)+1.0
+                            v = -float(vt.getAttributeNode('v').value) + 1.0
                             uvcoords.append([u, v])
 
                     if len(uvcoords) > 0:
@@ -1397,7 +1421,7 @@ def load(filepath):
                         fps = xAnalyseFPS(xDocSkeletonData)
                         if(fps and config.get('ROUND_FRAMES')):
                             logger.info(" * Setting FPS to %s" % fps)
-                            bpy.context.scene.render.fps = fps
+                            bpy.context.scene.render.fps = int(fps)
                         xCollectAnimations(meshData, xDocSkeletonData)
 
             else:
