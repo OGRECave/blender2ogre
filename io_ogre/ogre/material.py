@@ -97,9 +97,15 @@ def dot_material(mat, path, **kwargs):
         generator.copy_programs()
     if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
         generator.copy_textures()
-    with open(join(path, clean_object_name(generator.material_name) + ".material"), 'wb') as fd:
-        _write_b2o_ver(fd)
-        fd.write(bytes(material_text, 'utf-8'))
+    try:
+        mat_file_name = join(path, clean_object_name(generator.material_name) + ".material")
+        with open(mat_file_name, 'wb') as fd:
+            _write_b2o_ver(fd)
+            fd.write(bytes(material_text, 'utf-8'))
+    except Exception as e:
+        logger.error("Unable to create material file: %s" % mat_file_name)
+        logger.error(e)
+        Report.errors.append("Unable to create material file: %s" % mat_file_name)
 
     return generator.material_name
 
@@ -442,17 +448,21 @@ def load_user_materials():
     # I think this is solely used for realXtend...
     # the config of USER_MATERIAL points to a subdirectory of tundra by default.
     # In this case all parsing can be moved to the tundra subfolder
-    
+
     # Exit this function if the path is empty. Allows 'USER_MATERIALS' to be blank and not affect anything.
     # If 'USER_MATERIALS' is something too broad like "C:\\" it recursively scans it and might crash if it
     # hits directories it doesn't have access too
     if config.get('USER_MATERIALS') == '':
         return
-        
-    if os.path.isdir( config.get('USER_MATERIALS') ):
-        scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
-        for prog in progs:
-            logger.info('Ogre shader program: %s' % prog.name)
+
+    try:
+        if os.path.isdir( config.get('USER_MATERIALS') ):
+            scripts,progs = update_parent_material_path( config.get('USER_MATERIALS') )
+            for prog in progs:
+                logger.info('Ogre shader program: %s' % prog.name)
+    except Exception as e:
+        logger.warn("Unable to parse 'USER_MATERIALS' directory: %s" % config.get('USER_MATERIALS'))
+        logger.warn(e)
 
 
 def material_name( mat, clean = False, prefix='' ):
@@ -486,8 +496,9 @@ def get_shader_programs():
     return OgreProgram.PROGRAMS.values()
 
 def parse_material_and_program_scripts( path, scripts, progs, missing ):   # recursive
+
     for name in os.listdir(path):
-        url = os.path.join(path,name)
+        url = os.path.join(path, name)
         if os.path.isdir( url ):
             parse_material_and_program_scripts( url, scripts, progs, missing )
 

@@ -180,7 +180,8 @@ def detect_converter_type():
         proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
         output, _ = proc.communicate()
         output = output.decode('utf-8')
-    except:
+    except Exception as e:
+        logger.warn(e)
         output = ""
 
     if output.find("OgreXMLConverter") != -1:

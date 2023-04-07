@@ -137,8 +137,9 @@ class _OgreCommonExport_(object):
         # Add warning about missing XML converter
         if self.converter == "unknown":
             Report.errors.append(
-              "Cannot find suitable OgreXMLConverter or OgreMeshTool executable." +
-              "Export XML mesh - do NOT automatically convert .xml to .mesh file. You MUST run converter mesh manually.")
+              "Cannot find suitable OgreXMLConverter or OgreMeshTool executable.\n" +
+              "Exported XML mesh was NOT automatically converted to .mesh file.\n" + 
+              "You MUST run the converter manually to create binary .mesh file.")
 
         # Load addonPreference in CONFIG
         config.update_from_addon_preference(context)
@@ -168,26 +169,30 @@ class _OgreCommonExport_(object):
             log_file = ("%s/blender2ogre.log" % target_path)
             logger.info("* Writing log file to: %s" % log_file)
 
-            file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
+            try:
+                file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
 
-            # Show the python file name from where each log message originated
-            SHOW_LOG_NAME = False
+                # Show the python file name from where each log message originated
+                SHOW_LOG_NAME = False
 
-            if SHOW_LOG_NAME:
-                file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-            else:
-                file_formatter = logging.Formatter(fmt='%(asctime)s [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+                if SHOW_LOG_NAME:
+                    file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+                else:
+                    file_formatter = logging.Formatter(fmt='%(asctime)s [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-            file_handler.setFormatter(file_formatter)
+                file_handler.setFormatter(file_formatter)
 
-            if config.get('DEBUG_LOGGING') == True:
-                level = logging.DEBUG
-            else:
-                level = logging.INFO
+                if config.get('DEBUG_LOGGING') == True:
+                    level = logging.DEBUG
+                else:
+                    level = logging.INFO
 
-            for logger_name in logging.Logger.manager.loggerDict.keys():
-                logging.getLogger(logger_name).addHandler(file_handler)
-                logging.getLogger(logger_name).setLevel(level)
+                for logger_name in logging.Logger.manager.loggerDict.keys():
+                    logging.getLogger(logger_name).addHandler(file_handler)
+                    logging.getLogger(logger_name).setLevel(level)
+            except Exception as e:
+                logger.warn("Unable to create log file: %s" % log_file)
+                logger.warn(e)
 
         logger.info("* Target path: %s" % target_path)
         logger.info("* Target file name: %s" % target_file_name)
@@ -206,7 +211,7 @@ class _OgreCommonExport_(object):
         Report.show()
 
         # Flush and close all logging file handlers
-        if config.get('ENABLE_LOGGING') == True:
+        if config.get('ENABLE_LOGGING') == True and file_handler != None:
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logging.getLogger(logger_name).handlers.clear()
             
