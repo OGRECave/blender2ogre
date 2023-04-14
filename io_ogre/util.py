@@ -180,7 +180,8 @@ def detect_converter_type():
         proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
         output, _ = proc.communicate()
         output = output.decode('utf-8')
-    except:
+    except Exception as e:
+        logger.warn(e)
         output = ""
 
     if output.find("OgreXMLConverter") != -1:
@@ -502,7 +503,7 @@ def is_strictly_simple_terrain( ob ):
 def get_image_textures( mat ):
     r = []
     for s in mat.texture_slots:
-        if s and s.texture != None and s.texture.type == 'IMAGE':
+        if s and s.texture != None and s.use != False and s.texture.type == 'IMAGE':
             r.append( s )
     return r
 

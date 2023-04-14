@@ -143,7 +143,7 @@ class HT_info_header(bpy.types.Header):
 
         #layout.template_header()
         if not context.area.show_menus:
-            if window.screen.show_fullscreen:
+            if window.screen.show_fullscreen: 
                 layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
             else:
                 layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
