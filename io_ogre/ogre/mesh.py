@@ -126,7 +126,9 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
         with open(target_file, 'w') as f:
             f.flush()
     except Exception as e:
-        show_dialog("Invalid mesh object name: %s" % obj_name)
+        logger.error("Unable to create mesh file: %s" % target_file)
+        logger.error(e)
+        Report.errors.append("Unable to create mesh file: %s" % target_file)
         return []
 
     with open(target_file, 'w') as f:

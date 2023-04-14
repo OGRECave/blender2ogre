@@ -30,7 +30,7 @@ _CONFIG_DEFAULTS_ALL = {
     'SWAP_AXIS' : 'xyz', # ogre standard is 'xz-y', but swapping is currently broken
     'MESH_TOOL_VERSION' : 'v2',
     'XML_DELETE' : True,
-    
+
     # Scene
     'SCENE' : True,
     'SELECTED_ONLY' : True,
@@ -40,18 +40,18 @@ _CONFIG_DEFAULTS_ALL = {
     'FORCE_LAMPS' : True,
     'NODE_ANIMATION' : True,
     #'NODE_KEYFRAMES' : False,
-    
+
     # Materials
     'MATERIALS' : True,
     'COPY_SHADER_PROGRAMS' : True,
     'SEPARATE_MATERIALS' : True,
-    
+
     # Textures
     'MAX_TEXTURE_SIZE' : 4096,
     'FORCE_IMAGE_FORMAT' : 'NONE',
     'TOUCH_TEXTURES' : True,
     'DDS_MIPS' : 16,
-    
+
     # Armature
     'ONLY_DEFORMABLE_BONES' : False,
     'ONLY_KEYFRAMED_BONES' : False,
@@ -72,22 +72,22 @@ _CONFIG_DEFAULTS_ALL = {
     'INTERFACE_TOGGLE': False,
     'OPTIMISE_VERTEX_BUFFERS' : True,
     'OPTIMISE_VERTEX_BUFFERS_OPTIONS' : 'puqs',
-    
+
     # LOD
     'LOD_LEVELS' : 0,
     'LOD_DISTANCE' : 300,
     'LOD_PERCENT' : 40,
     'LOD_MESH_TOOLS' : False,
-    
+
     # Pose Animation
     'SHAPE_ANIMATIONS' : True,
     'SHAPE_NORMALS' : True,
-    
+
     # Logging
     'ENABLE_LOGGING' : False,
     'DEBUG_LOGGING' : False,
     #'SHOW_LOG_NAME' : False,
-    
+
     # Import
     'IMPORT_NORMALS' : True,
     'MERGE_SUBMESHES' : True,

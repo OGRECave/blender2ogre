@@ -733,10 +733,10 @@ def bCreateAnimations(meshData):
         fix1 = Matrix([(1, 0, 0), (0, 0, 1), (0, -1, 0)])
         fix2 = Matrix([(0, 1, 0), (0, 0, 1), (1, 0, 0)])
         for bone in rig.pose.bones:
-            if bone.parent:
-                mat[bone.name] = fix2 * bone.parent.matrix.to_3x3().transposed() * bone.matrix.to_3x3()
-            else:
-                mat[bone.name] = fix1 * bone.matrix.to_3x3()
+            if bone.parent: 
+            	mat[bone.name] = fix2 * bone.parent.matrix.to_3x3().transposed() * bone.matrix.to_3x3()
+            else: 
+            	mat[bone.name] = fix1 * bone.matrix.to_3x3()
         
         for name in sorted(meshData['animations'].keys(), reverse=True):
             action = bpy.data.actions.new(name)
@@ -1120,7 +1120,7 @@ def bCreateSubMeshes(meshData, meshName):
             # Specular
             if 'specular' in matInfo:
                 mat.specular_color = matInfo['specular'][0:3]
-
+                
                 # RGB to Grayscale Weighted method or luminosity method: ( (0.3 * R) + (0.59 * G) + (0.11 * B) )
                 mat.specular_intensity = (matInfo['specular'][0] * 0.2126 + matInfo['specular'][1] * 0.7152 + matInfo['specular'][2] * 0.0722);
 
@@ -1132,7 +1132,7 @@ def bCreateSubMeshes(meshData, meshName):
 
                 elif len(matInfo['specular']) == 5:
                     mat.specular_hardness = matInfo['specular'][4] * 4
-
+                    
             else:
                 mat.specular_color = [0.0, 0.0, 0.0]
 
@@ -1149,13 +1149,13 @@ def bCreateSubMeshes(meshData, meshName):
                 mat.emit = 0.0
 
             #mat.use_shadeless = True
-
+            
             if 'vertexcolour' in matInfo:
                 mat.use_vertex_color_paint = True
-
+            
             if 'depth_bias' in matInfo:
                 mat.offset_z = matInfo['depth_bias']
-
+            
             if 'receive_shadows' in matInfo:
                 mat.use_shadows = matInfo['receive_shadows']
 

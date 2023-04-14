@@ -3,8 +3,8 @@ from bpy.props import BoolProperty, StringProperty, FloatProperty, IntProperty, 
 from .ogre.material import IMAGE_FORMATS, load_user_materials
 
 load_user_materials()
-# Rendering
 
+## Rendering
 bpy.types.Object.use_draw_distance = BoolProperty(
     name='enable draw distance',
     description='use LOD draw distance',
@@ -27,7 +27,6 @@ bpy.types.Object.multires_lod_range = FloatProperty(
     default=30.0, min=0.0, max=10000.0)
 
 ## Physics
-
 _physics_modes =  [
     ('NONE', 'NONE', 'no physics'),
     ('RIGID_BODY', 'RIGID_BODY', 'rigid body'),
@@ -72,8 +71,8 @@ bpy.types.Object.subcollision = BoolProperty(
     name="collision compound",
     description="member of a collision compound",
     default=False)
-## Sound
 
+## Sound
 bpy.types.Speaker.play_on_load = BoolProperty(
     name='play on load',
     default=False)
@@ -120,8 +119,7 @@ bpy.types.Image.resize_y = IntProperty(
     description='only if image is larger than defined, use ImageMagick to resize it down',
     default=256, min=2, max=4096)
 
-# Materials
-
+## Materials
 bpy.types.Material.ogre_depth_write = BoolProperty(
     # Material.ogre_depth_write = AUTO|ON|OFF
     name='depth write',
@@ -298,4 +296,3 @@ bpy.types.World.ogre_skyX_cloud_density_y = FloatProperty(
     description="change density of volumetric clouds on Y",
     default=1.0,
     min=0.0, max=5.0)
-

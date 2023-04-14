@@ -216,9 +216,14 @@ def dot_scene(path, scene_name=None):
     # Create the .scene file
     if config.get('SCENE'):
         data = doc.toprettyxml()
-        with open(target_scene_file, 'wb') as fd:
-            fd.write(bytes(data,'utf-8'))
-        logger.info("- Exported Ogre Scene: %s " % target_scene_file)
+        try:
+            with open(target_scene_file, 'wb') as fd:
+                fd.write(bytes(data,'utf-8'))
+            logger.info("- Exported Ogre Scene: %s " % target_scene_file)
+        except Exception as e:
+            logger.error("Unable to create scene file: %s" % target_scene_file)
+            logger.error(e)
+            Report.errors.append("Unable to create scene file: %s" % target_scene_file)
 
     # Remove temporary objects/meshes
     for ob in temps:
@@ -678,7 +683,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     # Node Animation
     if config.get('NODE_ANIMATION'):
         node_anim.dot_nodeanim(ob, doc, o)
-    
+
     for child in ob.children:
         dot_scene_node_export( child,
             path, doc = doc, rex = rex,

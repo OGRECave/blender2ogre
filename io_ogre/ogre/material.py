@@ -64,7 +64,7 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
                     generator.copy_textures(path)
                 material_text = generator.generate()
                 fd.write(bytes(material_text+"\n",'utf-8'))
-            
+
             if include_missing:
                 fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
 
@@ -312,7 +312,7 @@ class OgreMaterialGenerator(object):
             # a is a packed png
             ext = splitext(origin_filepath)[1]
             tmp_filepath = tempfile.mkstemp(suffix=ext)[1]
-            slot.texture.image.filepath = tmp_filepath
+            slot.texture.image.filepath = tmp_filepath 
             slot.texture.image.save()
             slot.texture.image.filepath = origin_filepath
             updated_image = True
@@ -500,7 +500,7 @@ class OgreMaterialScript(object):
 
         brace = 0
         self.techniques = techs = []
-        prog = None  # pick up program params
+        prog = None # pick up program params
         tex = None  # pick up texture_unit options, require "texture" ?
         for line in self.data.splitlines():
             #logger.debug( line )
@@ -642,19 +642,19 @@ class MaterialScripts(object):
     def reset_rna(self, callback=None):
         bpy.types.Material.ogre_parent_material = EnumProperty(
             name="Script Inheritence",
-            description='ogre parent material class',
+            description='OGRE parent material class',
             items=self.ENUM_ITEMS,
             #update=callback
         )
 
 IMAGE_FORMATS =  [
-    ('NONE','NONE', 'do not convert image'),
-    ('bmp', 'bmp', 'bitmap format'),
-    ('jpg', 'jpg', 'jpeg format'),
-    ('gif', 'gif', 'gif format'),
-    ('png', 'png', 'png format'),
-    ('tga', 'tga', 'targa format'),
-    ('dds', 'dds', 'dds format'),
+    ('NONE','NONE', 'Do not convert image'),
+    ('bmp', 'bmp', 'Bitmap format'),
+    ('jpg', 'jpg', 'JPEG format'),
+    ('gif', 'gif', 'GIF format'),
+    ('png', 'png', 'PNG format'),
+    ('tga', 'tga', 'Targa format'),
+    ('dds', 'dds', 'DDS format'),
 ]
 
 def is_image_postprocessed( image ):
