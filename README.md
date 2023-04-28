@@ -69,6 +69,9 @@ The active object selection is when there is an object with a yellow outline (in
 Check out all the exporter and importer options in the [Options Document](Options.md)
 
 ### Materials
+Materials can be exported as OGRE 1.x material files or as OGRE Next material.json files.
+
+#### OGRE 1.x Materials
 Materials are exported as RTSS OGRE 1.x materials (unless "Fixed Function Parameters" is selected).
 The following textures are exported: Base Color, Metallic and Roughness, Normal Map and Emission. Baked Ambient Occlusion is not supported for the moment.
 
@@ -76,6 +79,13 @@ Your material will be best exported if you follow the GLTF2 guidelines: [glTF 2.
 Except for the Emission texture, where the Emission input of the Principled BSDF node is used as the Emission texture.
 
 A good example of how the material should be setup for best results is the "Damaged Helmet" model found here: https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/DamagedHelmet
+
+#### OGRE Next JSON Materials
+The current OGRE Next JSON exporter only explicitly supports a metalness workflow, however it will attempt to export materials not following that workflow regardless and *may* produce passable results.
+
+For materials using metalness it expects a single image with the blue channel containing the metalness map and the green channel containing the roughness map fed into the Principled BSDF via a Separate RGB node. Not following this convention will print a warning to the console and the exported materials will likely not appear correctly when rendered.
+
+There are numerous features in the Ogre Next JSON format that are not directly supported, see the [Materials JSON](MaterialsJSON.md) notes for details.
 
 ### Blender Modifiers Support
 Blender has some very useful modifiers, and most of them are supported by `blender2ogre` but not all of them.
@@ -92,6 +102,7 @@ If you do want to export in the OgreNext (v2.) format, make sure in the `Export 
   - Mesh export version: v2
 * Materials
   - Export materials: ticked
+  - Export V2 JSON materials: ticked
 * Armature
   - Armature animation: ticked
 * Mesh

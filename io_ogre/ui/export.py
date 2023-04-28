@@ -105,7 +105,7 @@ class _OgreCommonExport_(object):
         section_options = {
             "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"],
             "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"],
-            "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
+            "Materials" : ["EX_MATERIALS", "EX_MATERIALS_V2JSON", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
             "Armature" : ["EX_ARMATURE_ANIMATION", "EX_SHARED_ARMATURE", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
             "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"],
@@ -291,6 +291,10 @@ class _OgreCommonExport_(object):
         name="Export Materials",
         description="Exports .material scripts",
         default=config.get('MATERIALS')) = {}
+    EX_MATERIALS_V2JSON : BoolProperty(
+        name="Export V2 JSON Materials",
+        description="Exports .material.json (v2)",
+        default=config.get('MATERIALS_V2JSON')) = {}
     EX_SEPARATE_MATERIALS : BoolProperty(
         name="Separate Materials",
         description="Exports a .material file for each material\n(rather than putting all materials into a single .material file)",
