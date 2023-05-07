@@ -69,7 +69,7 @@ The active object selection is when there is an object with a yellow outline (in
 Check out all the exporter and importer options in the [Options Document](Options.md)
 
 ### Materials
-Materials can be exported as OGRE 1.x material files or as OGRE Next material.json files.
+Materials will be exported as OGRE 1.x material files or as OGRE Next material.json files as required.
 
 #### OGRE 1.x Materials
 Materials are exported as RTSS OGRE 1.x materials (unless "Fixed Function Parameters" is selected).
@@ -102,7 +102,6 @@ If you do want to export in the OgreNext (v2.) format, make sure in the `Export 
   - Mesh export version: v2
 * Materials
   - Export materials: ticked
-  - Export V2 JSON materials: ticked
 * Armature
   - Armature animation: ticked
 * Mesh

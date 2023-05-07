@@ -15,6 +15,10 @@ setup.
 Unsupported.
 
 ## Unsupported features
+
+### emissive.use_emissive_lightmap
+This requires features only found in Blender 2.9+
+
 ### fresnel
 This is used in the Specular workflows supported by Ogre. Right now we
 only support the metallic workflow.

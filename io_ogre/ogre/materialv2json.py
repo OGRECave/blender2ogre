@@ -164,17 +164,11 @@ class OgreMaterialv2JsonGenerator(object):
             datablock["diffuse"]["texture"] = tex_filename
 
         # Set up emissive parameters
-        use_emissive_lightmap = True
-        tex_filename = self.prepare_texture(bsdf.emission_strength_texture)
-        if not tex_filename:
-            use_emissive_lightmap = False
-            tex_filename = self.prepare_texture(bsdf.emission_color_texture)
-
+        tex_filename = self.prepare_texture(bsdf.emission_color_texture)
         if tex_filename:
             logger.debug("Emissive params")
-            logger.debug("  use_emissive_lightmap: {}".format(use_emissive_lightmap))
             datablock["emissive"] = {
-                "lightmap": use_emissive_lightmap,
+                "lightmap": False, # bsdf.emission_strength_texture not supported in Blender < 2.9.0
                 "value": bsdf.emission_color[0:3]
             }
             datablock["emissive"]["texture"] = tex_filename

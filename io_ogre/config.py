@@ -43,7 +43,6 @@ _CONFIG_DEFAULTS_ALL = {
 
     # Materials
     'MATERIALS' : True,
-    'MATERIALS_V2JSON': True,
     'COPY_SHADER_PROGRAMS' : True,
     'SEPARATE_MATERIALS' : True,
     'USE_FFP_PARAMETERS': False,
