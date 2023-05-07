@@ -384,11 +384,19 @@ def xml_convert(infile, has_uvs=False):
             logger.info("Removing generated xml file after conversion: %s" % infile)
             os.remove(infile)
 
-def image_magick( image, origin_filepath, target_filepath ):
+def image_magick( image, origin_filepath, target_filepath, separate_channel=None):
     exe = config.get('IMAGE_MAGICK_CONVERT')
     cmd = [ exe, origin_filepath ]
 
     x,y = image.size
+
+    if separate_channel is not None:
+        cmd.append('-set')
+        cmd.append('colorspace')
+        cmd.append('RGB')
+        cmd.append('-channel')
+        cmd.append('{}'.format(separate_channel))
+        cmd.append('-separate')
 
     if x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
         cmd.append( '-resize' )
@@ -399,7 +407,7 @@ def image_magick( image, origin_filepath, target_filepath ):
         cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS')))
 
     cmd.append(target_filepath)
-    logging.debug('image magick: "%s"', ' '.join(cmd))
+    logger.debug('image magick: "%s"', ' '.join(cmd))
     subprocess.call(cmd)
 
 def swap(vec):

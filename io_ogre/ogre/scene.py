@@ -5,6 +5,8 @@ if "bpy" in locals():
     import importlib
     if "material" in locals():
         importlib.reload(material)
+    if "materialv2json" in locals():
+        importlib.reload(materialv2json)
     if "node_anim" in locals():
         importlib.reload(node_anim)
     if "mesh" in locals():
@@ -25,6 +27,7 @@ if "bpy" in locals():
 import bpy, mathutils, os, getpass, math
 from os.path import join
 from . import material
+from . import materialv2json
 from . import node_anim
 from . import mesh
 from . import skeleton
@@ -35,6 +38,7 @@ from ..report import Report
 from ..util import *
 from ..xml import *
 from .material import *
+from .materialv2json import *
 from .mesh import *
 
 logger = logging.getLogger('scene')
@@ -189,7 +193,15 @@ def dot_scene(path, scene_name=None):
     if config.get("MATERIALS"):
         logger.info("* Processing Materials")
         materials = util.objects_merge_materials(meshes)
-        dot_materials(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)
+
+        converter_type= detect_converter_type()
+        if converter_type == "OgreMeshTool":
+            dot_materialsv2json(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)
+        elif converter_type == "OgreXMLConverter":
+            dot_materials(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)
+        else: # Unkown converter type, error
+            logger.error("Unkown converter type '{}', will not generate materials".format(converter_type))
+            Reports.error.append("Unkown converter type '{}', will not generate materials".format(converter_type))
 
     doc = ogre_document(materials)
 
