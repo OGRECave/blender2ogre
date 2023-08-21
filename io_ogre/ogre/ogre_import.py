@@ -1053,8 +1053,9 @@ def bCreateSubMeshes(meshData, meshName):
             me.loops[i*3].vertex_index = faces[i][0]
             me.loops[i*3+1].vertex_index = faces[i][1]
             me.loops[i*3+2].vertex_index = faces[i][2]
-            me.polygons[i].loop_start = i*3
-            me.polygons[i].loop_total = 3
+            me.polygons[i].loop_start = i * 3
+            # NOTE: Doesn't work in Blender 3.6+ and this isn't needed anyway.
+            #me.polygons[i].loop_total = 3
             me.polygons[i].use_smooth
 
         #meshFaces = me.tessfaces
