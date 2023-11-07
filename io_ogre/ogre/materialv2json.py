@@ -18,9 +18,10 @@ import logging, os, shutil, tempfile, json
 from .. import config
 from .. import util
 from ..report import Report
-from .material import material_name, ShaderImageTextureWrapper, gather_metallic_roughness_texture
+from .material import material_name, ShaderImageTextureWrapper, gather_metallic_roughness_texture, gather_alpha_texture
 from bpy_extras import node_shader_utils
 import bpy.path
+import subprocess
 
 logger = logging.getLogger('materialv2json')
 
@@ -52,12 +53,13 @@ class OgreMaterialv2JsonGenerator(object):
         """Process all the materials, create the output json and copy textures"""
         if self.separate_files:
             for mat in self.materials:
-                datablock = self.generate_pbs_datablock(mat)
+                datablock, blendblocks = self.generate_pbs_datablock(mat)
                 dst_filename = os.path.join(self.target_path, "{}.material.json".format(material_name(mat)))
                 logger.info("Writing material '{}'".format(dst_filename))
                 try:
                     with open(dst_filename, 'w') as fp:
-                        json.dump({"pbs": {material_name(mat): datablock}}, fp, indent=2, sort_keys=True)
+                        json.dump({"pbs": {material_name(mat): datablock}, "blendblocks": blendblocks}, fp, indent=2, sort_keys=True)
+                        #json.dump({"pbs": {"blendblocks": blendblocks}}, fp, indent=2, sort_keys=True)
                     Report.materials.append(material_name(mat))
                 except Exception as e:
                     logger.error("Unable to create material file '{}'".format(dst_filename))
@@ -68,7 +70,7 @@ class OgreMaterialv2JsonGenerator(object):
             fileblock = {"pbs": {}}
             for mat in self.materials:
                 logger.info("Preparing material '{}' for file '{}".format(material_name(mat), dst_filename))
-                fileblock["pbs"][material_name(mat)] = self.generate_pbs_datablock(mat)
+                fileblock["pbs"][material_name(mat)], fileblock["blendblocks"] = self.generate_pbs_datablock(mat)
             try:
                 with open(dst_filename, 'w') as fp:
                     json.dump(fileblock, fp, indent=2, sort_keys=True)
@@ -159,81 +161,149 @@ class OgreMaterialv2JsonGenerator(object):
         datablock["diffuse"] = {
             "value": bsdf.base_color[0:3]
         }
-        tex_filename = self.prepare_texture(bsdf.base_color_texture)
+        diffuse_tex = bsdf.base_color_texture
+        tex_filename, diffuse_tex_dst = self.prepare_texture(diffuse_tex)
         if tex_filename:
-            datablock["diffuse"]["texture"] = tex_filename
+            datablock["diffuse"]["texture"] = os.path.split(tex_filename)[-1]
+            datablock["diffuse"]["value"] = [1.0, 1.0, 1.0, 1.0]
+            diffuse_tex_src = tex_filename
+
 
         # Set up emissive parameters
-        tex_filename = self.prepare_texture(bsdf.emission_color_texture)
+        tex_filename = self.prepare_texture(bsdf.emission_color_texture)[0]
         if tex_filename:
             logger.debug("Emissive params")
             datablock["emissive"] = {
                 "lightmap": False, # bsdf.emission_strength_texture not supported in Blender < 2.9.0
                 "value": bsdf.emission_color[0:3]
             }
-            datablock["emissive"]["texture"] = tex_filename
+            datablock["emissive"]["texture"] = os.path.split(tex_filename)[-1]
 
 
         # Set up metalness parameters
-        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=2)
+        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=2)[0]
         logger.debug("Metallic params")
         datablock["metalness"] = {
             "value": bsdf.metallic
         }
         if tex_filename:
-            datablock["metalness"]["texture"] = tex_filename
+            datablock["metalness"]["texture"] = os.path.split(tex_filename)[-1]
 
         # Set up normalmap parameters, only if texture is present
-        tex_filename = self.prepare_texture(bsdf.normalmap_texture)
+        tex_filename = self.prepare_texture(bsdf.normalmap_texture)[0]
         if tex_filename:
             logger.debug("Normalmap params")
             datablock["normal"] = {
                 "value": bsdf.normalmap_strength
             }
-            datablock["normal"]["texture"] = tex_filename
+            datablock["normal"]["texture"] = os.path.split(tex_filename)[-1]
 
         # Set up roughness parameters
-        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=1)
+        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=1)[0]
         logger.debug("Roughness params")
         datablock["roughness"] = {
             "value": bsdf.roughness
         }
         if tex_filename:
-            datablock["roughness"]["texture"] = tex_filename
+            datablock["roughness"]["texture"] = os.path.split(tex_filename)[-1]
 
         # Set up specular parameters
         logger.debug("Specular params")
         datablock["specular"] = {
             "value": material.specular_color[0:3]
         }
-        tex_filename = self.prepare_texture(bsdf.specular_texture)
+        tex_filename = self.prepare_texture(bsdf.specular_texture)[0]
         if tex_filename:
-            datablock["specular"]["texture"] = tex_filename
+            datablock["specular"]["texture"] = os.path.split(tex_filename)[-1]
 
         # Set up transparency parameters, only if texture is present
         logger.debug("Transparency params")
-        tex_filename = self.prepare_texture(bsdf.alpha_texture)
+         # Initialize blendblock
+        blendblocks = {}
+        alpha_tex, alpha_strength = gather_alpha_texture(bsdf)
+        tex_filename, alpha_tex_dst = self.prepare_texture(alpha_tex)
         if tex_filename:
-            if tex_filename != datablock.get("diffuse", {}).get("texture", None):
-                logger.warning("Alpha texture on material '{}' is not the same as "
-                    "the diffuse texture! Probably will not work as expected.".format(
-                    material.name))
-            datablock["alpha_test"] = ["greater_equal", material.alpha_threshold]
-        if bsdf.alpha != 1.0:
-            transparency_mode = "None" # NOTE: This is an arbitrary mapping
-            if material.blend_method == "CLIP":
-                transparency_mode = "Fade"
-            elif material.blend_method == "HASHED":
-                transparency_mode = "Fade"
-            elif material.blend_method == "BLEND":
-                transparency_mode = "Transparent"
+            alpha_tex_src = tex_filename
+            datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
 
-            datablock["transparency"] = {
-                "mode": transparency_mode,
-                "use_alpha_from_textures": True,    # DEFAULT
-                "value": bsdf.alpha
-            }
+            # Give blendblock common settings
+            datablock["blendblock"] = ["blendblock_name", "blendblock_name_for_shadows"]
+            blendblocks["blendblock_name"] = {}
+            blendblocks["blendblock_name"]["alpha_to_coverage"] = False
+            blendblocks["blendblock_name"]["blendmask"] = "rgba"
+            blendblocks["blendblock_name"]["separate_blend"] = False
+            blendblocks["blendblock_name"]["blend_operation"] = "add"
+            blendblocks["blendblock_name"]["blend_operation_alpha"] = "add"
+            # Give blendblock specific settings
+            if material.blend_method == "CLIP":     # CLIP is equivalent to the Ogre BlendBlock of Blend Type: REPLACE
+                blendblocks["blendblock_name"]["src_blend_factor"] = "one"
+                blendblocks["blendblock_name"]["dst_blend_factor"] = "zero"
+                blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one"
+                blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "zero"
+            elif material.blend_method == "HASHED": # Currently HASHED has no equivalent in Ogre, so we treat this as a stronger Blend
+                blendblocks["blendblock_name"]["src_blend_factor"] = "one"
+                blendblocks["blendblock_name"]["dst_blend_factor"] = "dst_colour" # using "dst_colour" give an even clearer result than BLEND
+                blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one"
+                blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "dst_colour"
+            elif material.blend_method == "BLEND":  # BLEND is equivalent to the Ogre BlendBlock of Blend Type: Transparent Colour
+                blendblocks["blendblock_name"]["src_blend_factor"] = "one" # "src_colour" give almost invisible result, this setting is clearer
+                blendblocks["blendblock_name"]["dst_blend_factor"] = "one_minus_src_colour"
+                blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one" 
+                blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "one_minus_src_colour"
+            
+            # Add Alpha texture as the alpha channel of the diffuse texure
+            if ("texture" in datablock["diffuse"]):
+                if alpha_tex_src != datablock["diffuse"]["texture"]:
+                    logger.warning("The Alpha texture used on material '{}' is not from the same file as "
+                        "the diffuse texture! This is supported, but make sure you used the right Alpha texture!.".format(
+                        material.name))
+                    
+                    exe = config.get('IMAGE_MAGICK_CONVERT')
+                    diffuse_tex_dst = diffuse_tex_dst.replace(os.path.split(diffuse_tex_dst)[-1], "new_" + os.path.split(diffuse_tex_dst)[-1])
+                    
+                    cmd = [exe, diffuse_tex_src]
+                    x,y = diffuse_tex.image.size
+                    
+                    cmd.append(alpha_tex_src)
+                    cmd.append('-set')
+                    cmd.append('-channel')
+                    cmd.append('rgb')
+                    #cmd.append('-separate')
+                    cmd.append('+channel')
+                    #cmd.append('-alpha')
+                    #cmd.append('off')
+                    cmd.append('-compose')
+                    cmd.append('copy-opacity')
+                    cmd.append('-composite')
+
+
+                    if x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
+                        cmd.append( '-resize' )
+                        cmd.append( str(config.get('MAX_TEXTURE_SIZE')) )
+
+                    if diffuse_tex_dst.endswith('.dds'):
+                        cmd.append('-define')
+                        cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS')))
+
+                    cmd.append(diffuse_tex_dst)
+                    
+                    logger.debug('image magick: "%s"', ' '.join(cmd))
+                    subprocess.run(cmd)
+                    
+                    # Point the diffuse texture to the new image
+                    datablock["diffuse"]["texture"] = os.path.split(diffuse_tex_dst)[-1]
+                else:
+                    logger.debug("Base color and Alpha channel both came from the same image")
+                
+        else:
+            logger.warn("No Alpha texture found, the output will not have an Alpha channel")
             # UNSUSED IN OGRE datablock["transparency"]["texture"] = tex_filename
+
+        datablock["transparency"] = {
+                "mode": "Transparent",                  # "Transparent" mode can adjust transparency with "value"
+                "use_alpha_from_textures": True,        # DEFAULT
+                "value": max(0, min(alpha_strength, 1)) # Transparency strength clamped between [0,1] (0 for fully transparent and 1 for fully opaque)
+            }
 
         # Backface culling
         datablock["two_sided"] = not material.use_backface_culling
@@ -245,15 +315,16 @@ class OgreMaterialv2JsonGenerator(object):
                 datablock.pop("fresnel") # No fresnel if workflow is metallic
             except KeyError: pass
 
-        return datablock
+        return datablock, blendblocks
 
     def prepare_texture(self, tex, channel=None):
         """Prepare a texture for use
 
         channel is None=all channels, 0=red 1=green 2=blue
         """
+        base_return = (None, None)
         if not (tex and tex.image):
-            return None
+            return base_return
 
         src_filename = bpy.path.abspath(tex.image.filepath or tex.image.name)
         dst_filename = bpy.path.basename(src_filename)
@@ -289,7 +360,8 @@ class OgreMaterialv2JsonGenerator(object):
         else:
             self.copy_set.add((src_filename, dst_filename))
 
-        return os.path.split(dst_filename)[-1]
+        #return os.path.split(dst_filename)[-1]
+        return src_filename, dst_filename
 
     def copy_textures(self):
         """Copy and/or convert textures from previous prepare_texture() calls"""
