@@ -188,6 +188,12 @@ class OgreMaterialv2JsonGenerator(object):
         }
         if tex_filename:
             datablock["metalness"]["texture"] = os.path.split(tex_filename)[-1]
+            datablock["metalness"]["value"] = 0.818  # default mtallic value according to the docs
+        else:  # Support for standalone metallic texture
+            tex_filename = self.prepare_texture(bsdf.metallic_texture)[0]
+            if tex_filename:
+                datablock["metalness"]["texture"] = os.path.split(tex_filename)[-1]
+                datablock["metalness"]["value"] = 0.818
 
         # Set up normalmap parameters, only if texture is present
         tex_filename = self.prepare_texture(bsdf.normalmap_texture)[0]
@@ -206,6 +212,12 @@ class OgreMaterialv2JsonGenerator(object):
         }
         if tex_filename:
             datablock["roughness"]["texture"] = os.path.split(tex_filename)[-1]
+            datablock["roughness"]["value"] = 1.0 # default roughness value according to the docs
+        else:  # Support for standalone roughness texture
+            tex_filename = self.prepare_texture(bsdf.roughness_texture)[0]
+            if tex_filename:
+                datablock["roughness"]["texture"] = os.path.split(tex_filename)[-1]
+                datablock["roughness"]["value"] = 1.0
 
         # Set up specular parameters
         logger.debug("Specular params")
