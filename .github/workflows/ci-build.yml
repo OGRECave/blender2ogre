@@ -6,7 +6,7 @@ on:
     branches: [master]
 jobs:
   linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Install Dependencies
       run: |
@@ -15,8 +15,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Test
       run: |
-        mkdir -p ~/.config/blender/2.82/scripts/addons/
-        ln -s `pwd`/io_ogre ~/.config/blender/2.82/scripts/addons/
+        mkdir -p ~/.config/blender/3.0/scripts/addons/
+        ln -s `pwd`/io_ogre ~/.config/blender/3.0/scripts/addons/
         blender examples/armature-test.blend -b --python test/run.py
         # verify that files were created
         test -f test.scene
