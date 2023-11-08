@@ -162,11 +162,11 @@ class OgreMaterialv2JsonGenerator(object):
             "value": bsdf.base_color[0:3]
         }
         diffuse_tex = bsdf.base_color_texture
-        tex_filename, diffuse_tex_dst = self.prepare_texture(diffuse_tex)
+        tex_filename, diffuse_tex_src = self.prepare_texture(diffuse_tex)
         if tex_filename:
             datablock["diffuse"]["texture"] = os.path.split(tex_filename)[-1]
             datablock["diffuse"]["value"] = [1.0, 1.0, 1.0, 1.0]
-            diffuse_tex_src = tex_filename
+            diffuse_tex_dst = tex_filename
 
 
         # Set up emissive parameters
@@ -221,9 +221,8 @@ class OgreMaterialv2JsonGenerator(object):
          # Initialize blendblock
         blendblocks = {}
         alpha_tex, alpha_strength = gather_alpha_texture(bsdf)
-        tex_filename, alpha_tex_dst = self.prepare_texture(alpha_tex)
+        tex_filename, alpha_tex_src = self.prepare_texture(alpha_tex)
         if tex_filename:
-            alpha_tex_src = tex_filename
             datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
 
             # Give blendblock common settings
@@ -361,7 +360,7 @@ class OgreMaterialv2JsonGenerator(object):
             self.copy_set.add((src_filename, dst_filename))
 
         #return os.path.split(dst_filename)[-1]
-        return src_filename, dst_filename
+        return dst_filename, src_filename
 
     def copy_textures(self):
         """Copy and/or convert textures from previous prepare_texture() calls"""
