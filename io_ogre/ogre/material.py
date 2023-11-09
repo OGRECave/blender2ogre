@@ -838,50 +838,5 @@ def gather_metallic_roughness_texture(mat_wrapper):
 
     return ShaderImageTextureWrapper(node_image)
 
-def gather_alpha_texture(mat_wrapper):
-    
-    material = mat_wrapper.material
-
-    logger.debug("Getting Alpha texture of material: '%s'" % material.name)
-
-    input_name = 'Alpha'
-
-    base_return = (None, 1)
-
-    logger.debug(" + Processing input: '%s'" % input_name)
-
-    if material.use_nodes == False:
-        logger.warn("Material: '%s' does not use nodes" % material.name)
-        return base_return
-
-    if 'Principled BSDF' not in  material.node_tree.nodes:
-        logger.warn("Material: '%s' does not have a 'Principled BSDF' node" % material.name)
-        return base_return
-
-    input = material.node_tree.nodes['Principled BSDF'].inputs[input_name]
-
-    # Check that input is connected to a node
-    if len(input.links) > 0:
-        alpha_node = input.links[0].from_node
-    else:
-        logger.warn("%s input is not connected" % input_name)
-        return base_return
-
-    # Check that connected node is of type 'TEX_IMAGE'
-    if alpha_node.type in ['TEX_IMAGE']:
-        node_image = alpha_node
-        alpha = 1.0
-    elif alpha_node.type in ['MAP_RANGE']:
-        # Check that input is connected to an image texture
-        node_image = alpha_node.inputs[0].links[0].from_node
-        if node_image.type not in ['TEX_IMAGE']:
-            logger.warn("map range node has no input texture")
-            return base_return
-        alpha = alpha_node.inputs["To Max"].default_value
-    else:
-        logger.warn("Connected node '%s' is not of type 'TEX_IMAGE' or 'MAP_RANGE'" % alpha_node.name)
-        return base_return
-    
-    return (ShaderImageTextureWrapper(node_image), alpha)
 
 

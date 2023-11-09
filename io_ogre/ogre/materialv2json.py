@@ -18,10 +18,9 @@ import logging, os, shutil, tempfile, json
 from .. import config
 from .. import util
 from ..report import Report
-from .material import material_name, ShaderImageTextureWrapper, gather_metallic_roughness_texture, gather_alpha_texture
+from .material import material_name, ShaderImageTextureWrapper, gather_metallic_roughness_texture
 from bpy_extras import node_shader_utils
 import bpy.path
-import subprocess
 
 logger = logging.getLogger('materialv2json')
 
@@ -161,196 +160,92 @@ class OgreMaterialv2JsonGenerator(object):
         datablock["diffuse"] = {
             "value": bsdf.base_color[0:3]
         }
-        diffuse_tex = bsdf.base_color_texture
-        tex_filename, diffuse_tex_src = self.prepare_texture(diffuse_tex)
+        tex_filename = self.prepare_texture(bsdf.base_color_texture)
         if tex_filename:
-            datablock["diffuse"]["texture"] = os.path.split(tex_filename)[-1]
-            datablock["diffuse"]["value"] = [1.0, 1.0, 1.0]
-            diffuse_tex_dst = tex_filename
-
+            datablock["diffuse"]["texture"] = tex_filename
 
         # Set up emissive parameters
-        tex_filename = self.prepare_texture(bsdf.emission_color_texture)[0]
+        tex_filename = self.prepare_texture(bsdf.emission_color_texture)
         if tex_filename:
             logger.debug("Emissive params")
             datablock["emissive"] = {
                 "lightmap": False, # bsdf.emission_strength_texture not supported in Blender < 2.9.0
                 "value": bsdf.emission_color[0:3]
             }
-            datablock["emissive"]["texture"] = os.path.split(tex_filename)[-1]
-
+            datablock["emissive"]["texture"] = tex_filename
 
         # Set up metalness parameters
-        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=2)[0]
+        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=2)
         logger.debug("Metallic params")
         datablock["metalness"] = {
             "value": bsdf.metallic
         }
         if tex_filename:
-            datablock["metalness"]["texture"] = os.path.split(tex_filename)[-1]
-            datablock["metalness"]["value"] = 0.818  # default mtallic value according to the docs
+            datablock["metalness"]["texture"] = tex_filename
         else:  # Support for standalone metallic texture
-            tex_filename = self.prepare_texture(bsdf.metallic_texture)[0]
+            tex_filename = self.prepare_texture(bsdf.metallic_texture)
             if tex_filename:
-                datablock["metalness"]["texture"] = os.path.split(tex_filename)[-1]
-                datablock["metalness"]["value"] = 0.818
+                datablock["metalness"]["texture"] = tex_filename
 
         # Set up normalmap parameters, only if texture is present
-        tex_filename = self.prepare_texture(bsdf.normalmap_texture)[0]
+        tex_filename = self.prepare_texture(bsdf.normalmap_texture)
         if tex_filename:
             logger.debug("Normalmap params")
             datablock["normal"] = {
                 "value": bsdf.normalmap_strength
             }
-            datablock["normal"]["texture"] = os.path.split(tex_filename)[-1]
+            datablock["normal"]["texture"] = tex_filename
 
         # Set up roughness parameters
-        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=1)[0]
+        tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=1)
         logger.debug("Roughness params")
         datablock["roughness"] = {
             "value": bsdf.roughness
         }
         if tex_filename:
-            datablock["roughness"]["texture"] = os.path.split(tex_filename)[-1]
-            datablock["roughness"]["value"] = 1.0 # default roughness value according to the docs
+            datablock["roughness"]["texture"] = tex_filename
         else:  # Support for standalone roughness texture
-            tex_filename = self.prepare_texture(bsdf.roughness_texture)[0]
+            tex_filename = self.prepare_texture(bsdf.roughness_texture)
             if tex_filename:
-                datablock["roughness"]["texture"] = os.path.split(tex_filename)[-1]
-                datablock["roughness"]["value"] = 1.0
+                datablock["roughness"]["texture"] = tex_filename
 
         # Set up specular parameters
         logger.debug("Specular params")
         datablock["specular"] = {
             "value": material.specular_color[0:3]
         }
-        tex_filename = self.prepare_texture(bsdf.specular_texture)[0]
+        tex_filename = self.prepare_texture(bsdf.specular_texture)
         if tex_filename:
-            datablock["specular"]["texture"] = os.path.split(tex_filename)[-1]
+            datablock["specular"]["texture"] = tex_filename
 
         # Set up transparency parameters, only if texture is present
         logger.debug("Transparency params")
          # Initialize blendblock
         blendblocks = {}
-        alpha_tex, alpha_strength = gather_alpha_texture(bsdf)
-        tex_filename, alpha_tex_src = self.prepare_texture(alpha_tex)
-        if tex_filename:
-            #datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]            
-            # Give blendblock specific settings
-            if material.blend_method == "OPAQUE":     # OPAQUE will pass for now
-                pass
-            elif material.blend_method == "CLIP":     # CLIP enables alpha_test (alpha rejection)
-                datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
-            elif material.blend_method in ["HASHED", "BLEND"]: 
-                datablock["transparency"] = {
-                    "mode": "Transparent",        
-                    "use_alpha_from_textures": True,  # DEFAULT
-                    "value": max(0, min(alpha_strength, 1))    
-                }
-                # Give blendblock common settings
-                datablock["blendblock"] = ["blendblock_name", "blendblock_name_for_shadows"]
-                blendblocks["blendblock_name"] = {}
-                blendblocks["blendblock_name"]["alpha_to_coverage"] = False
-                blendblocks["blendblock_name"]["blendmask"] = "rgba"
-                blendblocks["blendblock_name"]["separate_blend"] = False
-                blendblocks["blendblock_name"]["blend_operation"] = "add"
-                blendblocks["blendblock_name"]["blend_operation_alpha"] = "add"
-                blendblocks["blendblock_name"]["src_blend_factor"] = "one"
-                blendblocks["blendblock_name"]["dst_blend_factor"] = "one_minus_src_colour" # using "dst_colour" give an even clearer result than BLEND
-                blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one"
-                blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "one_minus_src_colour"
-            
-            # Add Alpha texture as the alpha channel of the diffuse texure
-            if ("texture" in datablock["diffuse"]):
-                if alpha_tex_src != diffuse_tex_src:
-                    logger.warning("The Alpha texture used on material '{}' is not from the same file as "
-                        "the diffuse texture! This is supported, but make sure you used the right Alpha texture!.".format(
-                        material.name))
-                    
-                    exe = config.get('IMAGE_MAGICK_CONVERT')
-                    diffuse_tex_dst = diffuse_tex_dst.replace(os.path.split(diffuse_tex_dst)[-1], "new_" + os.path.split(diffuse_tex_dst)[-1])
-                    
-                    cmd = [exe, diffuse_tex_src]
-                    x,y = diffuse_tex.image.size
-                    
-                    cmd.append(alpha_tex_src)
-                    cmd.append('-set')
-                    cmd.append('-channel')
-                    cmd.append('rgb')
-                    #cmd.append('-separate')
-                    cmd.append('+channel')
-                    #cmd.append('-alpha')
-                    #cmd.append('off')
-                    cmd.append('-compose')
-                    cmd.append('copy-opacity')
-                    cmd.append('-composite')
-
-                    if x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
-                        cmd.append( '-resize' )
-                        cmd.append( str(config.get('MAX_TEXTURE_SIZE')) )
-
-                    if diffuse_tex_dst.endswith('.dds'):
-                        cmd.append('-define')
-                        cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS')))
-
-                    cmd.append(diffuse_tex_dst)
-                    
-                    logger.debug('image magick: "%s"', ' '.join(cmd))
-                    subprocess.run(cmd)
-                    
-                    # Point the diffuse texture to the new image
-                    datablock["diffuse"]["texture"] = os.path.split(diffuse_tex_dst)[-1]
-                else:
-                    logger.debug("Base color and Alpha channel both came from the same image")
-            else:
-                logger.debug("No diffuse texture found, combining alpha channel with Principled BSDF's base color value")
-                exe = config.get('IMAGE_MAGICK_CONVERT')
-                alpha_tex_dst = tex_filename
-                alpha_tex_dst = alpha_tex_dst.replace(os.path.split(alpha_tex_dst)[-1], "new_" + os.path.split(alpha_tex_dst)[-1])
-                    
-                cmd = [exe, alpha_tex_src]
-                x,y = alpha_tex.image.size
-                
-                cmd.append(alpha_tex_src)
-                cmd.append('-set')
-                cmd.append('-channel')
-                cmd.append('rgb')
-                #cmd.append('-separate')
-                cmd.append('+channel')
-                #cmd.append('-alpha')
-                #cmd.append('off')
-                cmd.append('-compose')
-                cmd.append('copy-opacity')
-                cmd.append('-composite')
-                cmd.append('-fill')
-                cmd.append(
-                    'rgb(' + str(int(bsdf.base_color[0] * 255))
-                    + ',' + str(int(bsdf.base_color[1] * 255))
-                    + ',' + str(int(bsdf.base_color[2] * 255))
-                    + ')')
-                cmd.append('-colorize')
-                cmd.append('100')
-
-                if x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
-                    cmd.append( '-resize' )
-                    cmd.append( str(config.get('MAX_TEXTURE_SIZE')) )
-
-                if alpha_tex_dst.endswith('.dds'):
-                    cmd.append('-define')
-                    cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS')))
-
-                cmd.append(alpha_tex_dst)
-                    
-                logger.debug('image magick: "%s"', ' '.join(cmd))
-                subprocess.run(cmd)
-                    
-                # Point the diffuse texture to the new image
-                datablock["diffuse"]["texture"] = os.path.split(alpha_tex_dst)[-1]
-        else:
-            logger.warn("No Alpha texture found, the output will not have an Alpha channel")
-            # UNSUSED IN OGRE datablock["transparency"]["texture"] = tex_filename
-
-        
+        tex_filename = self.prepare_texture(bsdf.alpha_texture)
+        # Give blendblock specific settings
+        if material.blend_method == "OPAQUE":     # OPAQUE will pass for now
+            pass
+        elif material.blend_method == "CLIP":     # CLIP enables alpha_test (alpha rejection)
+            datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
+        elif material.blend_method in ["HASHED", "BLEND"]: 
+            datablock["transparency"] = {
+                "mode": "Transparent",        
+                "use_alpha_from_textures": tex_filename != None,  # DEFAULT
+                "value": bsdf.alpha
+            }
+            # Give blendblock common settings
+            datablock["blendblock"] = ["blendblock_name", "blendblock_name_for_shadows"]
+            blendblocks["blendblock_name"] = {}
+            blendblocks["blendblock_name"]["alpha_to_coverage"] = False
+            blendblocks["blendblock_name"]["blendmask"] = "rgba"
+            blendblocks["blendblock_name"]["separate_blend"] = False
+            blendblocks["blendblock_name"]["blend_operation"] = "add"
+            blendblocks["blendblock_name"]["blend_operation_alpha"] = "add"
+            blendblocks["blendblock_name"]["src_blend_factor"] = "one"
+            blendblocks["blendblock_name"]["dst_blend_factor"] = "one_minus_src_colour" # using "dst_colour" give an even clearer result than BLEND
+            blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one"
+            blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "one_minus_src_colour"
 
         # Backface culling
         datablock["two_sided"] = not material.use_backface_culling
@@ -369,9 +264,8 @@ class OgreMaterialv2JsonGenerator(object):
 
         channel is None=all channels, 0=red 1=green 2=blue
         """
-        base_return = (None, None)
         if not (tex and tex.image):
-            return base_return
+            return None
 
         src_filename = bpy.path.abspath(tex.image.filepath or tex.image.name)
         dst_filename = bpy.path.basename(src_filename)
@@ -399,7 +293,7 @@ class OgreMaterialv2JsonGenerator(object):
         if not os.path.isfile(src_filename):
             logger.error("Cannot find source image: '{}'".format(src_filename))
             Report.errors.append("Cannot find source image: '{}'".format(src_filename))
-            return
+            return None
 
         if src_format != dst_format or channel is not None:
             # using extensions to determine filetype? gross
@@ -407,8 +301,7 @@ class OgreMaterialv2JsonGenerator(object):
         else:
             self.copy_set.add((src_filename, dst_filename))
 
-        #return os.path.split(dst_filename)[-1]
-        return dst_filename, src_filename
+        return os.path.split(dst_filename)[-1]
 
     def copy_textures(self):
         """Copy and/or convert textures from previous prepare_texture() calls"""
