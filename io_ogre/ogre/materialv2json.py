@@ -52,12 +52,13 @@ class OgreMaterialv2JsonGenerator(object):
         """Process all the materials, create the output json and copy textures"""
         if self.separate_files:
             for mat in self.materials:
-                datablock = self.generate_pbs_datablock(mat)
+                datablock, blendblocks = self.generate_pbs_datablock(mat)
                 dst_filename = os.path.join(self.target_path, "{}.material.json".format(material_name(mat)))
                 logger.info("Writing material '{}'".format(dst_filename))
                 try:
                     with open(dst_filename, 'w') as fp:
-                        json.dump({"pbs": {material_name(mat): datablock}}, fp, indent=2, sort_keys=True)
+                        json.dump({"pbs": {material_name(mat): datablock}, "blendblocks": blendblocks}, fp, indent=2, sort_keys=True)
+                        #json.dump({"pbs": {"blendblocks": blendblocks}}, fp, indent=2, sort_keys=True)
                     Report.materials.append(material_name(mat))
                 except Exception as e:
                     logger.error("Unable to create material file '{}'".format(dst_filename))
@@ -68,7 +69,7 @@ class OgreMaterialv2JsonGenerator(object):
             fileblock = {"pbs": {}}
             for mat in self.materials:
                 logger.info("Preparing material '{}' for file '{}".format(material_name(mat), dst_filename))
-                fileblock["pbs"][material_name(mat)] = self.generate_pbs_datablock(mat)
+                fileblock["pbs"][material_name(mat)], fileblock["blendblocks"] = self.generate_pbs_datablock(mat)
             try:
                 with open(dst_filename, 'w') as fp:
                     json.dump(fileblock, fp, indent=2, sort_keys=True)
@@ -173,7 +174,6 @@ class OgreMaterialv2JsonGenerator(object):
             }
             datablock["emissive"]["texture"] = tex_filename
 
-
         # Set up metalness parameters
         tex_filename = self.prepare_texture(gather_metallic_roughness_texture(bsdf), channel=2)
         logger.debug("Metallic params")
@@ -182,6 +182,10 @@ class OgreMaterialv2JsonGenerator(object):
         }
         if tex_filename:
             datablock["metalness"]["texture"] = tex_filename
+        else:  # Support for standalone metallic texture
+            tex_filename = self.prepare_texture(bsdf.metallic_texture)
+            if tex_filename:
+                datablock["metalness"]["texture"] = tex_filename
 
         # Set up normalmap parameters, only if texture is present
         tex_filename = self.prepare_texture(bsdf.normalmap_texture)
@@ -200,6 +204,10 @@ class OgreMaterialv2JsonGenerator(object):
         }
         if tex_filename:
             datablock["roughness"]["texture"] = tex_filename
+        else:  # Support for standalone roughness texture
+            tex_filename = self.prepare_texture(bsdf.roughness_texture)
+            if tex_filename:
+                datablock["roughness"]["texture"] = tex_filename
 
         # Set up specular parameters
         logger.debug("Specular params")
@@ -212,28 +220,32 @@ class OgreMaterialv2JsonGenerator(object):
 
         # Set up transparency parameters, only if texture is present
         logger.debug("Transparency params")
+         # Initialize blendblock
+        blendblocks = {}
         tex_filename = self.prepare_texture(bsdf.alpha_texture)
-        if tex_filename:
-            if tex_filename != datablock.get("diffuse", {}).get("texture", None):
-                logger.warning("Alpha texture on material '{}' is not the same as "
-                    "the diffuse texture! Probably will not work as expected.".format(
-                    material.name))
-            datablock["alpha_test"] = ["greater_equal", material.alpha_threshold]
-        if bsdf.alpha != 1.0:
-            transparency_mode = "None" # NOTE: This is an arbitrary mapping
-            if material.blend_method == "CLIP":
-                transparency_mode = "Fade"
-            elif material.blend_method == "HASHED":
-                transparency_mode = "Fade"
-            elif material.blend_method == "BLEND":
-                transparency_mode = "Transparent"
-
+        # Give blendblock specific settings
+        if material.blend_method == "OPAQUE":     # OPAQUE will pass for now
+            pass
+        elif material.blend_method == "CLIP":     # CLIP enables alpha_test (alpha rejection)
+            datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
+        elif material.blend_method in ["HASHED", "BLEND"]: 
             datablock["transparency"] = {
-                "mode": transparency_mode,
-                "use_alpha_from_textures": True,    # DEFAULT
+                "mode": "Transparent",        
+                "use_alpha_from_textures": tex_filename != None,  # DEFAULT
                 "value": bsdf.alpha
             }
-            # UNSUSED IN OGRE datablock["transparency"]["texture"] = tex_filename
+            # Give blendblock common settings
+            datablock["blendblock"] = ["blendblock_name", "blendblock_name_for_shadows"]
+            blendblocks["blendblock_name"] = {}
+            blendblocks["blendblock_name"]["alpha_to_coverage"] = False
+            blendblocks["blendblock_name"]["blendmask"] = "rgba"
+            blendblocks["blendblock_name"]["separate_blend"] = False
+            blendblocks["blendblock_name"]["blend_operation"] = "add"
+            blendblocks["blendblock_name"]["blend_operation_alpha"] = "add"
+            blendblocks["blendblock_name"]["src_blend_factor"] = "one"
+            blendblocks["blendblock_name"]["dst_blend_factor"] = "one_minus_src_colour" # using "dst_colour" give an even clearer result than BLEND
+            blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one"
+            blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "one_minus_src_colour"
 
         # Backface culling
         datablock["two_sided"] = not material.use_backface_culling
@@ -245,7 +257,7 @@ class OgreMaterialv2JsonGenerator(object):
                 datablock.pop("fresnel") # No fresnel if workflow is metallic
             except KeyError: pass
 
-        return datablock
+        return datablock, blendblocks
 
     def prepare_texture(self, tex, channel=None):
         """Prepare a texture for use
@@ -281,7 +293,7 @@ class OgreMaterialv2JsonGenerator(object):
         if not os.path.isfile(src_filename):
             logger.error("Cannot find source image: '{}'".format(src_filename))
             Report.errors.append("Cannot find source image: '{}'".format(src_filename))
-            return
+            return None
 
         if src_format != dst_format or channel is not None:
             # using extensions to determine filetype? gross
