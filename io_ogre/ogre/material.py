@@ -196,7 +196,10 @@ class OgreMaterialGenerator(object):
 
             color = mat_wrapper.base_color
             alpha = 1.0
-            if mat.blend_method != "OPAQUE":
+            if mat.blend_method == "CLIP":
+                alpha = mat_wrapper.alpha
+                self.w.iword('alpha_rejection greater_equal').round(255*mat.alpha_threshold).nl()
+            elif mat.blend_method != "OPAQUE":
                 alpha = mat_wrapper.alpha
                 self.w.iword('scene_blend alpha_blend').nl()
                 if mat.show_transparent_back:
