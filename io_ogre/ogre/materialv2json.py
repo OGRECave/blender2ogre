@@ -262,7 +262,7 @@ class OgreMaterialv2JsonGenerator(object):
             
             # Add Alpha texture as the alpha channel of the diffuse texure
             if ("texture" in datablock["diffuse"]):
-                if os.path.split(alpha_tex_src)[-1] != datablock["diffuse"]["texture"]:
+                if alpha_tex_src != diffuse_tex_src:
                     logger.warning("The Alpha texture used on material '{}' is not from the same file as "
                         "the diffuse texture! This is supported, but make sure you used the right Alpha texture!.".format(
                         material.name))
@@ -285,7 +285,6 @@ class OgreMaterialv2JsonGenerator(object):
                     cmd.append('copy-opacity')
                     cmd.append('-composite')
 
-
                     if x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
                         cmd.append( '-resize' )
                         cmd.append( str(config.get('MAX_TEXTURE_SIZE')) )
@@ -303,7 +302,50 @@ class OgreMaterialv2JsonGenerator(object):
                     datablock["diffuse"]["texture"] = os.path.split(diffuse_tex_dst)[-1]
                 else:
                     logger.debug("Base color and Alpha channel both came from the same image")
+            else:
+                logger.debug("No diffuse texture found, combining alpha channel with Principled BSDF's base color value")
+                exe = config.get('IMAGE_MAGICK_CONVERT')
+                alpha_tex_dst = tex_filename
+                alpha_tex_dst = alpha_tex_dst.replace(os.path.split(alpha_tex_dst)[-1], "new_" + os.path.split(alpha_tex_dst)[-1])
+                    
+                cmd = [exe, alpha_tex_src]
+                x,y = alpha_tex.image.size
                 
+                cmd.append(alpha_tex_src)
+                cmd.append('-set')
+                cmd.append('-channel')
+                cmd.append('rgb')
+                #cmd.append('-separate')
+                cmd.append('+channel')
+                #cmd.append('-alpha')
+                #cmd.append('off')
+                cmd.append('-compose')
+                cmd.append('copy-opacity')
+                cmd.append('-composite')
+                cmd.append('-fill')
+                cmd.append(
+                    'rgb(' + str(int(bsdf.base_color[0] * 255))
+                    + ',' + str(int(bsdf.base_color[1] * 255))
+                    + ',' + str(int(bsdf.base_color[2] * 255))
+                    + ')')
+                cmd.append('-colorize')
+                cmd.append('100')
+
+                if x > config.get('MAX_TEXTURE_SIZE') or y > config.get('MAX_TEXTURE_SIZE'):
+                    cmd.append( '-resize' )
+                    cmd.append( str(config.get('MAX_TEXTURE_SIZE')) )
+
+                if alpha_tex_dst.endswith('.dds'):
+                    cmd.append('-define')
+                    cmd.append('dds:mipmaps={}'.format(config.get('DDS_MIPS')))
+
+                cmd.append(alpha_tex_dst)
+                    
+                logger.debug('image magick: "%s"', ' '.join(cmd))
+                subprocess.run(cmd)
+                    
+                # Point the diffuse texture to the new image
+                datablock["diffuse"]["texture"] = os.path.split(alpha_tex_dst)[-1]
         else:
             logger.warn("No Alpha texture found, the output will not have an Alpha channel")
             # UNSUSED IN OGRE datablock["transparency"]["texture"] = tex_filename
