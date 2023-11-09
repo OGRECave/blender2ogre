@@ -235,36 +235,34 @@ class OgreMaterialv2JsonGenerator(object):
         alpha_tex, alpha_strength = gather_alpha_texture(bsdf)
         tex_filename, alpha_tex_src = self.prepare_texture(alpha_tex)
         if tex_filename:
-            datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
-
-            # Give blendblock common settings
-            datablock["blendblock"] = ["blendblock_name", "blendblock_name_for_shadows"]
-            blendblocks["blendblock_name"] = {}
-            blendblocks["blendblock_name"]["alpha_to_coverage"] = False
-            blendblocks["blendblock_name"]["blendmask"] = "rgba"
-            blendblocks["blendblock_name"]["separate_blend"] = False
-            blendblocks["blendblock_name"]["blend_operation"] = "add"
-            blendblocks["blendblock_name"]["blend_operation_alpha"] = "add"
+            #datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]            
             # Give blendblock specific settings
-            if material.blend_method == "CLIP":     # CLIP is equivalent to the Ogre BlendBlock of Blend Type: REPLACE
+            if material.blend_method == "OPAQUE":     # OPAQUE will pass for now
+                pass
+            elif material.blend_method == "CLIP":     # CLIP enables alpha_test (alpha rejection)
+                datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
+            elif material.blend_method in ["HASHED", "BLEND"]: 
+                datablock["transparency"] = {
+                    "mode": "Transparent",        
+                    "use_alpha_from_textures": True,  # DEFAULT
+                    "value": max(0, min(alpha_strength, 1))    
+                }
+                # Give blendblock common settings
+                datablock["blendblock"] = ["blendblock_name", "blendblock_name_for_shadows"]
+                blendblocks["blendblock_name"] = {}
+                blendblocks["blendblock_name"]["alpha_to_coverage"] = False
+                blendblocks["blendblock_name"]["blendmask"] = "rgba"
+                blendblocks["blendblock_name"]["separate_blend"] = False
+                blendblocks["blendblock_name"]["blend_operation"] = "add"
+                blendblocks["blendblock_name"]["blend_operation_alpha"] = "add"
                 blendblocks["blendblock_name"]["src_blend_factor"] = "one"
-                blendblocks["blendblock_name"]["dst_blend_factor"] = "zero"
+                blendblocks["blendblock_name"]["dst_blend_factor"] = "one_minus_src_colour" # using "dst_colour" give an even clearer result than BLEND
                 blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one"
-                blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "zero"
-            elif material.blend_method == "HASHED": # Currently HASHED has no equivalent in Ogre, so we treat this as a stronger Blend
-                blendblocks["blendblock_name"]["src_blend_factor"] = "one"
-                blendblocks["blendblock_name"]["dst_blend_factor"] = "dst_colour" # using "dst_colour" give an even clearer result than BLEND
-                blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one"
-                blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "dst_colour"
-            elif material.blend_method == "BLEND":  # BLEND is equivalent to the Ogre BlendBlock of Blend Type: Transparent Colour
-                blendblocks["blendblock_name"]["src_blend_factor"] = "one" # "src_colour" give almost invisible result, this setting is clearer
-                blendblocks["blendblock_name"]["dst_blend_factor"] = "one_minus_src_colour"
-                blendblocks["blendblock_name"]["src_alpha_blend_factor"] = "one" 
                 blendblocks["blendblock_name"]["dst_alpha_blend_factor"] = "one_minus_src_colour"
             
             # Add Alpha texture as the alpha channel of the diffuse texure
             if ("texture" in datablock["diffuse"]):
-                if alpha_tex_src != datablock["diffuse"]["texture"]:
+                if os.path.split(alpha_tex_src)[-1] != datablock["diffuse"]["texture"]:
                     logger.warning("The Alpha texture used on material '{}' is not from the same file as "
                         "the diffuse texture! This is supported, but make sure you used the right Alpha texture!.".format(
                         material.name))
@@ -310,11 +308,7 @@ class OgreMaterialv2JsonGenerator(object):
             logger.warn("No Alpha texture found, the output will not have an Alpha channel")
             # UNSUSED IN OGRE datablock["transparency"]["texture"] = tex_filename
 
-        datablock["transparency"] = {
-                "mode": "Transparent",                  # "Transparent" mode can adjust transparency with "value"
-                "use_alpha_from_textures": True,        # DEFAULT
-                "value": max(0, min(alpha_strength, 1)) # Transparency strength clamped between [0,1] (0 for fully transparent and 1 for fully opaque)
-            }
+        
 
         # Backface culling
         datablock["two_sided"] = not material.use_backface_culling
