@@ -165,7 +165,7 @@ class OgreMaterialv2JsonGenerator(object):
         tex_filename, diffuse_tex_src = self.prepare_texture(diffuse_tex)
         if tex_filename:
             datablock["diffuse"]["texture"] = os.path.split(tex_filename)[-1]
-            datablock["diffuse"]["value"] = [1.0, 1.0, 1.0, 1.0]
+            datablock["diffuse"]["value"] = [1.0, 1.0, 1.0]
             diffuse_tex_dst = tex_filename
 
 
