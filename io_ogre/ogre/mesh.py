@@ -85,8 +85,10 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     overwrite = kwargs.get('overwrite', False)
 
     # Don't export hidden or unselected objects unless told to
-    if ((config.get("EXPORT_HIDDEN") == False and ob not in bpy.context.visible_objects) or
-        (config.get("SELECTED_ONLY") == True and ob.select_get() == False)):
+    if not isLOD and (
+        (not config.get("EXPORT_HIDDEN") and ob not in bpy.context.visible_objects) or
+        (config.get("SELECTED_ONLY") and not ob.select_get())
+        ):
         logger.debug("Skip exporting hidden/non-selected object: %s" % ob.data.name)
         return []
 
