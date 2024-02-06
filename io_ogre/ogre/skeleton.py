@@ -146,7 +146,8 @@ class Bone(object):
                 self.ogreDerivedScale[1] *= self.parent.ogreDerivedScale[1]
                 self.ogreDerivedScale[2] *= self.parent.ogreDerivedScale[2]
                 # if we don't want inherited scale,
-                if not self.bone.bone.use_inherit_scale:
+                # https://docs.blender.org/api/2.83/bpy.types.Bone.html#bpy.types.Bone.inherit_scale
+                if self.bone.bone.inherit_scale == 'NONE' or self.bone.bone.inherit_scale == 'NONE_LEGACY':
                     # cancel out the scale that Ogre will calculate
                     scl = self.parent.ogreDerivedScale
                     self.pose_scale = mathutils.Vector((1.0/scl[0], 1.0/scl[1], 1.0/scl[2]))
@@ -156,7 +157,8 @@ class Bone(object):
             # just output the scale directly
             self.pose_scale = pbone.scale.copy()
             # however, if Blender is inheriting the scale,
-            if self.parent and self.bone.bone.use_inherit_scale:
+            # https://docs.blender.org/api/2.83/bpy.types.Bone.html#bpy.types.Bone.inherit_scale
+            if self.parent and self.bone.bone.inherit_scale == 'AVERAGE':
                 # apply parent's scale (only works for uniform scaling)
                 self.pose_scale[0] *= self.parent.pose_scale[0]
                 self.pose_scale[1] *= self.parent.pose_scale[1]
