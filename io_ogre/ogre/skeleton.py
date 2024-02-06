@@ -324,7 +324,12 @@ def findArmature( ob ):
     arm = ob.find_armature()
     # if this armature has no animation,
     if not arm.animation_data:
-        # search for another armature that is a proxy for it
+        # The old proxy system has been deprecated in Blender 3.0, and fully removed in Blender 3.2.
+        # https://docs.blender.org/manual/en/3.2/files/linked_libraries/library_proxies.html
+        if ((bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or (bpy.app.version[0] >= 4)):
+            return arm
+
+        # Search for another armature that is a proxy for it
         for ob2 in bpy.data.objects:
             if ob2.type == 'ARMATURE' and ob2.proxy == arm:
                 logger.info( "- Proxy armature %s found" % ob2.name )
