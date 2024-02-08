@@ -21,6 +21,12 @@ TANGENT_MODES =  [
     ('4', 'generate with parity', 'Generate with parity')
 ]
 
+LOD_METHODS =  [
+    ('0', 'meshtools', 'Generate LODs using OgreMesh Tools: does LOD by removing edges, which allows only changing the index buffer and re-use the vertex-buffer (storage efficient)'),
+    ('1', 'blender', 'Generate LODs using Blenders "Decimate" Modifier: does LOD by collapsing vertices, which can result in a visually better LOD, but needs different vertex-buffers per LOD'),
+    ('2', 'manual', 'Generate LODs by manually crafting the lower LODs: needs different vertex-buffers per LOD')
+]
+
 CONFIG_PATH = bpy.utils.user_resource('CONFIG', path='scripts', create=True)
 CONFIG_FILENAME = 'io_ogre.pickle'
 CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
@@ -75,10 +81,10 @@ _CONFIG_DEFAULTS_ALL = {
     'OPTIMISE_VERTEX_BUFFERS_OPTIONS' : 'puqs',
 
     # LOD
+    'LOD_GENERATION': '0',
     'LOD_LEVELS' : 0,
     'LOD_DISTANCE' : 300,
     'LOD_PERCENT' : 40,
-    'LOD_MESH_TOOLS' : False,
 
     # Pose Animation
     'SHAPE_ANIMATIONS' : True,

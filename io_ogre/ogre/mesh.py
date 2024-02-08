@@ -85,7 +85,8 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     overwrite = kwargs.get('overwrite', False)
 
     # Don't export hidden or unselected objects unless told to
-    if not isLOD and (
+    if  not isLOD and (
+        (config.get('LOD_GENERATION') == '2' and "_LOD_" in ob.name) or
         (not config.get("EXPORT_HIDDEN") and ob not in bpy.context.visible_objects) or
         (config.get("SELECTED_ONLY") and not ob.select_get())
         ):
@@ -447,8 +448,57 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
         logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
-        # Generate lod levels
-        if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == False:
+        # Generate LOD levels for manual LOD meshes
+        if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '2':
+            lod_levels = config.get('LOD_LEVELS')
+            lod_distance = config.get('LOD_DISTANCE')
+
+            lod_generated = []
+            lod_current_distance = lod_distance
+
+            for level in range(lod_levels + 1)[1:]:
+                lod_ob_name = obj_name + '_LOD_' + str(level)
+                lod_manual_ob = bpy.context.scene.objects.get(lod_ob_name)
+
+                if lod_manual_ob:
+                    logger.info("- Found LOD Manual object: %s" % lod_ob_name)
+                    lod_generated.append({ 'level': level, 'distance': lod_current_distance, 'lod_manual_ob': lod_manual_ob })
+                    lod_current_distance += lod_distance
+
+                else:
+                    failure = 'FAILED to manually create LOD levels, manual LOD with name %s NOT FOUND!' % lod_ob_name
+                    Report.warnings.append( failure )
+                    logger.error( failure )
+                    break
+
+            # Create lod .mesh files and generate LOD XML to the original .mesh.xml
+            if len(lod_generated) > 0:
+                # 'manual' means if the geometry gets loaded from a different file than this LOD list references
+                doc.start_tag('levelofdetail', {
+                    'strategy'  : 'default',
+                    'numlevels' : str(len(lod_generated) + 1), # The main mesh is + 1 (kind of weird Ogre logic)
+                    'manual'    : "true"
+                })
+
+                logger.info('- Generating: %s LOD meshes. Original: vertices %s, faces: %s' % (len(lod_generated), len(mesh.vertices), len(mesh.loop_triangles)))
+                for lod in lod_generated:
+                    lod_manual_ob = lod['lod_manual_ob']
+
+                    logger.info("- Writing LOD %s for distance %s, with %s vertices and %s faces" % 
+                        (lod['level'], lod['distance'], len(lod_manual_ob.data.vertices), len(lod_manual_ob.data.loop_triangles)))
+
+                    dot_mesh(lod_manual_ob, path, lod_manual_ob.data.name, ignore_shape_animation, normals, tangents, isLOD=True)
+
+                    # 'value' is the distance this LOD kicks in for the 'Distance' strategy.
+                    doc.leaf_tag('lodmanual', {
+                        'value'    : str(lod['distance']),
+                        'meshname' : lod_manual_ob.data.name + ".mesh"
+                    })
+
+                doc.end_tag('levelofdetail')
+
+        # Generate LOD levels automatically using Blenders "Decimate" Modifier
+        if isLOD == False and ob.type == 'MESH' and config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '1':
             lod_levels = config.get('LOD_LEVELS')
             lod_distance = config.get('LOD_DISTANCE')
             lod_ratio = config.get('LOD_PERCENT') / 100.0
@@ -799,7 +849,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     logger.info('- Created %s.mesh in total time %s seconds' % (obj_name, util.timer_diff_str(start)))
 
     # If requested by the user, generate LOD levels / Edge Lists / Vertex buffer optimization through OgreMeshUpgrader
-    if ((config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True) or
+    if ((config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0') or
         (config.get('GENERATE_EDGE_LISTS') == True)):
         target_mesh_file = os.path.join(path, '%s.mesh' % obj_name )
         util.mesh_upgrade_tool(target_mesh_file)
