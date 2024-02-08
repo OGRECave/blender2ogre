@@ -144,17 +144,26 @@ class _OgreCommonExport_(object):
         # Load addonPreference in CONFIG
         config.update_from_addon_preference(context)
 
+        # Update saved defaults to new settings and also print export code
         kw = {}
+        conf_name = ""
+
+        print ("_" * 80,"\n")
+
+        print("# Blender Script:")
+        print("import bpy")
+        print("bpy.ops.ogre.export(")
+        print("  filepath=\"%s\", " % os.path.abspath(self.filepath))
         for name in dir(_OgreCommonExport_):
-            if name.startswith('EX_V1_'):
-                kw[ name[6:] ] = getattr(self,name)
-            elif name.startswith('EX_V2_'):
-                kw[ name[6:] ] = getattr(self,name)
-            elif name.startswith('EX_Vx_'):
-                kw[ name[6:] ] = getattr(self,name)
+            if name.startswith('EX_V1_') or name.startswith('EX_V2_') or name.startswith('EX_Vx_'):
+                conf_name = name[6:]
             elif name.startswith('EX_'):
-                kw[ name[3:] ] = getattr(self,name)
+                conf_name = name[3:]
+            kw[ conf_name ] = getattr(self, name)
+            if name.startswith('EX_') and config._CONFIG_DEFAULTS_ALL[ conf_name ] != getattr(self, name):
+                print("  %s=%s, " % (name, getattr(self, name)))
         config.update(**kw)
+        print(")")
 
         print ("_" * 80,"\n")
 
