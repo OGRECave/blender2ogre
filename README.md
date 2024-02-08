@@ -26,6 +26,7 @@
 	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
 	- [Exporting Node Animations](#exporting-node-animations)
 	- [Exporting for Physics](#exporting-for-physics)
+	- [Level of Detail (LOD)](#level-of-detail--lod-)
  	- [Mesh Previewer](#mesh-previewer)
  - [About](#about)
  - [Authors](#authors)
@@ -250,6 +251,16 @@ Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create
 
 ### Exporting for Physics
 Check out the [Exporting for Physics](Physics.md) tutorial to see some techniques and optimizations when exporting collision meshes for Physics Engines
+
+### Level of Detail (LOD)
+Level of Detail or LOD is an optimization technique supported by OGRE, where meshes that are far away from the camera are replaced by meshes with lower vertex count.
+Because you can get away with less detailed models when they are in the distance this optimizacion technique is very common in games especially.
+With `blender2ogre` there are three ways to generate LOD levels for a mesh:
+ * `OgreMesh Tools`: This method uses the tool `OgreMeshUpgrader` to automatically generate the LOD levels for the mesh by removing edges. This allows only changing the index buffer and re-use the vertex-buffer (storage efficient)
+ * `Blender`: This method uses Blenders "Decimate" Modifier to automatically generate the LOD Leves by collapsing vertices. This can result in a visually better LOD, but needs different vertex-buffers per LOD
+ * `Manual`: This metod requires that the user manually create the aditional LOD levels for the mesh. The meshes should be called <base mesh>_LOD_1, <base mesh>_LOD_2, etc. This method gives better control over the resulting LODs.
+
+For the `Manual` it is currently not possible to manually set the distances for each LOD, but it is possible to have different materials for each LOD level.
 
 
 ### Mesh Previewer
