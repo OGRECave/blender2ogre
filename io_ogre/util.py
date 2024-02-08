@@ -83,7 +83,7 @@ def mesh_upgrade_tool(infile):
     if not os.path.exists(infile):
         logger.warn("Cannot find file mesh file: %s, unable run OgreMeshUpgrader" % filename)
 
-        if config.get('LOD_MESH_TOOLS') == True:
+        if config.get('LOD_GENERATION') == '0':
             Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
 
         if config.get('GENERATE_EDGE_LISTS') == True:
@@ -107,7 +107,7 @@ def mesh_upgrade_tool(infile):
 
     cmd = [exe]
 
-    if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+    if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
         cmd.append('-l')
         cmd.append(str(config.get('LOD_LEVELS')))
 
@@ -134,7 +134,7 @@ def mesh_upgrade_tool(infile):
     # Finally, specify input file
     cmd.append(infile)
 
-    if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+    if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
         logger.info("* Generating %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
 
     if config.get('GENERATE_EDGE_LISTS') == True:
@@ -153,7 +153,7 @@ def mesh_upgrade_tool(infile):
     if proc.returncode != 0:
         logger.warn("OgreMeshUpgrader failed, LODs / Edge Lists / Vertex buffer optimizations will not be generated for this mesh: %s" % filename)
 
-        if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+        if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
             Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
 
         if config.get('GENERATE_EDGE_LISTS') == True:
@@ -163,7 +163,7 @@ def mesh_upgrade_tool(infile):
             logger.error(error)
         logger.warn(output)
     else:
-        if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+        if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
             logger.info("- Generated %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
 
         if config.get('GENERATE_EDGE_LISTS') == True:
@@ -341,7 +341,7 @@ def xml_convert(infile, has_uvs=False):
         cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
 
         # If requested by the user, generate LOD levels through OgreMeshUpgrader/OgreMeshTool
-        if config.get('LOD_LEVELS') > 0 and config.get('LOD_MESH_TOOLS') == True:
+        if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
             cmd.append('-l')
             cmd.append(str(config.get('LOD_LEVELS')))
             
