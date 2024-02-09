@@ -254,13 +254,13 @@ Check out the [Exporting for Physics](Physics.md) tutorial to see some technique
 
 ### Level of Detail (LOD)
 Level of Detail or LOD is an optimization technique supported by OGRE, where meshes that are far away from the camera are replaced by meshes with lower vertex count.
-Because you can get away with less detailed models when they are in the distance this optimizacion technique is very common in games especially.
+Because you can get away with less detailed models when they are in the distance this optimizacion technique is very common, especially in games.
 With `blender2ogre` there are three ways to generate LOD levels for a mesh:
  * `OgreMesh Tools`: This method uses the tool `OgreMeshUpgrader` to automatically generate the LOD levels for the mesh by removing edges. This allows only changing the index buffer and re-use the vertex-buffer (storage efficient)
  * `Blender`: This method uses Blenders "Decimate" Modifier to automatically generate the LOD Leves by collapsing vertices. This can result in a visually better LOD, but needs different vertex-buffers per LOD
- * `Manual`: This metod requires that the user manually create the aditional LOD levels for the mesh. The meshes should be called <base mesh>_LOD_1, <base mesh>_LOD_2, etc. This method gives better control over the resulting LODs.
+ * `Manual`: This metod requires that the user manually creates the additional LOD levels for the mesh. The meshes should be called [base mesh]_LOD_1, [base mesh]_LOD_2, etc. This method gives better control over the resulting LODs.
 
-For the `Manual` it is currently not possible to manually set the distances for each LOD, but it is possible to have different materials for each LOD level.
+For the `Manual` method it is currently not possible to manually set the distances for each LOD, but it is possible to have different materials for each LOD level.
 
 
 ### Mesh Previewer
