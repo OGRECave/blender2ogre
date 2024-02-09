@@ -199,9 +199,9 @@ def dot_scene(path, scene_name=None):
             dot_materialsv2json(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)
         elif converter_type == "OgreXMLConverter":
             dot_materials(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)
-        else: # Unkown converter type, error
-            logger.error("Unkown converter type '{}', will not generate materials".format(converter_type))
-            Reports.error.append("Unkown converter type '{}', will not generate materials".format(converter_type))
+        else: # Unknown converter type, error
+            logger.error("Unknown converter type '{}', will not generate materials".format(converter_type))
+            Report.error.append("Unknown converter type '{}', will not generate materials".format(converter_type))
 
     doc = ogre_document(materials)
 
