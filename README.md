@@ -26,7 +26,7 @@
 	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
 	- [Exporting Node Animations](#exporting-node-animations)
 	- [Exporting for Physics](#exporting-for-physics)
-	- [Level of Detail (LOD)](#level-of-detail--lod-)
+	- [Level of Detail (LOD)](#level-of-detail-lod)
  	- [Mesh Previewer](#mesh-previewer)
  - [About](#about)
  - [Authors](#authors)
