@@ -251,15 +251,18 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
         progressScale = 1.0 / len(mesh.polygons)
         bpy.context.window_manager.progress_begin(0, 100)
 
+        step = max(1, int(len(mesh.polygons) / 100))
+
         # Process mesh after triangulation
         for F in mesh.polygons:
-            # Update progress in console
-            percent = (F.index + 1) * progressScale
-            sys.stdout.write( "\r + Faces [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
-            sys.stdout.flush()
+            if F.index % step == 0:
+                # Update progress in console
+                percent = (F.index + 1) * progressScale
+                sys.stdout.write( "\r + Faces [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(round(percent * 100)) + "%   ")
+                sys.stdout.flush()
 
-            # Update progress through Blender cursor
-            bpy.context.window_manager.progress_update(percent)
+                # Update progress through Blender cursor
+                bpy.context.window_manager.progress_update(percent)
 
             tri = (F.vertices[0], F.vertices[1], F.vertices[2])
             face = []
