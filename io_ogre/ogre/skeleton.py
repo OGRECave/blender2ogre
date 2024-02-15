@@ -417,18 +417,11 @@ class Skeleton(object):
 
         logger.info(" - Exporting action: %s" % actionName)
 
-        # Initialize progress through Blender cursor
-        progressScale = 1.0 / len(frame_range)
-        bpy.context.window_manager.progress_begin(0, 100)
+        progressbar = util.ProgressBar("Frames", len(frame_range) )
 
         # Add keyframes to export
         for frame in frame_range:
-            percent = (frame - frameBegin + 1) * progressScale
-            sys.stdout.write( "\r + Frames [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
-            sys.stdout.flush()
-
-            # Update progress through Blender cursor
-            bpy.context.window_manager.progress_update(percent)
+            progressbar.update( frame - frameBegin )
 
             bpy.context.scene.frame_set(frame)
             for bone in self.roots:

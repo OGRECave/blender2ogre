@@ -203,21 +203,11 @@ def xCollectVertexData(data):
     for vb in data.childNodes:
         if vb.localName == 'vertexbuffer':
             if vb.hasAttribute('positions'):
-
-                progressScale = 1.0 / len(vb.getElementsByTagName('vertex'))
-                bpy.context.window_manager.progress_begin(0, 100)
+                progressbar = util.ProgressBar("Vertices", len(vb.getElementsByTagName('vertex')))
                 index = 0
 
                 for vertex in vb.getElementsByTagName('vertex'):
-
-                    # Update progress in console
-                    percent = (index + 1) * progressScale
-                    sys.stdout.write( "\r + Vertices [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(int(percent * 10000) / 100.0) + "%   ")
-                    sys.stdout.flush()
-
-                    # Update progress through Blender cursor
-                    bpy.context.window_manager.progress_update(percent)
-
+                    progressbar.update(index)
                     index = index + 1
 
                     for vp in vertex.childNodes:

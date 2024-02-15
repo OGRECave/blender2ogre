@@ -248,21 +248,11 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
             # calc_tangents() already calculates split normals for us
             mesh.calc_normals_split()
 
-        progressScale = 1.0 / len(mesh.polygons)
-        bpy.context.window_manager.progress_begin(0, 100)
-
-        step = max(1, int(len(mesh.polygons) / 100))
+        progressbar = util.ProgressBar("Faces", len(mesh.polygons))
 
         # Process mesh after triangulation
         for F in mesh.polygons:
-            if F.index % step == 0:
-                # Update progress in console
-                percent = (F.index + 1) * progressScale
-                sys.stdout.write( "\r + Faces [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(round(percent * 100)) + "%   ")
-                sys.stdout.flush()
-
-                # Update progress through Blender cursor
-                bpy.context.window_manager.progress_update(percent)
+            progressbar.update(F.index)
 
             tri = (F.vertices[0], F.vertices[1], F.vertices[2])
             face = []

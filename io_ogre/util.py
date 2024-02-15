@@ -15,6 +15,27 @@ import bpy, logging, logging, mathutils, os, re, subprocess, sys, time
 
 logger = logging.getLogger('util')
 
+class ProgressBar:
+    def __init__(self, name, total):
+        self.name = name
+        self.progressScale = 1.0 / total
+        self.step = max(1, int(total / 100))
+
+        # Initialize progress through Blender cursor
+        bpy.context.window_manager.progress_begin(0, 100)
+    
+    def update(self, value):
+        if value % self.step != 0:
+            return
+
+        # Update progress in console
+        percent = (value + 1) * self.progressScale
+        sys.stdout.write( "\r + "+self.name+" [" + '=' * int(percent * 50) + '>' + '.' * int(50 - percent * 50) + "] " + str(round(percent * 100)) + "%   ")
+        sys.stdout.flush()
+
+        # Update progress through Blender cursor
+        bpy.context.window_manager.progress_update(percent)
+
 def xml_converter_parameters():
     """
     Return the name of the ogre converter
