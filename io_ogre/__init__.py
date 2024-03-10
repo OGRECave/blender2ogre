@@ -17,7 +17,7 @@
 bl_info = {
     "name": "OGRE Importer-Exporter (.scene, .mesh, .skeleton)",
     "author": "Brett, S.Rombauts, F00bar, Waruck, Mind Calamity, Mr.Magne, Jonne Nauha, vax456, Richard Plangger, Pavel Rojtberg, Guillermo Ojea Quintana",
-    "version": (0, 8, 3),
+    "version": (0, 8, 5),
     "blender": (2, 80, 0),
     "location": "File > Import and Export...",
     "description": "Import and Export to and from Ogre xml and binary formats",
