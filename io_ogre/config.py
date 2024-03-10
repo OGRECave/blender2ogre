@@ -33,9 +33,9 @@ CONFIG_FILEPATH = os.path.join(CONFIG_PATH, CONFIG_FILENAME)
 
 _CONFIG_DEFAULTS_ALL = {
     # General
-    'SWAP_AXIS' : 'xyz', # ogre standard is 'xz-y', but swapping is currently broken
+    'SWAP_AXIS' : 'xz-y',
     'MESH_TOOL_VERSION' : 'v2',
-    'XML_DELETE' : True,
+    'EXPORT_XML_DELETE' : True,
 
     # Scene
     'SCENE' : True,
@@ -96,6 +96,7 @@ _CONFIG_DEFAULTS_ALL = {
     #'SHOW_LOG_NAME' : False,
 
     # Import
+    'IMPORT_XML_DELETE' : False,
     'IMPORT_NORMALS' : True,
     'MERGE_SUBMESHES' : True,
     'IMPORT_ANIMATIONS' : True,
@@ -202,6 +203,8 @@ def get(name, default=None):
     global CONFIG
     if name in CONFIG:
         return CONFIG[name]
+    else:
+        logger.error("Config option %s does not exist!" % name)
     return default
 
 def update(**kwargs):

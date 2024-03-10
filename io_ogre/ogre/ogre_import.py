@@ -1342,7 +1342,8 @@ def load(filepath):
         # Create skeleton (if any) and mesh from parsed data
         bCreateMesh(meshData, folder, onlyName, pathMeshXml)
         bCreateAnimations(meshData)
-        if config.get('XML_DELETE'):
+
+        if config.get('IMPORT_XML_DELETE') == True:
             # Cleanup by deleting the XML file we created
             os.unlink("%s" % pathMeshXml)
             if 'skeleton' in meshData:

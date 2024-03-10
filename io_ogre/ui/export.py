@@ -103,7 +103,7 @@ class _OgreCommonExport_(object):
 
         # Options associated with each section
         section_options = {
-            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_XML_DELETE"],
+            "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_EXPORT_XML_DELETE"],
             "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"],
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
@@ -253,15 +253,15 @@ class _OgreCommonExport_(object):
         name='Mesh Export Version',
         description='Specify Ogre version format to write',
         default=config.get('MESH_TOOL_VERSION')) = {}
-    EX_XML_DELETE : BoolProperty(
-        name="Clean up xml files",
-        description="Remove the generated xml files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finishes successfully)",
-        default=config.get('XML_DELETE')) = {}
-    
+    EX_EXPORT_XML_DELETE : BoolProperty(
+        name="Clean up XML files",
+        description="Remove the generated XML files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finishes successfully)",
+        default=config.get('EXPORT_XML_DELETE')) = {}
+
     # Scene
     EX_SCENE : BoolProperty(
         name="Export Scene",
-        description="Export current scene (OgreDotScene xml file)",
+        description="Export current scene (OgreDotScene XML file)",
         default=config.get('SCENE')) = {}
     EX_SELECTED_ONLY : BoolProperty(
         name="Export Selected Only",
