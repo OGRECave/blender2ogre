@@ -351,12 +351,12 @@ def xml_convert(infile, has_uvs=False):
             logger.error("OgreXMLConverter returned with non-zero status, check OgreXMLConverter.log")
             logger.info(" ".join(cmd))
             Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
-        
+
         # Clean up .xml file after successful conversion
-        if proc.returncode == 0 and config.get('XML_DELETE') == True:
+        if proc.returncode == 0 and config.get('EXPORT_XML_DELETE') == True:
             logger.info("Removing generated xml file after conversion: %s" % infile)
             os.remove(infile)
-        
+
     else:
         # Convert to v2 format if required
         cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
@@ -390,7 +390,7 @@ def xml_convert(infile, has_uvs=False):
         if config.get('ENABLE_LOGGING'):
             logfile_path, name = os.path.split(infile)
             logfile = os.path.join(logfile_path, 'OgreMeshTool.log')
-        
+
             with open(logfile, 'w') as log:
                 log.write(output)
 
@@ -401,7 +401,7 @@ def xml_convert(infile, has_uvs=False):
             Report.errors.append("OgreMeshTool finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
 
         # Clean up .xml file after successful conversion
-        if proc.returncode == 0 and config.get('XML_DELETE') == True:
+        if proc.returncode == 0 and config.get('EXPORT_XML_DELETE') == True:
             logger.info("Removing generated xml file after conversion: %s" % infile)
             os.remove(infile)
 

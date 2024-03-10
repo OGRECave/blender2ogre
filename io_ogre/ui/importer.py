@@ -59,7 +59,7 @@ class _OgreCommonImport_(object):
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
-        
+
         return {'RUNNING_MODAL'}
 
     def draw(self, context):
@@ -77,16 +77,16 @@ class _OgreCommonImport_(object):
         section_icons = {
             "General" : "WORLD", "Armature" : "ARMATURE_DATA", "Mesh" : "MESH_DATA", "Shape Keys" : "ANIM_DATA", "Logging" : "TEXT"
         }
-        
+
         # Options associated with each section
         section_options = {
-            "General" : ["IM_SWAP_AXIS", "IM_V2_MESH_TOOL_VERSION", "IM_XML_DELETE"], 
+            "General" : ["IM_SWAP_AXIS", "IM_V2_MESH_TOOL_VERSION", "IM_IMPORT_XML_DELETE"], 
             "Armature" : ["IM_IMPORT_ANIMATIONS", "IM_ROUND_FRAMES", "IM_USE_SELECTED_SKELETON"], 
             "Mesh" : ["IM_IMPORT_NORMALS", "IM_MERGE_SUBMESHES"], 
             "Shape Keys" : ["IM_IMPORT_SHAPEKEYS"], 
             "Logging" : ["IM_Vx_ENABLE_LOGGING"]
         }
-        
+
         for section in sections:
             row = layout.row()
             box = row.box()
@@ -103,7 +103,7 @@ class _OgreCommonImport_(object):
                         box.prop(self, prop)
                 elif prop.startswith('IM_'):
                     box.prop(self, prop)
-        
+
     def execute(self, context):
         # Add warinng about missing XML converter
         Report.reset()
@@ -236,10 +236,10 @@ class _OgreCommonImport_(object):
         description='Specify Ogre version format to read',
         default=config.get('MESH_TOOL_VERSION')) = {}
 
-    IM_XML_DELETE : BoolProperty(
+    IM_IMPORT_XML_DELETE : BoolProperty(
         name="Clean up XML files",
         description="Remove the generated XML files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finishes successfully)",
-        default=config.get('XML_DELETE')) = {}
+        default=config.get('IMPORT_XML_DELETE')) = {}
 
     # Mesh
     IM_IMPORT_NORMALS : BoolProperty(
