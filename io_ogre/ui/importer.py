@@ -137,20 +137,29 @@ class _OgreCommonImport_(object):
 
         logger.debug("Self.filepath: %s" % self.filepath)
 
+        # Update saved defaults to new settings and also print import code
         kw = {}
-        for name in dir(_OgreCommonImport_):
-            if name.startswith('IM_V1_'):
-                kw[ name[6:] ] = getattr(self,name)
-            elif name.startswith('IM_V2_'):
-                kw[ name[6:] ] = getattr(self,name)
-            elif name.startswith('IM_Vx_'):
-                kw[ name[6:] ] = getattr(self,name)
-            elif name.startswith('IM_'):
-                kw[ name[3:] ] = getattr(self,name)
-        config.update(**kw)
+        conf_name = ""
 
-        print ("_" * 80)
-        
+        print ("_" * 80,"\n")
+
+        print("# Blender Script:")
+        print("import bpy")
+        print("bpy.ops.ogre.import_mesh(")
+        print("  filepath='%s', " % os.path.abspath(self.filepath).replace('\\', '\\\\'))
+        for name in dir(_OgreCommonImport_):
+            if name.startswith('IM_V1_') or name.startswith('IM_V2_') or name.startswith('IM_Vx_'):
+                conf_name = name[6:]
+            elif name.startswith('IM_'):
+                conf_name = name[3:]
+            kw[ conf_name ] = getattr(self, name)
+            if name.startswith('IM_') and config._CONFIG_DEFAULTS_ALL[ conf_name ] != getattr(self, name):
+                print("  %s=%s, " % (name, getattr(self, name)))
+        config.update(**kw)
+        print(")")
+
+        print ("_" * 80,"\n")
+
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
@@ -224,8 +233,8 @@ class _OgreCommonImport_(object):
         default=config.get('MESH_TOOL_VERSION')) = {}
 
     IM_XML_DELETE : BoolProperty(
-        name="Clean up xml files",
-        description="Remove the generated xml files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finish successfully)",
+        name="Clean up XML files",
+        description="Remove the generated XML files after binary conversion. \n(The removal will only happen if OgreXMLConverter/OgreMeshTool finishes successfully)",
         default=config.get('XML_DELETE')) = {}
 
     # Mesh
