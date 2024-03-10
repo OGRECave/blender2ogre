@@ -121,6 +121,7 @@ from .. import config
 from .. import util
 from ..report import Report
 from ..util import *
+from bpy_extras.io_utils import unpack_list
 
 logger = logging.getLogger('ogre_import')
 
@@ -1023,35 +1024,20 @@ def bCreateSubMeshes(meshData, meshName):
         if 'normals' in geometry.keys():
             normals = geometry['normals']
             hasNormals = True
-        # Mesh vertices and faces
 
-        # vertices and faces of mesh
+        # Mesh vertices and faces
         VertLength = len(verts)
         FaceLength = len(faces)
         me.vertices.add(VertLength)
         me.loops.add(FaceLength * 3)
         me.polygons.add(FaceLength)
-        for i in range(VertLength):
-            me.vertices[i].co = verts[i]
-            # NOTE: Doesn't work in Blender 3.2+ and this wasn't needed anyway.
-            # Even the Blender official .OBJ importer uses Custom Split Normals when importing normals
-            #if hasNormals:
-                #me.vertices[i].normal = Vector((normals[i][0],normals[i][1],normals[i][2]))
 
-        #me.vertices[VertLength].co = verts[0]
-        for i in range(FaceLength):
-            me.loops[i*3].vertex_index = faces[i][0]
-            me.loops[i*3+1].vertex_index = faces[i][1]
-            me.loops[i*3+2].vertex_index = faces[i][2]
-            me.polygons[i].loop_start = i * 3
-            # NOTE: Doesn't work in Blender 3.6+ and this isn't needed anyway.
-            #me.polygons[i].loop_total = 3
-            me.polygons[i].use_smooth
-
-        #meshFaces = me.tessfaces
-        #meshUV_textures = me.tessface_uv_textures
-        #meshVertex_colors = me.tessface_vertex_colors
-        #meshUV_textures = me.uv_textures
+        me.vertices.foreach_set("co", unpack_list(verts))
+        if hasNormals:
+            me.vertices.foreach_set("normal", unpack_list(normals))
+        me.loops.foreach_set("vertex_index", unpack_list(faces))
+        me.polygons.foreach_set("loop_start", [i for i in range(0, FaceLength * 3, 3)])
+        me.polygons.foreach_set("loop_total", [3] * (FaceLength))
 
         hasTexture = False
         # Material for the submesh
