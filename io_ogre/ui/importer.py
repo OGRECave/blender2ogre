@@ -212,6 +212,10 @@ class _OgreCommonImport_(object):
         default="",
         subtype='FILE_PATH')
 
+    filter_glob : StringProperty(
+            default="*.mesh;*.xml;*.scene;",
+            options={'HIDDEN'})
+
     # Basic options
     # NOTE config values are automatically propagated if you name it like: IM_<config-name>
     # Properties can also be enabled for a specific converter by adding V1 or V2 in the name:
