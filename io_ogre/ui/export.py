@@ -153,7 +153,7 @@ class _OgreCommonExport_(object):
         print("# Blender Script:")
         print("import bpy")
         print("bpy.ops.ogre.export(")
-        print("  filepath=\"%s\", " % os.path.abspath(self.filepath))
+        print("  filepath='%s', " % os.path.abspath(self.filepath).replace('\\', '\\\\'))
         for name in dir(_OgreCommonExport_):
             if name.startswith('EX_V1_') or name.startswith('EX_V2_') or name.startswith('EX_Vx_'):
                 conf_name = name[6:]
