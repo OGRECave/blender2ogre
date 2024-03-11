@@ -43,7 +43,7 @@ _CONFIG_DEFAULTS_ALL = {
     'EXPORT_HIDDEN' : True,
     #'EXPORT_USER' : True,
     'FORCE_CAMERA' : True,
-    'FORCE_LAMPS' : True,
+    'FORCE_LIGHTS' : True,
     'NODE_ANIMATION' : True,
     #'NODE_KEYFRAMES' : False,
 

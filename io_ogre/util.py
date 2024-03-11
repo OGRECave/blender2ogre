@@ -700,8 +700,9 @@ def wordwrap( txt ):
 def get_lights_by_type( T ):
     r = []
     for ob in bpy.context.scene.objects:
-        if ob.type=='LAMP':
-            if ob.data.type==T: r.append( ob )
+        if ob.type == 'LIGHT':
+            if ob.data.type == T:
+                r.append( ob )
     return r
 
 invalid_chars_in_name     = '"<>\:' # "<> is xml prohibited, : is Ogre prohibited, \ is standard escape char

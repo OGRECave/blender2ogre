@@ -44,7 +44,7 @@ def update_meshpreview_button_visibility(show):
             if meshpreviewButtonDisplayed:
                 bpy.types.VIEW3D_PT_tools_active.remove(add_preview_button)
                 meshpreviewButtonDisplayed = False
-                
+
     elif not show and meshpreviewButtonDisplayed:
         bpy.types.VIEW3D_PT_tools_active.remove(add_preview_button)
         meshpreviewButtonDisplayed = False

@@ -104,7 +104,7 @@ class _OgreCommonExport_(object):
         # Options associated with each section
         section_options = {
             "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_EXPORT_XML_DELETE"],
-            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LAMPS", "EX_NODE_ANIMATION"],
+            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LIGHTS", "EX_NODE_ANIMATION"],
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
             "Armature" : ["EX_ARMATURE_ANIMATION", "EX_SHARED_ARMATURE", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
@@ -223,7 +223,7 @@ class _OgreCommonExport_(object):
         if config.get('ENABLE_LOGGING') == True and file_handler != None:
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logging.getLogger(logger_name).handlers.clear()
-            
+
             file_handler.flush()
             file_handler.close()
 
@@ -277,12 +277,12 @@ class _OgreCommonExport_(object):
     #    default=config.get('EXPORT_USER')) = {}
     EX_FORCE_CAMERA : BoolProperty(
         name="Force Camera",
-        description="Export active camera",
+        description="Export active camera, even if not selected",
         default=config.get('FORCE_CAMERA')) = {}
-    EX_FORCE_LAMPS : BoolProperty(
-        name="Force Lamps",
-        description="Export all Lamps",
-        default=config.get('FORCE_LAMPS')) = {}
+    EX_FORCE_LIGHTS : BoolProperty(
+        name="Force Lights",
+        description="Export all Lights, even if not selected",
+        default=config.get('FORCE_LIGHTS')) = {}
     EX_NODE_ANIMATION : BoolProperty(
         name="Export Node Animations",
         description="Export Node Animations, these are animations of the objects properties like position, rotation and scale",
@@ -294,7 +294,7 @@ class _OgreCommonExport_(object):
 #Don't select this option if you have any fine tuning of the F-Curves in Blender, since they won't get exported.
 #NOTE: Node Animations based on the 'Follow Path' constraint will most likely fail with this option set to True.""",
 #        default=config.get('NODE_KEYFRAMES')) = {}
-    
+
     # Materials
     EX_MATERIALS : BoolProperty(
         name="Export Materials",
@@ -324,7 +324,7 @@ class _OgreCommonExport_(object):
         name="Convert Images",
         description="Convert all textures to selected image format",
         default=config.get('FORCE_IMAGE_FORMAT')) = {}
-    
+
     # Armature
     EX_ARMATURE_ANIMATION : BoolProperty(
         name="Armature Animation",
