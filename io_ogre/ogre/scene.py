@@ -77,12 +77,12 @@ def dot_scene(path, scene_name=None):
     for ob in bpy.context.scene.objects:
         if ob.subcollision:
             continue
-        if not (config.get("EXPORT_HIDDEN") or ob in bpy.context.visible_objects):
+        if ((config.get("EXPORT_HIDDEN") is False) and (ob not in bpy.context.visible_objects)):
             continue
         if config.get("SELECTED_ONLY") and not ob.select_get():
-            if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
+            if ob.type == 'CAMERA' and (config.get("FORCE_CAMERA") is True):
                 pass
-            elif ob.type == 'LIGHT' and config.get("FORCE_LIGHTS"):
+            elif ob.type == 'LIGHT' and (config.get("FORCE_LIGHTS") is True):
                 pass
             else:
                 continue
@@ -190,7 +190,7 @@ def dot_scene(path, scene_name=None):
             meshes.append(ob)
 
     materials = []
-    if config.get("MATERIALS"):
+    if config.get("MATERIALS") is True:
         logger.info("* Processing Materials")
         materials = util.objects_merge_materials(meshes)
 
@@ -223,7 +223,7 @@ def dot_scene(path, scene_name=None):
         )
 
     # Create the .scene file
-    if config.get('SCENE'):
+    if config.get('SCENE') is True:
         data = doc.toprettyxml()
         try:
             with open(target_scene_file, 'wb') as fd:
@@ -484,7 +484,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
 
-    # if config.get('EXPORT_USER'):
+    # if config.get('EXPORT_USER') is True:
     # Custom user props
     if len(ob.items()) > 0:
         user = doc.createElement('userData')
@@ -534,13 +534,13 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         elif collisionFile:
             e.setAttribute('collisionFile', collisionFile )
 
-        #if config.get('EXPORT_USER'):
+        #if config.get('EXPORT_USER') is True:
         _mesh_entity_helper( doc, ob, e )
 
         # export mesh.xml file of this object
-        if config.get('MESH') and ob.data.name not in exported_meshes:
+        if (config.get('MESH') is True) and ob.data.name not in exported_meshes:
             exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
-            overwrite = not exists or (exists and config.get("MESH_OVERWRITE"))
+            overwrite = not exists or (exists and (config.get("MESH_OVERWRITE") is True))
             tangents = int(config.get("GENERATE_TANGENTS"))
             mesh.dot_mesh(ob, path, overwrite=overwrite, tangents=tangents)
             exported_meshes.append( ob.data.name )
@@ -549,7 +549,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         # Deal with Array modifier
         vecs = [ ob.matrix_world.to_translation() ]
         for mod in ob.modifiers:
-            if config.get("ARRAY") == True and mod.type == 'ARRAY':
+            if (config.get("ARRAY") is True) and (mod.type == 'ARRAY'):
                 if mod.fit_type != 'FIXED_COUNT':
                     logger.warning("<%s> Unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
                     Report.warnings.append("Object \"%s\" has unsupported array-modifier type: %s, only 'Fixed Count' is supported" % (ob.name, mod.fit_type))
@@ -682,7 +682,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         a.setAttribute('quadratic', '0.0')
 
     # Node Animation
-    if config.get('NODE_ANIMATION'):
+    if config.get('NODE_ANIMATION') is True:
         node_anim.dot_nodeanim(ob, doc, o)
 
     for child in ob.children:

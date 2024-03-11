@@ -221,7 +221,7 @@ def xCollectVertexData(data):
 
                 sys.stdout.write("\n")
 
-            if vb.hasAttribute('normals') and config.get('IMPORT_NORMALS'):
+            if vb.hasAttribute('normals') and config.get('IMPORT_NORMALS') is True:
                 for vertex in vb.getElementsByTagName('vertex'):
                     for vn in vertex.childNodes:
                         if vn.localName == 'normal':
@@ -684,7 +684,7 @@ def xReadAnimation(action, tracks):
                 continue
             time = float(keyframe.getAttribute('time'))
             frame = time * fps
-            if config.get('ROUND_FRAMES'):
+            if config.get('ROUND_FRAMES') is True:
                 frame = round(frame)
             for key in keyframe.childNodes:
                 if key.nodeType != 1:
@@ -809,7 +809,7 @@ def bCreateMesh(meshData, folder, name, filepath):
         subOb.select_set(True)
     
     # TODO: Try to merge everything into the armature object
-    if config.get('MERGE_SUBMESHES') == True:
+    if config.get('MERGE_SUBMESHES') is True:
         bpy.ops.object.join()
         ob = bpy.context.view_layer.objects.active
         ob.name = name
@@ -1297,7 +1297,7 @@ def load(filepath):
 
         # Use selected skeleton
         selectedSkeleton = bpy.context.active_object \
-            if (config.get('USE_SELECTED_SKELETON')
+            if (config.get('USE_SELECTED_SKELETON') is True
                 and bpy.context.active_object
                 and bpy.context.active_object.type == 'ARMATURE') else None
         if selectedSkeleton:
@@ -1320,9 +1320,9 @@ def load(filepath):
                     meshData['skeletonName'] = os.path.basename(skeletonFile[:-9])
 
                     # Parse animations
-                    if config.get('IMPORT_ANIMATIONS'):
+                    if config.get('IMPORT_ANIMATIONS') is True:
                         fps = xAnalyseFPS(xDocSkeletonData)
-                        if(fps and config.get('ROUND_FRAMES')):
+                        if(fps and (config.get('ROUND_FRAMES') is True)):
                             logger.info(" * Setting FPS to %s" % fps)
                             bpy.context.scene.render.fps = int(fps)
                         xCollectAnimations(meshData, xDocSkeletonData)
@@ -1335,7 +1335,7 @@ def load(filepath):
         xCollectMeshData(meshData, xDocMeshData, onlyName, folder)
         MaterialParser.xCollectMaterialData(meshData, onlyName, folder)
         
-        if config.get('IMPORT_SHAPEKEYS'):
+        if config.get('IMPORT_SHAPEKEYS') is True:
             xCollectPoseData(meshData, xDocMeshData)
 
         # After collecting is done, start creating stuff#
@@ -1343,7 +1343,7 @@ def load(filepath):
         bCreateMesh(meshData, folder, onlyName, pathMeshXml)
         bCreateAnimations(meshData)
 
-        if config.get('IMPORT_XML_DELETE') == True:
+        if config.get('IMPORT_XML_DELETE') is True:
             # Cleanup by deleting the XML file we created
             os.unlink("%s" % pathMeshXml)
             if 'skeleton' in meshData:

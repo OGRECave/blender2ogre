@@ -174,7 +174,7 @@ class _OgreCommonExport_(object):
         file_handler = None
 
         # Add a file handler to all Logger instances
-        if config.get('ENABLE_LOGGING') == True:
+        if config.get('ENABLE_LOGGING') is True:
             log_file = ("%s/blender2ogre.log" % target_path)
             logger.info("* Writing log file to: %s" % log_file)
 
@@ -191,7 +191,7 @@ class _OgreCommonExport_(object):
 
                 file_handler.setFormatter(file_formatter)
 
-                if config.get('DEBUG_LOGGING') == True:
+                if config.get('DEBUG_LOGGING') is True:
                     level = logging.DEBUG
                 else:
                     level = logging.INFO
@@ -220,7 +220,7 @@ class _OgreCommonExport_(object):
         Report.show()
 
         # Flush and close all logging file handlers
-        if config.get('ENABLE_LOGGING') == True and file_handler != None:
+        if config.get('ENABLE_LOGGING') is True and file_handler is not None:
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logging.getLogger(logger_name).handlers.clear()
 

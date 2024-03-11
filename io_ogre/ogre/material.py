@@ -206,7 +206,7 @@ class OgreMaterialGenerator(object):
                     self.w.iword('cull_hardware none').nl()
                     self.w.iword('depth_write off').nl()
 
-            if config.get('USE_FFP_PARAMETERS'):
+            if config.get('USE_FFP_PARAMETERS') is True:
                 # arbitrary bad translation from PBR to Blinn Phong
                 # derive proportions from metallic
                 bf = 1.0 - mat_wrapper.metallic

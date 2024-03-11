@@ -42,11 +42,11 @@ def dot_skeleton(obj, path, **kwargs):
     """
 
     arm = obj.find_armature()
-    if arm and config.get('ARMATURE_ANIMATION'):
+    if arm and (config.get('ARMATURE_ANIMATION') is True):
         exported_armatures = kwargs.get('exported_armatures')
 
         name = kwargs.get('force_name') or obj.data.name
-        if config.get('SHARED_ARMATURE') == True:
+        if config.get('SHARED_ARMATURE') is True:
             name = kwargs.get('force_name') or arm.data.name
         name = util.clean_object_name(name)
 
@@ -101,7 +101,7 @@ class Bone(object):
 
         self.bone = pbone        # safe to hold pointer to pose bone, not edit bone!
         self.shouldOutput = True
-        if config.get('ONLY_DEFORMABLE_BONES') and not pbone.bone.use_deform:
+        if (config.get('ONLY_DEFORMABLE_BONES') is True) and not pbone.bone.use_deform:
             self.shouldOutput = False
 
         # todo: Test -> #if pbone.bone.use_inherit_scale: logger.warn('Bone <%s> is using inherit scaling, Ogre has no support for this' % self.name)
@@ -131,7 +131,7 @@ class Bone(object):
         #else:
         #    self.pose_rotation = pbone.rotation_euler.to_quaternion()
             
-        if config.get('OGRE_INHERIT_SCALE'):
+        if config.get('OGRE_INHERIT_SCALE') is True:
             # special case workaround for broken Ogre nonuniform scaling:
             # Ogre can't deal with arbitrary nonuniform scaling, but it can handle certain special cases
             # The special case we are trying to handle here is when a bone has a nonuniform scale and it's
@@ -399,11 +399,11 @@ class Skeleton(object):
             if bone.shouldOutput:
                 bone_tracks.append( Bone_Track(bone) )
             bone.clear_pose_transform()  # clear out any leftover pose transforms in case this bone isn't keyframed
-        
+
         # Decide keyframes to export:
         # ONLY keyframes (Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves)
         # OR export keyframe each frame over animation range (Exported animation will be affected by Inverse Kinematics, Drivers and modified F-Curves)
-        if config.get('ONLY_KEYFRAMES'): # Only keyframes 
+        if config.get('ONLY_KEYFRAMES') is True: # Only keyframes
             frame_range = [] # Holds a list of keyframes for export
             action = bpy.data.actions[actionName] # actionName is the animation name (NLAtrack child)
             # loops through all channels on the f-curve --> Code taken from: https://blender.stackexchange.com/questions/8387/how-to-get-keyframe-data-from-python
@@ -443,14 +443,14 @@ class Skeleton(object):
         parentElement.appendChild( anim )
         tracks = doc.createElement('tracks')
         anim.appendChild( tracks )
-        
+
         # Report and log
         suffix_text = ''
-        if config.get('ONLY_KEYFRAMES'):
+        if config.get('ONLY_KEYFRAMES') is True:
             suffix_text = ' - Key frames: ' + str(frame_range)
             logger.info('+ %s Key frames: %s' %(actionName,str(frame_range)))            
         Report.armature_animations.append( '%s : %s [start frame=%s end frame=%s]%s' %(arm.name, actionName, frameBegin, frameEnd, suffix_text) )
-            
+
         # Write stuff to skeleton.xml file
         anim.setAttribute('name', actionName)   # USE the action name
         anim.setAttribute('length', '%6f' %( (frameEnd - frameBegin)/ _fps ) )
@@ -519,9 +519,9 @@ class Skeleton(object):
                 Report.warnings.append('You must assign an NLA strip to armature (%s) that defines the start and end frames' % arm.name)
 
             # Log to console
-            if config.get('ONLY_KEYFRAMES'):
+            if config.get('ONLY_KEYFRAMES') is True:
                 logger.info('+ Only exporting keyframes')
-                            
+
             actions = {}  # actions by name
             # the only thing NLA is used for is to gather the names of the actions
             # it doesn't matter if the actions are all in the same NLA track or in different tracks
@@ -543,7 +543,7 @@ class Skeleton(object):
                 action = actionData[0]
                 arm.animation_data.action = action  # set as the current action
                 suppressedBones = []
-                if config.get('ONLY_KEYFRAMED_BONES'):
+                if config.get('ONLY_KEYFRAMED_BONES') is True:
                     keyframedBones = {}
                     for group in action.groups:
                         keyframedBones[ group.name ] = True

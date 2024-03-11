@@ -88,8 +88,8 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     # Don't export hidden or unselected objects unless told to
     if  not isLOD and (
         (config.get('LOD_GENERATION') == '2' and "_LOD_" in ob.name) or
-        (not config.get("EXPORT_HIDDEN") and ob not in bpy.context.visible_objects) or
-        (config.get("SELECTED_ONLY") and not ob.select_get())
+        ((config.get("EXPORT_HIDDEN") is False) and ob not in bpy.context.visible_objects) or
+        ((config.get("SELECTED_ONLY") is True) and not ob.select_get())
         ):
         logger.debug("Skip exporting hidden/non-selected object: %s" % ob.data.name)
         return []
@@ -108,13 +108,13 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
         # If we try to remove the unwanted modifiers from the copy object, then none of the modifiers will be applied when doing `to_mesh()`
 
         # If we want to optimise array modifiers as instances, then the Array Modifier should be disabled
-        if config.get("ARRAY") == True:
+        if config.get("ARRAY") is True:
             disable_mods = ['ARMATURE', 'ARRAY']
         else:
             disable_mods = ['ARMATURE']
 
         for mod in ob.modifiers:
-            if mod.type in disable_mods and mod.show_viewport == True:
+            if mod.type in disable_mods and mod.show_viewport is True:
                 logger.debug("Disabling Modifier: %s" % mod.name)
                 mod.show_viewport = False
 
@@ -622,7 +622,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
         arm = ob.find_armature()
         if arm:
             skeleton_name = obj_name
-            if config.get('SHARED_ARMATURE') == True:
+            if config.get('SHARED_ARMATURE') is True:
                 skeleton_name = arm.data.name
             skeleton_name = util.clean_object_name(skeleton_name)
 
@@ -634,7 +634,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
             boneIndexFromName = {}
             for bone in arm.pose.bones:
                 boneOutputEnableFromName[ bone.name ] = True
-                if config.get('ONLY_DEFORMABLE_BONES'):
+                if config.get('ONLY_DEFORMABLE_BONES') is True:
                     # if we found a deformable bone,
                     if bone.bone.use_deform:
                         # visit all ancestor bones and mark them "output enabled"
@@ -676,7 +676,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
             doc.end_tag('boneassignments')
 
         # Updated June3 2011 - shape animation works
-        if config.get('SHAPE_ANIMATIONS') and mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 0:
+        if (config.get('SHAPE_ANIMATIONS') is True) and mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 0:
             logger.info('* Writing shape keys')
 
             doc.start_tag('poses', {})
@@ -719,7 +719,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
                     pv = skey.data[ v.index ]
                     x,y,z = swap( pv.co - v.co )
 
-                    if config.get('SHAPE_NORMALS'):
+                    if config.get('SHAPE_NORMALS') is True:
                         vertex_idx = v.index
 
                         # Try to get original polygon loop index (before tesselation)
@@ -735,7 +735,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
                         pn = mathutils.Vector( snormals[normal_idx] )
                         nx,ny,nz = swap( pn )
 
-                    if config.get('SHAPE_NORMALS'):
+                    if config.get('SHAPE_NORMALS') is True:
                         doc.leaf_tag('poseoffset', {
                                 'x' : '%6f' % x,
                                 'y' : '%6f' % y,
@@ -844,10 +844,10 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     # If requested by the user, generate LOD levels / Edge Lists / Vertex buffer optimization through OgreMeshUpgrader
     if ((config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0') or
-        (config.get('GENERATE_EDGE_LISTS') == True)):
+        (config.get('GENERATE_EDGE_LISTS') is True)):
         target_mesh_file = os.path.join(path, '%s.mesh' % obj_name )
         util.mesh_upgrade_tool(target_mesh_file)
-    
+
     # Note that exporting the skeleton does not happen here anymore
     # It was moved to the function dot_skeleton in its own module (skeleton.py)
 

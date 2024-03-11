@@ -107,7 +107,7 @@ def mesh_upgrade_tool(infile):
         if config.get('LOD_GENERATION') == '0':
             Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
 
-        if config.get('GENERATE_EDGE_LISTS') == True:
+        if config.get('GENERATE_EDGE_LISTS') is True:
             Report.warnings.append("OgreMeshUpgrader failed, Edge Lists will not be generated for this mesh: %s" % filename)
 
         return
@@ -139,7 +139,7 @@ def mesh_upgrade_tool(infile):
         cmd.append(str(config.get('LOD_PERCENT')))
 
     # Don't generate Edge Lists (-e = DON'T generate edge lists (for stencil shadows))
-    if config.get('GENERATE_EDGE_LISTS') == False:
+    if config.get('GENERATE_EDGE_LISTS') is False:
         cmd.append('-e')
 
     # Put logfile into output directory
@@ -158,7 +158,7 @@ def mesh_upgrade_tool(infile):
     if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
         logger.info("* Generating %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
 
-    if config.get('GENERATE_EDGE_LISTS') == True:
+    if config.get('GENERATE_EDGE_LISTS') is True:
         logger.info("* Generating Edge Lists for mesh: %s" % filename)
 
     # First try to execute with the -log option
@@ -177,7 +177,7 @@ def mesh_upgrade_tool(infile):
         if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
             Report.warnings.append("OgreMeshUpgrader failed, LODs will not be generated for this mesh: %s" % filename)
 
-        if config.get('GENERATE_EDGE_LISTS') == True:
+        if config.get('GENERATE_EDGE_LISTS') is True:
             Report.warnings.append("OgreMeshUpgrader failed, Edge Lists will not be generated for this mesh: %s" % filename)
 
         if error != None:
@@ -187,7 +187,7 @@ def mesh_upgrade_tool(infile):
         if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
             logger.info("- Generated %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
 
-        if config.get('GENERATE_EDGE_LISTS') == True:
+        if config.get('GENERATE_EDGE_LISTS') is True:
             logger.info("- Generated Edge Lists for mesh: %s" % filename)
 
 
@@ -257,7 +257,7 @@ def mesh_convert(infile):
         
     else:
         # Convert to v2 format if required
-        cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
+        cmd.append('-%s' % config.get('MESH_TOOL_VERSION'))
 
         # Finally, specify input file
         cmd.append(infile)
@@ -271,7 +271,7 @@ def mesh_convert(infile):
 
         # Open log file to replace old logging feature that the new tool dropped
         # The log file will be created alongside the exported mesh
-        if config.get('ENABLE_LOGGING'):
+        if config.get('ENABLE_LOGGING') is True:
             logfile_path, name = os.path.split(infile)
             logfile = os.path.join(logfile_path, 'OgreMeshTool.log')
         
@@ -311,7 +311,7 @@ def xml_convert(infile, has_uvs=False):
 
     # OgreMeshTool (OGRE v2): -e = DON'T generate edge lists (for stencil shadows)
     # OgreXMLConverter (OGRE < 1.10): -e = DON'T generate edge lists (for stencil shadows)
-    if config.get('GENERATE_EDGE_LISTS') == False and (version < (1,10,0) or converter_type == "OgreMeshTool"):
+    if config.get('GENERATE_EDGE_LISTS') is False and (version < (1,10,0) or converter_type == "OgreMeshTool"):
         cmd.append('-e')
 
     if config.get('GENERATE_TANGENTS') != "0" and converter_type == "OgreMeshTool":
@@ -323,7 +323,7 @@ def xml_convert(infile, has_uvs=False):
         cmd.append('-O')
         cmd.append(config.get('OPTIMISE_VERTEX_BUFFERS_OPTIONS'))
 
-    if not config.get('OPTIMISE_ANIMATIONS'):
+    if config.get('OPTIMISE_ANIMATIONS') is not True:
         cmd.append('-o')
 
     if converter_type == "OgreXMLConverter":
@@ -353,13 +353,13 @@ def xml_convert(infile, has_uvs=False):
             Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
 
         # Clean up .xml file after successful conversion
-        if proc.returncode == 0 and config.get('EXPORT_XML_DELETE') == True:
+        if (proc.returncode == 0) and (config.get('EXPORT_XML_DELETE') is True):
             logger.info("Removing generated xml file after conversion: %s" % infile)
             os.remove(infile)
 
     else:
         # Convert to v2 format if required
-        cmd.append('-%s' %config.get('MESH_TOOL_VERSION'))
+        cmd.append('-%s' % config.get('MESH_TOOL_VERSION'))
 
         # If requested by the user, generate LOD levels through OgreMeshUpgrader/OgreMeshTool
         if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
@@ -387,7 +387,7 @@ def xml_convert(infile, has_uvs=False):
 
         # Open log file to replace old logging feature that the new tool dropped
         # The log file will be created alongside the exported mesh
-        if config.get('ENABLE_LOGGING'):
+        if config.get('ENABLE_LOGGING') is True:
             logfile_path, name = os.path.split(infile)
             logfile = os.path.join(logfile_path, 'OgreMeshTool.log')
 
@@ -401,7 +401,7 @@ def xml_convert(infile, has_uvs=False):
             Report.errors.append("OgreMeshTool finished with non-zero status converting mesh: (%s), it might not have been properly generated" % name)
 
         # Clean up .xml file after successful conversion
-        if proc.returncode == 0 and config.get('EXPORT_XML_DELETE') == True:
+        if (proc.returncode == 0) and (config.get('EXPORT_XML_DELETE') is True):
             logger.info("Removing generated xml file after conversion: %s" % infile)
             os.remove(infile)
 
@@ -465,9 +465,9 @@ def find_bone_index( ob, arm, groupidx): # sometimes the groups are out of order
     if groupidx < len(ob.vertex_groups): # reported by Slacker
         vg = ob.vertex_groups[ groupidx ]
         j = 0
-        for i,bone in enumerate(arm.pose.bones):
-            if not bone.bone.use_deform and config.get('ONLY_DEFORMABLE_BONES'):
-                j+=1 # if we skip bones we need to adjust the id
+        for i, bone in enumerate(arm.pose.bones):
+            if (config.get('ONLY_DEFORMABLE_BONES') is True) and (bone.bone.use_deform is False):
+                j = j + 1 # if we skip bones we need to adjust the id
             if bone.name == vg.name:
                 return i-j
     else:
