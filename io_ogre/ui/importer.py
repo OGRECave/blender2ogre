@@ -165,17 +165,17 @@ class _OgreCommonImport_(object):
         target_file_name_no_ext = os.path.splitext(target_file_name)[0]
 
         file_handler = None
-        
+
         # Add a file handler to all Logger instances
-        if config.get('ENABLE_LOGGING') == True:
+        if config.get('ENABLE_LOGGING') is True:
             log_file = ("%s/blender2ogre.log" % target_path)
             logger.info("Writing log file to: %s" % log_file)
 
             file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)
-            
+
             # Show the python file name from where each log message originated
             SHOW_LOG_NAME = False
-            
+
             if SHOW_LOG_NAME:
                 file_formatter = logging.Formatter(fmt='%(asctime)s %(name)9s.py [%(levelname)5s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
             else:
@@ -194,13 +194,13 @@ class _OgreCommonImport_(object):
         Report.show()
 
         # Flush and close all logging file handlers
-        if config.get('ENABLE_LOGGING') == True:
+        if config.get('ENABLE_LOGGING') is True:
             for logger_name in logging.Logger.manager.loggerDict.keys():
                 logger_instance = logging.getLogger(logger_name)
-                    
+
                 # Remove handlers
                 logger_instance.handlers.clear()
-            
+
             file_handler.flush()
             file_handler.close()
 
