@@ -82,7 +82,7 @@ def dot_scene(path, scene_name=None):
         if config.get("SELECTED_ONLY") and not ob.select_get():
             if ob.type == 'CAMERA' and config.get("FORCE_CAMERA"):
                 pass
-            elif ob.type == 'LAMP' and config.get("FORCE_LAMPS"):
+            elif ob.type == 'LIGHT' and config.get("FORCE_LIGHTS"):
                 pass
             else:
                 continue
