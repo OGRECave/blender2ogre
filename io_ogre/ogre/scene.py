@@ -671,15 +671,19 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if ob.data.type == 'SPOT':
             a = doc.createElement('lightRange')
             l.appendChild(a)
-            a.setAttribute('inner',str( ob.data.spot_size * (1.0 - ob.data.spot_blend)))
-            a.setAttribute('outer',str(ob.data.spot_size))
-            a.setAttribute('falloff','1.0')
+            a.setAttribute('inner', str( ob.data.spot_size * (1.0 - ob.data.spot_blend)))
+            a.setAttribute('outer', str(ob.data.spot_size))
+            a.setAttribute('falloff', '1.0')
 
         a = doc.createElement('lightAttenuation'); l.appendChild( a )
-        a.setAttribute('range', '5000' )        # is this an Ogre constant?
-        a.setAttribute('constant', '1.0')       # TODO support quadratic light
-        a.setAttribute('linear', '%6f' % (1.0 / ob.data.distance))
-        a.setAttribute('quadratic', '0.0')
+        # NOTE: No idea why a factor of 10 is required but otherwise it does not look correct
+        light_range = ob.data.cutoff_distance * 10
+        if light_range == 0:
+            light_range = 0.001
+        a.setAttribute('range', light_range)
+        a.setAttribute('constant', '1.0')
+        a.setAttribute('linear', '%6f' % (4.5 / light_range))
+        a.setAttribute('quadratic', '%6f' % (75.0 / (light_range * light_range)))
 
     # Node Animation
     if config.get('NODE_ANIMATION') is True:
