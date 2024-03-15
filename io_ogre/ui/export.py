@@ -410,7 +410,7 @@ S - strips the buffers for shadow mapping (consumes less space and memory)""",
         items=config.LOD_METHODS,
         name='LOD Generation Method',
         description='Method of generating LOD levels',
-        default=config.get('LOD_METHODS')) = {}    
+        default=config.get('LOD_GENERATION')) = {}
     EX_LOD_LEVELS : IntProperty(
         name="LOD Levels",
         description="Number of LOD levels",
