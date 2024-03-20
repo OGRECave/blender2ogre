@@ -840,6 +840,3 @@ def gather_metallic_roughness_texture(mat_wrapper):
             return None
 
     return ShaderImageTextureWrapper(node_image)
-
-
-

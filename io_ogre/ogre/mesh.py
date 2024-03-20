@@ -29,43 +29,48 @@ logger = logging.getLogger('mesh')
 
 class VertexColorLookup:
     def __init__(self, mesh):
-        self.mesh = mesh
-        
         self.__colors = None
-        self.__alphas = None
 
-        color_names = ["col", "color"]
-        alpha_names = ["a", "alpha"]
+        color_names = ["col", "color", "attribute"]
 
-        if len(self.mesh.vertex_colors) > 0:
-            for key, colors in self.mesh.vertex_colors.items():
+        vertex_colors = None
+
+        # In Blender version 3.2, vertex colors have been refactored into generic color attributes
+        # https://developer.blender.org/docs/release_notes/3.2/sculpt/
+        if (bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or bpy.app.version[0] > 3:
+            print("Blender version >= 3.2")
+            vertex_colors = mesh.color_attributes
+        else:
+            print("Blender version < 3.2")
+            vertex_colors = mesh.vertex_colors
+
+        if len(vertex_colors) > 0:
+            for key, colors in vertex_colors.items():
                 if (self.__colors is None) and (key.lower() in color_names):
                     self.__colors = colors
-                if (self.__alphas is None) and (key.lower() in alpha_names):
-                    self.__alphas = colors
-            if self.__colors is None and self.__alphas is None:
-                # No alpha and color found by name, assume that the only
-                # vertex color data is actual color data
-                self.__colors = colors
+
+                    if ((bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or bpy.app.version[0] > 3):
+                        if colors.domain != 'CORNER':
+                            Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color domain: "%s" (should be: "CORNER")' % \
+                                (mesh.name, key, colors.domain) )
+                        if colors.data_type != 'BYTE_COLOR':
+                            Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color data type: "%s" (should be: "BYTE_COLOR")' % \
+                                (mesh.name, key, colors.data_type) )
 
             if self.__colors:
                 self.__colors = [x.color for x in self.__colors.data]
-            if self.__alphas:
-                self.__alphas = [x.color for x in self.__alphas.data]
+                #self.__colors = [x.color_srgb for x in self.__colors.data]
 
     @property
     def has_color_data(self):
-        return self.__colors is not None or self.__alphas is not None
+        return self.__colors is not None
 
     def get(self, item):
         if self.__colors:
             color = self.__colors[item]
         else:
             color = [1.0] * 4
-        if self.__alphas:
-            color[3] = mathutils.Vector(self.__alphas[item]).length
         return color
-
 
 def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=4, isLOD=False, **kwargs):
     """
