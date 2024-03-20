@@ -1112,24 +1112,20 @@ def bCreateSubMeshes(meshData, meshName):
 
         # Vertex colors
         if 'vertexcolors' in geometry:
-            colourData = me.vertex_colors.new(name='Colour'+str(j)).data
+            colourData = None
+
+            if (bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or bpy.app.version[0] > 3:
+                print("Blender version >= 3.2")
+                colourData = me.color_attributes.new(name='Colour', domain='CORNER', type='BYTE_COLOR').data
+            else:
+                colourData = me.vertex_colors.new(name='Colour').data
+
             vcolors = geometry['vertexcolors']
             loopIndex = 0
             for face in faces:
                 for v in face:
                     colourData[loopIndex].color = vcolors[v]
                     loopIndex += 1
-            
-            # Vertex Alpha
-            for c in vcolors:
-                if c[3] != 1.0:
-                    alphaData = me.vertex_colors.new(name='Alpha'+str(j)).data
-                    loopIndex = 0
-                    for face in faces:
-                        for v in face:
-                            colourData[loopIndex].color[3] = vcolors[v][3]
-                            loopIndex += 1
-                    break
 
         # Bone assignments:
         if 'boneIDs' in meshData:
