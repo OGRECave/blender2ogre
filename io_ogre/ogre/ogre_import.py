@@ -1033,18 +1033,21 @@ def bCreateSubMeshes(meshData, meshName):
         me.polygons.add(FaceLength)
 
         me.vertices.foreach_set("co", unpack_list(verts))
+
         if hasNormals:
+            me.create_normals_split()
             me.vertices.foreach_set("normal", unpack_list(normals))
-        me.loops.foreach_set("vertex_index", unpack_list(faces))
+
         me.polygons.foreach_set("loop_start", [i for i in range(0, FaceLength * 3, 3)])
         me.polygons.foreach_set("loop_total", [3] * (FaceLength))
+        me.loops.foreach_set("vertex_index", unpack_list(faces))
 
         hasTexture = False
         # Material for the submesh
         # Create image texture from image.
         if subMeshName in meshData['materials']:
             matInfo = meshData['materials'][subMeshName]	# material data
-            Report.materials.append( subMeshName )
+            Report.materials.append(subMeshName)
 
             # Create shadeless material and MTex
             mat = bpy.data.materials.new(subMeshName)
@@ -1172,33 +1175,20 @@ def bCreateSubMeshes(meshData, meshName):
                         me.shape_keys.key_blocks[name].data[vkey[0]].co = [vkey[1] + b[0], vkey[2] + b[1], vkey[3] + b[2]]
 
         # Update mesh with new data
+        #me.calc_loop_triangles()
         me.update(calc_edges=True)
-        me.use_auto_smooth = True
 
         # Try to set custom normals
         if hasNormals:
-            noChange = len(me.loops) == len(faces) * 3
-            if not noChange:
-                logger.debug('Removed %s faces' % (len(faces) - len(me.loops) / 3))
-            split = []
-            polyIndex = 0
-            for face in faces:
-                if noChange or matchFace(face, verts, me, polyIndex):
-                    polyIndex += 1
-                    for vx in face:
-                        split.append(normals[vx])
-
-            if len(split) == len(me.loops):
-                me.normals_split_custom_set(split)
-            else:
-                Report.warnings.append("Failed to import mesh normals")
-                logger.warning('Failed to import mesh normals %s / %s' % (polyIndex, str(len(me.polygons))))
+            me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))
+            me.normals_split_custom_set_from_vertices(normals)
+            me.use_auto_smooth = True
 
         Report.orig_vertices = len( me.vertices )
         Report.faces += len( me.polygons )
 
         bpy.ops.object.editmode_toggle()
-        bpy.ops.mesh.remove_doubles(threshold=0.001)
+        #bpy.ops.mesh.remove_doubles(threshold=0.001)
         #bpy.ops.mesh.tris_convert_to_quads()
         bpy.ops.object.editmode_toggle()
 
