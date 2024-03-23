@@ -30,24 +30,19 @@ bl_info = {
 # https://blender.stackexchange.com/questions/28504/blender-ignores-changes-to-python-scripts/28505
 # When bpy is already in local, we know this is not the initial import...
 if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
     import importlib
-    if "config" in locals():
-        importlib.reload(config)
-    if "properties" in locals():
-        importlib.reload(properties)
-    if "ui" in locals():
-        importlib.reload(ui)
+    #print("Reloading modules: config, mesh_preview, properties, xml, ui, util")
+    importlib.reload(config)
+    importlib.reload(mesh_preview)
+    importlib.reload(properties)
+    importlib.reload(xml)
+    importlib.reload(ui)
+    importlib.reload(util)
 
-# This is only relevant on first run, on later reloads those modules
-# are already in locals() and those statements do not do anything.
-from . import config
-from . import properties
-from . import ui
-
+import bpy
 import os, sys, logging
 from pprint import pprint
-import bpy
+from . import config, properties, ui
 
 # Import the plugin directory and setup the plugin
 class Blender2OgreAddonPreferences(bpy.types.AddonPreferences):
@@ -107,7 +102,7 @@ def register():
     logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='[%(levelname)5s] %(message)s', datefmt='%H:%M:%S')
 
     logging.info('Starting io_ogre %s', bl_info["version"])
-    
+
     # The UI modules define auto_register functions that
     # return classes that should be loaded by the plugin
     for clazz in ui.auto_register(True):
@@ -120,10 +115,10 @@ def register():
 
 def unregister():
     logging.info('Unloading io_ogre %s', bl_info["version"])
-    
+
     # Save the config
     config.save_config()
-    
+
     # Unregister classes
     for clazz in ui.auto_register(False):
         bpy.utils.unregister_class(clazz)

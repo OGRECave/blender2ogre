@@ -50,8 +50,8 @@ There are two possible solutions:
 
 
 ## Updating to new versions ##
-If you are upgrading from a previous version of blender2ogre and having problems, you may want to delete your old .pickle config file from
-[$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/config/scripts/blender2ogre.pickle` and restart blender.
+If you are upgrading from a previous version of blender2ogre and having problems, you may want to delete your old .json config file from
+[$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/config/scripts/io_ogre.json` and restart blender.
 
 ## Video Tutorials
 * [General Usage](http://www.youtube.com/watch?feature=player_embedded&v=3EpwEsB0_kk)

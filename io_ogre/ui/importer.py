@@ -1,26 +1,18 @@
+# When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    import importlib
+    #print("Reloading modules: ogre_import")
+    importlib.reload(ogre_import)
+
 import bpy, os, getpass, math, mathutils, logging
 
 from pprint import pprint
-
-# When bpy is already in local, we know this is not the initial import...
-if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
-    import importlib
-    if "config" in locals():
-        importlib.reload(config)
-    if "ogre_import" in locals():
-        importlib.reload(ogre_import)
-    if "util" in locals():
-        importlib.reload(util)
-
-# This is only relevant on first run, on later reloads those modules
-# are already in locals() and those statements do not do anything.
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
 from .. import config
-from ..ogre import ogre_import
 from ..report import Report
 from ..util import *
 from ..xml import *
+from ..ogre import ogre_import
 
 logger = logging.getLogger('import')
 
@@ -53,9 +45,10 @@ class _OgreCommonImport_(object):
     def invoke(self, context, event):
         # Update the interface with the config values
         for key, value in config.CONFIG.items():
-            if getattr(self, "IM_" + key, None) or getattr(self, "IM_Vx_" + key, None) or getattr(self, "IM_V1_" + key, None) or getattr(self, "IM_V2_" + key, None):
-                # todo: isn't the key missing the "IM_" prefix?
-                setattr(self,key,value)
+            for prefix in ["IM_", "IM_Vx_", "IM_V1_", "IM_V2_"]:
+                attr_name = prefix + key
+                if getattr(self, attr_name, None) is not None:
+                    setattr(self, attr_name, value)
 
         wm = context.window_manager
         fs = wm.fileselect_add(self)
@@ -139,7 +132,6 @@ class _OgreCommonImport_(object):
 
         # Update saved defaults to new settings and also print import code
         kw = {}
-        conf_name = ""
 
         print ("_" * 80,"\n")
 
@@ -148,15 +140,21 @@ class _OgreCommonImport_(object):
         print("bpy.ops.ogre.import_mesh(")
         print("  filepath='%s', " % os.path.abspath(self.filepath).replace('\\', '\\\\'))
         for name in dir(_OgreCommonImport_):
-            if name.startswith('IM_V1_') or name.startswith('IM_V2_') or name.startswith('IM_Vx_'):
+            conf_name = ""
+            if name.startswith('IM_V1_') or \
+               name.startswith('IM_V2_') or \
+               name.startswith('IM_Vx_'):
                 conf_name = name[6:]
             elif name.startswith('IM_'):
                 conf_name = name[3:]
-            kw[ conf_name ] = getattr(self, name)
-            if name.startswith('IM_') and config._CONFIG_DEFAULTS_ALL[ conf_name ] != getattr(self, name):
-                print("  %s=%s, " % (name, getattr(self, name)))
-        config.update(**kw)
+            if conf_name not in config.CONFIG.keys():
+                continue
+            attribute = getattr(self, name)
+            kw[ conf_name ] = attribute
+            if config._CONFIG_DEFAULTS_ALL[ conf_name ] != attribute:
+                print("  %s=%s, " % (name, attribute))
         print(")")
+        config.update(**kw)
 
         print ("_" * 80,"\n")
 
@@ -273,7 +271,7 @@ class _OgreCommonImport_(object):
         name="Import shape keys",
         description="Import shape keys (morphs)",
         default=config.get('IMPORT_SHAPEKEYS')) = {}
-    
+
     # Logging
     IM_Vx_ENABLE_LOGGING : BoolProperty(
         name="Write Importer Logs",

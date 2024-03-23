@@ -1,35 +1,21 @@
+## When bpy is already in local, we know this is not the initial import...
+if "bpy" in locals():
+    import importlib
+    #print("Reloading modules: scene")
+    importlib.reload(material)
+    importlib.reload(mesh)
+    importlib.reload(scene)
+    importlib.reload(skeleton)
+
 import bpy, os, getpass, math, mathutils, logging
 
 from pprint import pprint
-
-# When bpy is already in local, we know this is not the initial import...
-if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
-    import importlib
-    if "config" in locals():
-        importlib.reload(config)
-    if "mesh" in locals():
-        importlib.reload(mesh)
-    if "skeleton" in locals():
-        importlib.reload(skeleton)
-    if "scene" in locals():
-        importlib.reload(scene)
-    if "material" in locals():
-        importlib.reload(material)
-    if "report" in locals():
-        importlib.reload(report)
-
-# This is only relevant on first run, on later reloads those modules
-# are already in locals() and those statements do not do anything.
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
 from .. import config
-from ..ogre import material
-from ..ogre import mesh
-from ..ogre import scene
-from ..ogre import skeleton
 from ..report import Report
 from ..util import *
 from ..xml import *
+from ..ogre import material, mesh, scene, skeleton
 
 logger = logging.getLogger('export')
 
@@ -60,9 +46,10 @@ class _OgreCommonExport_(object):
     def invoke(self, context, event):
         # Update the interface with the config values
         for key, value in config.CONFIG.items():
-            if getattr(self, "EX_" + key, None) or getattr(self, "EX_Vx_" + key, None) or getattr(self, "EX_V1_" + key, None) or getattr(self, "EX_V2_" + key, None):
-                # todo: isn't the key missing the "EX_" prefix?
-                setattr(self,key,value)
+            for prefix in ["EX_", "EX_Vx_", "EX_V1_", "EX_V2_"]:
+                attr_name = prefix + key
+                if getattr(self, attr_name, None) is not None:
+                    setattr(self, attr_name, value)
 
         if not self.filepath:
             blend_filepath = context.blend_data.filepath
@@ -146,7 +133,6 @@ class _OgreCommonExport_(object):
 
         # Update saved defaults to new settings and also print export code
         kw = {}
-        conf_name = ""
 
         print ("_" * 80,"\n")
 
@@ -155,15 +141,21 @@ class _OgreCommonExport_(object):
         print("bpy.ops.ogre.export(")
         print("  filepath='%s', " % os.path.abspath(self.filepath).replace('\\', '\\\\'))
         for name in dir(_OgreCommonExport_):
-            if name.startswith('EX_V1_') or name.startswith('EX_V2_') or name.startswith('EX_Vx_'):
+            conf_name = ""
+            if name.startswith('EX_V1_') or \
+               name.startswith('EX_V2_') or \
+               name.startswith('EX_Vx_'):
                 conf_name = name[6:]
             elif name.startswith('EX_'):
                 conf_name = name[3:]
-            kw[ conf_name ] = getattr(self, name)
-            if name.startswith('EX_') and config._CONFIG_DEFAULTS_ALL[ conf_name ] != getattr(self, name):
-                print("  %s=%s, " % (name, getattr(self, name)))
-        config.update(**kw)
+            if conf_name not in config.CONFIG.keys():
+                continue
+            attribute = getattr(self, name)
+            kw[ conf_name ] = attribute
+            if config._CONFIG_DEFAULTS_ALL[ conf_name ] != attribute:
+                print("  %s=%s, " % (name, attribute))
         print(")")
+        config.update(**kw)
 
         print ("_" * 80,"\n")
 
@@ -436,19 +428,19 @@ S - strips the buffers for shadow mapping (consumes less space and memory)""",
         name="Shape Normals",
         description="Export normals in shape animations (updates the .mesh file)",
         default=config.get('SHAPE_NORMALS')) = {}
-    
+
     # Logging
     EX_Vx_ENABLE_LOGGING : BoolProperty(
         name="Write Exporter Logs",
         description="Write Log file to the output directory (blender2ogre.log)",
         default=config.get('ENABLE_LOGGING')) = {}
-    
+
     # It seems that it is not possible to exclude DEBUG when selecting a log level
     EX_Vx_DEBUG_LOGGING : BoolProperty(
         name="Debug Logging",
         description="Whether to show DEBUG log messages",
         default=config.get('DEBUG_LOGGING')) = {}
-    
+
     # It was decided to make this an option that is not user-facing
     #EX_Vx_SHOW_LOG_NAME : BoolProperty(
     #    name="Show Log name",

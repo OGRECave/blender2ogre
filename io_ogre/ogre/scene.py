@@ -1,39 +1,17 @@
-
 # When bpy is already in local, we know this is not the initial import...
 if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
     import importlib
-    if "material" in locals():
-        importlib.reload(material)
-    if "materialv2json" in locals():
-        importlib.reload(materialv2json)
-    if "node_anim" in locals():
-        importlib.reload(node_anim)
-    if "mesh" in locals():
-        importlib.reload(mesh)
-    if "skeleton" in locals():
-        importlib.reload(skeleton)
-    if "config" in locals():
-        importlib.reload(config)
-    if "util" in locals():
-        importlib.reload(util)
-    if "report" in locals():
-        importlib.reload(report)
-    if "xml" in locals():
-        importlib.reload(xml)
+    #print("Reloading modules: material, materialv2json, node_anim, mesh, skeleton")
+    importlib.reload(material)
+    importlib.reload(materialv2json)
+    importlib.reload(node_anim)
+    importlib.reload(mesh)
+    importlib.reload(skeleton)
 
-# This is only relevant on first run, on later reloads those modules
-# are already in locals() and those statements do not do anything.
-import bpy, mathutils, os, getpass, math
+import bpy, mathutils, os, getpass, math, logging
 from os.path import join
-from . import material
-from . import materialv2json
-from . import node_anim
-from . import mesh
-from . import skeleton
-from .. import bl_info
-from .. import config
-from .. import util
+from . import material, materialv2json, node_anim, mesh, skeleton
+from .. import bl_info, config, util
 from ..report import Report
 from ..util import *
 from ..xml import *
