@@ -84,7 +84,7 @@ MESHDATA:
         [[vertexNumber], [weight]], [[vertexNumber], [weight]],  ..
 ['submeshes'][idx]
         [material] - string (material name)
-        [materialOrg] - original material name - for searching the in shared materials file
+        [materialOrig] - original material name - for searching in the shared materials file
         [faces] - vectors with faces [v1,v2,v3]
         [geometry] - identical to 'sharedgeometry' data content
 ['materials']
@@ -287,12 +287,14 @@ def xCollectMeshData(meshData, xmldoc, meshname, dirname):
     for submeshes in xmldoc.getElementsByTagName('submeshes'):
         for submesh in submeshes.childNodes:
             if submesh.localName == 'submesh':
-                materialOrg = str(submesh.getAttributeNode('material').value)
+                materialOrig = "Material"
+                if submesh.getAttributeNode('material') is not None:
+                    materialOrig = str(submesh.getAttributeNode('material').value)
                 # To avoid Blender naming limit problems
-                material = GetValidBlenderName(materialOrg)
+                material = GetValidBlenderName(materialOrig)
                 sm = {}
                 sm['material'] = material
-                sm['materialOrg'] = materialOrg
+                sm['materialOrig'] = materialOrig
                 for subnodes in submesh.childNodes:
                     if subnodes.localName == 'faces':
                         facescount = int(subnodes.getAttributeNode('count').value)
@@ -1050,7 +1052,11 @@ def bCreateSubMeshes(meshData, meshName):
             Report.materials.append(subMeshName)
 
             # Create shadeless material and MTex
-            mat = bpy.data.materials.new(subMeshName)
+            mat = None
+            if subMeshName not in bpy.data.materials:
+                mat = bpy.data.materials.new(subMeshName)
+            else:
+                mat = bpy.data.materials.get(subMeshName)
 
             mat.use_nodes = True
 
