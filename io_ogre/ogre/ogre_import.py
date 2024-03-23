@@ -105,13 +105,11 @@ Note: Bones store their OGREID as a custom variable so they are consistent when 
 """
 
 # When bpy is already in local, we know this is not the initial import...
-if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
-    import importlib
-    if "material_parser" in locals():
-        importlib.reload(material_parser.MaterialParser)
+#if "bpy" in locals():
+#    import importlib
+#    print("RELOADING: material_parser.MaterialParser")
+#    importlib.reload(material_parser)
 
-#from Blender import *
 import bpy
 from xml.dom import minidom
 from mathutils import Vector, Matrix

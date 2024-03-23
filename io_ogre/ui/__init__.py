@@ -1,29 +1,17 @@
-import bpy
-
 # When bpy is already in local, we know this is not the initial import...
 if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
     import importlib
-    if "config" in locals():
-        importlib.reload(config)
-    if "report" in locals():
-        importlib.reload(report)
-    if "importer" in locals():
-        importlib.reload(importer)
-    if "export" in locals():
-        importlib.reload(export)
-    if "mesh_preview" in locals():
-        importlib.reload(mesh_preview)
+    #print("Reloading modules: export, importer")
+    importlib.reload(export)
+    importlib.reload(importer)
 
-# This is only relevant on first run, on later reloads those modules
-# are already in locals() and those statements do not do anything.
+import bpy
 import shutil
+from os.path import exists
+from . import importer, export
 from .. import config
 from ..report import Report
-from . import importer
-from . import export
 from ..mesh_preview import OGREMESH_OT_preview
-from os.path import exists
 
 # Variable to visibility state of the mesh preview button is displayed
 meshpreviewButtonDisplayed = False

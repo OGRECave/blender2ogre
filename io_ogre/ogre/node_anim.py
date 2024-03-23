@@ -1,19 +1,3 @@
-
-# When bpy is already in local, we know this is not the initial import...
-if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
-    import importlib
-    if "config" in locals():
-        importlib.reload(config)
-    if "report" in locals():
-        importlib.reload(report)
-    if "xml" in locals():
-        importlib.reload(xml)
-    if "util" in locals():
-        importlib.reload(util)
-
-# This is only relevant on first run, on later reloads those modules
-# are already in locals() and those statements do not do anything.
 import bpy, mathutils, logging, time
 from .. import config
 from ..report import Report

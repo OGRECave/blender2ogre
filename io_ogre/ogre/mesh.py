@@ -1,27 +1,10 @@
 import os, time, sys, logging
-import bmesh
-import mathutils
-import math
-
-# When bpy is already in local, we know this is not the initial import...
-if "bpy" in locals():
-    # ...so we need to reload our submodule(s) using importlib
-    import importlib
-    if "report" in locals():
-        importlib.reload(report)
-    if "material" in locals():
-        importlib.reload(material)
-    if "util" in locals():
-        importlib.reload(util)
-    if "xml" in locals():
-        importlib.reload(xml)
-    if "skeleton.Skeleton" in locals():
-        importlib.reload(skeleton.Skeleton)
+import bmesh, mathutils, math
 
 from ..report import Report
 from ..util import *
 from ..xml import *
-from .. import util
+from .. import util, config
 from .material import *
 from .skeleton import Skeleton
 
