@@ -26,6 +26,7 @@
 	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
 	- [Exporting Node Animations](#exporting-node-animations)
 	- [Exporting for Physics](#exporting-for-physics)
+	- [Exporting Vertex Colors](#exporting-vertex-colors)
 	- [Level of Detail (LOD)](#level-of-detail-lod)
  	- [Mesh Previewer](#mesh-previewer)
  - [About](#about)
@@ -251,6 +252,12 @@ Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create
 
 ### Exporting for Physics
 Check out the [Exporting for Physics](Physics.md) tutorial to see some techniques and optimizations when exporting collision meshes for Physics Engines
+
+### Exporting Vertex Colors
+![vertex-colors.png](images/vertex_colors/vertex_colors1.png)
+
+`blender2ogre` can import and export Vertex Colors, a way to assign colors to your mesh by vertex. It is also possible to asign alpha values to each vertex for transparency or other uses.
+Check out the [Vertex Colors](VertexColors.md) tutorial to see how to create the Vertex Colors in Blender and how to export them.
 
 ### Level of Detail (LOD)
 Level of Detail or LOD is an optimization technique supported by OGRE, where meshes that are far away from the camera are replaced by meshes with lower vertex count.
