@@ -400,6 +400,8 @@ def ogre_document(materials):
     time_format = "%a, %d %b %Y %H:%M:%S +0000"
     doc.addComment('exporter: blender2ogre ' + ".".join(str(i) for i in bl_info["version"]))
     doc.addComment('export_time: ' + time.strftime(time_format, time.gmtime(now)))
+    doc.addComment('blender_version: %s (%s; %s)' % (bpy.app.version_string, bpy.app.version_cycle, bpy.app.build_platform.decode('UTF-8')))
+
     scn.setAttribute('formatVersion', '1.1')
     bscn = bpy.context.scene
 
@@ -517,6 +519,13 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
         # export mesh.xml file of this object
         if (config.get('MESH') is True) and ob.data.name not in exported_meshes:
+            # Alert if scale or rotation are not uniform
+            if ob.scale != mathutils.Vector((1.0, 1.0, 1.0)) or \
+               ob.rotation_quaternion != mathutils.Quaternion((1.0, 0.0, 0.0, 0.0)) or \
+               ob.rotation_euler.to_quaternion() != mathutils.Quaternion((1.0, 0.0, 0.0, 0.0)):
+                    logger.warning("Object \"%s\" has non uniform scale or rotation" % ob.name)
+                    Report.warnings.append("Object \"%s\" has non uniform scale or rotation, exported mesh will look different" % ob.name)
+
             exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
             overwrite = not exists or (exists and (config.get("MESH_OVERWRITE") is True))
             tangents = int(config.get("GENERATE_TANGENTS"))
