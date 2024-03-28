@@ -152,7 +152,7 @@ if sys.platform.startswith('linux') or sys.platform.startswith('darwin') or sys.
 
 def load_config():
     global CONFIG
-    logger.info('Loading config: %s' % CONFIG_FILEPATH)
+    logger.info('* Loading config: %s' % CONFIG_FILEPATH)
     config_dict = {}
 
     # Check if the config file exists and load it
@@ -228,7 +228,7 @@ def update(**kwargs):
 
 def save_config():
     global CONFIG
-    logger.info('Saving config to: %s' % CONFIG_FILEPATH)
+    logger.info('* Saving config to: %s' % CONFIG_FILEPATH)
     #for key in CONFIG: print( '%s = %s' %(key, CONFIG[key]) )
     if os.path.isdir( CONFIG_PATH ):
         try:

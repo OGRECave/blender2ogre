@@ -136,10 +136,11 @@ class _OgreCommonExport_(object):
 
         print ("_" * 80,"\n")
 
-        print("# Blender Script:")
-        print("import bpy")
-        print("bpy.ops.ogre.export(")
-        print("  filepath='%s', " % os.path.abspath(self.filepath).replace('\\', '\\\\'))
+        script_text = "# Blender Export Script:\n\n"
+        script_text += "import bpy\n"
+        script_text += "bpy.ops.ogre.export(\n"
+        script_text += "  filepath='%s', \n" % os.path.abspath(self.filepath).replace('\\', '\\\\')
+        #print(dir(_OgreCommonExport_))
         for name in dir(_OgreCommonExport_):
             conf_name = ""
             if name.startswith('EX_V1_') or \
@@ -153,11 +154,22 @@ class _OgreCommonExport_(object):
             attribute = getattr(self, name)
             kw[ conf_name ] = attribute
             if config._CONFIG_DEFAULTS_ALL[ conf_name ] != attribute:
-                print("  %s=%s, " % (name, attribute))
-        print(")")
-        config.update(**kw)
+                script_text += "  %s=%s, \n" % (name, attribute)
+        script_text += ")\n"
+
+        print(script_text)
 
         print ("_" * 80,"\n")
+
+        # Let's save the script in a text block
+        text_block_name = "ogre_export" # -" + datetime.datetime.now().strftime("%Y%m%d%H%M")
+        logger.info("* Creating Text Block '%s' with export script" % text_block_name)
+        if text_block_name not in bpy.data.texts:
+            #text_block = bpy.data.texts[text_block_name]
+            text_block = bpy.data.texts.new(text_block_name)
+            text_block.from_string(script_text)
+
+        config.update(**kw)
 
         target_path, target_file_name = os.path.split(os.path.abspath(self.filepath))
         target_file_name = clean_object_name(target_file_name)
