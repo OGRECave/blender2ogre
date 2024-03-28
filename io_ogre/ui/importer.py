@@ -77,7 +77,7 @@ class _OgreCommonImport_(object):
             "Armature" : ["IM_IMPORT_ANIMATIONS", "IM_ROUND_FRAMES", "IM_USE_SELECTED_SKELETON"], 
             "Mesh" : ["IM_IMPORT_NORMALS", "IM_MERGE_SUBMESHES"], 
             "Shape Keys" : ["IM_IMPORT_SHAPEKEYS"], 
-            "Logging" : ["IM_Vx_ENABLE_LOGGING"]
+            "Logging" : ["IM_Vx_ENABLE_LOGGING", "IM_Vx_DEBUG_LOGGING"]
         }
 
         for section in sections:
@@ -289,6 +289,11 @@ class _OgreCommonImport_(object):
         description="Write Log file to the output directory (blender2ogre.log)",
         default=config.get('ENABLE_LOGGING')) = {}
 
+    # It seems that it is not possible to exclude DEBUG when selecting a log level
+    IM_Vx_DEBUG_LOGGING : BoolProperty(
+        name="Debug Logging",
+        description="Whether to show DEBUG log messages",
+        default=config.get('DEBUG_LOGGING')) = {}
 
 class OP_ogre_import(bpy.types.Operator, _OgreCommonImport_):
     '''Import Ogre Scene'''
