@@ -138,20 +138,15 @@ SHOW_IMPORT_DUMPS = False
 SHOW_IMPORT_TRACE = False
 MIN_BONE_LENGTH = 0.00001	# Prevent automatic removal of bones
 
-# Default blender version of script
-blender_version = 259
-
 # Makes sure name doesn't exceed Blenders naming limits
 # Also keeps after name (as Torchlight uses names to identify types -boots, chest, ...- with names)
 # TODO: This is not needed for Blender 2.62 and above
 def GetValidBlenderName(name):
 
-    global blender_version
-
     newname = name.strip()
     
     maxChars = 20
-    if blender_version > 262:
+    if bpy.app.version >= (2, 62, 0):
         maxChars = 63
 
     if(len(name) > maxChars):
@@ -1051,12 +1046,12 @@ def bCreateSkeleton(meshData, name):
         rotmat = boneData['rotmatAS']
         #print(rotmat[1].to_tuple())
         #boneObj.matrix = Matrix(rotmat[1],rotmat[0],rotmat[2])
-        if blender_version <= 262:
+        if bpy.app.version <= (2, 62, 0):
             r0 = [rotmat[0].x] + [rotmat[0].y] + [rotmat[0].z]
             r1 = [rotmat[1].x] + [rotmat[1].y] + [rotmat[1].z]
             r2 = [rotmat[2].x] + [rotmat[2].y] + [rotmat[2].z]
             boneRotMatrix = Matrix((r1, r0, r2))
-        elif blender_version > 262:
+        elif bpy.app.version > (2, 62, 0):
             # this is fugly way of flipping matrix
             r0 = [rotmat.col[0].x] + [rotmat.col[0].y] + [rotmat.col[0].z]
             r1 = [rotmat.col[1].x] + [rotmat.col[1].y] + [rotmat.col[1].z]
@@ -1287,8 +1282,7 @@ def bCreateSubMeshes(meshData, meshName):
         # Vertex colors
         if 'vertexcolors' in geometry and len(geometry['vertexcolors']) > 0:
             colourData = None
-            if (bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or bpy.app.version[0] > 3:
-                print("Blender version >= 3.2")
+            if (bpy.app.version >= (3, 2, 0)):
                 colourData = me.color_attributes.new(name='Colour', domain='CORNER', type='BYTE_COLOR').data
             else:
                 colourData = me.vertex_colors.new(name='Colour').data
@@ -1389,23 +1383,19 @@ def matchFace(face, vertices, mesh, index):
 
 
 def getBoneNameMapFromArmature(arm):
-        # Get Ogre bone IDs - need to be in edit mode to access edit_bones
-        # Arm should already be the active object
-        boneMap = {}
-        bpy.context.view_layer.objects.active = arm
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-        bpy.ops.object.mode_set(mode='EDIT', toggle=False)
-        for bone in arm.data.edit_bones:
-            if 'OGREID' in bone:
-                boneMap[ str(bone['OGREID']) ] = bone.name;
-        bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
-        return boneMap
+    # Get Ogre bone IDs - need to be in edit mode to access edit_bones
+    # Arm should already be the active object
+    boneMap = {}
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+    bpy.ops.object.mode_set(mode='EDIT', toggle=False)
+    for bone in arm.data.edit_bones:
+        if 'OGREID' in bone:
+            boneMap[ str(bone['OGREID']) ] = bone.name;
+    bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
+    return boneMap
 
 def load(filepath):
-    global blender_version
-
-    blender_version = bpy.app.version[0] * 100 + bpy.app.version[1]
-
     logger.info("* Loading mesh from: %s" % str(filepath))
 
     filepath = filepath

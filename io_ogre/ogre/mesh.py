@@ -20,11 +20,9 @@ class VertexColorLookup:
 
         # In Blender version 3.2, vertex colors have been refactored into generic color attributes
         # https://developer.blender.org/docs/release_notes/3.2/sculpt/
-        if (bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or bpy.app.version[0] > 3:
-            print("Blender version >= 3.2")
+        if bpy.app.version >= (3, 2, 0):
             vertex_colors = mesh.color_attributes
         else:
-            print("Blender version < 3.2")
             vertex_colors = mesh.vertex_colors
 
         if len(vertex_colors) > 0:
@@ -32,7 +30,7 @@ class VertexColorLookup:
                 if (self.__colors is None) and (key.lower() in color_names):
                     self.__colors = colors
 
-                    if ((bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or bpy.app.version[0] > 3):
+                    if (bpy.app.version >= (3, 2, 0)):
                         if colors.domain != 'CORNER':
                             Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color domain: "%s" (should be: "CORNER")' % \
                                 (mesh.name, key, colors.domain) )
