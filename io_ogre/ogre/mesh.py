@@ -667,6 +667,11 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
         if (config.get('SHAPE_ANIMATIONS') is True) and mesh.shape_keys and len(mesh.shape_keys.key_blocks) > 0:
             logger.info('* Writing shape keys')
 
+            if ob.active_shape_key_index != 0 and ob.show_only_shape_key == True:
+                warning = "Object \"%s\" mesh will look like selected shape key: '%s', not 'Basis'" % (ob.name, ob.active_shape_key.name)
+                logger.warn(warning)
+                Report.warnings.append(warning)
+
             doc.start_tag('poses', {})
             for sidx, skey in enumerate(mesh.shape_keys.key_blocks):
                 # Skip the basis Shape Key

@@ -87,6 +87,9 @@ MESHDATA:
         [materialOrig] - original material name - for searching in the shared materials file
         [faces] - vectors with faces [v1,v2,v3]
         [geometry] - identical to 'sharedgeometry' data content
+['poses']
+    ['pose'] - name, target, index (if target = submesh)
+        ['poseoffset'] - vectors with index, nx, ny, nz, x, y, z
 ['materials']
     [(matID)]: {}
         ['texture'] - full path to texture file
@@ -100,6 +103,14 @@ MESHDATA:
         ['children'] - list with names if children ([child1, child2, ...])
 ['boneIDs']: {[bone ID]:[bone Name]} - dictionary with ID to name
 ['skeletonName'] - name of skeleton
+[animations] - vector of animation tuples
+  [animation] - tuple: ([tracks], name, length)
+    [tracks] - vector of track tuples
+      [track] - tuple: ([keyframes], type, target, index (>=0 if submesh, else: -1))
+        [keyframes] - vector of keyframe tuples
+          [keyframe] - tuple: ([poserefs], frame)
+            [poserefs] - vector of poseref tuples
+              poseref: tuple: (poseindex, influence)
 
 Note: Bones store their OGREID as a custom variable so they are consistent when a mesh is exported
 """
@@ -113,12 +124,11 @@ Note: Bones store their OGREID as a custom variable so they are consistent when 
 import bpy
 from xml.dom import minidom
 from mathutils import Vector, Matrix
-import math, os, subprocess
+import math, os, subprocess, json
 from .material_parser import MaterialParser
-from .. import config
-from .. import util
-from ..report import Report
+from .. import config, util
 from ..util import *
+from ..report import Report
 from bpy_extras.io_utils import unpack_list
 
 logger = logging.getLogger('ogre_import')
@@ -349,26 +359,184 @@ def xCollectBoneAssignments(meshData, xmldoc):
 def xCollectPoseData(meshData, xmldoc):
     logger.info("* Collecting pose data...")
 
-    poses = xmldoc.getElementsByTagName('pose')
-    if(len(poses) > 0):
-        meshData['poses'] = []
+    poses = xmldoc.getElementsByTagName('poses')
+    if(len(poses) == 0):
+        return
 
-    for pose in poses:
+    meshData['poses'] = []
+
+    for pose in poses[0].getElementsByTagName('pose'):
         name = pose.getAttribute('name')
         target = pose.getAttribute('target')
-        index = pose.getAttribute('index')
+
+        poseData = {}
+        poseData['name'] = name
         if target == 'submesh':
-            poseData = {}
-            poseData['name'] = name
+            index = pose.getAttribute('index')
             poseData['submesh'] = int(index)
-            poseData['data'] = data = []
-            meshData['poses'].append(poseData)
-            for value in pose.getElementsByTagName('poseoffset'):
-                index = int(value.getAttribute('index'))
-                x = float(value.getAttribute('x'))
-                y = float(value.getAttribute('y'))
-                z = float(value.getAttribute('z'))
-                data.append((index, x, -z, y))
+            logger.info("+ Pose: %s, index: %s, target: %s" % (name, index, target))
+        else:
+            logger.info("+ Pose: %s, target: %s" % (name, target))
+        poseData['data'] = data = []
+        meshData['poses'].append(poseData)
+        for value in pose.getElementsByTagName('poseoffset'):
+            index = int(value.getAttribute('index'))
+            x = float(value.getAttribute('x'))
+            y = float(value.getAttribute('y'))
+            z = float(value.getAttribute('z'))
+            data.append((index, x, -z, y))
+
+    # Let's see if there are Pose animations as well
+    # https://ogrecave.github.io/ogre/api/13/_animation.html#Pose-Animation
+    animations_tag = xmldoc.getElementsByTagName('animations')
+    if(len(animations_tag) == 0):
+        return
+
+    animations = []
+
+    fps = bpy.context.scene.render.fps
+
+    for animation_tag in animations_tag[0].getElementsByTagName('animation'):
+        name = animation_tag.getAttribute('name')
+        length = animation_tag.getAttribute('length')
+
+        logger.info("+ Animation: %s, length: %s" % (name, length))
+
+        tracks = []
+
+        for track_tag in animation_tag.getElementsByTagName('track'):
+            target = track_tag.getAttribute('target')
+            type = track_tag.getAttribute('type')
+
+            # If the type of animations were not pose after all... bail
+            if type != "pose":
+                return
+
+            if target == 'submesh':
+                submesh_index = track_tag.getAttribute('index')
+                logger.info("+ Track: %s, index: %s, target: %s" % (name, submesh_index, target))
+            else:
+                submesh_index = -1
+                logger.info("+ Track: %s, target: %s" % (name, target))
+
+            for keyframes_tag in track_tag.getElementsByTagName('keyframes'):
+
+                keyframes = []
+
+                for keyframe_tag in keyframes_tag.getElementsByTagName('keyframe'):
+
+                    time = float(keyframe_tag.getAttribute('time'))
+                    frame = time * fps + 1
+                    print("frame: %s, time: %s" % (frame, time))
+
+                    if config.get('ROUND_FRAMES') is True:
+                        frame = round(frame)
+
+                    poserefs = []
+
+                    for poseref_tag in keyframe_tag.getElementsByTagName('poseref'):
+                        influence = poseref_tag.getAttribute('influence')
+                        poseindex = poseref_tag.getAttribute('poseindex')
+
+                        poseref = (poseindex, influence)
+                        poserefs.append(poseref)
+
+                    keyframe = (poserefs, frame)
+                    keyframes.append(keyframe)
+
+            track = (keyframes, type, target, submesh_index)
+            tracks.append(track)
+
+        animation = (tracks, name, length)
+        animations.append(animation)
+
+    meshData['pose_animations'] = animations
+
+
+def bCreatePoseAnimations(ob, meshData, subMeshIndex):
+    if 'pose_animations' in meshData:
+        logger.info("+ Creating pose animations...")
+
+        # Create animation data for the shape animations
+        shape_keys = ob.data.shape_keys
+
+        if shape_keys.animation_data is None:
+            shape_keys.animation_data_create()
+
+        shape_key_names = []
+        for pose in meshData['poses']:
+            shape_key_names.append(pose['name'])
+
+        for animation in meshData['pose_animations']:
+            tracks = animation[0]
+            name = animation[1]
+            length = float(animation[2])
+
+            logger.debug("- Animation: %s, length: %s" % (name, length))
+
+            fcurves = {}
+
+            # The way we are iterating over submeshes the action might already exist
+            if name in bpy.data.actions:
+                action = bpy.data.actions[name]
+                logger.debug("- Action: %s already in 'bpy.data.actions'" % name)
+
+                # Get the FCurves for each pose/shape key
+                for shape_key_name in shape_key_names:
+                    fcurves[shape_key_name] = action.fcurves.find(data_path=f'key_blocks["{shape_key_name}"].value')
+            else:
+                action = bpy.data.actions.new(name)
+                # action.use_fake_user = True   # Dont need this as we are adding them to the nla editor
+                shape_keys.animation_data.action = action
+                Report.shape_animations.append(name)
+
+                # Add action to NLA tracks
+                track = shape_keys.animation_data.nla_tracks.new()
+                track.name = name
+                track.mute = True
+                track.strips.new(name, 0, action)
+
+                # Create the FCurves for each pose/shape key
+                for shape_key_name in shape_key_names:
+                    fcurve = action.fcurves.new(data_path=f'key_blocks["{shape_key_name}"].value')
+                    fcurves[shape_key_name] = fcurve
+
+                logger.info("+ Created action: %s" % name)
+
+            for track in tracks:
+                keyframes = track[0]
+                type = track[1]
+                target = track[2]
+                submesh_index = int(track[3])
+                logger.debug("- Track -- type: %s, target: %s, submesh_index: %s" % (type, target, submesh_index))
+
+                # If we are not dealing with shared geometry and this track does not apply to this submesh... skip
+                if(submesh_index >= 0 and submesh_index != subMeshIndex):
+                    logger.debug("Skipping submesh_index: %s" % submesh_index)
+                    continue
+
+                # Create fcurves
+                for keyframe in keyframes:
+                    poserefs = keyframe[0]
+                    frame = keyframe[1]
+
+                    # We have to account for the shape keys not referenced in the poserefs
+                    referenced_shape_keys = []
+
+                    for poseref in poserefs:
+                        pose_index = int(poseref[0])
+                        influence = float(poseref[1])
+                        shape_key_name = meshData['poses'][pose_index]['name']
+                        referenced_shape_keys.append(shape_key_name)
+
+                        fcurve = fcurves[shape_key_name]
+                        fcurve.keyframe_points.insert(frame, influence)
+
+                    # Set influence to 0 for shape keys not referenced in the poserefs
+                    # Otherwise the animation will look bad
+                    for shape_key_name in [item for item in shape_key_names if item not in referenced_shape_keys]:
+                        fcurve = fcurves[shape_key_name]
+                        fcurve.keyframe_points.insert(frame, 0)
 
 
 def xGetSkeletonLink(xmldoc, folder):
@@ -671,7 +839,6 @@ def xCollectAnimations(meshData, xDoc):
                 xReadAnimation(action, tracks.childNodes)
                 meshData['animations'][name] = action
 
-
 def xReadAnimation(action, tracks):
     fps = bpy.context.scene.render.fps
     for track in tracks:
@@ -815,11 +982,11 @@ def bCreateMesh(meshData, folder, name, filepath):
         ob.name = name
         ob.data.name = name
 
+    # Dump import structure
     if SHOW_IMPORT_DUMPS:
-        importDump = filepath + "IDump"
-        fileWr = open(importDump, 'w')
-        fileWr.write(str(meshData))
-        fileWr.close()
+        import_dump = filepath.replace(".xml", ".json")
+        with open( import_dump, 'w' ) as f:
+            json.dump(meshData, f, indent=4)
 
 
 def bCreateSkeleton(meshData, name):
@@ -1103,8 +1270,8 @@ def bCreateSubMeshes(meshData, meshName):
             ob.data.materials.append(mat)
             #logger.debug(me.uv_textures[0].data.values()[0].image)
         else:
-            logger.warning("Definition of material: %s not found!" % subMeshName)
-            Report.warnings.append("Definition of material: %s not found!" % subMeshName)
+            logger.warning("Definition of material: \"%s\" not found!" % subMeshName)
+            Report.warnings.append("Definition of material: \"%s\" not found!" % subMeshName)
 
         # Texture coordinates
         if 'texcoordsets' in geometry and 'uvsets' in geometry:
@@ -1118,9 +1285,8 @@ def bCreateSubMeshes(meshData, meshName):
                         loopIndex += 1
 
         # Vertex colors
-        if 'vertexcolors' in geometry:
+        if 'vertexcolors' in geometry and len(geometry['vertexcolors']) > 0:
             colourData = None
-
             if (bpy.app.version[0] >= 3 and bpy.app.version[1] >= 2) or bpy.app.version[0] > 3:
                 print("Blender version >= 3.2")
                 colourData = me.color_attributes.new(name='Colour', domain='CORNER', type='BYTE_COLOR').data
@@ -1144,12 +1310,12 @@ def bCreateSubMeshes(meshData, meshName):
                     for (v, w) in vgroup:
                         #grp.add([v], w, 'REPLACE')
                         grp.add([v], w, 'ADD')
-                        
+
         # Give mesh object an armature modifier, using vertex groups but not envelopes
         if 'skeleton' in meshData:
             skeletonName = meshData['skeletonName']
             Report.armatures.append(skeletonName)
-            
+
             mod = ob.modifiers.new('OgreSkeleton', 'ARMATURE')
             mod.object = bpy.data.objects[skeletonName]  # gets the rig object
             mod.use_bone_envelopes = False
@@ -1163,20 +1329,21 @@ def bCreateSubMeshes(meshData, meshName):
 
         # Shape keys (poses)
         if 'poses' in meshData:
-            base = None
+            # Must have base shape
+            base = ob.shape_key_add(name='Basis')
+
             for pose in meshData['poses']:
-                if(pose['submesh'] == subMeshIndex):
-                    if base is None:
-                        # Must have base shape
-                        base = ob.shape_key_add(name='Basis')
+                if('submesh' not in pose or pose['submesh'] == subMeshIndex):
                     name = pose['name']
-                    Report.shape_animations.append(name)
-                    
-                    logger.info('* Creating pose', name)
+                    Report.shape_keys.append(name)
+
+                    logger.info('* Creating pose: %s' % name)
                     shape = ob.shape_key_add(name=name)
                     for vkey in pose['data']:
                         b = base.data[vkey[0]].co
                         me.shape_keys.key_blocks[name].data[vkey[0]].co = [vkey[1] + b[0], vkey[2] + b[1], vkey[3] + b[2]]
+
+            bCreatePoseAnimations(ob, meshData, subMeshIndex)
 
         # Update mesh with new data
         #me.calc_loop_triangles()
@@ -1193,7 +1360,7 @@ def bCreateSubMeshes(meshData, meshName):
 
         bpy.ops.object.editmode_toggle()
         #bpy.ops.mesh.remove_doubles(threshold=0.001)
-        #bpy.ops.mesh.tris_convert_to_quads()
+        bpy.ops.mesh.tris_convert_to_quads()
         bpy.ops.object.editmode_toggle()
 
         Report.triangles += len( me.polygons )
