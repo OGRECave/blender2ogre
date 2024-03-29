@@ -17,6 +17,7 @@ class ReportSingleton(object):
         self.cameras = []
         self.armatures = []
         self.armature_animations = []
+        self.shape_keys = []
         self.shape_animations = []
         self.textures = []
         self.vertices = 0
@@ -61,7 +62,7 @@ class ReportSingleton(object):
         
         ## TODO report file sizes, meshes and textures
 
-        for tag in 'meshes lights cameras armatures armature_animations shape_animations materials textures'.split():
+        for tag in 'meshes lights cameras armatures armature_animations shape_keys shape_animations materials textures'.split():
             attr = getattr(self, tag)
             if attr:
                 name = tag.replace('_',' ').upper()
