@@ -427,7 +427,7 @@ def xCollectPoseData(meshData, xmldoc):
 
                     time = float(keyframe_tag.getAttribute('time'))
                     frame = time * fps + 1
-                    print("frame: %s, time: %s" % (frame, time))
+                    #print("frame: %s, time: %s" % (frame, time))
 
                     if config.get('ROUND_FRAMES') is True:
                         frame = round(frame)
@@ -454,7 +454,7 @@ def xCollectPoseData(meshData, xmldoc):
 
 
 def bCreatePoseAnimations(ob, meshData, subMeshIndex):
-    if 'pose_animations' in meshData:
+    if 'pose_animations' in meshData and len(meshData['pose_animations']) > 0:
         logger.info("+ Creating pose animations...")
 
         # Create animation data for the shape animations
