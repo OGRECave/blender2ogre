@@ -123,7 +123,7 @@ Note: Bones store their OGREID as a custom variable so they are consistent when 
 
 import bpy
 from xml.dom import minidom
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, Quaternion
 import math, os, subprocess, json
 from .material_parser import MaterialParser
 from .. import config, util
@@ -164,6 +164,7 @@ def GetValidBlenderName(name):
 
     if(newname != name):
         logger.warning("Name truncated (%s -> %s)" % (name, newname))
+        Report.warnings.append("Name truncated (%s -> %s)" % (name, newname))
 
     return newname
 
@@ -543,8 +544,8 @@ def xGetSkeletonLink(xmldoc, folder):
         skeletonFile = os.path.join(folder, skeletonName)
         # Check for existence of skeleton file
         if not os.path.isfile(skeletonFile):
-            Report.warnings.append("Cannot find linked skeleton file '%s'\nIt must be in the same directory as the mesh file." % skeletonName)
             logger.warning("Ogre skeleton missing: %s" % skeletonFile)
+            Report.warnings.append("Cannot find linked skeleton file '%s'\nIt must be in the same directory as the mesh file." % skeletonName)
             skeletonFile = "None"
 
     return skeletonFile
@@ -834,6 +835,7 @@ def xCollectAnimations(meshData, xDoc):
                 xReadAnimation(action, tracks.childNodes)
                 meshData['animations'][name] = action
 
+
 def xReadAnimation(action, tracks):
     fps = bpy.context.scene.render.fps
     for track in tracks:
@@ -948,12 +950,12 @@ def bCreateMesh(meshData, folder, name, filepath):
         bCreateSkeleton(meshData, skeletonName)
 
     logger.info("+ Creating mesh: %s" % name)
-    
+
     # From collected data create all sub meshes
     subObjs = bCreateSubMeshes(meshData, name)
     # Skin submeshes
     #bSkinMesh(subObjs)
-    
+
     # Move to parent skeleton if there
     if 'armature' in meshData:
         arm = meshData['armature']
@@ -969,13 +971,15 @@ def bCreateMesh(meshData, folder, name, filepath):
     # Temporarily select all imported objects
     for subOb in subObjs:
         subOb.select_set(True)
-    
+
     # TODO: Try to merge everything into the armature object
     if config.get('MERGE_SUBMESHES') is True:
         bpy.ops.object.join()
         ob = bpy.context.view_layer.objects.active
         ob.name = name
         ob.data.name = name
+
+    Report.meshes.append( name )
 
     # Dump import structure
     if SHOW_IMPORT_DUMPS:
@@ -1162,8 +1166,7 @@ def bCreateSubMeshes(meshData, meshName):
     for subMeshIndex in range(len(submeshes)):
         subMeshData = submeshes[subMeshIndex]
         subMeshName = subMeshData['material']
-        Report.meshes.append( subMeshName )
-        
+
         # Create mesh and object
         me = bpy.data.meshes.new(subMeshName)
         ob = bpy.data.objects.new(subMeshName, me)
@@ -1181,7 +1184,7 @@ def bCreateSubMeshes(meshData, meshName):
 
         verts = geometry['positions']
         faces = subMeshData['faces']
-        
+
         hasNormals = False
         if 'normals' in geometry.keys():
             normals = geometry['normals']
@@ -1209,7 +1212,8 @@ def bCreateSubMeshes(meshData, meshName):
         # Create image texture from image.
         if subMeshName in meshData['materials']:
             matInfo = meshData['materials'][subMeshName]	# material data
-            Report.materials.append(subMeshName)
+            if subMeshName not in Report.materials:
+                Report.materials.append(subMeshName)
 
             # Create shadeless material and MTex
             mat = None
@@ -1283,9 +1287,9 @@ def bCreateSubMeshes(meshData, meshName):
         if 'vertexcolors' in geometry and len(geometry['vertexcolors']) > 0:
             colourData = None
             if (bpy.app.version >= (3, 2, 0)):
-                colourData = me.color_attributes.new(name='Colour', domain='CORNER', type='BYTE_COLOR').data
+                colourData = me.color_attributes.new(name='Color', domain='CORNER', type='BYTE_COLOR').data
             else:
-                colourData = me.vertex_colors.new(name='Colour').data
+                colourData = me.vertex_colors.new(name='Color').data
 
             vcolors = geometry['vertexcolors']
             loopIndex = 0
@@ -1395,11 +1399,254 @@ def getBoneNameMapFromArmature(arm):
     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
     return boneMap
 
-def load(filepath):
+
+def load_scene(filepath):
+    logger.info("* Loading scene from: %s" % str(filepath))
+
+    folder = os.path.dirname(filepath)
+
+    xDocSceneData = xOpenFile(filepath)
+
+    scene = xDocSceneData.getElementsByTagName('scene')
+    if len(scene) == 0:
+        logger.error("No scene found!")
+        Report.errors.append("No scene found!")
+        return
+
+    import_collection = bpy.data.collections.new("OgreImport")
+    bpy.context.scene.collection.children.link(import_collection)
+
+    environment = scene[0].getElementsByTagName('environment')
+    if len(environment) > 0:
+        logger.info("+ Environment")
+
+        backgnd_col = environment[0].getElementsByTagName('colourBackground')[0]
+        backgnd_col_r = float(backgnd_col.getAttribute('r'))
+        backgnd_col_g = float(backgnd_col.getAttribute('g'))
+        backgnd_col_b = float(backgnd_col.getAttribute('b'))
+        logger.info(f"  - Background Color: r={backgnd_col_r}, g={backgnd_col_g}, b={backgnd_col_b}")
+
+        world = bpy.context.scene.world
+        world.color = Vector((backgnd_col_r, backgnd_col_g, backgnd_col_b))
+
+        if len(environment[0].getElementsByTagName('fog')) > 0:
+            fog = environment[0].getElementsByTagName('fog')[0]
+            fog_falloff = fog.getAttribute('mode')
+            linear_start = float(fog.getAttribute('linearStart'))
+            linear_end = float(fog.getAttribute('linearEnd'))
+            exp_density = float(fog.getAttribute('expDensity'))
+            logger.info(f"  - Fog: falloff={fog_falloff}, linear_start={linear_start}, linear_end={linear_end}, exp_density={exp_density}")
+
+            world.mist_settings.use_mist = True
+            world.mist_settings.intensity = exp_density
+            world.mist_settings.start = linear_start
+            world.mist_settings.depth = linear_end - linear_start
+
+            falloff_types = {'linear': 'LINEAR', 'exp': 'QUADRATIC', 'exp2': 'INVERSE_QUADRATIC'}
+            world.mist_settings.falloff = falloff_types[fog_falloff]
+
+    nodes = scene[0].getElementsByTagName('nodes')
+    if len(nodes) > 0:
+        for node in nodes[0].getElementsByTagName('node'):
+            # Extract and print node name
+            node_name = node.getAttribute('name')
+            logger.info(f"+ Node: {node_name}")
+
+            # Position
+            position = node.getElementsByTagName('position')[0]
+            pos_x = float(position.getAttribute('x'))
+            pos_y = float(position.getAttribute('y'))
+            pos_z = float(position.getAttribute('z'))
+            location = Vector((pos_x, -pos_z, pos_y))
+            logger.info(f"  - Position: x={pos_x}, y={pos_y}, z={pos_z}")
+
+            # Rotation
+            rotation = node.getElementsByTagName('rotation')[0]
+            rot_qw = float(rotation.getAttribute('qw'))
+            rot_qx = float(rotation.getAttribute('qx'))
+            rot_qy = float(rotation.getAttribute('qy'))
+            rot_qz = float(rotation.getAttribute('qz'))
+            quaternion = Quaternion((rot_qw, rot_qx, -rot_qz, rot_qy))
+            euler = quaternion.to_euler()
+            logger.info(f"  - Rotation: qw={rot_qw}, qx={rot_qx}, qy={rot_qy}, qz={rot_qz}")
+
+            # Scale
+            scale = node.getElementsByTagName('scale')[0]
+            scale_x = float(scale.getAttribute('x'))
+            scale_y = float(scale.getAttribute('y'))
+            scale_z = float(scale.getAttribute('z'))
+            scale_vector = Vector((scale_x, scale_z, scale_y))
+            logger.info(f"  - Scale: x={scale_x}, y={scale_y}, z={scale_z}")
+
+            # Entity (if any)
+            entities = node.getElementsByTagName('entity')
+            if entities:
+                entity = entities[0]
+                meshFile = entity.getAttribute('meshFile')
+                entity_name = entity.getAttribute('name')
+                logger.info(f"  * Entity: {entity_name}, Mesh File: {meshFile}")
+
+                mesh_path = os.path.join(folder, meshFile)
+                load_mesh(mesh_path)
+
+                entity = bpy.context.active_object
+                entity.name = node_name
+                entity.location = location
+                entity.rotation_euler = euler
+                entity.scale = scale_vector
+                # Unlink from all current collections
+                for col in entity.users_collection:
+                    col.objects.unlink(entity)
+                import_collection.objects.link(entity)
+
+            # Light (if any)
+            lights = node.getElementsByTagName('light')
+            if lights:
+                light = lights[0]
+                light_name = light.getAttribute('name')
+                light_type = light.getAttribute('type')
+                powerScale = float(light.getAttribute('powerScale'))
+                logger.info(f"  * Light: {light_name}, Type: {light_type}, Power Scale: {powerScale}")
+
+                diff_color = light.getElementsByTagName('colourDiffuse')
+                diff_color_r = float(diff_color[0].getAttribute('r'))
+                diff_color_g = float(diff_color[0].getAttribute('g'))
+                diff_color_b = float(diff_color[0].getAttribute('b'))
+                diffuse_color = Vector((diff_color_r, diff_color_g, diff_color_b))
+                diffuse_factor = 1              # Impossible to obtain from the data
+                logger.info(f"  * Light Diffuse: (color: r={diff_color_r}, g={diff_color_g}, b={diff_color_b}), factor: {diffuse_factor}")
+
+                spec_color = light.getElementsByTagName('colourSpecular')
+                spec_color_r = float(spec_color[0].getAttribute('r'))
+                spec_color_g = float(spec_color[0].getAttribute('g'))
+                spec_color_b = float(spec_color[0].getAttribute('b'))
+                specular_color = Vector((spec_color_r, spec_color_g, spec_color_b))
+                if (bpy.app.version >= (2, 93, 0)):
+                    specular_factor = 1         # Impossible to obtain from the data
+                else:
+                    if diff_color_r > 0.001:
+                        specular_factor = spec_color_r / diff_color_r
+                    elif diff_color_g > 0.001:
+                        specular_factor = spec_color_g / diff_color_g
+                    elif diff_color_b > 0.001:
+                        specular_factor = spec_color_b / diff_color_b
+                    else:
+                        specular_factor = 1     # Impossible to know
+                logger.info(f"  * Light Specular (color: r={spec_color_r}, g={spec_color_g}, b={spec_color_b}), factor: {specular_factor}")
+
+                light_attn = light.getElementsByTagName('lightAttenuation')
+                light_attn_constant = float(light_attn[0].getAttribute('constant'))
+                light_attn_linear = float(light_attn[0].getAttribute('linear'))
+                light_attn_quadratic = float(light_attn[0].getAttribute('quadratic'))
+                light_attn_range = float(light_attn[0].getAttribute('range'))
+                logger.info(f"  * Light Attenuation -- Constant: {light_attn_constant}, Linear: {light_attn_linear}, Range: {light_attn_range}")
+
+                light_types = {'point': 'POINT', 'directional': 'SUN', 'spot': 'SPOT', 'rect': 'RECTANGLE'}
+                bpy.ops.object.light_add(type=light_types[light_type], location=location, rotation=euler)
+                light = bpy.context.active_object
+
+                # Common attributes to all lights: color, energy, diffuse, specular, volume
+                light.name = light_name
+
+                # Unlink from all current collections
+                for col in light.users_collection:
+                    col.objects.unlink(light)
+                import_collection.objects.link(light)
+
+                light.data.energy = powerScale
+                if (bpy.app.version >= (2, 93, 0)):
+                    light.data.color = diffuse_color / diffuse_factor
+                    light.data.diffuse_factor = diffuse_factor
+                else:
+                    light.data.color = diffuse_color
+                light.data.specular_factor = specular_factor
+
+                Report.lights.append( light_name )
+
+                # Point light sources give off light equally in all directions, so require only position not direction.
+                #if light_type == 'point':
+                #    light.data.use_custom_distance = True
+                #    light.data.cutoff_distance = light_attn_range
+
+                #Directional lights simulate parallel light beams from a distant source, hence have direction but no position.
+                #if light_type == 'directional':
+                #    light.data.angle = 0.0615403
+                #    pass
+
+                #Spotlights simulate a cone of light from a source so require position and direction, plus extra values for falloff.
+                #if light_type == 'spot':
+                #    light.data.use_custom_distance = True
+                #    light.data.cutoff_distance = light_attn_range
+                #    light.data.spot_size = 0.785398
+                #    light.data.spot_blend = 0.15
+                    #a.setAttribute('inner', str( ob.data.spot_size * (1.0 - ob.data.spot_blend)))
+                    #a.setAttribute('outer', str(ob.data.spot_size))
+
+                #A rectangular area light, requires position, direction, width and height.
+                #if light_type == 'rect':
+                #    light.data.shape = 'RECTANGLE'
+                #    light.data.size = 0.25
+                #    light.data.size_y = 0.25
+
+            # Camera (if any)
+            cameras = node.getElementsByTagName('camera')
+            if cameras:
+                camera = cameras[0]
+                camera_name = camera.getAttribute('name')
+                fov = float(camera.getAttribute('fov'))
+                projection_type = camera.getAttribute('projectionType')
+                clipping = camera.getElementsByTagName('clipping')[0]
+                clipping_near = float(clipping.getAttribute('near'))
+                clipping_far = float(clipping.getAttribute('far'))
+                logger.info(f"  * Camera: {camera_name}, FOV: {fov}, Projection Type: {projection_type}, Clipping: (near: {clipping_near}, far: {clipping_far})")
+
+                bpy.ops.object.camera_add(location=location, rotation=euler)
+
+                camera = bpy.context.active_object
+                camera.name = camera_name
+
+                # Unlink from all current collections
+                for col in camera.users_collection:
+                    col.objects.unlink(camera)
+                import_collection.objects.link(camera)
+
+                Report.cameras.append( camera_name )
+
+                #aspx = bpy.context.scene.render.pixel_aspect_x
+                #aspy = bpy.context.scene.render.pixel_aspect_y
+                #sx = bpy.context.scene.render.resolution_x
+                #sy = bpy.context.scene.render.resolution_y
+                #if ob.data.type == "PERSP":
+                #    fovY = 0.0
+                #    if (sx*aspx > sy*aspy):
+                #        fovY = 2 * math.atan(sy * aspy * 16.0 / (ob.data.lens * sx * aspx))
+                #    else:
+                #        fovY = 2 * math.atan(16.0 / ob.data.lens)
+                #    # fov in radians - like OgreMax - requested by cyrfer
+                #    fov = math.radians( fovY * 180.0 / math.pi )
+                #    c.setAttribute('projectionType', "perspective")
+                #    c.setAttribute('fov', '%6f' % fov)
+                #else: # ob.data.type == "ORTHO":
+                #    c.setAttribute('projectionType', "orthographic")
+                #    c.setAttribute('orthoScale', '%6f' % ob.data.ortho_scale)
+
+                # Perspective
+                camera_types = {'perspective': 'PERSP', 'orthographic': 'ORTHO'}
+                camera.data.type = camera_types[projection_type]
+
+                # Field of View
+                camera.data.lens_unit = 'FOV'
+                camera.data.angle = fov * 2
+
+                # Clipping
+                camera.data.clip_start = clipping_near
+                camera.data.clip_end = clipping_far
+
+
+def load_mesh(filepath):
     logger.info("* Loading mesh from: %s" % str(filepath))
 
-    filepath = filepath
-    pathMeshXml = filepath
+    pathMeshXml = None
     # Get the mesh as .xml file
     if filepath.lower().endswith(".mesh"):
         if mesh_convert(filepath):
@@ -1413,7 +1660,7 @@ def load(filepath):
     else:
         return {'CANCELLED'}
 
-    folder = os.path.split(filepath)[0]
+    folder = os.path.dirname(filepath)
     nameDotMeshDotXml = os.path.split(pathMeshXml)[1]
     nameDotMesh = os.path.splitext(nameDotMeshDotXml)[0]
     onlyName = os.path.splitext(nameDotMesh)[0]
@@ -1453,8 +1700,9 @@ def load(filepath):
                 meshData['boneIDs'] = map
                 meshData['armature'] = selectedSkeleton
             else:
+                logger.warning("Selected armature has no OGRE data.")
                 Report.warnings.append("Selected armature has no OGRE data.")
-        
+
         # There is valid skeleton link and existing file
         elif skeletonFile != "None":
             if mesh_convert(skeletonFile):
@@ -1475,8 +1723,8 @@ def load(filepath):
                         xCollectAnimations(meshData, xDocSkeletonData)
 
             else:
-                Report.warnings.append("Failed to load linked skeleton")
                 logger.warning("Failed to load linked skeleton")
+                Report.warnings.append("Failed to load linked skeleton")
 
         # Collect mesh data
         xCollectMeshData(meshData, xDocMeshData, onlyName, folder)

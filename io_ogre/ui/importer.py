@@ -26,7 +26,7 @@ def auto_register(register):
 
 def menu_func(self, context):
     """ invoked when import in drop down menu is clicked """
-    op = self.layout.operator(OP_ogre_import.bl_idname, text="Ogre3D (.mesh)")
+    op = self.layout.operator(OP_ogre_import.bl_idname, text="Ogre3D (.scene and .mesh)")
     return op
 
 class _OgreCommonImport_(object):
@@ -202,7 +202,10 @@ class _OgreCommonImport_(object):
         logger.info("Target_file_name: %s" % target_file_name)
 
         Report.importing = True
-        ogre_import.load(os.path.join(target_path, target_file_name))
+        if target_file_name.lower().endswith(".scene"):
+            ogre_import.load_scene(os.path.join(target_path, target_file_name))
+        else:
+            ogre_import.load_mesh(os.path.join(target_path, target_file_name))
         Report.show()
 
         # Flush and close all logging file handlers
