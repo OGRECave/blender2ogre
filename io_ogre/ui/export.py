@@ -7,7 +7,7 @@ if "bpy" in locals():
     importlib.reload(scene)
     importlib.reload(skeleton)
 
-import bpy, os, getpass, math, mathutils, logging
+import bpy, os, getpass, math, mathutils, logging, datetime
 
 from pprint import pprint
 from bpy.props import EnumProperty, BoolProperty, FloatProperty, StringProperty, IntProperty
@@ -33,6 +33,8 @@ def menu_func(self, context):
     return op
 
 class _OgreCommonExport_(object):
+
+    called_from_UI = False
 
     @classmethod
     def poll(cls, context):
@@ -71,6 +73,7 @@ class _OgreCommonExport_(object):
 
     def draw(self, context):
         layout = self.layout
+        self.called_from_UI = True
 
         if self.converter == "unknown":
             layout.label(text="No converter found! Please check your preferences.", icon='ERROR')
@@ -161,13 +164,14 @@ class _OgreCommonExport_(object):
 
         print ("_" * 80,"\n")
 
-        # Let's save the script in a text block
-        text_block_name = "ogre_export" # -" + datetime.datetime.now().strftime("%Y%m%d%H%M")
-        logger.info("* Creating Text Block '%s' with export script" % text_block_name)
-        if text_block_name not in bpy.data.texts:
-            #text_block = bpy.data.texts[text_block_name]
-            text_block = bpy.data.texts.new(text_block_name)
-            text_block.from_string(script_text)
+        # Let's save the script in a text block if called from the UI
+        if self.called_from_UI:
+            text_block_name = "ogre_export-" + datetime.datetime.now().strftime("%Y%m%d%H%M")
+            logger.info("* Creating Text Block '%s' with export script" % text_block_name)
+            if text_block_name not in bpy.data.texts:
+                #text_block = bpy.data.texts[text_block_name]
+                text_block = bpy.data.texts.new(text_block_name)
+                text_block.from_string(script_text)
 
         config.update(**kw)
 
