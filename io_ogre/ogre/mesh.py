@@ -14,7 +14,7 @@ class VertexColorLookup:
     def __init__(self, mesh):
         self.__colors = None
 
-        color_names = ["col", "color", "attribute"]
+        color_names = ["col", "color", "colour", "attribute"]
 
         vertex_colors = None
 
@@ -26,6 +26,8 @@ class VertexColorLookup:
             vertex_colors = mesh.vertex_colors
 
         if len(vertex_colors) > 0:
+            logger.debug("* Mesh has vertex colors")
+
             for key, colors in vertex_colors.items():
                 if (self.__colors is None) and (key.lower() in color_names):
                     self.__colors = colors
