@@ -122,6 +122,7 @@ Blender will export the material format in an Ogre (V1) format. This is not comp
 ## Importing Meshes
 As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated into `blender2ogre` with the following features:
  - Import mesh from `.xml` as well as `.mesh` files
+ - Import whole `.scene` files (as of version *0.8.5*) with all its objects
  - Option to be able to merge imported submeshes or keep them separate
  - Parsing/Conversion of materials into Blender (just create a Principled BSDF material and add a texture with the proper UV mapping)
  - Importing of Poses
