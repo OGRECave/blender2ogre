@@ -1200,7 +1200,6 @@ def bCreateSubMeshes(meshData, meshName):
         me.vertices.foreach_set("co", unpack_list(verts))
 
         if hasNormals:
-            me.create_normals_split()
             me.vertices.foreach_set("normal", unpack_list(normals))
 
         me.polygons.foreach_set("loop_start", [i for i in range(0, FaceLength * 3, 3)])
@@ -1349,9 +1348,9 @@ def bCreateSubMeshes(meshData, meshName):
 
         # Try to set custom normals
         if hasNormals:
-            me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))
+            if bpy.app.version < (4, 1, 0):
+                me.use_auto_smooth = True
             me.normals_split_custom_set_from_vertices(normals)
-            me.use_auto_smooth = True
 
         Report.orig_vertices = len( me.vertices )
         Report.faces += len( me.polygons )

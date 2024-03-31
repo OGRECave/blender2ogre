@@ -234,7 +234,8 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
             mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
         else:
             # calc_tangents() already calculates split normals for us
-            mesh.calc_normals_split()
+            if bpy.app.version < (4, 1, 0):
+                mesh.calc_normals_split()
 
         progressbar = util.ProgressBar("Faces", len(mesh.polygons))
 
@@ -247,7 +248,10 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
             for loop_idx, idx in zip(F.loop_indices, tri):
                 v = mesh.vertices[ idx ]
 
-                nx,ny,nz = swap( mesh.loops[ loop_idx ].normal )
+                if bpy.app.version < (3, 6, 0):
+                    nx,ny,nz = swap( mesh.loops[ loop_idx ].normal )
+                else:
+                    nx,ny,nz = swap( mesh.corner_normals[ loop_idx ].vector )
 
                 if tangents != 0:
                     tx,ty,tz = swap( mesh.loops[ loop_idx ].tangent )
