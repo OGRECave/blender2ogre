@@ -20,8 +20,12 @@ def auto_register(register):
     yield OP_ogre_import
 
     if register:
+        if bpy.app.version >= (4, 1, 0):
+            bpy.utils.register_class(OGRE_FH_import)
         bpy.types.TOPBAR_MT_file_import.append(menu_func)
     else:
+        if bpy.app.version >= (4, 1, 0):
+            bpy.utils.unregister_class(OGRE_FH_import)
         bpy.types.TOPBAR_MT_file_import.remove(menu_func)
 
 def menu_func(self, context):
@@ -44,6 +48,16 @@ class _OgreCommonImport_(object):
         self.converter = detect_converter_type()
 
     def invoke(self, context, event):
+        """
+        By default the file handler invokes the operator with the filepath property set.
+        In this example if this property is set the operator is executed, if not the
+        file select window is invoked.
+        This depends on setting ``options={'SKIP_SAVE'}`` to the property options to avoid
+        to reuse filepath data between operator calls.
+        """
+        if self.filepath:
+            return self.execute(context)
+
         # Update the interface with the config values
         for key, value in config.CONFIG.items():
             for prefix in ["IM_", "IM_Vx_", "IM_V1_", "IM_V2_"]:
@@ -100,7 +114,14 @@ class _OgreCommonImport_(object):
                     box.prop(self, prop)
 
     def execute(self, context):
-        # Add warinng about missing XML converter
+        """ Calls to this Operator can set unfiltered filepaths, ensure the file extension is .mesh, .xml or .scene. """
+        if not self.filepath or not (\
+           self.filepath.endswith(".mesh") or \
+           self.filepath.endswith(".xml") or \
+           self.filepath.endswith(".scene")):
+            return {'CANCELLED'}
+
+        # Add warning about missing XML converter
         Report.reset()
         if self.converter == "unknown":
             Report.errors.append(
@@ -222,9 +243,10 @@ class _OgreCommonImport_(object):
         return {'FINISHED'}
 
     filepath : StringProperty(name="File Path",
-        description="Filepath used for importing Ogre .mesh file",
+        description="Filepath used for importing Ogre .mesh and .scene files",
         maxlen=1024,
         default="",
+        options={'SKIP_SAVE'},
         subtype='FILE_PATH')
 
     filter_glob : StringProperty(
@@ -300,6 +322,22 @@ class _OgreCommonImport_(object):
         name="Debug Logging",
         description="Whether to show DEBUG log messages",
         default=config.get('DEBUG_LOGGING')) = {}
+
+
+# Support for Blender 4.1+ drag and drop
+# (https://docs.blender.org/api/4.1/bpy.types.FileHandler.html)
+if bpy.app.version >= (4, 1, 0):
+    class OGRE_FH_import(bpy.types.FileHandler):
+        bl_idname = "OGRE_FH_import"
+        bl_label = "Import Ogre drag and drop support"
+        bl_import_operator = "ogre.import_mesh"
+        bl_file_extensions = ".mesh;.xml;.scene;"
+
+        @classmethod
+        def poll_drop(cls, context):
+            if context.mode != 'EDIT_MESH':
+                return True
+
 
 class OP_ogre_import(bpy.types.Operator, _OgreCommonImport_):
     '''Import Ogre Scene'''
