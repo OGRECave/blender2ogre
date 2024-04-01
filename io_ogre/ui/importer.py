@@ -175,7 +175,10 @@ class _OgreCommonImport_(object):
             attribute = getattr(self, name)
             kw[ conf_name ] = attribute
             if config._CONFIG_DEFAULTS_ALL[ conf_name ] != attribute:
-                script_text += "  %s=%s, \n" % (name, attribute)
+                if type(attribute) == str:
+                    script_text += "  %s='%s', \n" % (name, attribute)
+                else:
+                    script_text += "  %s=%s, \n" % (name, attribute)
         script_text += ")\n"
 
         print(script_text)
