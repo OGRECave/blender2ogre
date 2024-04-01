@@ -143,7 +143,6 @@ class _OgreCommonExport_(object):
         script_text += "import bpy\n"
         script_text += "bpy.ops.ogre.export(\n"
         script_text += "  filepath='%s', \n" % os.path.abspath(self.filepath).replace('\\', '\\\\')
-        #print(dir(_OgreCommonExport_))
         for name in dir(_OgreCommonExport_):
             conf_name = ""
             if name.startswith('EX_V1_') or \
@@ -157,7 +156,10 @@ class _OgreCommonExport_(object):
             attribute = getattr(self, name)
             kw[ conf_name ] = attribute
             if config._CONFIG_DEFAULTS_ALL[ conf_name ] != attribute:
-                script_text += "  %s=%s, \n" % (name, attribute)
+                if type(attribute) == str:
+                    script_text += "  %s='%s', \n" % (name, attribute)
+                else:
+                    script_text += "  %s=%s, \n" % (name, attribute)
         script_text += ")\n"
 
         print(script_text)
