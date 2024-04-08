@@ -61,10 +61,10 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
                     generator.copy_programs()
                 if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
                     generator.copy_textures()
-                fd.write(bytes(material_text+"\n",'utf-8'))
+                fd.write(bytes(material_text + "\n", 'utf-8'))
 
             if include_missing:
-                fd.write(bytes(MISSING_MATERIAL + "\n",'utf-8'))
+                fd.write(bytes(MISSING_MATERIAL + "\n", 'utf-8'))
 
 def dot_material(mat, path, **kwargs):
     """
@@ -114,16 +114,23 @@ class OgreMaterialGenerator(object):
         self.target_path = target_path
         self.w = util.IndentedWriter()
         self.passes = []
-        self.material_name = material_name(self.material,prefix=prefix)
+        if self.material is None:
+            self.material_name = "_missing_material_"
+        else:
+            self.material_name = material_name(self.material, prefix=prefix)
         self.images = set()
 
-        if material.node_tree:
+        if (self.material is not None and 
+            material.node_tree is not None):
             nodes = shader.get_subnodes( self.material.node_tree, type='MATERIAL_EXT' )
             for node in nodes:
                 if node.material:
                     self.passes.append( node.material )
 
     def generate(self):
+        if self.material is None:
+            return MISSING_MATERIAL
+
         self.generate_header()
         with self.w.iword('material').word(self.material_name).embed():
             if self.material.shadow_method != "NONE":
