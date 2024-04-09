@@ -13,22 +13,22 @@
     - [Materials](#materials)
     - [Blender Modifiers Support](#blender-modifiers-support)
     - [Mesh triangulation issues](#mesh-triangulation-issues)
-	- [OgreNext Tips](#ogrenext-tips)
+    - [OgreNext Tips](#ogrenext-tips)
  - [Importing Meshes](#importing-meshes)
  - [Additional Features](#additional-features)
-	- [Merge Objects on export](#merge-objects-on-export)
-	- [External OGRE Materials](#external-ogre-materials)
-	- [Console Export](#console-export)
-	- [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
-	- [Exporting Custom Normals](#exporting-custom-normals)
-	- [Exporting Skeletal Animations](#exporting-skeletal-animations)
-	- [Exporting Particle Systems](#exporting-particle-systems)
-	- [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
-	- [Exporting Node Animations](#exporting-node-animations)
-	- [Exporting for Physics](#exporting-for-physics)
-	- [Exporting Vertex Colors](#exporting-vertex-colors)
-	- [Level of Detail (LOD)](#level-of-detail-lod)
- 	- [Mesh Previewer](#mesh-previewer)
+    - [Merge Objects on export](#merge-objects-on-export)
+    - [External OGRE Materials](#external-ogre-materials)
+    - [Console Export](#console-export)
+    - [Exporting Custom Vertex Groups](#exporting-custom-vertex-groups)
+    - [Exporting Custom Normals](#exporting-custom-normals)
+    - [Exporting Skeletal Animations](#exporting-skeletal-animations)
+    - [Exporting Particle Systems](#exporting-particle-systems)
+    - [Exporting Shape (or Pose) Animations](#exporting-shape-animations)
+    - [Exporting Node Animations](#exporting-node-animations)
+    - [Exporting for Physics](#exporting-for-physics)
+    - [Exporting Vertex Colors](#exporting-vertex-colors)
+    - [Level of Detail (LOD)](#level-of-detail-lod)
+    - [Mesh Previewer](#mesh-previewer)
  - [About](#about)
  - [Authors](#authors)
 
@@ -36,11 +36,11 @@
 1. Copy the [io_ogre](io_ogre) folder into the [$BLENDER_DIR](https://docs.blender.org/manual/en/latest/advanced/blender_directory_layout.html)`/scripts/addons` folder.
 2. Enable the addon in Blender: `Edit menu > Preferences > Add-ons`. Search for `'ogre'` and click the box up the top left.
 3. Configure the plugin before the first run.
-	- Set the correct path to `OGRETOOLS_XML_CONVERTER` 
-		- for Ogre (v1): path should point to `OgreXMLConverter.exe`. This can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
-		- for OgreNext (v2): path should point to `OgreMeshTool.exe`. This can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
-	- *OPTIONAL* Set `MESH_PREVIEWER` to a path pointed to `ogre-meshviewer.bat`. This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)      
-  	- Make sure that `USER_MATERIALS` isn't set to a directory like "C:\\\". The addon scans this path recursively and will crash when it hits a path it doesn't have permissions for.
+   - Set the correct path to `OGRETOOLS_XML_CONVERTER`
+     - for Ogre (v1): path should point to `OgreXMLConverter.exe`. This can be found in the [Ogre SDK](https://www.ogre3d.org/download/sdk/sdk-ogre)
+     - for OgreNext (v2): path should point to `OgreMeshTool.exe`. This can be found in the [OgreNext SDK](https://www.ogre3d.org/download/sdk/sdk-ogre-next)
+   - *OPTIONAL* Set `MESH_PREVIEWER` to a path pointed to `ogre-meshviewer.bat`. This can be found in [OGRECave/ogre-meshviewer](https://github.com/OGRECave/ogre-meshviewer/releases)
+   - Make sure that `USER_MATERIALS` isn't set to a directory like "C:\\\". The addon scans this path recursively and will crash when it hits a path it doesn't have permissions for.
 
 > **NOTE**: Installing Blender using Ubuntu Snap package or Fedora Flatpak will lead to the following error: `cp: cannot create directory '/snap/blender/3132/3.4/scripts/addons/io_ogre': Read-only file system
 ` (see: [Installing on Ubuntu 20.04 and Blender 3.4.1. #169](https://github.com/OGRECave/blender2ogre/issues/169))
@@ -128,6 +128,7 @@ As of `blender2ogre` version *0.8.2*, the Kenshi Importer has been integrated in
  - Importing of Poses
  - Importing of Skeletons works for the most part, but Ogre skeletons conventions are not like Blenders (see: [How to get bone's vector and bone's length?](https://forums.ogre3d.org/viewtopic.php?t=49689))
  - Importing of Animations work, but depends on the skeleton which sometimes doesn't get correctly imported
+ - As of Blender 4.1+, it is now possible to drag and drop files of types: `.xml`, `.mesh` or `.scene` and import them automatically. (https://docs.blender.org/api/4.1/bpy.types.FileHandler.html)
 
 > **NOTE:** Orientation of the imported mesh is assumed to be `xz-y` (Ogre default), the `blender2ogre` Axis Swapping option does not work for the importing process.
 
