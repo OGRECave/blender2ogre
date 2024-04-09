@@ -98,7 +98,7 @@ class _OgreCommonExport_(object):
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
             "Armature" : ["EX_ARMATURE_ANIMATION", "EX_SHARED_ARMATURE", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
-            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"],
+            "Mesh" : ["EX_MESH", "EX_MESH_OVERWRITE", "EX_ARRAY", "EX_V1_EXTREMITY_POINTS", "EX_Vx_GENERATE_EDGE_LISTS", "EX_GENERATE_TANGENTS", "EX_Vx_OPTIMISE_ANIMATIONS", "EX_Vx_OPTIMISE_VERTEX_CACHE", "EX_V2_OPTIMISE_VERTEX_BUFFERS", "EX_V2_OPTIMISE_VERTEX_BUFFERS_OPTIONS"],
             "LOD" : ["EX_LOD_GENERATION", "EX_LOD_LEVELS", "EX_LOD_DISTANCE", "EX_LOD_PERCENT"],
             "Shape Animation" : ["EX_SHAPE_ANIMATIONS", "EX_SHAPE_NORMALS"],
             "Logging" : ["EX_Vx_ENABLE_LOGGING", "EX_Vx_DEBUG_LOGGING"]
@@ -399,6 +399,12 @@ For some meshes with transparent materials (partial transparency) this can be us
         name="Optimise Animations",
         description="DON'T optimise out redundant tracks & keyframes",
         default=config.get('OPTIMISE_ANIMATIONS')) = {}
+    EX_Vx_OPTIMISE_VERTEX_CACHE : BoolProperty(
+        name="Optimise Vertex Cache",
+        description="""This reorders the index buffer of the mesh such that triangles are rendered in order of proximity.
+If enabled, the MeshUpgrader will print the change of the "average cache miss ratio (ACMR)" metric.
+It measures the number of cache misses per triangle and thus ranges from 3.0 (all 3 vertices missed) to about 0.5 for an optimized mesh.""",
+        default=config.get('OPTIMISE_VERTEX_CACHE')) = {}
     EX_V2_OPTIMISE_VERTEX_BUFFERS : BoolProperty(
         name="Optimise Vertex Buffers For Shaders",
         description="Optimise vertex buffers for shaders.\nSee Vertex Buffers Options for more settings",
