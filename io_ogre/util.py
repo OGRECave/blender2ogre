@@ -88,7 +88,13 @@ def mesh_upgrade_tool(infile):
     # For Ogre v2.x we will use OgreMeshTool, which can perform the same operations
     if detect_converter_type() != "OgreXMLConverter":
         return
-    
+
+    # Don't run 'OgreMeshUpgrader' unless we really need to
+    if config.get('LOD_GENERATION') != '0' and \
+       config.get('GENERATE_EDGE_LISTS') is False and \
+       config.get('OPTIMISE_VERTEX_CACHE') is False:
+       return
+
     output_path, filename = os.path.split(infile)
     
     if not os.path.exists(infile):
@@ -99,6 +105,9 @@ def mesh_upgrade_tool(infile):
 
         if config.get('GENERATE_EDGE_LISTS') is True:
             Report.warnings.append("OgreMeshUpgrader failed, Edge Lists will not be generated for this mesh: %s" % filename)
+
+        if config.get('OPTIMISE_VERTEX_CACHE') is True:
+            Report.warnings.append("OgreMeshUpgrader failed, Vertex Cache will not be optimized for this mesh: %s" % filename)
 
         return
     
@@ -132,6 +141,17 @@ def mesh_upgrade_tool(infile):
     if config.get('GENERATE_EDGE_LISTS') is False:
         cmd.append('-e')
 
+    # Vertex Cache Optimization
+    # https://www.ogre3d.org/2024/02/26/ogre-14-2-released#vertex-cache-optimization-in-meshupgrader
+
+    # Check to see if the option is available
+    if config.get('OPTIMISE_VERTEX_CACHE') is True:
+        if output.find("-optvtxcache") == -1:
+            logger.warn("Vertex Cache Optimization requested, but this version of OgreMeshUpgrader does not support it (OGRE >= 14.2)")
+            Report.warnings.append("Vertex Cache Optimization requested, but this version of OgreMeshUpgrader does not support it (OGRE >= 14.2)")
+        else:
+            cmd.append('-optvtxcache')
+
     # Put logfile into output directory
     use_logger = False
     logfile = os.path.join(output_path, 'OgreMeshUpgrader.log')
@@ -150,6 +170,9 @@ def mesh_upgrade_tool(infile):
 
     if config.get('GENERATE_EDGE_LISTS') is True:
         logger.info("* Generating Edge Lists for mesh: %s" % filename)
+
+    if config.get('OPTIMISE_VERTEX_CACHE') is True:
+        logger.info("* Optimizing Vertex Cache for mesh: %s" % filename)
 
     # First try to execute with the -log option
     logger.debug("%s" % " ".join(cmd))
@@ -170,6 +193,9 @@ def mesh_upgrade_tool(infile):
         if config.get('GENERATE_EDGE_LISTS') is True:
             Report.warnings.append("OgreMeshUpgrader failed, Edge Lists will not be generated for this mesh: %s" % filename)
 
+        if config.get('OPTIMISE_VERTEX_CACHE') is True:
+            Report.warnings.append("OgreMeshUpgrader failed, Vertex Cache will not be optimized for this mesh: %s" % filename)
+
         if error != None:
             logger.error(error)
         logger.warn(output)
@@ -179,6 +205,9 @@ def mesh_upgrade_tool(infile):
 
         if config.get('GENERATE_EDGE_LISTS') is True:
             logger.info("- Generated Edge Lists for mesh: %s" % filename)
+
+        if config.get('OPTIMISE_VERTEX_CACHE') is True and '-optvtxcache' in cmd:
+            logger.info("- Optimized Vertex Cache for mesh: %s" % filename)
 
 
 def detect_converter_type():
