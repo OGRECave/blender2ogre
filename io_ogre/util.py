@@ -103,6 +103,9 @@ def mesh_upgrade_tool(infile):
         if config.get('OPTIMISE_VERTEX_CACHE') is True:
             Report.warnings.append("OgreMeshUpgrader failed, Vertex Cache will not be optimized for this mesh: %s" % filename)
 
+        if config.get('PACK_INT_10_10_10_2') is True:
+            Report.warnings.append("OgreMeshUpgrader failed, Normals won't be packed for this mesh: %s" % filename)
+
         return
 
     # Extract converter type from its output
@@ -155,6 +158,15 @@ def mesh_upgrade_tool(infile):
         else:
             cmd.append('-optvtxcache')
 
+    # Normal Packing
+    # https://www.ogre3d.org/2022/06/07/ogre-13-4-released#vetint1010102norm-support-added
+    if config.get('PACK_INT_10_10_10_2') is True:
+        if output.find("-pack") == -1:
+            logger.warn("Normal Packing requested, but this version of OgreMeshUpgrader does not support it (OGRE >= 13.4)")
+            Report.warnings.append("Normal Packing requested, but this version of OgreMeshUpgrader does not support it (OGRE >= 13.4)")
+        else:
+            cmd.append('-pack')
+
     # Put logfile into output directory
     use_logger = False
     logfile = os.path.join(output_path, 'OgreMeshUpgrader.log')
@@ -176,6 +188,9 @@ def mesh_upgrade_tool(infile):
 
     if config.get('OPTIMISE_VERTEX_CACHE') is True and '-optvtxcache' in cmd:
         logger.info("* Optimizing Vertex Cache for mesh: %s" % filename)
+
+    if config.get('PACK_INT_10_10_10_2') is True and '-pack' in cmd:
+        logger.info("* Packing Normals for mesh: %s" % filename)
 
     # First try to execute with the -log option
     logger.debug("%s" % " ".join(cmd))
@@ -199,6 +214,9 @@ def mesh_upgrade_tool(infile):
         if config.get('OPTIMISE_VERTEX_CACHE') is True:
             Report.warnings.append("OgreMeshUpgrader failed, Vertex Cache will not be optimized for this mesh: %s" % filename)
 
+        if config.get('PACK_INT_10_10_10_2') is True:
+            Report.warnings.append("OgreMeshUpgrader failed, Normals won't be packed for this mesh: %s" % filename)
+
         if error != None:
             logger.error(error)
         logger.warn(output)
@@ -212,6 +230,8 @@ def mesh_upgrade_tool(infile):
         if config.get('OPTIMISE_VERTEX_CACHE') is True and '-optvtxcache' in cmd:
             logger.info("- Optimized Vertex Cache for mesh: %s" % filename)
 
+        if config.get('PACK_INT_10_10_10_2') is True and '-pack' in cmd:
+            logger.info("- Packed Normals for mesh: %s" % filename)
 
 def detect_converter_type():
     # todo: executing the same exe twice might not be efficient but will do for now

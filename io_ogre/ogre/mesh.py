@@ -841,7 +841,9 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     # If requested by the user, generate LOD levels / Edge Lists / Vertex buffer optimization through OgreMeshUpgrader
     if ((config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0') or
-        (config.get('GENERATE_EDGE_LISTS') is True)):
+        (config.get('GENERATE_EDGE_LISTS') is True) or
+        (config.get('PACK_INT_10_10_10_2') is True) or
+        (config.get('OPTIMISE_VERTEX_CACHE') is True)):
         target_mesh_file = os.path.join(path, '%s.mesh' % obj_name )
         util.mesh_upgrade_tool(target_mesh_file)
 
