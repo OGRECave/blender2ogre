@@ -359,6 +359,7 @@ def _ogre_node_helper( doc, ob, prefix='', pos=None, rot=None, scl=None ):
         v = swap(pos)
     else:
         v = swap( mat.to_translation() )
+
     p = doc.createElement('position')
     p.setAttribute('x', '%6f' % v.x)
     p.setAttribute('y', '%6f' % v.y)
@@ -622,7 +623,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         a.setAttribute('near', '%6f' % ob.data.clip_start)    # requested by cyrfer
         a.setAttribute('far', '%6f' % ob.data.clip_end)
 
-    elif ob.type == 'LIGHT' and ob.data.type in 'POINT SPOT SUN'.split():
+    elif ob.type == 'LIGHT' and ob.data.type in 'POINT SPOT SUN AREA'.split():
         Report.lights.append( ob.name )
         l = doc.createElement('light')
         o.appendChild(l)
@@ -633,10 +634,9 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             l.setAttribute('type', 'spot')
         elif ob.data.type == 'SUN':
             l.setAttribute('type', 'directional')
+        elif ob.data.type == 'AREA':
+            l.setAttribute('type', 'rect')
 
-        l.setAttribute('name', ob.name )
-        l.setAttribute('powerScale', str(ob.data.energy))
-        
         if (bpy.app.version >= (2, 93, 0)):
             a = doc.createElement('colourDiffuse'); l.appendChild(a)
             a.setAttribute('r', '%3f' % (ob.data.color.r * ob.data.diffuse_factor))
@@ -657,18 +657,30 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if ob.data.type == 'SPOT':
             a = doc.createElement('lightRange')
             l.appendChild(a)
-            a.setAttribute('inner', str( ob.data.spot_size * (1.0 - ob.data.spot_blend)))
+            a.setAttribute('inner', str(ob.data.spot_size * (1.0 - ob.data.spot_blend)))
             a.setAttribute('outer', str(ob.data.spot_size))
             a.setAttribute('falloff', '1.0')
 
+        if ob.data.type == 'AREA':
+            a = doc.createElement('lightSourceSize')
+            l.appendChild(a)
+            a.setAttribute('width', str(ob.data.size))
+            a.setAttribute('height', str(ob.data.size_y))
+
+        factor = 10
+        l.setAttribute('name', ob.name )
+        l.setAttribute('powerScale', str(ob.data.energy / factor))
+
         a = doc.createElement('lightAttenuation'); l.appendChild( a )
-        light_range = ob.data.cutoff_distance
+        light_range = ob.data.cutoff_distance / factor
         if light_range == 0:
             light_range = 0.001
-        a.setAttribute('range', light_range)
+        a.setAttribute('range', light_range * factor)
         a.setAttribute('constant', '1.0')
-        a.setAttribute('linear', '%6f' % (0 / light_range))
-        a.setAttribute('quadratic', '%6f' % (1 / (light_range * light_range)))
+        a.setAttribute('linear', '%6f' % (4.5 / light_range))
+        #a.setAttribute('linear', '%6f' % (0 / light_range))
+        a.setAttribute('quadratic', '%6f' % (75.0 / (light_range * light_range)))
+        #a.setAttribute('quadratic', '%6f' % (1 / (light_range * light_range)))
 
     # Node Animation
     if config.get('NODE_ANIMATION') is True:
