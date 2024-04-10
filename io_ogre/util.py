@@ -89,14 +89,8 @@ def mesh_upgrade_tool(infile):
     if detect_converter_type() != "OgreXMLConverter":
         return
 
-    # Don't run 'OgreMeshUpgrader' unless we really need to
-    if config.get('LOD_GENERATION') != '0' and \
-       config.get('GENERATE_EDGE_LISTS') is False and \
-       config.get('OPTIMISE_VERTEX_CACHE') is False:
-       return
-
     output_path, filename = os.path.split(infile)
-    
+
     if not os.path.exists(infile):
         logger.warn("Cannot find file mesh file: %s, unable run OgreMeshUpgrader" % filename)
 
@@ -110,7 +104,7 @@ def mesh_upgrade_tool(infile):
             Report.warnings.append("OgreMeshUpgrader failed, Vertex Cache will not be optimized for this mesh: %s" % filename)
 
         return
-    
+
     # Extract converter type from its output
     try:
         exe_path, exe_name = os.path.split(exe)
@@ -137,14 +131,23 @@ def mesh_upgrade_tool(infile):
         cmd.append('-p')
         cmd.append(str(config.get('LOD_PERCENT')))
 
-    # Don't generate Edge Lists (-e = DON'T generate edge lists (for stencil shadows))
-    if config.get('GENERATE_EDGE_LISTS') is False:
-        cmd.append('-e')
+    # Edge Lists: why is the logic so convoluted?
+    # OGRE < 14.0: the option is '-e' and the option is NOT to generate the edge lists (reverse logic which created the whole problem)
+    # OGRE >= 14.0: the option is now named '-el' and the option is to generate the edge lists
+
+    # [OGRE >= 14.0] Generate Edge Lists (-el = generate edge lists (for stencil shadows))
+    if config.get('GENERATE_EDGE_LISTS') is True:
+        # If OGRE version is >= 14.0
+        if output.find("-el") != -1:
+            cmd.append('-el')
+    # [OGRE < 14.0] Don't generate Edge Lists (-e = DON'T generate edge lists (for stencil shadows))
+    else:
+        # If OGRE version is < 14.0
+        if output.find("-el") == -1:
+            cmd.append('-e')
 
     # Vertex Cache Optimization
     # https://www.ogre3d.org/2024/02/26/ogre-14-2-released#vertex-cache-optimization-in-meshupgrader
-
-    # Check to see if the option is available
     if config.get('OPTIMISE_VERTEX_CACHE') is True:
         if output.find("-optvtxcache") == -1:
             logger.warn("Vertex Cache Optimization requested, but this version of OgreMeshUpgrader does not support it (OGRE >= 14.2)")
@@ -168,10 +171,10 @@ def mesh_upgrade_tool(infile):
     if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
         logger.info("* Generating %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
 
-    if config.get('GENERATE_EDGE_LISTS') is True:
+    if config.get('GENERATE_EDGE_LISTS') is True and ('-e' not in cmd or '-el' in cmd):
         logger.info("* Generating Edge Lists for mesh: %s" % filename)
 
-    if config.get('OPTIMISE_VERTEX_CACHE') is True:
+    if config.get('OPTIMISE_VERTEX_CACHE') is True and '-optvtxcache' in cmd:
         logger.info("* Optimizing Vertex Cache for mesh: %s" % filename)
 
     # First try to execute with the -log option
@@ -183,7 +186,7 @@ def mesh_upgrade_tool(infile):
         # If this OgreMeshUpgrader does not have -log then use python to write the output of stdout to a log file
         with open(logfile, 'w') as log:
             log.write(output)
-    
+
     if proc.returncode != 0:
         logger.warn("OgreMeshUpgrader failed, LODs / Edge Lists / Vertex buffer optimizations will not be generated for this mesh: %s" % filename)
 
@@ -203,7 +206,7 @@ def mesh_upgrade_tool(infile):
         if config.get('LOD_LEVELS') > 0 and config.get('LOD_GENERATION') == '0':
             logger.info("- Generated %s LOD levels for mesh: %s" % (config.get('LOD_LEVELS'), filename))
 
-        if config.get('GENERATE_EDGE_LISTS') is True:
+        if config.get('GENERATE_EDGE_LISTS') is True and ('-e' not in cmd or '-el' in cmd):
             logger.info("- Generated Edge Lists for mesh: %s" % filename)
 
         if config.get('OPTIMISE_VERTEX_CACHE') is True and '-optvtxcache' in cmd:
