@@ -204,7 +204,7 @@ class _OgreCommonImport_(object):
 
         # Add a file handler to all Logger instances
         if config.get('ENABLE_LOGGING') is True:
-            log_file = ("%s/blender2ogre.log" % target_path)
+            log_file = os.path.join(target_path, "blender2ogre.log")
             logger.info("Writing log file to: %s" % log_file)
 
             file_handler = logging.FileHandler(filename=log_file, mode='w', encoding='utf-8', delay=False)

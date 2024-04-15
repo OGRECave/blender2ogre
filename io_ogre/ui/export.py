@@ -94,7 +94,7 @@ class _OgreCommonExport_(object):
         # Options associated with each section
         section_options = {
             "General" : ["EX_SWAP_AXIS", "EX_V2_MESH_TOOL_VERSION", "EX_EXPORT_XML_DELETE"],
-            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LIGHTS", "EX_NODE_ANIMATION"],
+            "Scene" : ["EX_SCENE", "EX_SELECTED_ONLY", "EX_EXPORT_HIDDEN", "EX_FORCE_CAMERA", "EX_FORCE_LIGHTS", "EX_NODE_ANIMATION", "EX_EXPORT_SKYBOX", "EX_SKYBOX_RESOLUTION"],
             "Materials" : ["EX_MATERIALS", "EX_SEPARATE_MATERIALS", "EX_COPY_SHADER_PROGRAMS", "EX_USE_FFP_PARAMETERS"],
             "Textures" : ["EX_DDS_MIPS", "EX_FORCE_IMAGE_FORMAT"],
             "Armature" : ["EX_ARMATURE_ANIMATION", "EX_SHARED_ARMATURE", "EX_ONLY_KEYFRAMES", "EX_ONLY_DEFORMABLE_BONES", "EX_ONLY_KEYFRAMED_BONES", "EX_OGRE_INHERIT_SCALE", "EX_TRIM_BONE_WEIGHTS"],
@@ -185,7 +185,7 @@ class _OgreCommonExport_(object):
 
         # Add a file handler to all Logger instances
         if config.get('ENABLE_LOGGING') is True:
-            log_file = ("%s/blender2ogre.log" % target_path)
+            log_file = os.path.join(target_path, "blender2ogre.log")
             logger.info("* Writing log file to: %s" % log_file)
 
             try:
@@ -305,6 +305,15 @@ class _OgreCommonExport_(object):
 #Don't select this option if you have any fine tuning of the F-Curves in Blender, since they won't get exported.
 #NOTE: Node Animations based on the 'Follow Path' constraint will most likely fail with this option set to True.""",
 #        default=config.get('NODE_KEYFRAMES')) = {}
+    EX_EXPORT_SKYBOX : BoolProperty(
+        name="Export SkyBox",
+        description="Export SkyBox when there is an environment texture plugged to the World background.\nThis is useful to convert from HDRi images to a CubeMap format.",
+        default=config.get('EXPORT_SKYBOX')) = {}
+    EX_SKYBOX_RESOLUTION : IntProperty(
+        name="SkyBox Resolution",
+        description="Resolution for the exported CubeMap images of the SkyBox",
+        min=512, max=16384,
+        default=config.get('SKYBOX_RESOLUTION')) = {}
 
     # Materials
     EX_MATERIALS : BoolProperty(

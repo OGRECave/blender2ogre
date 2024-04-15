@@ -8,12 +8,11 @@ if "bpy" in locals():
     importlib.reload(mesh)
     importlib.reload(skeleton)
 
-import bpy, mathutils, os, getpass, math, logging
+import bpy, mathutils, os, getpass, math, logging, datetime
 from os.path import join
 from . import material, materialv2json, node_anim, mesh, skeleton
 from .. import bl_info, config, util
 from ..report import Report
-from ..util import *
 from ..xml import *
 from .material import *
 from .materialv2json import *
@@ -181,7 +180,7 @@ def dot_scene(path, scene_name=None):
             logger.error("Unknown converter type '{}', will not generate materials".format(converter_type))
             Report.errors.append("Unknown converter type '{}', will not generate materials".format(converter_type))
 
-    doc = ogre_document(materials)
+    doc = ogre_document(materials, path)
 
     mesh_collision_prims = {}
     mesh_collision_files = {}
@@ -393,7 +392,7 @@ def _ogre_node_helper( doc, ob, prefix='', pos=None, rot=None, scl=None ):
 
     return o
 
-def ogre_document(materials):
+def ogre_document(materials, path):
     now = time.time()
     doc = RDocument()
     scn = doc.createElement('scene')
@@ -414,48 +413,245 @@ def ogre_document(materials):
 
     nodes = doc.createElement('nodes')
     doc._scene_nodes = nodes
-    extern = doc.createElement('externals')
-    environ = doc.createElement('environment')
-    for n in (nodes,extern,environ):
+    external = doc.createElement('externals')
+    environment = doc.createElement('environment')
+    for n in (nodes, external, environment):
         scn.appendChild( n )
 
-    # Extern files
+    # External files
     for mat in materials:
         if mat is None: continue
         item = doc.createElement('item')
-        extern.appendChild( item )
+        external.appendChild( item )
         item.setAttribute('type', 'material')
         a = doc.createElement('file')
         item.appendChild( a )
-        a.setAttribute('name', '%s.material'%material.material_name(mat))
+        a.setAttribute('name', '%s.material' % material.material_name(mat))
 
-    # Environ settings
+    # Environment settings
     world = bpy.context.scene.world
     if world: # multiple scenes - other scenes may not have a world
         _c = [ ('colourBackground', world.color)]
         for ctag, color in _c:
-            a = doc.createElement(ctag); environ.appendChild( a )
+            a = doc.createElement(ctag)
+            environment.appendChild( a )
             a.setAttribute('r', '%3f' % color.r)
             a.setAttribute('g', '%3f' % color.g)
             a.setAttribute('b', '%3f' % color.b)
 
     if world and world.mist_settings.use_mist:
-        a = doc.createElement('fog'); environ.appendChild( a )
-        a.setAttribute('linearStart', '%6f' % world.mist_settings.start )
+        fog = doc.createElement('fog')
+        environment.appendChild( fog )
+        fog.setAttribute('linearStart', '%6f' % world.mist_settings.start )
         mist_falloff = world.mist_settings.falloff
-        if mist_falloff == 'QUADRATIC': a.setAttribute('mode', 'exp')    # on DTD spec (none | exp | exp2 | linear)
-        elif mist_falloff == 'LINEAR': a.setAttribute('mode', 'linear')
-        else: a.setAttribute('mode', 'exp2')
-        #a.setAttribute('mode', world.mist_settings.falloff.lower() )    # not on DTD spec
-        a.setAttribute('linearEnd', '%6f' % (world.mist_settings.start + world.mist_settings.depth))
-        a.setAttribute('expDensity', world.mist_settings.intensity)
+        if mist_falloff == 'QUADRATIC': fog.setAttribute('mode', 'exp')    # on DTD spec (none | exp | exp2 | linear)
+        elif mist_falloff == 'LINEAR': fog.setAttribute('mode', 'linear')
+        else: fog.setAttribute('mode', 'exp2')
+        #fog.setAttribute('mode', world.mist_settings.falloff.lower() )    # not on DTD spec
+        fog.setAttribute('linearEnd', '%6f' % (world.mist_settings.start + world.mist_settings.depth))
+        fog.setAttribute('expDensity', world.mist_settings.intensity)
 
-        c = doc.createElement('colourDiffuse'); a.appendChild( c )
+        c = doc.createElement('colourDiffuse')
+        fog.appendChild( c )
         c.setAttribute('r', '%3f' % color.r)
         c.setAttribute('g', '%3f' % color.g)
         c.setAttribute('b', '%3f' % color.b)
 
+    skybox_name = dot_scene_skybox_export( path )
+    if skybox_name is not None:
+        skybox = doc.createElement('skyBox')
+        environment.appendChild( skybox )
+        skybox.setAttribute('material', skybox_name )
+        #skybox.setAttribute('distance', '5000')
+        #skybox.setAttribute('drawFirst', 'true')
+        skybox.setAttribute('active', 'true')
+
     return doc
+
+def dot_scene_skybox_export( path ):
+    if config.get('EXPORT_SKYBOX') is False:
+        return None
+
+    skybox_name = None
+    skybox_resolution = config.get('SKYBOX_RESOLUTION')
+    skybox_distance = 5000
+    skybox_imagepath = None
+    collection_name = "OgreSkyBox"
+    #path = "D:\\tmp\\SkyBox"
+
+    # Get the current scene
+    scene = bpy.context.scene
+
+    # Get the world used by the scene
+    world = scene.world
+
+    # Ensure that node use is enabled for the world
+    if world.use_nodes:
+        # Get the node tree of the world
+        nodes = world.node_tree.nodes
+
+        # Find the Background node (usually named 'Background')
+        background_node = nodes.get('Background')
+        if background_node:
+            # Access the 'Color' input
+            color_input = background_node.inputs['Color']
+
+            # Check if there is a link and if it's from a valid node
+            if color_input.is_linked:
+                linked_node = color_input.links[0].from_node
+                # Check if the node is an environment texture
+                if linked_node.type == 'TEX_ENVIRONMENT':
+                    # Output some information about the image
+                    logger.debug("SkyBox: Image linked as background:")
+                    logger.debug("SkyBox: - Image Name: %s" % linked_node.image.name)
+                    logger.debug("SkyBox: - Image Filepath: %s" % linked_node.image.filepath)
+                else:
+                    logger.warning("Unable to create SkyBox: Linked node is not an environment texture. Node type: %s" % linked_node.type)
+                    Report.warnings.append("Unable to create SkyBox: Linked node is not an environment texture. Node type: %s" % linked_node.type)
+                    return None
+            else:
+                # Retrieve the static color if no image is linked
+                background_color = color_input.default_value
+                logger.warning("Unable to create SkyBox: Found background color instead of environment texture")
+                Report.warnings.append("Unable to create SkyBox: Found background color instead of environment texture")
+                return None
+        else:
+            logger.warning("Unable to create SkyBox: No Background node found")
+            Report.warnings.append("Unable to create SkyBox: No Background node found")
+            return None
+    else:
+        logger.warning("Unable to create SkyBox: World nodes are not enabled.")
+        Report.warnings.append("Unable to create SkyBox: World nodes are not enabled.")
+        return None
+
+    skybox_imagepath = linked_node.image.filepath
+    skybox_name = os.path.splitext(linked_node.image.name)[0]
+
+    logger.info("* Generating SkyBox: %s" % skybox_name)
+    logger.info("+ From Image: %s" % skybox_name)
+    logger.info("+ With resolution: %s" % skybox_resolution)
+
+    # Create a collection to render the SkyBox
+    skybox_collection = bpy.data.collections.new(collection_name)
+    bpy.context.scene.collection.children.link(skybox_collection)
+
+    # Create camera to render the SkyBox
+    camera_name = "OgreSkyBox_CAM"
+
+    camera = bpy.data.cameras.new(camera_name)
+    camera_ob = bpy.data.objects.new(camera_name, camera)
+    #bpy.context.scene.objects.link(camera_ob)
+
+    #camera_ob = bpy.data.objects['CameraY']
+    skybox_collection.objects.link(camera_ob)
+
+    scene_camera_orig = scene.camera
+    scene.camera = camera_ob
+
+    # Set SkyBox camera settings
+    camera_ob.data.lens_unit = 'FOV'
+    camera_ob.data.angle = math.radians(90)
+
+    # Depth of Field
+    #camera_ob.data.dof.use_dof = True
+    #camera_ob.data.dof.focus_distance = 10.0
+
+    camera_ob.data.clip_start = 0.1
+    camera_ob.data.clip_end = 1000
+
+    # Backup scene settings
+    scene_res_x_orig = scene.render.resolution_x
+    scene_res_y_orig = scene.render.resolution_y
+    scene_rdr_perc_orig = scene.render.resolution_percentage
+    scene_filepath_orig = scene.render.filepath
+    scene_use_nodes_orig = scene.use_nodes
+    scene_file_format_orig = scene.render.image_settings.file_format
+
+    # Set scene settings for SkyBox rendering
+    scene.render.resolution_x = skybox_resolution
+    scene.render.resolution_y = skybox_resolution
+    scene.render.resolution_percentage = 100
+    scene.use_nodes = True
+    scene.render.image_settings.file_format = 'PNG'
+
+    # Create SkyBox camera orientations
+    front = mathutils.Euler((math.radians(90), 0, 0), 'XYZ')
+    back = mathutils.Euler((math.radians(90), 0, math.radians(180)), 'XYZ')
+    right = mathutils.Euler((math.radians(90), 0, -math.radians(90)), 'XYZ')
+    left = mathutils.Euler((math.radians(90), 0, math.radians(90)), 'XYZ')
+    top = mathutils.Euler((math.radians(180), 0, 0), 'XYZ')
+    bottom = mathutils.Euler((0, 0, 0), 'XYZ')
+
+    orientations = {"fr": front, "bk": back, "rt": right, "lf": left, "up": top, "dn": bottom}
+
+    # Render only the SkyBox collection
+    for collection in bpy.data.collections:
+        if collection != skybox_collection:
+            collection.hide_render = True
+        else:
+            collection.hide_render = False
+
+    # Render one side of the skybox for each orientation
+    i = 0
+    for orientation in orientations:
+        camera_ob.rotation_euler = orientations[orientation]
+        image_name = os.path.join(path, skybox_name + "_" + orientation)
+        scene.render.filepath = image_name
+        logger.info("Exporting SkyBox image: %s" % image_name)
+        scene.render.use_compositing = True
+        bpy.ops.render.render(write_still = True)
+        #bpy.ops.render.render(animation=False, write_still=False, use_viewport=False, layer='', scene='')
+        #progressbar.update(i)
+        i = i + 1
+        percent = len(orientations) / i
+        bpy.context.window_manager.progress_update(percent * 100)
+
+    # Restore scene settings
+    scene.render.resolution_x = scene_res_x_orig
+    scene.render.resolution_y = scene_res_y_orig
+    scene.render.resolution_percentage = scene_rdr_perc_orig
+    scene.render.filepath = scene_filepath_orig
+    scene.use_nodes = scene_use_nodes_orig
+    scene.camera = scene_camera_orig
+    scene.render.image_settings.file_format = scene_file_format_orig
+
+    # Restore collection rendering
+    for collection in bpy.data.collections:
+        collection.hide_render = False
+
+    # Remove SkyBox camera
+    bpy.data.cameras.remove(camera)
+
+    # Destroy the collection created to render the SkyBox
+    bpy.context.scene.collection.children.unlink(skybox_collection)
+    bpy.data.collections.remove(skybox_collection)
+
+    w = util.IndentedWriter()
+    with w.iword('material').word(skybox_name).embed():
+        with w.iword('technique').embed():
+            with w.iword('pass').embed():
+                w.iline('lighting off')
+                w.iline('depth_write off')
+                with w.iword('texture_unit').embed():
+                    w.iword('texture').word(skybox_name + ".png").word("cubic").nl()
+                    w.iline('tex_address_mode clamp')
+    material_text = w.text
+
+    try:
+        mat_file_name = join(path, skybox_name + ".material")
+        with open(mat_file_name, 'wb') as fd:
+            logger.info("SkyBox: Exporting material to: %s" % mat_file_name)
+            b2o_ver = ".".join(str(i) for i in bl_info["version"])
+            fd.write(bytes('// generated by blender2ogre %s on %s\n' % (b2o_ver, datetime.now().replace(microsecond=0)), 'utf-8'))
+            fd.write(bytes(material_text, 'utf-8'))
+    except Exception as e:
+        logger.error("Unable to create SkyBox material file: %s" % mat_file_name)
+        logger.error(e)
+        Report.errors.append("Unable to create SkyBox material file: %s" % mat_file_name)
+        return None
+
+    return skybox_name
+
 
 # Recursive Node export
 def dot_scene_node_export( ob, path, doc=None, rex=None,
