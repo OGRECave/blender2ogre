@@ -27,6 +27,7 @@
     - [Exporting Node Animations](#exporting-node-animations)
     - [Exporting for Physics](#exporting-for-physics)
     - [Exporting Vertex Colors](#exporting-vertex-colors)
+    - [Exporting SkyBoxes](#exporting-skyboxes)
     - [Level of Detail (LOD)](#level-of-detail-lod)
     - [Mesh Previewer](#mesh-previewer)
  - [About](#about)
@@ -260,6 +261,13 @@ Check out the [Exporting for Physics](Physics.md) tutorial to see some technique
 
 `blender2ogre` can import and export Vertex Colors, a way to assign colors to your mesh by vertex. It is also possible to asign alpha values to each vertex for transparency or other uses.
 Check out the [Vertex Colors](VertexColors.md) tutorial to see how to create the Vertex Colors in Blender and how to export them.
+
+### Exporting SkyBoxes
+![skyboxes1.jpg](images/skyboxes/skyboxes1.jpg)
+
+`blender2ogre` can generate SkyBoxes from HDRi Maps and export them in a format that can be used in OGRE, that is a Cube Map.
+Check out the [SkyBoxes](SkyBoxes.md) tutorial to see how to create import the Environment Map in Blender and how to export it.
+
 
 ### Level of Detail (LOD)
 Level of Detail or LOD is an optimization technique supported by OGRE, where meshes that are far away from the camera are replaced by meshes with lower vertex count.
