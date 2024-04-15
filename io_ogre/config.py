@@ -48,6 +48,8 @@ _CONFIG_DEFAULTS_ALL = {
     'FORCE_LIGHTS' : True,
     'NODE_ANIMATION' : True,
     #'NODE_KEYFRAMES' : False,
+    'EXPORT_SKYBOX': False,
+    'SKYBOX_RESOLUTION': 2048,
 
     # Materials
     'MATERIALS' : True,
