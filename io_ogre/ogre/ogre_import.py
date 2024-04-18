@@ -1270,6 +1270,9 @@ def bCreateSubMeshes(meshData, meshName):
         else:
             logger.warning("Definition of material: \"%s\" not found!" % subMeshName)
             Report.warnings.append("Definition of material: \"%s\" not found!" % subMeshName)
+            # create default material if it could not be imported to preserve submesh material reference
+            mat = bpy.data.materials.new(name=subMeshName)
+            ob.data.materials.append(mat)
 
         # Texture coordinates
         if 'texcoordsets' in geometry and 'uvsets' in geometry:
