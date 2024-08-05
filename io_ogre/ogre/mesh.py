@@ -40,6 +40,11 @@ class VertexColorLookup:
                             Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color data type: "%s" (should be: "BYTE_COLOR")' % \
                                 (mesh.name, key, colors.data_type) )
 
+            if self.__colors is None:
+                # No color found by name, assume that the only vertex color data is actual color data
+                logger.debug("No color found by name, assume that the only vertex color data is actual color data")
+                self.__colors = colors
+
             if self.__colors:
                 self.__colors = [x.color for x in self.__colors.data]
                 #self.__colors = [x.color_srgb for x in self.__colors.data]
