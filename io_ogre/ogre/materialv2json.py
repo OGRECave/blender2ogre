@@ -212,7 +212,7 @@ class OgreMaterialv2JsonGenerator(object):
             pass
         elif material.blend_method == "CLIP":     # CLIP enables alpha_test (alpha rejection)
             datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
-        elif material.blend_method in ["HASHED", "BLEND"]: 
+        elif material.blend_method == "BLEND": 
             datablock["transparency"] = {
                 "mode": "Transparent",        
                 "use_alpha_from_textures": tex_filename != None,  # DEFAULT
