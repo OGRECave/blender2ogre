@@ -829,15 +829,15 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     # todo: Very ugly, find better way
     def replaceInplace(f,searchExp,replaceExp):
-            import fileinput
-            for line in fileinput.input(f, inplace=1):
+        import fileinput
+        
+        with fileinput.FileInput(f, inplace=True, encoding="utf-8") as file:
+            for line in file:
                 if searchExp in line:
                     line = line.replace(searchExp,replaceExp)
                 sys.stdout.write(line)
-            fileinput.close() # reported by jakob
 
     replaceInplace(target_file, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
-    del(replaceInplace)
 
     # Start .mesh.xml to .mesh convertion tool
     util.xml_convert(target_file, has_uvs=dotextures)
