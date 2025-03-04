@@ -133,7 +133,7 @@ class OgreMaterialGenerator(object):
 
         self.generate_header()
         with self.w.iword('material').word(self.material_name).embed():
-            if self.material.shadow_method != "NONE":
+            if self.material['visible_shadow']:
                 self.w.iline('receive_shadows on')
             else:
                 self.w.iline('receive_shadows off')
