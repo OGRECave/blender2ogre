@@ -579,6 +579,8 @@ def objects_merge_materials(objs):
     materials = set()
     for obj in objs:
         for mat in obj.data.materials:
+            # adapt to Blender API change: https://developer.blender.org/docs/release_notes/4.2/eevee/#shading-modes
+            mat['visible_shadow'] = obj.visible_shadow
             materials.add(mat)
     return materials
 
