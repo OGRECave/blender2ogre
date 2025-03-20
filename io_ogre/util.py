@@ -301,8 +301,12 @@ def mesh_convert(infile):
         # Convert to v2 format if required
         cmd.append('-%s' % config.get('MESH_TOOL_VERSION'))
 
+        # Ask MeshTool to "unoptimize" if necessary. Otherwise we can't read half and qtangents
+        cmd.append("-U")
         # Finally, specify input file
         cmd.append(infile)
+        # MeshTool needs us to specify output file
+        cmd.append(infile + ".xml")
         
         # OgreMeshTool must be run from its own directory (so setting cwd accordingly)
         # otherwise it will complain about missing render system (missing plugins_tools.cfg)
