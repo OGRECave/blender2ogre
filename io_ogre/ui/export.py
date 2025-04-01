@@ -35,15 +35,19 @@ def menu_func(self, context):
 class _OgreCommonExport_(object):
 
     called_from_UI = False
+    converter = "unknown"
 
     @classmethod
     def poll(cls, context):
         if context.active_object and context.mode != 'EDIT_MESH':
             return True
 
-    def __init__(self):
-        # Check that converter is setup
-        self.converter = detect_converter_type()
+    # https://docs.blender.org/api/current/bpy.utils.html#bpy.utils.register_class
+    # > If the class has a register class method it will be called before registration.
+    # call chain: __init__.py::register() -> bpy.utils.register_class() -> (Blender internals) -> Self::register()
+    @classmethod
+    def register(cls):
+       cls.converter = detect_converter_type()
 
     def invoke(self, context, event):
         # Update the interface with the config values
