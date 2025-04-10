@@ -499,3 +499,7 @@ class OP_ogre_export(bpy.types.Operator, _OgreCommonExport_):
     bl_label = "Export Ogre"
     bl_options = {'REGISTER'}
     # export logic is contained in the subclass
+
+    def __init__(self, *args, **kwargs):
+        bpy.types.Operator.__init__(self, *args, **kwargs)
+        _OgreCommonExport_.__init__(self)
