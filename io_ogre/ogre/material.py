@@ -191,13 +191,19 @@ class OgreMaterialGenerator(object):
 
             color = mat_wrapper.base_color
             alpha = 1.0
-            if mat.blend_method == "CLIP":
-                alpha = mat_wrapper.alpha
-                self.w.iword('alpha_rejection greater_equal').round(255*mat.alpha_threshold).nl()
-            elif mat.blend_method == "BLEND":
+            if mat.surface_render_method == "DITHERED":
+                # https://developer.blender.org/docs/release_notes/4.2/eevee_migration/#materials
+                if mat.use_nodes and mat.node_tree:
+                    for node in mat.node_tree.nodes:
+                        if type(node) == bpy.types.ShaderNodeMath and node.operation == 'GREATER_THAN':
+                            alpha = mat_wrapper.alpha
+                            self.w.iword('alpha_rejection greater_equal').round(255*mat.alpha_threshold).nl()
+                            break
+            elif mat.surface_render_method == "BLENDED":
                 alpha = mat_wrapper.alpha
                 self.w.iword('scene_blend alpha_blend').nl()
-                if mat.show_transparent_back:
+                # https://developer.blender.org/docs/release_notes/4.2/python_api/
+                if mat.use_transparency_overlap:
                     self.w.iword('cull_hardware none').nl()
                     self.w.iword('depth_write off').nl()
 
