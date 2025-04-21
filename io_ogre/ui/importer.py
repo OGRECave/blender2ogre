@@ -348,3 +348,7 @@ class OP_ogre_import(bpy.types.Operator, _OgreCommonImport_):
     bl_label = "Import Ogre"
     bl_options = {'REGISTER'}
     # import logic is contained in the subclass
+
+    def __init__(self, *args, **kwargs):
+        bpy.types.Operator.__init__(self, *args, **kwargs)
+        _OgreCommonImport_.__init__(self)
