@@ -578,13 +578,19 @@ def texture_image_path(image):
 
 def objects_merge_materials(objs):
     """
-    return a list that contains unique material objects
+    return a set that contains unique material objects.
+
+    Empty material slots are kept as None so the callers can emit
+    _missing_material_ instead of crashing on an unassigned slot.
     """
     materials = set()
     for obj in objs:
+        if obj is None or obj.type != 'MESH':
+            continue
         for mat in obj.data.materials:
             # adapt to Blender API change: https://developer.blender.org/docs/release_notes/4.2/eevee/#shading-modes
-            mat['visible_shadow'] = obj.visible_shadow
+            if mat is not None:
+                mat['visible_shadow'] = obj.visible_shadow
             materials.add(mat)
     return materials
 

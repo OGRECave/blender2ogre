@@ -36,8 +36,14 @@ class OgreMaterialv2JsonGenerator(object):
         """Process all the materials, create the output json and copy textures"""
         if self.separate_files:
             for mat in self.materials:
+                if mat is None:
+                    logger.warning("Skipping empty material slot for JSON material export")
+                    continue
                 datablock, blendblocks = self.generate_pbs_datablock(mat)
-                dst_filename = os.path.join(self.target_path, "{}.material.json".format(material_name(mat)))
+                dst_filename = os.path.join(
+                    self.target_path,
+                    "{}.material.json".format(util.clean_object_name(material_name(mat)))
+                )
                 logger.info("Writing material '{}'".format(dst_filename))
                 try:
                     with open(dst_filename, 'w') as fp:
@@ -49,11 +55,20 @@ class OgreMaterialv2JsonGenerator(object):
                     Report.errors.append("Unable to create material file '{}'".format(dst_filename))
                     logger.error(e)
         else:
-            dst_filename = os.path.join(self.target_path, "{}.material.json".format(self.prefix))
+            dst_filename = os.path.join(
+                self.target_path,
+                "{}.material.json".format(util.clean_object_name(self.prefix))
+            )
             fileblock = {"pbs": {}}
             for mat in self.materials:
+                if mat is None:
+                    logger.warning("Skipping empty material slot for JSON material export")
+                    continue
                 logger.info("Preparing material '{}' for file '{}".format(material_name(mat), dst_filename))
-                fileblock["pbs"][material_name(mat)], fileblock["blendblocks"] = self.generate_pbs_datablock(mat)
+                datablock, blendblocks = self.generate_pbs_datablock(mat)
+                fileblock["pbs"][material_name(mat)] = datablock
+                if blendblocks:
+                    fileblock.setdefault("blendblocks", {}).update(blendblocks)
             try:
                 with open(dst_filename, 'w') as fp:
                     json.dump(fileblock, fp, indent=2, sort_keys=True)
