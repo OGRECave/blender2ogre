@@ -317,7 +317,8 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
         doc.close() # reported by Reyn
         f.close ()
     
-    return
+    mats = [material_name(mat) for mat in materials if mat is not None]
+    return mats
 
 class VertexColorLookup:
     def __init__(self, mesh):
@@ -1040,6 +1041,15 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
 
         replaceInplace(target_file, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
 
+    mats = []
+    for mat_name, extern, mat in materials:
+        # _missing_material_ is marked as extern
+        if not extern:
+            mats.append(mat_name)
+        else:
+            logger.info("Extern material: %s" % mat_name)
+    return mats
+
 def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=True, tangents=4, isLOD=False, **kwargs):
     """
     export the vertices of an object into a .mesh file
@@ -1134,9 +1144,9 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     unshare_geometry = config.get ('UNSHARE_GEOMETRY')
     if unshare_geometry:
-        write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, obj_name)
+        mats = write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, obj_name)
     else:
-        write_shared (target_file, path, dotextures, mesh, normals, tangents, material_prefix, ob, obj_name, copy, start, ignore_shape_animation, isLOD, disable_mods)
+        mats = write_shared (target_file, path, dotextures, mesh, normals, tangents, material_prefix, ob, obj_name, copy, start, ignore_shape_animation, isLOD, disable_mods)
 
     ## If we made a copy of the object, clean it up
     if ob != copy:
@@ -1171,6 +1181,8 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     # Note that exporting the skeleton does not happen here anymore
     # It was moved to the function dot_skeleton in its own module (skeleton.py)
+
+    return mats
 
 def triangle_list_in_group(mesh, shared_vertices, group_index):
     faces = []
