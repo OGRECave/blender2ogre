@@ -353,7 +353,7 @@ def xml_convert(infile, has_uvs=False):
 
     if config.get('EXTREMITY_POINTS') > 0 and converter_type == "OgreXMLConverter":
         cmd.append('-x')
-        cmd.append(config.get('EXTREMITY_POINTS'))
+        cmd.append(str(config.get('EXTREMITY_POINTS')))
 
     # OgreMeshTool (OGRE v2): -e = DON'T generate edge lists (for stencil shadows)
     # OgreXMLConverter (OGRE < 1.10): -e = DON'T generate edge lists (for stencil shadows)
