@@ -752,7 +752,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                     logger.warning("Object \"%s\" has non uniform scale or rotation" % ob.name)
                     Report.warnings.append("Object \"%s\" has non uniform scale or rotation, exported mesh will look different" % ob.name)
 
-            exists = os.path.isfile( join( path, '%s.mesh' % ob.data.name ) )
+            exists = os.path.isfile( join( path, '%s.mesh' % clean_object_name(ob.data.name) ) )
             overwrite = not exists or (exists and (config.get("MESH_OVERWRITE") is True))
             tangents = int(config.get("GENERATE_TANGENTS"))
             mesh.dot_mesh(ob, path, overwrite=overwrite, tangents=tangents)

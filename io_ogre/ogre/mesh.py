@@ -568,12 +568,14 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
 
             try:
                 material_faces[F.material_index].append(face)
-            except:
+            except IndexError:
                 failure = 'FAILED to assign material to face - you might be using a Boolean Modifier between objects with different materials!'
                 failure += '[ mesh : %s ]' % mesh.name
                 Report.warnings.append( failure )
                 logger.error( failure )
-                break
+                # Skip only the offending face; the remaining polygons are
+                # still valid and used to be silently discarded here.
+                continue
 
         Report.vertices += numverts
 
@@ -703,7 +705,7 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                     # 'value' is the distance this LOD kicks in for the 'Distance' strategy.
                     doc.leaf_tag('lodmanual', {
                         'value'    : str(lod['distance']),
-                        'meshname' : lod_manual_ob.data.name + ".mesh"
+                        'meshname' : clean_object_name(lod_manual_ob.data.name) + ".mesh"
                     })
 
                 doc.end_tag('levelofdetail')
