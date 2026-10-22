@@ -1,4 +1,4 @@
-import bpy, mathutils, logging, time, sys
+import bpy, mathutils, logging, time, sys, os
 from .. import config
 from ..report import Report
 from ..xml import RDocument
@@ -27,7 +27,7 @@ def dot_skeleton(obj, path, **kwargs):
 
     arm = obj.find_armature()
     if arm and (config.get('ARMATURE_ANIMATION') is True):
-        exported_armatures = kwargs.get('exported_armatures')
+        exported_armatures = kwargs.get('exported_armatures') or []
 
         name = kwargs.get('force_name') or obj.data.name
         if config.get('SHARED_ARMATURE') is True:
@@ -40,6 +40,12 @@ def dot_skeleton(obj, path, **kwargs):
             return None
 
         xmlfile = join(path, '%s.skeleton.xml' % name)
+        binaryfile = join(path, '%s.skeleton' % name)
+
+        if kwargs.get('overwrite', True) is False and \
+                (os.path.isfile(xmlfile) or os.path.isfile(binaryfile)):
+            logger.debug("Skip overwriting existing skeleton: %s" % binaryfile)
+            return None
 
         logger.info('* Generating: %s.skeleton.xml' % name)
 
@@ -387,25 +393,32 @@ class Skeleton(object):
         # Decide keyframes to export:
         # ONLY keyframes (Exported animation won't be affected by Inverse Kinematics, Drivers and modified F-Curves)
         # OR export keyframe each frame over animation range (Exported animation will be affected by Inverse Kinematics, Drivers and modified F-Curves)
+        start_frame = int(frameBegin)
+        end_frame = int(frameEnd)
+
         if config.get('ONLY_KEYFRAMES') is True: # Only keyframes
-            frame_range = [] # Holds a list of keyframes for export
+            frame_range = set() # Holds all keyframes for export
             action = bpy.data.actions[actionName] # actionName is the animation name (NLAtrack child)
             # loops through all channels on the f-curve --> Code taken from: https://blender.stackexchange.com/questions/8387/how-to-get-keyframe-data-from-python
             for fcu in action.fcurves:
                 for keyframe in fcu.keyframe_points: # Loops through all the keyframes in the channel
                     kf = int(keyframe.co[0]) # key frame number
-                    if kf not in frame_range: # only add the key frames in once. Keyframes repeat in different channels
-                        frame_range.append(kf)
+                    # Ignore keys outside this strip; Ogre expects keyframe
+                    # times inside [0, animation length].
+                    if start_frame <= kf <= end_frame:
+                        frame_range.add(kf)
+            frame_range = sorted(frame_range)
         else: # Keyframes each frame
-            frame_range = range( int(frameBegin), int(frameEnd) + 1, bpy.context.scene.frame_step) #thanks to Vesa, NOTE: frame_step is [( # of frames / FPS ) / # of frames ] -- I think??
+            frame_range = range( start_frame, end_frame + 1, bpy.context.scene.frame_step) #thanks to Vesa, NOTE: frame_step is [( # of frames / FPS ) / # of frames ] -- I think??
 
         logger.info(" - Exporting action: %s" % actionName)
 
-        progressbar = util.ProgressBar("Frames", len(frame_range) )
+        progressbar = util.ProgressBar("Frames", len(frame_range)) if frame_range else None
 
         # Add keyframes to export
         for frame in frame_range:
-            progressbar.update( frame - frameBegin )
+            if progressbar:
+                progressbar.update( frame - start_frame )
 
             bpy.context.scene.frame_set(frame)
             for bone in self.roots:

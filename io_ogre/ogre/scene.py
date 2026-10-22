@@ -721,12 +721,19 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         if not collisionPrim and not collisionFile:
             for child in ob.children:
                 if child.subcollision and child.name.startswith('DECIMATE'):
-                    collisionFile = '%s_collision_%s.mesh' % (prefix, ob.data.name)
+                    collision_name = '%s_collision_%s' % (prefix, clean_object_name(ob.data.name))
+                    collisionFile = collision_name + '.mesh'
                     break
             if collisionFile:
                 mesh_collision_files[ ob.data.name ] = collisionFile
-                mesh.dot_mesh(child, path, force_name='%s_collision_%s' % (prefix, ob.data.name) )
-                skeleton.dot_skeleton(child, path)
+                mesh.dot_mesh(child, path, force_name=collision_name)
+                # A collision mesh has no node of its own, so its skeletonlink
+                # is derived from the forced mesh name. Match that here unless
+                # a shared armature is used, in which case both sides use the
+                # armature name.
+                skeleton_force_name = None if config.get('SHARED_ARMATURE') else collision_name
+                skeleton.dot_skeleton(child, path, force_name=skeleton_force_name,
+                                      exported_armatures=exported_armatures)
 
         if collisionPrim:
             e.setAttribute('collisionPrim', collisionPrim )
