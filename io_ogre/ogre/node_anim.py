@@ -81,6 +81,12 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
 
     _fps = float( bpy.context.scene.render.fps )
 
+    # Ogre animation time is relative to the start of the action. Keep the
+    # same integer-frame handling as the skeleton exporter so NLA strips with
+    # fractional boundaries still produce a stable first frame.
+    start_frame = int(frame_start)
+    end_frame = int(frame_end)
+
     # Actually in Blender this does not make sense because there is only one possible animation per object,
     # but lets maintain compatibility with Easy Ogre Exporter
     aa = doc.createElement('animations')
@@ -92,7 +98,7 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
     a.setAttribute("loop", "false")
     a.setAttribute("interpolationMode", "linear")
     a.setAttribute("rotationInterpolationMode", "linear")
-    a.setAttribute("length", '%6f' % ((frame_end) / _fps))
+    a.setAttribute("length", '%6f' % ((end_frame - start_frame) / _fps))
     aa.appendChild(a)
 
     frame_current = bpy.context.scene.frame_current
@@ -101,7 +107,7 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
     initial_rotation = mathutils.Quaternion((1, 0, 0, 0))
     initial_scale = mathutils.Vector((1, 1, 1))
 
-    frames = range(int(frame_start), int(frame_end) + 1)
+    frames = range(start_frame, end_frame + 1)
 
     # If NODE_KEYFRAMES is True, then use only the keyframes to export the animation
     #if config.get('NODE_KEYFRAMES') is True:
@@ -110,7 +116,7 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
     for frame in frames:
 
         kf = doc.createElement('keyframe')
-        kf.setAttribute("time", '%6f' % (frame / _fps))
+        kf.setAttribute("time", '%6f' % ((frame - start_frame) / _fps))
         a.appendChild(kf)
 
         bpy.context.scene.frame_set(frame)
@@ -119,7 +125,7 @@ def write_animation(ob, action, frame_start, frame_end, doc, xmlnode):
         rotation_quat = mathutils.Quaternion((1, 0, 0, 0))
         scale = mathutils.Vector((1, 1, 1))
 
-        if frame == frame_start:
+        if frame == start_frame:
             initial_location = util.swap( ob.matrix_local.to_translation() )
             initial_rotation = util.swap( ob.matrix_local.to_quaternion() )
             initial_scale = calc_scale( ob.matrix_local )
