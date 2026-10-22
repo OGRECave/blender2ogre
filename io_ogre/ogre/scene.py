@@ -40,6 +40,7 @@ def dot_scene(path, scene_name=None):
 
     logger.info("* Processing Scene: %s, path: %s" % (scene_name, path))
     prefix = scene_name
+    converter_type = detect_converter_type()
 
     # If an object has an animation, then we want to export the position at the first frame (with the object at rest)
     # Otherwise the objects position will be at an arbitrary place if current frame is different from frame_start
@@ -171,7 +172,6 @@ def dot_scene(path, scene_name=None):
         logger.info("* Processing Materials")
         materials = util.objects_merge_materials(meshes)
 
-        converter_type= detect_converter_type()
         if converter_type == "OgreMeshTool":
             dot_materialsv2json(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)
         elif converter_type == "OgreXMLConverter":
@@ -180,7 +180,7 @@ def dot_scene(path, scene_name=None):
             logger.error("Unknown converter type '{}', will not generate materials".format(converter_type))
             Report.errors.append("Unknown converter type '{}', will not generate materials".format(converter_type))
 
-    doc = ogre_document(materials, path)
+    doc = ogre_document(materials, path, prefix, converter_type)
 
     mesh_collision_prims = {}
     mesh_collision_files = {}
@@ -392,7 +392,7 @@ def _ogre_node_helper( doc, ob, prefix='', pos=None, rot=None, scl=None ):
 
     return o
 
-def ogre_document(materials, path):
+def ogre_document(materials, path, prefix=None, converter_type=None):
     now = time.time()
     doc = RDocument()
     scn = doc.createElement('scene')
@@ -419,14 +419,36 @@ def ogre_document(materials, path):
         scn.appendChild( n )
 
     # External files
-    for mat in materials:
-        if mat is None: continue
+    if converter_type is None:
+        converter_type = util.detect_converter_type()
+    material_ext = 'material.json' if converter_type == "OgreMeshTool" else 'material'
+
+    external_files = []
+    if config.get('MATERIALS') is True and materials:
+        if config.get('SEPARATE_MATERIALS') is True:
+            for mat in materials:
+                if mat is None:
+                    # dot_materials() writes _missing_material_.material
+                    if converter_type == "OgreXMLConverter":
+                        external_files.append('_missing_material_.' + material_ext)
+                    continue
+                external_files.append(material.material_filename(mat) + '.' + material_ext)
+        else:
+            # dot_materials()/dot_materialsv2json() write one combined file
+            combined_prefix = prefix or bpy.context.scene.name
+            external_files.append(clean_object_name(combined_prefix) + '.' + material_ext)
+
+    seen_externals = set()
+    for filename in external_files:
+        if filename in seen_externals:
+            continue
+        seen_externals.add(filename)
         item = doc.createElement('item')
         external.appendChild( item )
         item.setAttribute('type', 'material')
         a = doc.createElement('file')
         item.appendChild( a )
-        a.setAttribute('name', '%s.material' % material.material_name(mat))
+        a.setAttribute('name', filename)
 
     # Environment settings
     world = bpy.context.scene.world

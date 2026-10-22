@@ -44,7 +44,7 @@ def dot_materials(materials, path=None, separate_files=True, prefix='mats', **kw
         for mat in materials:
             dot_material(mat, path)
     else:
-        mat_file_name = prefix
+        mat_file_name = clean_object_name(prefix)
         target_file = os.path.join(path, '%s.material' % mat_file_name)
         with open(target_file, 'wb') as fd:
             _write_b2o_ver(fd)
@@ -86,7 +86,7 @@ def dot_material(mat, path, **kwargs):
     if kwargs.get('touch_textures', config.get('TOUCH_TEXTURES')):
         generator.copy_textures()
     try:
-        mat_file_name = join(path, clean_object_name(generator.material_name) + ".material")
+        mat_file_name = join(path, material_filename(mat, prefix=prefix) + ".material")
         with open(mat_file_name, 'wb') as fd:
             _write_b2o_ver(fd)
             fd.write(bytes(material_text, 'utf-8'))
@@ -133,7 +133,7 @@ class OgreMaterialGenerator(object):
 
         self.generate_header()
         with self.w.iword('material').word(self.material_name).embed():
-            if self.material['visible_shadow']:
+            if self.material.get('visible_shadow', True):
                 self.w.iline('receive_shadows on')
             else:
                 self.w.iline('receive_shadows off')
@@ -483,6 +483,18 @@ def material_name( mat, clean = False, prefix='' ):
         return prefix + "_" + name
     else:
         return prefix + name
+
+def material_filename( mat, prefix='' ):
+    """
+    Return the sanitized filename stem used for a material file.
+
+    Mesh submesh references and .scene external entries must use the same
+    name as the file written by dot_material(), otherwise Blender material
+    names containing filename-invalid characters produce dangling references.
+    """
+    if mat is None:
+        return '_missing_material_'
+    return clean_object_name(material_name(mat, prefix=prefix))
 
 def get_shader_program( name ):
     if name in OgreProgram.PROGRAMS:
