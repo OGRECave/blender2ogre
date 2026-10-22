@@ -7,7 +7,7 @@ from .report import Report
 from . import config
 from .ogre.mesh import dot_mesh
 from .ogre.material import dot_materials
-from .util import objects_merge_materials, merge_objects
+from .util import objects_merge_materials, merge_objects, get_merge_group, merge_group
 
 ## This class is called when the "Preview Mesh" button is pressed. It opens the Ogre mesh previewer
 ## The button is created int ui/__init__.py > auto_register() function.
@@ -39,12 +39,9 @@ class OGREMESH_OT_preview(bpy.types.Operator):
         else:
             path = 'C:\\tmp'
 
-        mat = None
-        mgroup = merged = None
+        merged = None
 
-        if context.active_object.type == 'MESH':
-            mat = context.active_object.active_material
-        elif context.active_object.type == 'EMPTY': # assume group
+        if context.active_object.type == 'EMPTY': # assume group
             obs = []
             for e in context.selected_objects:
                 if e.type != 'EMPTY' and e.instance_collection: continue
@@ -57,18 +54,11 @@ class OGREMESH_OT_preview(bpy.types.Operator):
                     obs.append( m )
             if obs:
                 merged = merge_objects( obs )
-                umaterials = dot_mesh( merged, path=path, force_name='preview' )
+                dot_mesh( merged, path=path, force_name='preview' )
                 for o in obs: context.scene.objects.unlink(o)
 
-        if not self.mesh:
-            for ob in context.selected_objects:
-                if ob.type == 'MESH':
-                    for mat in ob.data.materials:
-                        if mat and mat not in umaterials: umaterials.append( mat )
-
         if not merged:
-            mgroup = False # TODO relevant? MeshMagick.get_merge_group( context.active_object )
-            if not mgroup and self.groups:
+            if self.groups:
                 group = get_merge_group( context.active_object )
                 if group:
                     print('--------------- has merge group ---------------' )
@@ -78,14 +68,7 @@ class OGREMESH_OT_preview(bpy.types.Operator):
             elif len(context.selected_objects)>1 and context.selected_objects:
                 merged = merge_objects( context.selected_objects )
 
-            if mgroup:
-                for ob in mgroup.objects:
-                    nmats = dot_mesh( ob, path=path )
-                    for m in nmats:
-                        if m not in umaterials: umaterials.append( m )
-                MeshMagick.merge( mgroup, path=path, force_name='preview' )
-            else:
-                dot_mesh( merged or context.active_object, path=path, force_name='preview', overwrite=True )
+            dot_mesh( merged or context.active_object, path=path, force_name='preview', overwrite=True )
 
         mats = objects_merge_materials([merged or context.active_object])
         dot_materials(mats, path, False, "preview")
