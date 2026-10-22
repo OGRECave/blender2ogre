@@ -188,25 +188,6 @@ def load_config():
                 logger.error('Unknown platform: %s' % sys.platform)
                 assert 0
 
-    # Setup temp hidden RNA to expose the file paths
-    for tag in _CONFIG_TAGS_:
-        default = config_dict[ tag ]
-        #func = eval( 'lambda self,con: config_dict.update( {"%s" : self.%s} )' %(tag,tag) )
-        func = lambda self,con: config_dict.update( {tag : getattr(self,tag,default)} )
-        if type(default) is bool:
-            prop = BoolProperty( name=tag,
-                                 description='updates bool setting',
-                                 default=default,
-                                 options={'SKIP_SAVE'},
-                                 update=func)
-        else:
-            prop = StringProperty( name=tag,
-                    description='updates path setting',
-                    maxlen=128,
-                    default=default,
-                    options={'SKIP_SAVE'},
-                    update=func)
-        setattr( bpy.types.WindowManager, tag, prop )
 
     return config_dict
 

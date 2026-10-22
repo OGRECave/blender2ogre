@@ -402,22 +402,6 @@ class OgreMaterialGenerator(object):
 # Make default material for missing materials:
 # * Red flags for users so they can quickly see what they forgot to assign a material to.
 # * Do not crash if no material on object - thats annoying for the user.
-TEXTURE_COLOUR_OP = {
-    'MIX'       : 'modulate',   # Ogre Default - was "replace" but that kills lighting
-    'ADD'       : 'add',
-    'MULTIPLY'  : 'modulate',
-    #'alpha_blend' : '',
-}
-TEXTURE_COLOUR_OP_EX = {
-    'MIX'       : 'blend_manual',
-    'SCREEN'    : 'modulate_x2',
-    'LIGHTEN'   : 'modulate_x4',
-    'SUBTRACT'  : 'subtract',
-    'OVERLAY'   : 'add_signed',
-    'DIFFERENCE': 'dotproduct', # best match?
-    'VALUE'     : 'blend_diffuse_colour',
-}
-
 TEXTURE_ADDRESS_MODE = {
     'REPEAT'    : 'wrap',
     'EXTEND'    : 'clamp',

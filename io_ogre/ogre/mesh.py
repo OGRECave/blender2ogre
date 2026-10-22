@@ -432,7 +432,7 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                 'normals':'true',
                 'tangents': str(bool(tangents)),
                 'tangent_dimensions': str(tangents),
-                'colours_diffuse' : str(bool( mesh.vertex_colors )),
+                'colours_diffuse' : str(bool(mesh.color_attributes) if bpy.app.version >= (3, 2, 0) else bool(mesh.vertex_colors)),
                 'texture_coords' : '%s' % len(mesh.uv_layers) * dotextures
         })
 
@@ -1225,19 +1225,6 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     # It was moved to the function dot_skeleton in its own module (skeleton.py)
 
     return mats
-
-def triangle_list_in_group(mesh, shared_vertices, group_index):
-    faces = []
-    for face in mesh.data.loop_triangles:
-        vertices = [mesh.data.vertices[v] for v in face.vertices]
-        match_group = lambda g, v: g in [x.group for x in v.groups]
-        all_in_group = all([match_group(group_index, v) for v in vertices])
-        if not all_in_group:
-            continue
-        assert len(face.vertices) == 3
-        entry = [shared_vertices[v][0].ogre_vidx for v in face.vertices]
-        faces.append(tuple(entry))
-    return faces
 
 def append_triangle_in_vertex_group(mesh, obj, vertex_groups, ogre_indices, blender_indices):
     vertices = [mesh.vertices[i] for i in blender_indices]
