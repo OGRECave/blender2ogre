@@ -14,15 +14,14 @@ def hash_combine(x, y):
     return x ^ y + 0x9e3779b9 + (x<<6) + (x>>2)
 
 class Vertex(object):
-    def __init__(self, x, y, z, nx, ny, nz, u, v, r, g, b, a, tx, ty, tz, tw, boneWeights, original):
+    def __init__(self, x, y, z, nx, ny, nz, uvs, r, g, b, a, tx, ty, tz, tw, boneWeights, original):
         self.x = x
         self.y = y
         self.z = z
         self.nx = nx
         self.ny = ny
         self.nz = nz
-        self.u = u
-        self.v = v
+        self.uvs = uvs
         self.r = r
         self.g = g
         self.b = b
@@ -37,9 +36,13 @@ class Vertex(object):
     def __eq__(self, o):
         if self.nx != o.nx or self.ny != o.ny or self.nz != o.nz: return False
         elif self.x != o.x or self.y != o.y or self.z != o.z: return False
-        elif self.u != o.u or self.v != o.v: return False
-        elif self.r != o.r or self.g != o.g or self.b != o.b: return False
+        elif self.uvs != o.uvs: return False
+        elif self.r != o.r or self.g != o.g or self.b != o.b or self.a != o.a: return False
         elif self.tx != o.tx or self.ty != o.ty or self.tz != o.tz or self.tw != o.tw: return False
+        # Bone weights are part of the vertex identity: two loops at the same
+        # position with the same normal/UV/color may still be bound to
+        # different bones and must not be merged.
+        elif self.boneWeights != o.boneWeights: return False
         return True
 
     def __hash__(self):
@@ -49,21 +52,26 @@ class Vertex(object):
         result = hash_combine( result, hash(self.nx) )
         result = hash_combine( result, hash(self.ny) )
         result = hash_combine( result, hash(self.nz) )
-        result = hash_combine( result, hash(self.u) )
-        result = hash_combine( result, hash(self.v) )
+        for uv in self.uvs:
+            result = hash_combine( result, hash(uv[0]) )
+            result = hash_combine( result, hash(uv[1]) )
         result = hash_combine( result, hash(self.r) )
         result = hash_combine( result, hash(self.g) )
         result = hash_combine( result, hash(self.b) )
+        result = hash_combine( result, hash(self.a) )
         result = hash_combine( result, hash(self.tx) )
         result = hash_combine( result, hash(self.ty) )
         result = hash_combine( result, hash(self.tz) )
         result = hash_combine( result, hash(self.tw) )
+        for bone_index in sorted(self.boneWeights):
+            result = hash_combine( result, hash(bone_index) )
+            result = hash_combine( result, hash(self.boneWeights[bone_index]) )
         return result
 
-def write_submeshnames (doc, materials):
+def write_submeshnames (doc, material_names):
     doc.start_tag('submeshnames', {})
-    for i, material in enumerate (materials):
-        doc.leaf_tag('submesh', {'name': material.name, 'index': i})
+    for i, name in enumerate (material_names):
+        doc.leaf_tag('submesh', {'name': name, 'index': i})
     doc.end_tag('submeshnames')
 
 def write_skeletonlink (obj_name, arm, doc):
@@ -76,13 +84,35 @@ def write_skeletonlink (obj_name, arm, doc):
     doc.leaf_tag('skeletonlink', { 'name' : '%s.skeleton' % skeleton_name })
 
 def calc_boneindex (arm):
+    """
+    Return the vertex-group name -> Ogre bone index mapping.
+
+    This must match Skeleton.to_xml(): only bones with shouldOutput are
+    written, and ancestors of deformable bones are kept as well. Otherwise
+    ONLY_DEFORMABLE_BONES shifts the indices relative to the .skeleton file.
+    """
     if arm is None:
         return {}
+
+    outputEnabled = {bone.name: True for bone in arm.pose.bones}
+    if config.get('ONLY_DEFORMABLE_BONES') is True:
+        for bone in arm.pose.bones:
+            outputEnabled[bone.name] = bone.bone.use_deform
+        # Keep every ancestor of a deformable bone so the Ogre bone
+        # hierarchy remains connected.
+        for bone in arm.pose.bones:
+            if bone.bone.use_deform:
+                parent = bone.parent
+                while parent:
+                    outputEnabled[parent.name] = True
+                    parent = parent.parent
+
     boneIndexFromName = {}
     boneIndex = 0
     for bone in arm.pose.bones:
-        boneIndexFromName[ bone.name ] = boneIndex
-        boneIndex += 1
+        if outputEnabled[bone.name]:
+            boneIndexFromName[bone.name] = boneIndex
+            boneIndex += 1
     return boneIndexFromName
 
 def calc_geometry (mesh, ob, materials, tangents, arm):
@@ -104,7 +134,7 @@ def calc_geometry (mesh, ob, materials, tangents, arm):
             mesh.calc_normals_split()
 
     vertex_color_lookup = VertexColorLookup(mesh)
-    uvData = mesh.uv_layers.active.data if mesh.uv_layers.active else None
+    uv_layers = [layer.data for layer in mesh.uv_layers]
 
     faces = {}
     for material_index, material in enumerate(materials):
@@ -116,22 +146,21 @@ def calc_geometry (mesh, ob, materials, tangents, arm):
     boneindex = calc_boneindex (arm)
     TRIM_BONE_WEIGHTS = config.get('TRIM_BONE_WEIGHTS')
 
-    import sys
-    progressScale = 1.0 / (len(mesh.polygons) - 1)
+    progressbar = util.ProgressBar("Faces", len(mesh.polygons)) if len(mesh.polygons) else None
     for fidx, face in enumerate(mesh.polygons):
-        tris = []
-        tris.append( (face.vertices[0], face.vertices[1], face.vertices[2]) )
-        if(len(face.vertices)>=4):
-            tris.append( (face.vertices[0], face.vertices[2], face.vertices[3]) )
-                    
-        # Progress
-        percent = fidx * progressScale
-        sys.stdout.write( "\rVertices [" + '=' * int(percent*50) + '>' + '.' * int(50-percent*50) + "] " + str(int(percent*10000)/100.0) + "%   ")
-        sys.stdout.flush()
-        
+        if progressbar:
+            progressbar.update(fidx)
+
         # should be triangles
         if len(face.vertices) != 3:
             raise ValueError('Polygon not a triangle')        
+
+        if face.material_index not in faces:
+            failure = 'Invalid material index %s on face %s of mesh %s' % (
+                face.material_index, fidx, mesh.name)
+            logger.error(failure)
+            Report.warnings.append(failure)
+            continue
 
         # Add triangle
         newFace = []
@@ -145,7 +174,7 @@ def calc_geometry (mesh, ob, materials, tangents, arm):
                 nx,ny,nz = swap(mesh.loops[loop].normal)
             else:
                 nx,ny,nz = swap(mesh.corner_normals[loop].vector)
-            u, v  = uvData[loop].uv if uvData else (0, 0)
+            uvs = tuple(tuple(layer[loop].uv) for layer in uv_layers)
             r,g,b,ra = vertex_color_lookup.get(loop)
             
             if tangents != 0:
@@ -165,14 +194,17 @@ def calc_geometry (mesh, ob, materials, tangents, arm):
                     boneWeights[bi] = vGroup.weight
             
             # Add vertex
-            vert = Vertex(x, y, z, nx, ny, nz, u, v, r, g, b, ra, tx, ty, tz, tw, boneWeights, vertex)
+            vert = Vertex(x, y, z, nx, ny, nz, uvs, r, g, b, ra, tx, ty, tz, tw, boneWeights, vertex)
             nextIdx = map.get(vert)
-            if nextIdx == None:
+            if nextIdx is None:
                 nextIdx = len(vertexList)
                 vertexList.append(vert)
                 map[vert] = nextIdx
             newFace.append(nextIdx)        
         faces[face.material_index].append (newFace)
+
+    if progressbar:
+        sys.stdout.write("\n")
 
     # geometry
     geometry = {}
@@ -193,6 +225,10 @@ def calc_materials (ob):
     materials = []
     for material in ob.data.materials:
         materials.append (material)
+    if not materials:
+        # Keep the face material index valid; write_unshared() maps this to
+        # _missing_material_ in the exported mesh.
+        materials.append(None)
     return materials
 
 def calc_submeshes (geometry, materials):    
@@ -213,7 +249,7 @@ def calc_submeshes (geometry, materials):
     assert len (submeshes) == len (materials)
     return submeshes
 
-def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, obj_name):
+def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, obj_name, material_prefix=''):
 
     logger.info('* Writing unshared geometry')
 
@@ -224,6 +260,10 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
 
     vertex_color_lookup = VertexColorLookup(mesh)
     materials = calc_materials (ob)
+    material_names = [
+        material_name(mat, prefix=material_prefix) if mat is not None else '_missing_material_'
+        for mat in materials
+    ]
     geometry = calc_geometry (mesh, ob, materials, tangents, arm)
     submeshes = calc_submeshes (geometry, materials)
     
@@ -243,7 +283,7 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
             face_count = len (faces[i])
             Report.triangles += face_count
             if face_count == 0:
-                Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (obj_name, materials[i].name) )
+                Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (obj_name, material_names[i]) )
                 continue # fixes corrupt unused materials
 
             vertex_count = len (remap)
@@ -253,7 +293,7 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
                 'usesharedvertices' : 'false',
                 "use32bitindexes" : str(bool(vertex_count > 65535)),
                 "operationtype" : "triangle_list",
-                "material" : materials[i].name}
+                "material" : material_names[i]}
             doc.start_tag('submesh', submesh_attributes)
 
             doc.start_tag('faces', { 'count' : str(face_count)})
@@ -272,15 +312,15 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
                 'normals':'true',
                 'tangents': str(bool(tangents)),
                 'tangent_dimensions': str(tangents),
-                'colours_diffuse' : str(bool( mesh.vertex_colors )),
+                'colours_diffuse' : str(vertex_color_lookup.has_color_data),
                 'texture_coords' : '%s' % int (len (mesh.uv_layers))})
 
             logger.info('* Writing submesh vertices: ' + str(i))
             for r in range (vertex_count):
-                i = unmap[r]
-                assert i >= 0
-                assert i < len(vertices)
-                v = vertices[i]
+                vertex_index = unmap[r]
+                assert vertex_index >= 0
+                assert vertex_index < len(vertices)
+                v = vertices[vertex_index]
 
                 doc.start_tag('vertex', {})
                 doc.leaf_tag('position', {'x' : '%6f' % v.x, 'y' : '%6f' % v.y,  'z' : '%6f' % v.z})
@@ -291,7 +331,8 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
                     doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (v.r,v.g,v.b,v.ra)})
                 # Texture maps
                 if dotextures:
-                   doc.leaf_tag('texcoord', { 'u' : '%6f' % v.u, 'v' : '%6f' % (1.0-v.v) })
+                    for uv in v.uvs:
+                        doc.leaf_tag('texcoord', { 'u' : '%6f' % uv[0], 'v' : '%6f' % (1.0-uv[1]) })
                 doc.end_tag('vertex')
 
             doc.end_tag('vertexbuffer')
@@ -300,10 +341,10 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
             if arm:
                 doc.start_tag('boneassignments', {})
                 for r in range (vertex_count):
-                    i = unmap[r]
-                    assert i >= 0
-                    assert i < len(boneassignments)
-                    vbas = boneassignments[i]
+                    vertex_index = unmap[r]
+                    assert vertex_index >= 0
+                    assert vertex_index < len(boneassignments)
+                    vbas = boneassignments[vertex_index]
                     for vba in vbas:
                         doc.leaf_tag('vertexboneassignment', { 'vertexindex' : str(r), 'boneindex' : str(vba[0]), 'weight' : '%6f' % vba[1] })
                 doc.end_tag('boneassignments')  
@@ -311,14 +352,13 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
             doc.end_tag('submesh')
         doc.end_tag('submeshes')
 
-        write_submeshnames (doc, materials)
+        write_submeshnames (doc, material_names)
         write_skeletonlink (obj_name, arm, doc)
 
         doc.close() # reported by Reyn
         f.close ()
     
-    mats = [material_name(mat) for mat in materials if mat is not None]
-    return mats
+    return [name for name in material_names if name != '_missing_material_']
 
 class VertexColorLookup:
     def __init__(self, mesh):
@@ -1146,7 +1186,7 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     unshare_geometry = config.get ('UNSHARE_GEOMETRY')
     if unshare_geometry:
-        mats = write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, obj_name)
+        mats = write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, obj_name, material_prefix)
     else:
         mats = write_shared (target_file, path, dotextures, mesh, normals, tangents, material_prefix, ob, obj_name, copy, start, ignore_shape_animation, isLOD, disable_mods)
 
