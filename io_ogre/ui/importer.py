@@ -43,9 +43,19 @@ class _OgreCommonImport_(object):
         if context.mode != 'EDIT_MESH':
             return True
 
-    def __init__(self):
-        # Check that converter is setup
-        self.converter = detect_converter_type()
+    @property
+    def converter(self):
+        """Converter type, detected on first use.
+
+        Blender 4.4 added an __init__ to bpy.types.Operator, which hides a
+        mixin __init__ (see issue #272). Do not rely on a custom constructor;
+        resolve this lazily instead. The value is cached, as probing the
+        converter executable otherwise happens once per access (and thus per
+        draw call).
+        """
+        if not hasattr(self, "_converter"):
+            self._converter = detect_converter_type()
+        return self._converter
 
     def invoke(self, context, event):
         """
@@ -348,7 +358,3 @@ class OP_ogre_import(bpy.types.Operator, _OgreCommonImport_):
     bl_label = "Import Ogre"
     bl_options = {'REGISTER'}
     # import logic is contained in the subclass
-
-    def __init__(self, *args, **kwargs):
-        bpy.types.Operator.__init__(self, *args, **kwargs)
-        _OgreCommonImport_.__init__(self)
