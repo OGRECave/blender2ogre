@@ -399,8 +399,11 @@ class Skeleton(object):
         if config.get('ONLY_KEYFRAMES') is True: # Only keyframes
             frame_range = set() # Holds all keyframes for export
             action = bpy.data.actions[actionName] # actionName is the animation name (NLAtrack child)
+            # The F-Curves have to be read from the slot that is bound to the
+            # armature; the legacy action.fcurves API only exposes slot 0.
+            slot = getattr(arm.animation_data, 'action_slot', None)
             # loops through all channels on the f-curve --> Code taken from: https://blender.stackexchange.com/questions/8387/how-to-get-keyframe-data-from-python
-            for fcu in action.fcurves:
+            for fcu in util.action_fcurves(action, slot):
                 for keyframe in fcu.keyframe_points: # Loops through all the keyframes in the channel
                     kf = int(keyframe.co[0]) # key frame number
                     # Ignore keys outside this strip; Ogre expects keyframe
@@ -511,6 +514,7 @@ class Skeleton(object):
         elif arm.animation_data:
             savedUseNla = arm.animation_data.use_nla
             savedAction = arm.animation_data.action
+            savedActionSlot = getattr(arm.animation_data, 'action_slot', None)
             arm.animation_data.use_nla = False
             if not len( arm.animation_data.nla_tracks ):
                 Report.warnings.append('You must assign an NLA strip to armature (%s) that defines the start and end frames' % arm.name)
@@ -530,7 +534,7 @@ class Skeleton(object):
                     if action is None:
                         logger.error("NLA strip '%s' has no action" % strip.name)
                         continue
-                    actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end]
+                    actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end, getattr(strip, 'action_slot', None)]
                     logger.info('  - Action name: %s' % action.name)
                     logger.info('  -  Strip name: %s' % strip.name)
 
@@ -538,11 +542,14 @@ class Skeleton(object):
             for actionName in actionNames:
                 actionData = actions[ actionName ]
                 action = actionData[0]
-                arm.animation_data.action = action  # set as the current action
+                # Assign the action together with the slot used by the NLA
+                # strip. Blender 4.4+ does not necessarily auto-assign a slot,
+                # and without one the action does not animate anything.
+                slot = util.assign_action(arm.animation_data, action, actionData[3])
                 suppressedBones = []
                 if config.get('ONLY_KEYFRAMED_BONES') is True:
                     keyframedBones = {}
-                    for group in action.groups:
+                    for group in util.action_groups(action, slot):
                         keyframedBones[ group.name ] = True
                     for b in self.bones:
                         if (not b.name in keyframedBones) and b.shouldOutput:
@@ -555,7 +562,7 @@ class Skeleton(object):
                     bone = self.get_bone( boneName )
                     bone.shouldOutput = True
             # restore these to what they originally were
-            arm.animation_data.action = savedAction
+            util.assign_action(arm.animation_data, savedAction, savedActionSlot)
             arm.animation_data.use_nla = savedUseNla
 
         # restore

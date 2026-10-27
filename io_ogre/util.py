@@ -495,6 +495,82 @@ def swap(vec):
 def timer_diff_str(start):
     return "%0.2f" % (time.time()-start)
 
+def get_action_slot(action, anim_data=None, preferred=None):
+    """
+    Return the slot that has to be bound when evaluating `action` on `anim_data`.
+
+    Blender 4.4 introduced slotted actions. Assigning an action in Python does
+    not always auto-assign a slot. This happens in particular for actions that
+    were pushed down to the NLA (for example actions upgraded from Blender 4.3,
+    whose slots are called "Legacy Slot"). Without a bound slot the action is
+    not evaluated at all, so the exported animation is empty.
+
+    Returns None on Blender versions without slotted actions.
+    """
+    if action is None:
+        return None
+    slots = getattr(action, 'slots', None)
+    if not slots:
+        return None
+    if preferred is not None:
+        return preferred
+    if anim_data is not None:
+        id_block = getattr(anim_data, 'id_data', None)
+        id_name = getattr(id_block, 'name', None)
+        id_type = getattr(id_block, 'id_type', None)
+        # Mirrors Blender's auto-assignment: prefer a slot named like the ID
+        for slot in slots:
+            if slot.name_display == id_name:
+                return slot
+        # then any slot that can animate this type of ID
+        for slot in slots:
+            if slot.target_id_type == id_type:
+                return slot
+    return slots[0]
+
+def assign_action(anim_data, action, preferred_slot=None):
+    """
+    Assign `action` to `anim_data` and make sure a slot is bound on Blender 4.4+.
+    """
+    anim_data.action = action
+    slot = get_action_slot(action, anim_data, preferred_slot)
+    if slot is not None and hasattr(anim_data, 'action_slot'):
+        anim_data.action_slot = slot
+    return slot
+
+def _slot_channelbag(action, slot):
+    if action is None or slot is None:
+        return None
+    for layer in getattr(action, 'layers', []):
+        for strip in layer.strips:
+            if hasattr(strip, 'channelbag'):
+                channelbag = strip.channelbag(slot)
+                if channelbag is not None:
+                    return channelbag
+    return None
+
+def action_fcurves(action, slot=None):
+    """
+    Return the F-Curves of `action` for `slot`.
+
+    The legacy `action.fcurves` API only exposes the first slot, which is the
+    wrong one for multi-slot actions. Falls back to it on older Blender versions.
+    """
+    if action is None:
+        return []
+    channelbag = _slot_channelbag(action, slot)
+    if channelbag is not None:
+        return channelbag.fcurves
+    return action.fcurves
+
+def action_groups(action, slot=None):
+    if action is None:
+        return []
+    channelbag = _slot_channelbag(action, slot)
+    if channelbag is not None:
+        return channelbag.groups
+    return action.groups
+
 def objects_merge_materials(objs):
     """
     return a set that contains unique material objects.
