@@ -618,6 +618,33 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
 
+    def _export_children():
+        for child in ob.children:
+            # Selection and visibility must be honored for child nodes too;
+            # otherwise exporting one selected parent drags its whole hierarchy
+            # (including hidden/unselected meshes) into the .scene file.
+            if objects is not None and child not in objects:
+                logger.debug("Skip exporting node: %s (not selected/visible)" % child.name)
+                continue
+            dot_scene_node_export( child,
+                path, doc = doc, rex = rex,
+                exported_meshes = exported_meshes,
+                meshes = meshes,
+                mesh_collision_prims = mesh_collision_prims,
+                mesh_collision_files = mesh_collision_files,
+                exported_armatures = exported_armatures,
+                prefix = prefix,
+                objects=objects,
+                xmlparent=o
+            )
+
+    # An unselected ancestor may still be needed to preserve the transform
+    # hierarchy, but it must not contribute its own mesh/camera/light.
+    if objects is not None and ob not in objects:
+        logger.debug("Exporting unselected/hidden ancestor as transform node only: %s" % ob.name)
+        _export_children()
+        return
+
     # if config.get('EXPORT_USER') is True:
     # Custom user props
     if len(ob.items()) > 0:
@@ -846,21 +873,4 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
     if config.get('NODE_ANIMATION') is True:
         node_anim.dot_nodeanim(ob, doc, o)
 
-    for child in ob.children:
-        # Selection and visibility must be honored for child nodes too;
-        # otherwise exporting one selected parent drags its whole hierarchy
-        # (including hidden/unselected meshes) into the .scene file.
-        if objects is not None and child not in objects:
-            logger.debug("Skip exporting node: %s (not selected/visible)" % child.name)
-            continue
-        dot_scene_node_export( child,
-            path, doc = doc, rex = rex,
-            exported_meshes = exported_meshes,
-            meshes = meshes,
-            mesh_collision_prims = mesh_collision_prims,
-            mesh_collision_files = mesh_collision_files,
-            exported_armatures = exported_armatures,
-            prefix = prefix,
-            objects=objects,
-            xmlparent=o
-        )
+    _export_children()
