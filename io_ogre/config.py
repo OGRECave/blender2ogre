@@ -78,7 +78,7 @@ _CONFIG_DEFAULTS_ALL = {
     'ARRAY' : True,
     'EXTREMITY_POINTS' : 0,
     'GENERATE_EDGE_LISTS' : False,
-    'GENERATE_TANGENTS' : '0',
+    'GENERATE_TANGENTS' : '4',
     'PACK_INT_10_10_10_2': False,
     'OPTIMISE_ANIMATIONS' : True,
     'INTERFACE_TOGGLE': False,
