@@ -280,8 +280,9 @@ def mesh_convert(infile):
 
         # Put logfile into output directory
         logfile_path, name = os.path.split(infile)
+        log_file = os.path.join(logfile_path, 'OgreXMLConverter.log')
         cmd.append('-log')
-        cmd.append(os.path.join(logfile_path, 'OgreXMLConverter.log'))
+        cmd.append(log_file)
 
         # Finally, specify input file
         cmd.append(infile)
@@ -290,9 +291,11 @@ def mesh_convert(infile):
 
         # Instead of asserting, report an error
         if ret != 0:
-            logger.error("OgreXMLConverter returned with non-zero status, check OgreXMLConverter.log")
+            logger.error("OgreXMLConverter returned with non-zero status, check %s" % log_file)
             logger.info(" ".join(cmd))
-            Report.errors.append("OgreXMLConverter finished with non-zero status converting mesh: (%s), unable to proceed" % name)
+            Report.errors.append(
+                "OgreXMLConverter finished with non-zero status converting mesh: (%s), unable to proceed. "
+                "See %s for details." % (name, log_file))
             return False
         else:
             return True
