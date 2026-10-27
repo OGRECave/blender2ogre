@@ -328,7 +328,7 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
                 if tangents != 0:
                     doc.leaf_tag('tangent', {'x' : '%6f' % v.tx, 'y' : '%6f' % v.ty, 'z' : '%6f' % v.tz, 'w' : '%6f' % v.tw})
                 if vertex_color_lookup.has_color_data:
-                    doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (v.r,v.g,v.b,v.ra)})
+                    doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (v.r,v.g,v.b,v.a)})
                 # Texture maps
                 if dotextures:
                     for uv in v.uvs:
