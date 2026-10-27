@@ -34,6 +34,7 @@ def dot_nodeanim(ob, doc, xmlnode):
 
     savedUseNla = anim.use_nla
     savedAction = anim.action
+    savedActionSlot = getattr(anim, 'action_slot', None)
     anim.use_nla = False
     if not len( anim.nla_tracks ):
         Report.warnings.append('You must assign an NLA strip to object (%s) that defines the start and end frames' % ob.name)
@@ -50,7 +51,7 @@ def dot_nodeanim(ob, doc, xmlnode):
 
         for strip in nla.strips:
             action = strip.action
-            actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end]
+            actions[ action.name ] = [action, strip.action_frame_start, strip.action_frame_end, getattr(strip, 'action_slot', None)]
             logger.info('  - Action name: %s' % action.name)
             logger.info('  -  Strip name: %s' % strip.name)
 
@@ -58,11 +59,13 @@ def dot_nodeanim(ob, doc, xmlnode):
     for actionName in actionNames:
         actionData = actions[ actionName ]
         action = actionData[0]
-        anim.action = action  # set as the current action
+        # Also bind the slot on Blender 4.4+, otherwise the action is not
+        # evaluated and the exported animation stays empty.
+        util.assign_action(anim, action, actionData[3])
         write_animation( ob, action, actionData[1], actionData[2], doc, xmlnode )
 
     # restore these to what they originally were
-    anim.action = savedAction
+    util.assign_action(anim, savedAction, savedActionSlot)
     anim.use_nla = savedUseNla
 
     logger.info('- Done at %s seconds' % util.timer_diff_str(start))
