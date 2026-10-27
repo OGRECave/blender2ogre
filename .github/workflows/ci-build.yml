@@ -12,7 +12,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y blender ogre-1.12-tools
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Test
       run: |
         mkdir -p ~/.config/blender/3.0/scripts/addons/
