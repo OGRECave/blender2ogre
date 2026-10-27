@@ -3,7 +3,7 @@ from .. import config
 from .. import util
 from ..report import Report
 from .material import (material_name, ShaderImageTextureWrapper, gather_metallic_roughness_texture,
-                       get_blend_method)
+                       get_blend_method, get_alpha_clip_threshold)
 from bpy_extras import node_shader_utils
 import bpy.path
 
@@ -228,7 +228,7 @@ class OgreMaterialv2JsonGenerator(object):
         if blend_method == "OPAQUE":     # OPAQUE will pass for now
             pass
         elif blend_method == "CLIP":     # CLIP enables alpha_test (alpha rejection)
-            datablock["alpha_test"] = ["greater_equal", material.alpha_threshold, False]
+            datablock["alpha_test"] = ["greater_equal", get_alpha_clip_threshold(material), False]
         elif blend_method == "BLEND":
             datablock["transparency"] = {
                 "mode": "Transparent",        

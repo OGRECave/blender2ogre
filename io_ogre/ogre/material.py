@@ -75,6 +75,18 @@ def get_blend_method(mat):
 
     return mat.blend_method
 
+def get_alpha_clip_threshold(mat):
+    """Return the threshold used by the material's alpha clip node."""
+    if hasattr(mat, 'surface_render_method'):
+        clip_node = _find_alpha_clip_node(mat)
+        if clip_node is not None:
+            threshold_input = clip_node.inputs[1]
+            if not threshold_input.is_linked:
+                return threshold_input.default_value
+            return 0.5
+
+    return mat.alpha_threshold
+
 def get_transparency_overlap(mat):
     """Return whether transparent materials should show their backfaces.
 
@@ -257,7 +269,7 @@ class OgreMaterialGenerator(object):
             blend_method = get_blend_method(mat)
             if blend_method == "CLIP":
                 alpha = mat_wrapper.alpha
-                self.w.iword('alpha_rejection greater_equal').round(255*mat.alpha_threshold).nl()
+                self.w.iword('alpha_rejection greater_equal').round(255*get_alpha_clip_threshold(mat)).nl()
             elif blend_method == "BLEND":
                 alpha = mat_wrapper.alpha
                 self.w.iword('scene_blend alpha_blend').nl()
