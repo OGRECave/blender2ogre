@@ -565,7 +565,14 @@ def xCollectBoneData(meshData, xDoc):
             OGRE_Bone = {}
             if bone.localName == 'bone':
                 boneName = str(bone.getAttributeNode('name').value)
-                boneID = int(bone.getAttributeNode('id').value)
+                # Ogre 14 no longer writes bone ids: the id is implied by the
+                # order of the <bone> elements. Older versions write it
+                # explicitly.
+                boneIdNode = bone.getAttributeNode('id')
+                if boneIdNode is not None:
+                    boneID = int(boneIdNode.value)
+                else:
+                    boneID = len(OGRE_Bones)
                 OGRE_Bone['name'] = boneName
                 OGRE_Bone['id'] = boneID
                 BoneIDToName[str(boneID)] = boneName
