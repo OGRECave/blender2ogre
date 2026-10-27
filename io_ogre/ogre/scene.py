@@ -185,6 +185,10 @@ def dot_scene(path, scene_name=None):
     mesh_collision_prims = {}
     mesh_collision_files = {}
 
+    # Keep a set for fast membership tests while walking the hierarchy. The
+    # list form is still used above for _flatten() and merge-group bookkeeping.
+    export_objects = set(objects)
+
     # Export the objects in the scene
     for root in roots:
         logger.info("* Exporting root node: %s " % root.name)
@@ -195,7 +199,7 @@ def dot_scene(path, scene_name=None):
             mesh_collision_files = mesh_collision_files,
             exported_armatures = exported_armatures,
             prefix = prefix,
-            objects = objects,
+            objects = export_objects,
             xmlparent = doc._scene_nodes
         )
 
@@ -609,7 +613,7 @@ def dot_scene_skybox_export( path ):
 # Recursive Node export
 def dot_scene_node_export( ob, path, doc=None, rex=None,
         exported_meshes=[], meshes=[], mesh_collision_prims={}, mesh_collision_files={},
-        exported_armatures=[], prefix='', objects=[], xmlparent=None ):
+        exported_armatures=[], prefix='', objects=None, xmlparent=None ):
 
     o = _ogre_node_helper( doc, ob )
     xmlparent.appendChild(o)
@@ -843,6 +847,12 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         node_anim.dot_nodeanim(ob, doc, o)
 
     for child in ob.children:
+        # Selection and visibility must be honored for child nodes too;
+        # otherwise exporting one selected parent drags its whole hierarchy
+        # (including hidden/unselected meshes) into the .scene file.
+        if objects is not None and child not in objects:
+            logger.debug("Skip exporting node: %s (not selected/visible)" % child.name)
+            continue
         dot_scene_node_export( child,
             path, doc = doc, rex = rex,
             exported_meshes = exported_meshes,
