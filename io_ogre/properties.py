@@ -5,23 +5,9 @@ from .ogre.material import load_user_materials
 load_user_materials()
 
 ## Physics / collision
-_collision_modes =  [
-    ('NONE', 'NONE', 'no collision'),
-    ('PRIMITIVE', 'PRIMITIVE', 'primitive collision type'),
-    ('MESH', 'MESH', 'triangle-mesh or convex-hull collision type'),
-    ('DECIMATED', 'DECIMATED', 'auto-decimated collision type'),
-    ('COMPOUND', 'COMPOUND', 'children primitive compound collision type'),
-    ('TERRAIN', 'TERRAIN', 'terrain (height map) collision type'),
-]
-
-bpy.types.Object.collision_mode = EnumProperty(
-    items = _collision_modes,
-    name = 'primary collision mode',
-    description='collision mode',
-    default='NONE')
 bpy.types.Object.subcollision = BoolProperty(
     name="collision compound",
-    description="member of a collision compound",
+    description="Object is a collision proxy for its parent (legacy; objects named 'collision*' are detected as well)",
     default=False)
 
 ## Materials
