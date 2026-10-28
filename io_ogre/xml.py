@@ -71,6 +71,27 @@ class SimpleSaxWriter():
     def leaf_tag(self, name, attrs):
         self._out_tag(name, attrs, True)
 
+    def leaf_template(self, name, formats, depth=0):
+        """
+        Return a %-format string for a leaf tag, `depth` levels below the
+        current one. `formats` maps attribute names to format specifiers, the
+        values must not require XML escaping (i.e. numbers).
+        Attributes are written sorted, so `formats` must be sorted as well to
+        make the order of the values obvious.
+        """
+        assert list(formats) == sorted(formats)
+        attrs = ''.join(' %s="%s"' % (key, formats[key]) for key in sorted(formats))
+        return "%s<%s%s/>\n" % (" " * (self.indent + 4 * depth), name, attrs)
+
+    def element_template(self, name, children):
+        """Return a %-format string for an element containing `children` templates."""
+        pad = " " * self.indent
+        return "%s<%s>\n%s%s</%s>\n" % (pad, name, ''.join(children), pad, name)
+
+    def write_rows(self, template, rows):
+        """Write `template` once for every row of values."""
+        self.output.writelines(template % tuple(row) for row in rows)
+
     def close(self):
         self.end_tag( self.root_tag )
 

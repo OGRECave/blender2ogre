@@ -518,6 +518,17 @@ def swap(vec):
         elif len(vec) == 4: return mathutils.Quaternion( [ vec.w, vec.x, vec.z, -vec.y] )
     else:
         logging.warn( 'unknown swap axis mode %s', config.get('SWAP_AXIS') )
+
+def swap_array(vecs):
+    """Vectorized swap() for an (N, 3) numpy array of vectors"""
+    mode = config.get('SWAP_AXIS')
+    if mode == 'xyz': return vecs
+    elif mode == 'xzy': return vecs[:, [0, 2, 1]]
+    elif mode == '-xzy': return vecs[:, [0, 2, 1]] * vecs.dtype.type([-1, 1, 1])
+    elif mode == 'xz-y': return vecs[:, [0, 2, 1]] * vecs.dtype.type([1, 1, -1])
+    else:
+        logging.warn( 'unknown swap axis mode %s', mode )
+        return vecs
         assert 0
 
 def timer_diff_str(start):
