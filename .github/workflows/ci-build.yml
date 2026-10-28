@@ -11,7 +11,8 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt update
-        sudo apt install -y blender ogre-1.12-tools
+        # the distribution blender uses the system python, which lacks numpy
+        sudo apt install -y blender python3-numpy ogre-1.12-tools
     - uses: actions/checkout@v4
     - name: Test
       run: |
