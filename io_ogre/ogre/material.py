@@ -194,6 +194,7 @@ class OgreMaterialGenerator(object):
         else:
             self.material_name = material_name(self.material, prefix=prefix)
         self.images = set()
+        self._temporary_files = []
 
         if (self.material is not None and 
             material.node_tree is not None):
@@ -415,31 +416,63 @@ class OgreMaterialGenerator(object):
         for image in self.images:
             self.copy_texture(image)
 
+    def _save_image(self, image, filepath):
+        """Write an image that only exists in memory to filepath."""
+        try:
+            # save_copy does not re-link the image to the exported file, so
+            # generated images stay usable for subsequent exports.
+            image.save(filepath=filepath, save_copy=True)
+        except TypeError:
+            # Blender < 2.83 does not support save_copy
+            origin_filepath = image.filepath
+            image.filepath = filepath
+            try:
+                image.save()
+            finally:
+                image.filepath = origin_filepath
+
+    def _get_source_filepath(self, image):
+        """Return a file on disk containing the image data, or None if unavailable."""
+        if image.packed_file or not image.filepath or image.source in ('GENERATED', 'VIEWER'):
+            # packed or generated in Blender: there is no source file to copy,
+            # so write the image out to a temporary file first.
+            ext = image.file_format.lower() if image.file_format != 'NONE' else 'png'
+            fd, filepath = tempfile.mkstemp(suffix='.' + ext, prefix='ogre_io_')
+            os.close(fd)
+            self._temporary_files.append(filepath)
+            self._save_image(image, filepath)
+            logger.info("Writing texture: (%s)", filepath)
+            return filepath
+
+        image_filepath = bpy.path.abspath(image.filepath, library=image.library)
+        image_filepath = os.path.normpath(image_filepath)
+        if not os.path.isfile(image_filepath):
+            msg = ("Cannot find source image '%s' for texture '%s'. Pack the image "
+                   "into the .blend file or fix its filepath; the texture was not "
+                   "copied." % (image_filepath, image.name))
+            logger.error(msg)
+            Report.errors.append(msg)
+            return None
+        return image_filepath
+
     def copy_texture(self, image):
         origin_filepath = image.filepath
         target_filepath = split(origin_filepath or image.name)[1]
         target_filepath = self.change_ext(target_filepath, image)
         target_filepath = join(self.target_path, target_filepath)
 
-        if image.packed_file:
-            # packed in .blend file, save image as target file
-            image.filepath = target_filepath
-            image.save()
-            image.filepath = origin_filepath
-            logger.info("Writing texture: (%s)", target_filepath)
-        else:
-            image_filepath = bpy.path.abspath(image.filepath, library=image.library)
-            image_filepath = os.path.normpath(image_filepath)
-            
+        try:
+            image_filepath = self._get_source_filepath(image)
+            if image_filepath is None:
+                return
+
             # Should we update the file
-            update = False
+            update = True
             if os.path.isfile(target_filepath):
-                src_stat = os.stat(target_filepath)
-                dst_stat = os.stat(image_filepath)
+                src_stat = os.stat(image_filepath)
+                dst_stat = os.stat(target_filepath)
                 update = src_stat.st_size != dst_stat.st_size \
                     or src_stat.st_mtime != dst_stat.st_mtime
-            else:
-                update = True
 
             if update:
                 if is_image_postprocessed(image):
@@ -448,9 +481,17 @@ class OgreMaterialGenerator(object):
                 else:
                     # copy2 tries to copy all metadata (modification date included), to keep update decision consistent
                     shutil.copy2(image_filepath, target_filepath)
-                    logger.info("Copying image: (%s)", origin_filepath)
+                    logger.info("Copying image: (%s)", origin_filepath or image.name)
             else:
-                logger.info("Skip copying (%s). Texture is already up to date.", origin_filepath)
+                logger.info("Skip copying (%s). Texture is already up to date.", origin_filepath or image.name)
+        finally:
+            # remove files written out for images that only exist in memory
+            for filepath in self._temporary_files:
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
+            self._temporary_files = []
 
     def get_active_programs(self):
         r = []
