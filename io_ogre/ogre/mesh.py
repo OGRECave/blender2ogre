@@ -10,6 +10,16 @@ from .skeleton import Skeleton
 
 logger = logging.getLogger('mesh')
 
+# Material referenced by meshes that have no material slots at all. Ogre's
+# serializers reject an empty material name, so point at the built-in material
+# instead. Applications can override it at runtime.
+BASE_WHITE = 'BaseWhite'
+
+# Sentinel for a mesh that has no material slots at all. Unlike an empty slot
+# (None), which is a likely authoring mistake and maps to _missing_material_,
+# a mesh without slots is exported with BASE_WHITE.
+NO_MATERIAL = object()
+
 def hash_combine(x, y):
     return x ^ y + 0x9e3779b9 + (x<<6) + (x>>2)
 
@@ -227,9 +237,31 @@ def calc_materials (ob):
         materials.append (material)
     if not materials:
         # Keep the face material index valid; write_unshared() maps this to
-        # _missing_material_ in the exported mesh.
-        materials.append(None)
+        # the built-in BaseWhite material.
+        materials.append(NO_MATERIAL)
     return materials
+
+def material_reference (mat, prefix=''):
+    """
+    Return (name, extern) for a material slot as used in the .mesh file.
+
+    A mesh without material slots references the built-in BaseWhite material,
+    an empty slot references _missing_material_ and materials prefixed with
+    extern. reference a material that is provided by the Ogre project.
+    """
+    if mat is NO_MATERIAL:
+        return BASE_WHITE, True
+    if mat is None:
+        return '_missing_material_', True
+
+    name = mat.name
+    if name.startswith("extern."):
+        name = name[len("extern."):]
+        if not name:
+            return BASE_WHITE, True
+        # External material names are not prefixed with the library name.
+        return material_name(name, prefix=prefix), True
+    return material_name(mat, prefix=prefix), False
 
 def calc_submeshes (geometry, materials):    
     submeshes = {}
@@ -260,10 +292,7 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
 
     vertex_color_lookup = VertexColorLookup(mesh)
     materials = calc_materials (ob)
-    material_names = [
-        material_name(mat, prefix=material_prefix) if mat is not None else '_missing_material_'
-        for mat in materials
-    ]
+    material_names = [material_reference(mat, material_prefix)[0] for mat in materials]
     geometry = calc_geometry (mesh, ob, materials, tangents, arm)
     submeshes = calc_submeshes (geometry, materials)
     
@@ -443,21 +472,14 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
         # the diffuse color in the mesh file!
 
         for mat in ob.data.materials:
-            mat_name = "_missing_material_"
-            if mat is not None:
-                mat_name = mat.name
-            mat_name = material_name(mat_name, prefix=material_prefix)
-            extern = False
-            if mat_name.startswith("extern."):
-                mat_name = mat_name[len("extern."):]
-                extern = True
-            if mat:
-                materials.append( (mat_name, extern, mat) )
-            else:
+            if not mat:
                 logger.warn('Bad material data in: %s' % ob.name)
-                materials.append( ('_missing_material_', True, None) ) # fixed dec22, keep proper index
+            mat_name, extern = material_reference(mat, material_prefix)
+            materials.append( (mat_name, extern, mat) )
         if not materials:
-            materials.append( ('_missing_material_', True, None) )
+            # No material slots at all: use the built-in material instead of
+            # forcing the user-facing _missing_material_ diagnostic on it.
+            materials.append( (BASE_WHITE, True, None) )
         vertex_groups = {}
         material_faces = []
         for matidx, mat in enumerate(materials):
@@ -640,8 +662,7 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                 "use32bitindexes" : str(bool(numverts > 65535)),
                 "operationtype" : "triangle_list"
             }
-            if mat_name != "_missing_material_":
-                submesh_attributes['material'] = mat_name
+            submesh_attributes['material'] = mat_name
 
             doc.start_tag('submesh', submesh_attributes)
             doc.start_tag('faces', {
