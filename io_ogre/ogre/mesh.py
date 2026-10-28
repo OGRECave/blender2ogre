@@ -911,26 +911,7 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                     'name' : '%s.skeleton' % skeleton_name
             })
             doc.start_tag('boneassignments', {})
-            boneOutputEnableFromName = {}
-            boneIndexFromName = {}
-            for bone in arm.pose.bones:
-                boneOutputEnableFromName[ bone.name ] = True
-                if config.get('ONLY_DEFORMABLE_BONES') is True:
-                    # if we found a deformable bone,
-                    if bone.bone.use_deform:
-                        # visit all ancestor bones and mark them "output enabled"
-                        parBone = bone.parent
-                        while parBone:
-                            boneOutputEnableFromName[ parBone.name ] = True
-                            parBone = parBone.parent
-                    else:
-                        # non-deformable bone, no output
-                        boneOutputEnableFromName[ bone.name ] = False
-            boneIndex = 0
-            for bone in arm.pose.bones:
-                boneIndexFromName[ bone.name ] = boneIndex
-                if boneOutputEnableFromName[ bone.name ]:
-                    boneIndex += 1
+            boneIndexFromName = calc_boneindex(arm)
             badverts = 0
             for vidx, v in enumerate(_remap_verts_):
                 check = 0
