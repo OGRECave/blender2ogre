@@ -20,6 +20,25 @@ from .mesh import *
 
 logger = logging.getLogger('scene')
 
+def _is_collision_proxy(ob):
+    """Whether ob is a collision proxy for its parent.
+
+    Historically proxies were marked through the ``subcollision`` property.
+    Naming the object with a ``collision`` prefix is an easier to discover
+    convention and has the same effect. The name-based detection only applies
+    to children of meshes, so that regular objects are not hidden by accident.
+    """
+    if ob.type != 'MESH':
+        return False
+    if ob.subcollision:
+        return True
+    return (ob.name.lower().startswith('collision')
+            and ob.parent is not None and ob.parent.type == 'MESH')
+
+def _is_identity_matrix(mat, eps=1e-5):
+    return all(abs(mat[i][j] - (1.0 if i == j else 0.0)) < eps
+               for i in range(4) for j in range(4))
+
 # Called by io_ogre/ui/exporter.py to start exporting the scene
 def dot_scene(path, scene_name=None):
     """
@@ -53,7 +72,7 @@ def dot_scene(path, scene_name=None):
     linkedgroups = []
     invalidnamewarnings = []
     for ob in bpy.context.scene.objects:
-        if ob.subcollision:
+        if _is_collision_proxy(ob):
             continue
         if ((config.get("EXPORT_HIDDEN") is False) and (ob not in bpy.context.visible_objects)):
             continue
@@ -185,7 +204,6 @@ def dot_scene(path, scene_name=None):
 
     doc = ogre_document(materials, path, prefix, converter_type)
 
-    mesh_collision_prims = {}
     mesh_collision_files = {}
 
     # Keep a set for fast membership tests while walking the hierarchy. The
@@ -198,7 +216,6 @@ def dot_scene(path, scene_name=None):
         dot_scene_node_export(root, path = path, doc = doc,
             exported_meshes = exported_meshes,
             meshes = meshes,
-            mesh_collision_prims = mesh_collision_prims,
             mesh_collision_files = mesh_collision_files,
             exported_armatures = exported_armatures,
             prefix = prefix,
@@ -615,7 +632,7 @@ def dot_scene_skybox_export( path ):
 
 # Recursive Node export
 def dot_scene_node_export( ob, path, doc=None, rex=None,
-        exported_meshes=[], meshes=[], mesh_collision_prims={}, mesh_collision_files={},
+        exported_meshes=[], meshes=[], mesh_collision_files={},
         exported_armatures=[], prefix='', objects=None, xmlparent=None ):
 
     o = _ogre_node_helper( doc, ob )
@@ -629,11 +646,14 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
             if objects is not None and child not in objects:
                 logger.debug("Skip exporting node: %s (not selected/visible)" % child.name)
                 continue
+            if _is_collision_proxy(child):
+                # Collision proxies are exported with their parent entity and
+                # must not become scene nodes of their own.
+                continue
             dot_scene_node_export( child,
                 path, doc = doc, rex = rex,
                 exported_meshes = exported_meshes,
                 meshes = meshes,
-                mesh_collision_prims = mesh_collision_prims,
                 mesh_collision_files = mesh_collision_files,
                 exported_armatures = exported_armatures,
                 prefix = prefix,
@@ -668,9 +688,6 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
 
     if ob.type == 'MESH' and len(ob.data.loop_triangles):
         collisionFile = None
-        collisionPrim = None
-        if ob.data.name in mesh_collision_prims:
-            collisionPrim = mesh_collision_prims[ ob.data.name ]
         if ob.data.name in mesh_collision_files:
             collisionFile = mesh_collision_files[ ob.data.name ]
         
@@ -683,26 +700,44 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
         _mesh_instance_helper(e, ob, "static")
         _mesh_instance_helper(e, ob, "instanced")
 
-        if not collisionPrim and not collisionFile:
-            for child in ob.children:
-                if child.subcollision and child.name.startswith('DECIMATE'):
-                    collision_name = '%s_collision_%s' % (prefix, clean_object_name(ob.data.name))
-                    collisionFile = collision_name + '.mesh'
-                    break
-            if collisionFile:
-                mesh_collision_files[ ob.data.name ] = collisionFile
-                mesh.dot_mesh(child, path, force_name=collision_name)
-                # A collision mesh has no node of its own, so its skeletonlink
-                # is derived from the forced mesh name. Match that here unless
-                # a shared armature is used, in which case both sides use the
-                # armature name.
-                skeleton_force_name = None if config.get('SHARED_ARMATURE') else collision_name
-                skeleton.dot_skeleton(child, path, force_name=skeleton_force_name,
-                                      exported_armatures=exported_armatures)
+        if not collisionFile:
+            proxies = [child for child in ob.children if _is_collision_proxy(child)]
+            if len(proxies) > 1:
+                warning = ('Object "%s" has %i collision proxies, but only one '
+                           'collisionFile can be exported; using "%s"'
+                           % (ob.name, len(proxies), proxies[0].name))
+                logger.warning(warning)
+                Report.warnings.append(warning)
 
-        if collisionPrim:
-            e.setAttribute('collisionPrim', collisionPrim )
-        elif collisionFile:
+            if proxies:
+                child = proxies[0]
+                if len(child.data.polygons) == 0:
+                    warning = 'Collision proxy "%s" of object "%s" has no faces; not exporting it' % (child.name, ob.name)
+                    logger.warning(warning)
+                    Report.warnings.append(warning)
+                else:
+                    if not _is_identity_matrix(child.matrix_local):
+                        warning = ('Collision proxy "%s" of object "%s" is not at the '
+                                   'same transform as its parent; the exported collision '
+                                   'mesh will not match the visual mesh'
+                                   % (child.name, ob.name))
+                        logger.warning(warning)
+                        Report.warnings.append(warning)
+
+                    collision_name = '%s_collision' % clean_object_name(ob.data.name)
+                    collisionFile = collision_name + '.mesh'
+                    mesh_collision_files[ ob.data.name ] = collisionFile
+                    mesh.dot_mesh(child, path, force_name=collision_name,
+                                  ignore_visibility=True)
+                    # A collision mesh has no node of its own, so its skeletonlink
+                    # is derived from the forced mesh name. Match that here unless
+                    # a shared armature is used, in which case both sides use the
+                    # armature name.
+                    skeleton_force_name = None if config.get('SHARED_ARMATURE') else collision_name
+                    skeleton.dot_skeleton(child, path, force_name=skeleton_force_name,
+                                          exported_armatures=exported_armatures)
+
+        if collisionFile:
             e.setAttribute('collisionFile', collisionFile )
 
         #if config.get('EXPORT_USER') is True:
@@ -757,8 +792,7 @@ def dot_scene_node_export( ob, path, doc=None, rex=None,
                             _mesh_instance_helper(e, ob, "static")
                             _mesh_instance_helper(e, ob, "instanced")
 
-                            if collisionPrim: e.setAttribute('collisionPrim', collisionPrim )
-                            elif collisionFile: e.setAttribute('collisionFile', collisionFile )
+                            if collisionFile: e.setAttribute('collisionFile', collisionFile )
                     vecs += newvecs
 
         # Deal with Particle Systems
