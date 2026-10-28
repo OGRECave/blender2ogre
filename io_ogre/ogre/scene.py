@@ -170,7 +170,10 @@ def dot_scene(path, scene_name=None):
     materials = []
     if config.get("MATERIALS") is True:
         logger.info("* Processing Materials")
-        materials = util.objects_merge_materials(meshes)
+        # Materials with the extern. prefix are loaded by the Ogre project, so
+        # neither export them nor list them as external files.
+        materials = {mat for mat in util.objects_merge_materials(meshes)
+                     if not material.is_extern_material(mat)}
 
         if converter_type == "OgreMeshTool":
             dot_materialsv2json(materials, path, separate_files=config.get('SEPARATE_MATERIALS'), prefix=prefix)

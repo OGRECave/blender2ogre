@@ -544,6 +544,15 @@ def material_name( mat, clean = False, prefix='' ):
     else:
         return prefix + name
 
+def is_extern_material( mat ):
+    """
+    Return True for materials that are provided by the Ogre project itself.
+
+    Such materials are only referenced by name in the mesh and must not be
+    written to a .material file or listed in the .scene externals.
+    """
+    return mat is not None and mat.name.startswith('extern.')
+
 def material_filename( mat, prefix='' ):
     """
     Return the sanitized filename stem used for a material file.
