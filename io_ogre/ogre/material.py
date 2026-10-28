@@ -414,7 +414,14 @@ class OgreMaterialGenerator(object):
 
     def copy_textures(self):
         for image in self.images:
-            self.copy_texture(image)
+            # Do not let a single broken texture abort the whole export;
+            # report it so that the user can fix the image instead.
+            try:
+                self.copy_texture(image)
+            except Exception as e:
+                msg = "Unable to copy texture '%s': %s" % (image.name, str(e).strip())
+                logger.error(msg)
+                Report.errors.append(msg)
 
     def _save_image(self, image, filepath):
         """Write an image that only exists in memory to filepath."""
