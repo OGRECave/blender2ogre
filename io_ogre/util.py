@@ -1,9 +1,25 @@
 from os.path import split, splitext
-import bpy, logging, logging, mathutils, os, re, subprocess, sys, time
+import bpy, logging, logging, mathutils, os, re, shutil, subprocess, sys, time
+from functools import lru_cache
 from . import config
 from . report import Report
 
 logger = logging.getLogger('util')
+
+def _executable_fingerprint(exe):
+    """
+    Return a value that changes when the executable at `exe` is replaced.
+
+    Probing the converter means spawning a process, which is expensive enough
+    that the result is cached (see below). The fingerprint makes sure that
+    installing or upgrading the tools is still picked up without restarting
+    Blender.
+    """
+    path = shutil.which(exe) or exe
+    try:
+        return os.stat(path).st_mtime_ns
+    except OSError:
+        return None
 
 class ProgressBar:
     def __init__(self, name, total):
@@ -26,10 +42,8 @@ class ProgressBar:
         # Update progress through Blender cursor
         bpy.context.window_manager.progress_update(percent)
 
-def xml_converter_parameters():
-    """
-    Return the name of the ogre converter
-    """
+@lru_cache(maxsize=None)
+def _xml_converter_parameters(exe, _fingerprint):
     if sys.platform.startswith("win"):
         # Don't display the Windows GPF dialog if the invoked program dies.
         # See comp.os.ms-windows.programmer.win32
@@ -40,7 +54,6 @@ def xml_converter_parameters():
         SEM_NOGPFAULTERRORBOX = 0x0002 # From MSDN
         ctypes.windll.kernel32.SetErrorMode(SEM_NOGPFAULTERRORBOX);
 
-    exe = config.get('OGRETOOLS_XML_CONVERTER')
     proc = subprocess.Popen([exe,'-v'],stdout=subprocess.PIPE)
     output, _ = proc.communicate()
 
@@ -54,14 +67,18 @@ def xml_converter_parameters():
 
     return ("unknown", (1,9,0),"unknown") # means pre 1.10
 
+def xml_converter_parameters():
+    """
+    Return the name of the ogre converter
+    """
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+    return _xml_converter_parameters(exe, _executable_fingerprint(exe))
+
 def xml_converter_version():
     return xml_converter_parameters()[1]
 
-def mesh_tool_parameters():
-    """
-    Extract OgreMeshTool version info and stuff
-    """
-    exe = config.get('OGRETOOLS_XML_CONVERTER')
+@lru_cache(maxsize=None)
+def _mesh_tool_parameters(exe, _fingerprint):
     exe_path, name = os.path.split(exe)
     proc = subprocess.Popen([exe], stdout=subprocess.PIPE, cwd=exe_path)
     output, _ = proc.communicate()
@@ -74,6 +91,13 @@ def mesh_tool_parameters():
         return (match.group(1), version, match.group(5))
 
     return ("unknown", (0,0,0), "unknown") # should not happen
+
+def mesh_tool_parameters():
+    """
+    Extract OgreMeshTool version info and stuff
+    """
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+    return _mesh_tool_parameters(exe, _executable_fingerprint(exe))
 
 def mesh_tool_version():
     return mesh_tool_parameters()[1]
@@ -233,11 +257,8 @@ def mesh_upgrade_tool(infile):
         if config.get('PACK_INT_10_10_10_2') is True and '-pack' in cmd:
             logger.info("- Packed Normals for mesh: %s" % filename)
 
-def detect_converter_type():
-    # todo: executing the same exe twice might not be efficient but will do for now
-    # (twice because version will be extracted later in xml_converter_parameters)
-    exe = config.get('OGRETOOLS_XML_CONVERTER')
-
+@lru_cache(maxsize=None)
+def _detect_converter_type(exe, _fingerprint):
     # extract converter type from its output
     try:
         proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
@@ -252,6 +273,10 @@ def detect_converter_type():
     if output.find("OgreMeshTool") != -1:
         return "OgreMeshTool"
     return "unknown"
+
+def detect_converter_type():
+    exe = config.get('OGRETOOLS_XML_CONVERTER')
+    return _detect_converter_type(exe, _executable_fingerprint(exe))
 
 def mesh_convert(infile):
     # todo: Show a UI dialog to show this error. It's pretty fatal for normal usage.
