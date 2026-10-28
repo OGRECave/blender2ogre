@@ -262,7 +262,7 @@ Node Animations are a way to have scripted node animations in your Ogre applicat
 Check out the [Node Animations](NodeAnimations.md) tutorial to see how to create some animations for a couple of different scenarios.
 
 ### Exporting for Physics
-Check out the [Exporting for Physics](Physics.md) tutorial to see some techniques and optimizations when exporting collision meshes for Physics Engines
+Check out the [Exporting for Physics](Physics.md) tutorial to see some techniques and optimizations when exporting collision meshes for Physics Engines, including how to export a separate convex collision mesh and how to use it in Jolt Physics.
 
 ### Exporting Vertex Colors
 ![vertex-colors.png](images/vertex_colors/vertex_colors1.png)
