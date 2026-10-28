@@ -1,5 +1,6 @@
-import os, time, sys, logging
-import bmesh, mathutils, math
+import os, time, logging
+import bmesh
+import numpy as np
 
 from ..report import Report
 from ..util import *
@@ -20,63 +21,144 @@ BASE_WHITE = 'BaseWhite'
 # a mesh without slots is exported with BASE_WHITE.
 NO_MATERIAL = object()
 
-def hash_combine(x, y):
-    return x ^ y + 0x9e3779b9 + (x<<6) + (x>>2)
+def foreach_get(collection, attr, dtype, width=1):
+    """Read the attribute `attr` of all items of a bpy collection into a numpy array"""
+    data = np.empty(len(collection) * width, dtype=dtype)
+    collection.foreach_get(attr, data)
+    return data.reshape(-1, width) if width > 1 else data
 
-class Vertex(object):
-    def __init__(self, x, y, z, nx, ny, nz, uvs, r, g, b, a, tx, ty, tz, tw, boneWeights, original):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-        self.uvs = uvs
-        self.r = r
-        self.g = g
-        self.b = b
-        self.a = a
-        self.tx = tx
-        self.ty = ty
-        self.tz = tz
-        self.tw = tw
-        self.boneWeights = boneWeights
-        self.original = original
+def triangulate(mesh):
+    """
+    Triangulate the mesh in place, as Ogre only supports triangles.
+    Returns the mapping from the new triangle indices to the original polygon indices.
+    """
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    face_map = bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='FIXED')['face_map']
+    bm.to_mesh(mesh)
+    tess_polygon_face_map = {tess_face.index: face.index for tess_face, face in face_map.items()}
+    bm.free()
+    return tess_polygon_face_map
 
-    def __eq__(self, o):
-        if self.nx != o.nx or self.ny != o.ny or self.nz != o.nz: return False
-        elif self.x != o.x or self.y != o.y or self.z != o.z: return False
-        elif self.uvs != o.uvs: return False
-        elif self.r != o.r or self.g != o.g or self.b != o.b or self.a != o.a: return False
-        elif self.tx != o.tx or self.ty != o.ty or self.tz != o.tz or self.tw != o.tw: return False
-        # Bone weights are part of the vertex identity: two loops at the same
-        # position with the same normal/UV/color may still be bound to
-        # different bones and must not be merged.
-        elif self.boneWeights != o.boneWeights: return False
-        return True
+def calc_normals(mesh, tangents):
+    if tangents != 0:
+        mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
+    elif bpy.app.version < (4, 1, 0):
+        # calc_tangents() already calculates split normals for us
+        mesh.calc_normals_split()
 
-    def __hash__(self):
-        result = hash(self.x)
-        result = hash_combine( result, hash(self.y) )
-        result = hash_combine( result, hash(self.z) )
-        result = hash_combine( result, hash(self.nx) )
-        result = hash_combine( result, hash(self.ny) )
-        result = hash_combine( result, hash(self.nz) )
-        for uv in self.uvs:
-            result = hash_combine( result, hash(uv[0]) )
-            result = hash_combine( result, hash(uv[1]) )
-        result = hash_combine( result, hash(self.r) )
-        result = hash_combine( result, hash(self.g) )
-        result = hash_combine( result, hash(self.b) )
-        result = hash_combine( result, hash(self.a) )
-        result = hash_combine( result, hash(self.tx) )
-        result = hash_combine( result, hash(self.ty) )
-        result = hash_combine( result, hash(self.tz) )
-        result = hash_combine( result, hash(self.tw) )
-        for bone_index in sorted(self.boneWeights):
-            result = hash_combine( result, hash(bone_index) )
-            result = hash_combine( result, hash(self.boneWeights[bone_index]) )
-        return result
+def calc_triangles(mesh):
+    """Return the loop indices of the triangles of a triangulated mesh as (N, 3) array"""
+    if np.any(foreach_get(mesh.polygons, 'loop_total', np.int32) != 3):
+        raise ValueError('Polygon not a triangle')
+    loop_start = foreach_get(mesh.polygons, 'loop_start', np.int32)
+    return loop_start[:, None] + np.arange(3, dtype=np.int32)
+
+def first_occurrences(*columns):
+    """
+    Deduplicate the rows formed by stacking `columns`.
+
+    Returns the index of the first occurrence of every distinct row, in order
+    of appearance, and for every row the position of its distinct row therein.
+    """
+    # adding 0.0 turns -0.0 into 0.0, so they compare equal as in Python
+    keys = np.column_stack(columns).astype(np.float64) + 0.0
+    if len(keys) == 0:
+        return np.zeros(0, np.intp), np.zeros(0, np.intp)
+    _, first, inverse = np.unique(keys, axis=0, return_index=True, return_inverse=True)
+    order = np.argsort(first)
+    rank = np.empty_like(order)
+    rank[order] = np.arange(len(order))
+    return first[order], rank[inverse.reshape(-1)]
+
+def vertex_colors(mesh):
+    """Return the per loop vertex colors as (N, 4) array or None if the mesh has no colors"""
+    color_names = ["col", "color", "colour", "attribute"]
+
+    # In Blender version 3.2, vertex colors have been refactored into generic color attributes
+    # https://developer.blender.org/docs/release_notes/3.2/sculpt/
+    if bpy.app.version >= (3, 2, 0):
+        vertex_colors = mesh.color_attributes
+    else:
+        vertex_colors = mesh.vertex_colors
+
+    if len(vertex_colors) == 0:
+        return None
+    logger.debug("* Mesh has vertex colors")
+
+    found = None
+    for key, colors in vertex_colors.items():
+        if (found is None) and (key.lower() in color_names):
+            found = colors
+
+            if (bpy.app.version >= (3, 2, 0)):
+                if colors.domain != 'CORNER':
+                    Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color domain: "%s" (should be: "CORNER")' % \
+                        (mesh.name, key, colors.domain) )
+                if colors.data_type != 'BYTE_COLOR':
+                    Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color data type: "%s" (should be: "BYTE_COLOR")' % \
+                        (mesh.name, key, colors.data_type) )
+
+    if found is None:
+        # No color found by name, assume that the only vertex color data is actual color data
+        logger.debug("No color found by name, assume that the only vertex color data is actual color data")
+        found = colors
+
+    return foreach_get(found.data, 'color', np.float32, 4)
+
+class MeshAttributes:
+    """
+    The vertex attributes of a triangulated mesh as numpy arrays, with vectors
+    converted to the Ogre coordinate system. Positions are indexed by vertex,
+    everything else by loop.
+    """
+    def __init__(self, mesh, tangents):
+        self.positions = swap_array(foreach_get(mesh.vertices, 'co', np.float32, 3))
+        self.vertex_index = foreach_get(mesh.loops, 'vertex_index', np.int32)
+
+        if bpy.app.version < (3, 6, 0):
+            self.normals = swap_array(foreach_get(mesh.loops, 'normal', np.float32, 3))
+        else:
+            self.normals = swap_array(foreach_get(mesh.corner_normals, 'vector', np.float32, 3))
+
+        if tangents != 0:
+            self.tangents = np.column_stack((
+                swap_array(foreach_get(mesh.loops, 'tangent', np.float32, 3)),
+                foreach_get(mesh.loops, 'bitangent_sign', np.float32)))
+        else:
+            self.tangents = np.zeros((len(mesh.loops), 4), np.float32)
+
+        self.uvs = [foreach_get(layer.data, 'uv', np.float32, 2) for layer in mesh.uv_layers]
+        self.colors = vertex_colors(mesh)
+
+    @property
+    def has_color_data(self):
+        return self.colors is not None
+
+    def template(self, doc, tangents, dotextures):
+        """Format string for a <vertex> element, see rows()"""
+        xyz = {'x' : '%6f', 'y' : '%6f', 'z' : '%6f'}
+        children = [doc.leaf_template('position', xyz, 1), doc.leaf_template('normal', xyz, 1)]
+        if tangents != 0:
+            children.append(doc.leaf_template('tangent', {'w' : '%6f', **xyz}, 1))
+        if self.has_color_data:
+            children.append(doc.leaf_template('colour_diffuse', {'value' : '%6f %6f %6f %6f'}, 1))
+        if dotextures:
+            children += [doc.leaf_template('texcoord', {'u' : '%6f', 'v' : '%6f'}, 1)] * len(self.uvs)
+        return doc.element_template('vertex', children)
+
+    def rows(self, loops, tangents, dotextures):
+        """Values for template() of the vertices given by one of their loops"""
+        columns = [self.positions[self.vertex_index[loops]], self.normals[loops]]
+        if tangents != 0:
+            columns.append(self.tangents[loops][:, [3, 0, 1, 2]]) # w, x, y, z
+        if self.has_color_data:
+            columns.append(self.colors[loops])
+        if dotextures:
+            for uv in self.uvs:
+                u, v = uv[loops].astype(np.float64).T
+                columns += [u, 1.0 - v]
+        return np.column_stack(columns)
 
 def write_submeshnames (doc, material_names):
     doc.start_tag('submeshnames', {})
@@ -92,6 +174,11 @@ def write_skeletonlink (obj_name, arm, doc):
         skeleton_name = arm.data.name
     skeleton_name = util.clean_object_name(skeleton_name)
     doc.leaf_tag('skeletonlink', { 'name' : '%s.skeleton' % skeleton_name })
+
+def write_faces (doc, faces):
+    doc.start_tag('faces', { 'count' : str(len(faces))})
+    doc.write_rows(doc.leaf_template('face', {'v1' : '%d', 'v2' : '%d', 'v3' : '%d'}), faces.tolist())
+    doc.end_tag('faces')
 
 def calc_boneindex (arm):
     """
@@ -125,111 +212,16 @@ def calc_boneindex (arm):
             boneIndex += 1
     return boneIndexFromName
 
-def calc_geometry (mesh, ob, materials, tangents, arm):
-    bm = bmesh.new()
-    bm.from_mesh(mesh)
-    bm.verts.ensure_lookup_table()
-
-    # Ogre only supports triangles
-    bmesh_return = bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='FIXED')
-    bm.to_mesh(mesh)
-    bm.free()
-    del bm
-
-    if tangents != 0:
-        mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
-    else:
-        # calc_tangents() already calculates split normals for us
-        if bpy.app.version < (4, 1, 0):
-            mesh.calc_normals_split()
-
-    vertex_color_lookup = VertexColorLookup(mesh)
-    uv_layers = [layer.data for layer in mesh.uv_layers]
-
-    faces = {}
-    for material_index, material in enumerate(materials):
-        faces[material_index] = []
-    
-    vertexList = []
-    map = {}
-
+def calc_bone_weights (mesh, ob, arm):
+    """Return the (bone index, weight) pairs of every vertex of the mesh"""
+    if arm is None:
+        return [[] for v in mesh.vertices]
     boneindex = calc_boneindex (arm)
+    group_bones = [boneindex.get(vg.name) for vg in ob.vertex_groups]
     TRIM_BONE_WEIGHTS = config.get('TRIM_BONE_WEIGHTS')
-
-    progressbar = util.ProgressBar("Faces", len(mesh.polygons)) if len(mesh.polygons) else None
-    for fidx, face in enumerate(mesh.polygons):
-        if progressbar:
-            progressbar.update(fidx)
-
-        # should be triangles
-        if len(face.vertices) != 3:
-            raise ValueError('Polygon not a triangle')        
-
-        if face.material_index not in faces:
-            failure = 'Invalid material index %s on face %s of mesh %s' % (
-                face.material_index, fidx, mesh.name)
-            logger.error(failure)
-            Report.warnings.append(failure)
-            continue
-
-        # Add triangle
-        newFace = []
-        for i in range(3):
-            vertex = face.vertices[i]
-            loop = face.loop_indices[i]
-            
-            x, y, z = swap (mesh.vertices[vertex].co)
-            
-            if bpy.app.version < (3, 6, 0):
-                nx,ny,nz = swap(mesh.loops[loop].normal)
-            else:
-                nx,ny,nz = swap(mesh.corner_normals[loop].vector)
-            uvs = tuple(tuple(layer[loop].uv) for layer in uv_layers)
-            r,g,b,ra = vertex_color_lookup.get(loop)
-            
-            if tangents != 0:
-                tx,ty,tz = swap(mesh.loops[loop].tangent)
-                tw = mesh.loops[loop].bitangent_sign
-            else:
-                tx = ty = tz = tw = 0
-            
-            #vertex groups
-            boneWeights = {}
-            for vGroup in mesh.vertices[vertex].groups:
-                if vGroup.weight > TRIM_BONE_WEIGHTS:
-                    vg = ob.vertex_groups[ vGroup.group ]
-                    if vg.name not in boneindex:
-                        continue
-                    bi = boneindex[vg.name]
-                    boneWeights[bi] = vGroup.weight
-            
-            # Add vertex
-            vert = Vertex(x, y, z, nx, ny, nz, uvs, r, g, b, ra, tx, ty, tz, tw, boneWeights, vertex)
-            nextIdx = map.get(vert)
-            if nextIdx is None:
-                nextIdx = len(vertexList)
-                vertexList.append(vert)
-                map[vert] = nextIdx
-            newFace.append(nextIdx)        
-        faces[face.material_index].append (newFace)
-
-    if progressbar:
-        sys.stdout.write("\n")
-
-    # geometry
-    geometry = {}
-    boneAssignments = []
-
-    for vert in vertexList:
-        boneWeights = []
-        for bi in vert.boneWeights.keys():
-            boneWeights.append([bi, vert.boneWeights[bi]])
-        boneAssignments.append(boneWeights)
-    
-    geometry['boneassignments'] = boneAssignments
-    geometry['vertices'] = vertexList
-    geometry['faces'] = faces   
-    return geometry
+    return [[(group_bones[g.group], g.weight) for g in v.groups
+             if g.weight > TRIM_BONE_WEIGHTS and group_bones[g.group] is not None]
+            for v in mesh.vertices]
 
 def calc_materials (ob):
     materials = []
@@ -263,23 +255,16 @@ def material_reference (mat, prefix=''):
         return material_name(name, prefix=prefix), True
     return material_name(mat, prefix=prefix), False
 
-def calc_submeshes (geometry, materials):    
-    submeshes = {}
-    assert len (materials) == len (geometry['faces'])
-    for material_index, submesh in geometry['faces'].items ():
-        next_idx = 0
-        remap = {}
-        unmap = {}
-        for face in submesh:
-            for v in face:
-                if v in remap:
-                    continue
-                remap[v] = next_idx
-                unmap[next_idx] = v
-                next_idx += 1
-        submeshes[material_index] = [remap, unmap]
-    assert len (submeshes) == len (materials)
-    return submeshes
+def valid_material_faces (mesh, num_materials):
+    """Return a mask of the faces with a valid material index, warn about the others"""
+    material_index = foreach_get(mesh.polygons, 'material_index', np.int32)
+    valid = material_index < num_materials
+    for fidx in np.flatnonzero(~valid):
+        failure = 'Invalid material index %s on face %s of mesh %s' % (
+            material_index[fidx], fidx, mesh.name)
+        logger.error(failure)
+        Report.warnings.append(failure)
+    return material_index, valid
 
 def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, obj_name, material_prefix=''):
 
@@ -290,32 +275,55 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
     else:
         arm = None
 
-    vertex_color_lookup = VertexColorLookup(mesh)
     materials = calc_materials (ob)
     material_names = [material_reference(mat, material_prefix)[0] for mat in materials]
-    geometry = calc_geometry (mesh, ob, materials, tangents, arm)
-    submeshes = calc_submeshes (geometry, materials)
-    
-    faces = geometry['faces']
-    vertices = geometry['vertices']
-    boneassignments = geometry['boneassignments']
-    assert len(vertices) == len(boneassignments)
+
+    triangulate(mesh)
+    calc_normals(mesh, tangents)
+    attr = MeshAttributes(mesh, tangents)
+    material_index, valid = valid_material_faces(mesh, len(materials))
+    material_index = material_index[valid]
+    loops = calc_triangles(mesh)[valid].reshape(-1)
+
+    # Bone weights are part of the vertex identity: two loops at the same
+    # position with the same normal/UV/color may still be bound to
+    # different bones and must not be merged.
+    bone_weights = calc_bone_weights(mesh, ob, arm)
+    weight_classes = {}
+    bone_class = np.array([weight_classes.setdefault(frozenset(w), len(weight_classes))
+                           for w in bone_weights], dtype=np.int32)
+
+    vertex_index = attr.vertex_index[loops]
+    key = [attr.positions[vertex_index], attr.normals[loops], *[uv[loops] for uv in attr.uvs],
+           attr.tangents[loops], bone_class[vertex_index]]
+    if attr.has_color_data:
+        key.append(attr.colors[loops])
+    first, inverse = first_occurrences(*key)
+    vertex_loops = loops[first]
+    vertices = attr.rows(vertex_loops, tangents, dotextures)
+    vertex_weights = [bone_weights[v] for v in attr.vertex_index[vertex_loops].tolist()]
+    faces = inverse.reshape(-1, 3)
 
     with open(target_file, 'w') as f:
         doc = SimpleSaxWriter(f, 'mesh', {})
 
         doc.start_tag('submeshes', {})
 
-        for i, (remap, unmap) in submeshes.items ():
+        for i in range(len(materials)):
             logger.info('* Writing submesh: ' + str(i))
 
-            face_count = len (faces[i])
+            submesh_faces = faces[material_index == i]
+            face_count = len (submesh_faces)
             Report.triangles += face_count
             if face_count == 0:
                 Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (obj_name, material_names[i]) )
                 continue # fixes corrupt unused materials
 
-            vertex_count = len (remap)
+            # Renumber the vertices used by this submesh
+            used_vertices = submesh_faces.reshape(-1)
+            first_use, submesh_faces = first_occurrences(used_vertices)
+            submesh_vertices = used_vertices[first_use]
+            vertex_count = len (submesh_vertices)
             Report.vertices += vertex_count
 
             submesh_attributes = {
@@ -325,14 +333,7 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
                 "material" : material_names[i]}
             doc.start_tag('submesh', submesh_attributes)
 
-            doc.start_tag('faces', { 'count' : str(face_count)})
-            
-            for fi, (v1, v2, v3) in enumerate (faces[i]):
-                r1 = remap[v1]
-                r2 = remap[v2]
-                r3 = remap[v3]
-                doc.leaf_tag('face', { 'v1' : str(r1), 'v2' : str(r2), 'v3' : str(r3)})
-            doc.end_tag('faces')
+            write_faces(doc, submesh_faces.reshape(-1, 3))
 
             doc.start_tag('geometry', {'vertexcount' : str(vertex_count)})
 
@@ -341,42 +342,22 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
                 'normals':'true',
                 'tangents': str(bool(tangents)),
                 'tangent_dimensions': str(tangents),
-                'colours_diffuse' : str(vertex_color_lookup.has_color_data),
+                'colours_diffuse' : str(attr.has_color_data),
                 'texture_coords' : '%s' % int (len (mesh.uv_layers))})
 
             logger.info('* Writing submesh vertices: ' + str(i))
-            for r in range (vertex_count):
-                vertex_index = unmap[r]
-                assert vertex_index >= 0
-                assert vertex_index < len(vertices)
-                v = vertices[vertex_index]
-
-                doc.start_tag('vertex', {})
-                doc.leaf_tag('position', {'x' : '%6f' % v.x, 'y' : '%6f' % v.y,  'z' : '%6f' % v.z})
-                doc.leaf_tag('normal', {'x' : '%6f' % v.nx,  'y' : '%6f' % v.ny, 'z' : '%6f' % v.nz})
-                if tangents != 0:
-                    doc.leaf_tag('tangent', {'x' : '%6f' % v.tx, 'y' : '%6f' % v.ty, 'z' : '%6f' % v.tz, 'w' : '%6f' % v.tw})
-                if vertex_color_lookup.has_color_data:
-                    doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (v.r,v.g,v.b,v.a)})
-                # Texture maps
-                if dotextures:
-                    for uv in v.uvs:
-                        doc.leaf_tag('texcoord', { 'u' : '%6f' % uv[0], 'v' : '%6f' % (1.0-uv[1]) })
-                doc.end_tag('vertex')
+            doc.write_rows(attr.template(doc, tangents, dotextures), vertices[submesh_vertices].tolist())
 
             doc.end_tag('vertexbuffer')
             doc.end_tag('geometry')
 
             if arm:
                 doc.start_tag('boneassignments', {})
-                for r in range (vertex_count):
-                    vertex_index = unmap[r]
-                    assert vertex_index >= 0
-                    assert vertex_index < len(boneassignments)
-                    vbas = boneassignments[vertex_index]
-                    for vba in vbas:
-                        doc.leaf_tag('vertexboneassignment', { 'vertexindex' : str(r), 'boneindex' : str(vba[0]), 'weight' : '%6f' % vba[1] })
-                doc.end_tag('boneassignments')  
+                template = doc.leaf_template('vertexboneassignment', {'boneindex' : '%d', 'vertexindex' : '%d', 'weight' : '%6f'})
+                doc.write_rows(template, [(bone, r, weight)
+                                          for r, v in enumerate(submesh_vertices.tolist())
+                                          for bone, weight in vertex_weights[v]])
+                doc.end_tag('boneassignments')
 
             doc.end_tag('submesh')
         doc.end_tag('submeshes')
@@ -386,59 +367,8 @@ def write_unshared (target_file, path, dotextures, mesh, normals, tangents, ob, 
 
         doc.close() # reported by Reyn
         f.close ()
-    
+
     return [name for name in material_names if name != '_missing_material_']
-
-class VertexColorLookup:
-    def __init__(self, mesh):
-        self.__colors = None
-
-        color_names = ["col", "color", "colour", "attribute"]
-
-        vertex_colors = None
-
-        # In Blender version 3.2, vertex colors have been refactored into generic color attributes
-        # https://developer.blender.org/docs/release_notes/3.2/sculpt/
-        if bpy.app.version >= (3, 2, 0):
-            vertex_colors = mesh.color_attributes
-        else:
-            vertex_colors = mesh.vertex_colors
-
-        if len(vertex_colors) > 0:
-            logger.debug("* Mesh has vertex colors")
-
-            for key, colors in vertex_colors.items():
-                if (self.__colors is None) and (key.lower() in color_names):
-                    self.__colors = colors
-
-                    if (bpy.app.version >= (3, 2, 0)):
-                        if colors.domain != 'CORNER':
-                            Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color domain: "%s" (should be: "CORNER")' % \
-                                (mesh.name, key, colors.domain) )
-                        if colors.data_type != 'BYTE_COLOR':
-                            Report.warnings.append( 'Mesh "%s" with color attribute "%s" has wrong color data type: "%s" (should be: "BYTE_COLOR")' % \
-                                (mesh.name, key, colors.data_type) )
-
-            if self.__colors is None:
-                # No color found by name, assume that the only vertex color data is actual color data
-                logger.debug("No color found by name, assume that the only vertex color data is actual color data")
-                self.__colors = colors
-
-            if self.__colors:
-                self.__colors = [x.color for x in self.__colors.data]
-                #self.__colors = [x.color_srgb for x in self.__colors.data]
-
-    @property
-    def has_color_data(self):
-        return self.__colors is not None
-
-    def get(self, item):
-        if self.__colors:
-            color = self.__colors[item]
-        else:
-            color = [1.0] * 4
-        return color
-    
 
 def write_shared (target_file, path, dotextures, mesh, normals, tangents, material_prefix, ob, obj_name, copy, start, ignore_shape_animation, isLOD, disable_mods):
     with open(target_file, 'w') as f:
@@ -481,178 +411,50 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
             # No material slots at all: use the built-in material instead of
             # forcing the user-facing _missing_material_ diagnostic on it.
             materials.append( (BASE_WHITE, True, None) )
-        vertex_groups = {}
-        material_faces = []
-        for matidx, mat in enumerate(materials):
-            material_faces.append([])
-
-        shared_vertices = {}
-        _remap_verts_ = []
-        _face_indices_ = []
-
-        numverts = 0
-
-        # Create bmesh to help obtain custom vertex normals
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
-        bm.verts.ensure_lookup_table()
 
         if mesh.has_custom_normals:
             logger.debug("* Mesh has custom normals")
         else:
             logger.debug("* Mesh has NO custom normals")
 
-        # Ogre only supports triangles
-        bmesh_return = bmesh.ops.triangulate(bm, faces=bm.faces, quad_method='FIXED')
-        bm.to_mesh(mesh)
-        
-        # Map the original face indices to the tesselated ones
-        face_map = bmesh_return['face_map']
+        tess_polygon_face_map = triangulate(mesh)
+        calc_normals(mesh, tangents)
+        attr = MeshAttributes(mesh, tangents)
+        loops = calc_triangles(mesh).reshape(-1)
 
-        _tess_polygon_face_map_ = {}
+        # Share the vertices of loops that only differ in position-independent
+        # attributes, so flat shading, seams, etc. still get separate vertices.
+        # Tangents are not compared, the first loop determines them.
+        key = [attr.vertex_index[loops], attr.normals[loops]]
+        if attr.has_color_data:
+            key.append(attr.colors[loops])
+        if dotextures:
+            key += [uv[loops] for uv in attr.uvs]
+        first, inverse = first_occurrences(*key)
+        vertex_loops = loops[first]
+        numverts = len(vertex_loops)
+        faces = inverse.reshape(-1, 3)
+        # Blender vertex and triangle of every Ogre vertex
+        vertex_source = attr.vertex_index[vertex_loops]
+        vertex_face = first // 3
 
-        for tess_face in face_map:
-            #print("tess_face.index[%s] <---> polygon_face.index[%s]" % (tess_face.index, face_map[tess_face].index))
-            _tess_polygon_face_map_[tess_face.index] = face_map[tess_face].index
+        doc.write_rows(attr.template(doc, tangents, dotextures), attr.rows(vertex_loops, tangents, dotextures).tolist())
 
-        # Vertex colors
-        vertex_color_lookup = VertexColorLookup(mesh)
-
-        if tangents != 0:
-            mesh.calc_tangents(uvmap=mesh.uv_layers.active.name)
-        else:
-            # calc_tangents() already calculates split normals for us
-            if bpy.app.version < (4, 1, 0):
-                mesh.calc_normals_split()
-
-        progressbar = util.ProgressBar("Faces", len(mesh.polygons))
-
-        # Process mesh after triangulation
-        for F in mesh.polygons:
-            progressbar.update(F.index)
-
-            tri = (F.vertices[0], F.vertices[1], F.vertices[2])
-            face = []
-            for loop_idx, idx in zip(F.loop_indices, tri):
-                v = mesh.vertices[ idx ]
-
-                if bpy.app.version < (3, 6, 0):
-                    nx,ny,nz = swap( mesh.loops[ loop_idx ].normal )
-                else:
-                    nx,ny,nz = swap( mesh.corner_normals[ loop_idx ].vector )
-
-                if tangents != 0:
-                    tx,ty,tz = swap( mesh.loops[ loop_idx ].tangent )
-                    tw = mesh.loops[ loop_idx ].bitangent_sign
-
-                r,g,b,ra = vertex_color_lookup.get(loop_idx)
-
-                # Texture maps
-                vert_uvs = []
-                if dotextures:
-                    for layer in mesh.uv_layers:
-                        vert_uvs.append( layer.data[ loop_idx ].uv )
-
-                ''' Check if we already exported that vertex with same normal, do not export in that case,
-                    (flat shading in blender seems to work with face normals, so we copy each flat face'
-                    vertices, if this vertex with same normals was already exported,
-                    todo: maybe not best solution, check other ways (let blender do all the work, or only
-                    support smooth shading, what about seems, smoothing groups, materials, ...)
-                '''
-                vert = VertexNoPos(numverts, nx, ny, nz, r, g, b, ra, vert_uvs)
-                alreadyExported = False
-                if idx in shared_vertices:
-                    for vert2 in shared_vertices[idx]:
-                        #does not compare ogre_vidx (and position at the moment)
-                        if vert == vert2:
-                            face.append(vert2.ogre_vidx)
-                            alreadyExported = True
-                            #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "already exported")
-                            break
-                    if not alreadyExported:
-                        face.append(vert.ogre_vidx)
-                        shared_vertices[idx].append(vert)
-                        #print(numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "appended")
-                else:
-                    face.append(vert.ogre_vidx)
-                    shared_vertices[idx] = [vert]
-                    #print(idx, numverts, nx,ny,nz, r,g,b,ra, vert_uvs, "created")
-
-                if alreadyExported:
-                    continue
-
-                numverts += 1
-                _remap_verts_.append( v )
-                
-                # Use mapping from tesselated face to polygon face if the mapping exists
-                #if F.index in _tess_polygon_face_map_:
-                #    _face_indices_.append( _tess_polygon_face_map_[F.index] )
-                #else:
-                #    _face_indices_.append( F.index )
-                _face_indices_.append( F.index )
-
-                x,y,z = swap(v.co)        # xz-y is correct!
-
-                doc.start_tag('vertex', {})
-                doc.leaf_tag('position', {
-                        'x' : '%6f' % x,
-                        'y' : '%6f' % y,
-                        'z' : '%6f' % z
-                })
-
-                doc.leaf_tag('normal', {
-                        'x' : '%6f' % nx,
-                        'y' : '%6f' % ny,
-                        'z' : '%6f' % nz
-                })
-
-                if tangents != 0:
-                    doc.leaf_tag('tangent', {
-                            'x' : '%6f' % tx,
-                            'y' : '%6f' % ty,
-                            'z' : '%6f' % tz,
-                            'w' : '%6f' % tw
-                    })
-
-                if vertex_color_lookup.has_color_data:
-                    doc.leaf_tag('colour_diffuse', {'value' : '%6f %6f %6f %6f' % (r,g,b,ra)})
-
-                # Texture maps
-                if dotextures:
-                    for uv in vert_uvs:
-                        doc.leaf_tag('texcoord', {
-                                'u' : '%6f' % uv[0],
-                                'v' : '%6f' % (1.0-uv[1])
-                        })
-
-                doc.end_tag('vertex')
-
-            append_triangle_in_vertex_group(mesh, ob, vertex_groups, face, tri)
-
-            try:
-                material_faces[F.material_index].append(face)
-            except IndexError:
-                failure = 'FAILED to assign material to face - you might be using a Boolean Modifier between objects with different materials!'
-                failure += '[ mesh : %s ]' % mesh.name
-                Report.warnings.append( failure )
-                logger.error( failure )
-                # Skip only the offending face; the remaining polygons are
-                # still valid and used to be silently discarded here.
-                continue
+        vertex_groups = vertex_group_triangles(mesh, ob, attr.vertex_index[loops].reshape(-1, 3))
+        material_index, valid = valid_material_faces(mesh, len(materials))
 
         Report.vertices += numverts
 
         doc.end_tag('vertexbuffer')
         doc.end_tag('sharedgeometry')
 
-        sys.stdout.write("\n")
-
         logger.info('- Done at %s seconds' % util.timer_diff_str(start))
         logger.info('* Writing submeshes')
 
         doc.start_tag('submeshes', {})
         for matidx, (mat_name, extern, mat) in enumerate(materials):
-            if len(material_faces[matidx]) == 0:
+            material_faces = faces[valid & (material_index == matidx)]
+            if len(material_faces) == 0:
                 Report.warnings.append('BAD SUBMESH "%s": material %r, has not been applied to any faces - not exporting as submesh.' % (obj_name, mat_name) )
                 continue # fixes corrupt unused materials
 
@@ -666,22 +468,11 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
             submesh_attributes['material'] = mat_name
 
             doc.start_tag('submesh', submesh_attributes)
-            doc.start_tag('faces', {
-                'count' : str(len(material_faces[matidx]))
-            })
-            for fidx, (v1, v2, v3) in enumerate(material_faces[matidx]):
-                doc.leaf_tag('face', {
-                    'v1' : str(v1),
-                    'v2' : str(v2),
-                    'v3' : str(v3)
-                })
-            doc.end_tag('faces')
+            write_faces(doc, material_faces)
             doc.end_tag('submesh')
-            Report.triangles += len(material_faces[matidx])
+            Report.triangles += len(material_faces)
 
-        for name, ogre_indices in vertex_groups.items():
-            if len(ogre_indices) <= 0:
-                continue
+        for name, triangles in vertex_groups.items():
             submesh_attributes = {
                 'usesharedvertices' : 'true',
                 "use32bitindexes" : str(bool(numverts > 65535)),
@@ -689,20 +480,9 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                 "material": "none",
             }
             doc.start_tag('submesh', submesh_attributes)
-            doc.start_tag('faces', {
-                'count' : len(ogre_indices)
-            })
-            for (v1, v2, v3) in ogre_indices:
-                doc.leaf_tag('face', {
-                    'v1' : str(v1),
-                    'v2' : str(v2),
-                    'v3' : str(v3)
-                })
-            doc.end_tag('faces')
+            write_faces(doc, faces[triangles])
             doc.end_tag('submesh')
 
-        del material_faces
-        del shared_vertices
         doc.end_tag('submeshes')
 
         # Submesh names
@@ -902,35 +682,17 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
 
         arm = ob.find_armature()
         if arm:
-            skeleton_name = obj_name
-            if config.get('SHARED_ARMATURE') is True:
-                skeleton_name = arm.data.name
-            skeleton_name = util.clean_object_name(skeleton_name)
-
-            doc.leaf_tag('skeletonlink', {
-                    'name' : '%s.skeleton' % skeleton_name
-            })
+            write_skeletonlink (obj_name, arm, doc)
             doc.start_tag('boneassignments', {})
-            boneIndexFromName = calc_boneindex(arm)
+            vertex_bone_weights = calc_bone_weights(mesh, copy, arm)
+            bone_weights = [vertex_bone_weights[v] for v in vertex_source.tolist()]
+            template = doc.leaf_template('vertexboneassignment', {'boneindex' : '%d', 'vertexindex' : '%d', 'weight' : '%6f'})
+            doc.write_rows(template, [(bone, vidx, weight)
+                                      for vidx, weights in enumerate(bone_weights)
+                                      for bone, weight in weights])
             badverts = 0
-            for vidx, v in enumerate(_remap_verts_):
-                check = 0
-                for vgroup in v.groups:
-                    if vgroup.weight > config.get('TRIM_BONE_WEIGHTS'):
-                        groupIndex = vgroup.group
-                        if groupIndex < len(copy.vertex_groups):
-                            vg = copy.vertex_groups[ groupIndex ]
-                            if vg.name in boneIndexFromName: # allows other vertex groups, not just armature vertex groups
-                                bnidx = boneIndexFromName[ vg.name ] # find_bone_index(copy,arm,vgroup.group)
-                                doc.leaf_tag('vertexboneassignment', {
-                                        'vertexindex' : str(vidx),
-                                        'boneindex' : str(bnidx),
-                                        'weight' : '%6f' % vgroup.weight
-                                })
-                                check += 1
-                        else:
-                            logger.warn('Mesh: %s vertex groups not in sync with armature %s (groupIndex = %s)' % (mesh.name, arm.name, groupIndex))
-                if check > 4:
+            for vidx, weights in enumerate(bone_weights):
+                if len(weights) > 4:
                     badverts += 1
                     logger.warn('<%s> vertex %s is in more than 4 vertex groups (bone weights). This maybe Ogre incompatible' % (mesh.name, vidx))
             if badverts:
@@ -945,6 +707,26 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                 warning = "Object \"%s\" mesh will look like selected shape key: '%s', not 'Basis'" % (ob.name, ob.active_shape_key.name)
                 logger.warn(warning)
                 Report.warnings.append(warning)
+
+            shape_normals = config.get('SHAPE_NORMALS') is True
+            if shape_normals:
+                # normals_split_get() returns the normals of the loops of the
+                # original mesh, polygon by polygon. Map each Ogre vertex to
+                # the loop of its original polygon (before tesselation).
+                loop_total = foreach_get(ob.data.polygons, 'loop_total', np.int32)
+                loop_start = foreach_get(ob.data.polygons, 'loop_start', np.int32)
+                polygon_offset = np.cumsum(loop_total) - loop_total
+                loops = np.repeat(loop_start - polygon_offset, loop_total) + np.arange(loop_total.sum())
+                loop_polygon = np.repeat(np.arange(len(loop_total)), loop_total)
+                loop_vertex = foreach_get(ob.data.loops, 'vertex_index', np.int32)[loops]
+                normal_index_of = {key: idx for idx, key in enumerate(zip(loop_polygon.tolist(), loop_vertex.tolist()))}
+                source_faces = [tess_polygon_face_map.get(f, f) for f in vertex_face.tolist()]
+                normal_indices = [normal_index_of[key] for key in zip(source_faces, vertex_source.tolist())]
+                template = doc.leaf_template('poseoffset', {'index' : '%d', 'nx' : '%6f', 'ny' : '%6f', 'nz' : '%6f', 'x' : '%6f', 'y' : '%6f', 'z' : '%6f'}, 2)
+            else:
+                template = doc.leaf_template('poseoffset', {'index' : '%d', 'x' : '%6f', 'y' : '%6f', 'z' : '%6f'}, 2)
+
+            positions = foreach_get(mesh.vertices, 'co', np.float32, 3)[vertex_source]
 
             doc.start_tag('poses', {})
             for sidx, skey in enumerate(mesh.shape_keys.key_blocks):
@@ -967,60 +749,13 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                         'target' : 'mesh'
                 })
 
-                normals_data = skey.normals_split_get()
-                # Separate normals_split_get() data into 3-tuples
-                snormals = tuple(normals_data[i:i + 3] for i in range(0, len(normals_data), 3))
-                shape_data = skey.data
-
-                # Create mapping between objects original mesh (polygons,vertices) and normals from "normals_split_get()"
-                normal_idx = 0
-                _remap_normals_ = {}
-                for poly in ob.data.polygons:
-                    for loop_idx in poly.loop_indices:
-                        vertex_idx = ob.data.loops[loop_idx].vertex_index
-                        _remap_normals_[(poly.index,vertex_idx)] = normal_idx
-                        normal_idx = normal_idx + 1
-
-                # Go through _remap_verts_ (array of vertices that are going into OGRE mesh)
-                for vidx, v in enumerate(_remap_verts_):
-                    pv = skey.data[ v.index ]
-                    x,y,z = swap( pv.co - v.co )
-
-                    if config.get('SHAPE_NORMALS') is True:
-                        vertex_idx = v.index
-
-                        # Try to get original polygon loop index (before tesselation)
-                        if _face_indices_[vidx] in _tess_polygon_face_map_:
-                            loop_idx = _tess_polygon_face_map_[_face_indices_[vidx]]
-                        # If not in _tess_polygon_face_map_, then we can get the original
-                        else:
-                            loop_idx = _face_indices_[vidx]
-
-                        # Index of normal into snormals array
-                        normal_idx = _remap_normals_[(loop_idx, vertex_idx)]
-
-                        pn = mathutils.Vector( snormals[normal_idx] )
-                        nx,ny,nz = swap( pn )
-
-                    if config.get('SHAPE_NORMALS') is True:
-                        doc.leaf_tag('poseoffset', {
-                                'x' : '%6f' % x,
-                                'y' : '%6f' % y,
-                                'z' : '%6f' % z,
-                                'nx' : '%6f' % nx,
-                                'ny' : '%6f' % ny,
-                                'nz' : '%6f' % nz,
-                                'index' : str(vidx)
-                        })
-                    else:
-                        doc.leaf_tag('poseoffset', {
-                                'x' : '%6f' % x,
-                                'y' : '%6f' % y,
-                                'z' : '%6f' % z,
-                                'index' : str(vidx)
-                        })
-
-                del _remap_normals_
+                columns = [np.arange(numverts)]
+                if shape_normals:
+                    normals = np.array(skey.normals_split_get(), np.float32).reshape(-1, 3)
+                    columns.append(swap_array(normals[normal_indices]))
+                offsets = foreach_get(skey.data, 'co', np.float32, 3)[vertex_source] - positions
+                columns.append(swap_array(offsets))
+                doc.write_rows(template, np.column_stack(columns).tolist())
 
                 doc.end_tag('pose')
             doc.end_tag('poses')
@@ -1065,12 +800,6 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
                 doc.end_tag('animations')
                 logger.info('- Done at %s seconds' % util.timer_diff_str(start))
 
-        # Release BMesh resources
-        bm.free()
-        del bm
-
-        del _remap_verts_
-        del _face_indices_
         doc.fill_placeholder(vertex_count, numverts)
         doc.close() # reported by Reyn
 
@@ -1221,53 +950,27 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     return mats
 
-def append_triangle_in_vertex_group(mesh, obj, vertex_groups, ogre_indices, blender_indices):
-    vertices = [mesh.vertices[i] for i in blender_indices]
-    names = set()
-    for v in vertices:
-        for g in v.groups:
-            if g.group >= len(obj.vertex_groups):
-                return
-            group = obj.vertex_groups[g.group]
-            if not group.name.startswith("ogre.vertex.group."):
-                return
-            names.add(group.name)
-    match_group = lambda name, v: name in [obj.vertex_groups[x.group].name for x in v.groups]
-    for name in names:
-        all_in_group = all([match_group(name, v) for v in vertices])
-        if not all_in_group:
+def vertex_group_triangles(mesh, obj, triangles):
+    """
+    Return the indices of the triangles that are entirely within each
+    'ogre.vertex.group.*' vertex group. Triangles touching a vertex that is
+    in any other vertex group are ignored.
+    """
+    prefix = "ogre.vertex.group."
+    names = [group.name for group in obj.vertex_groups]
+    if not any(name.startswith(prefix) for name in names):
+        return {}
+
+    # The ogre vertex groups of each vertex or None if it is in any other group
+    vertex_groups = []
+    for v in mesh.vertices:
+        groups = {names[g.group] if g.group < len(names) else '' for g in v.groups}
+        vertex_groups.append(groups if all(name.startswith(prefix) for name in groups) else None)
+
+    result = {}
+    for tidx, (a, b, c) in enumerate(triangles.tolist()):
+        if vertex_groups[a] is None or vertex_groups[b] is None or vertex_groups[c] is None:
             continue
-        if name not in vertex_groups:
-            vertex_groups[name] = []
-        vertex_groups[name].append(ogre_indices)
-
-class VertexNoPos(object):
-    def __init__(self, ogre_vidx, nx,ny,nz, r,g,b,ra, vert_uvs):
-        self.ogre_vidx = ogre_vidx
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-        self.r = r
-        self.g = g
-        self.b = b
-        self.ra = ra
-        self.vert_uvs = vert_uvs
-
-    '''does not compare ogre_vidx (and position at the moment) [ no need to compare position ]'''
-    def __eq__(self, o):
-        if not math.isclose(self.nx, o.nx): return False
-        if not math.isclose(self.ny, o.ny): return False
-        if not math.isclose(self.nz, o.nz): return False
-        if not math.isclose(self.r, o.r): return False
-        if not math.isclose(self.g, o.g): return False
-        if not math.isclose(self.b, o.b): return False
-        if not math.isclose(self.ra, o.ra): return False
-        if len(self.vert_uvs) != len(o.vert_uvs): return False
-        if self.vert_uvs:
-            for i, uv1 in enumerate( self.vert_uvs ):
-                uv2 = o.vert_uvs[ i ]
-                if uv1 != uv2: return False
-        return True
-
-    def __repr__(self):
-        return 'vertex(%d)' % self.ogre_vidx
+        for name in vertex_groups[a] & vertex_groups[b] & vertex_groups[c]:
+            result.setdefault(name, []).append(tidx)
+    return result
