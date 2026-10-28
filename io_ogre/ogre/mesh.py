@@ -1112,6 +1112,9 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
     kwargs:
       * material_prefix - string. (optional)
       * overwrite - bool. (optional) default False
+      * ignore_visibility - bool. (optional) default False. Export even if the
+        object is hidden or unselected. Used for auxiliary meshes such as
+        collision proxies.
     """
     obj_name = force_name or ob.data.name
     obj_name = clean_object_name(obj_name)
@@ -1119,9 +1122,10 @@ def dot_mesh(ob, path, force_name=None, ignore_shape_animation=False, normals=Tr
 
     material_prefix = kwargs.get('material_prefix', '')
     overwrite = kwargs.get('overwrite', False)
+    ignore_visibility = kwargs.get('ignore_visibility', False)
 
     # Don't export hidden or unselected objects unless told to
-    if  not isLOD and (
+    if  not isLOD and not ignore_visibility and (
         (config.get('LOD_GENERATION') == '2' and "_LOD_" in ob.name) or
         ((config.get("EXPORT_HIDDEN") is False) and ob not in bpy.context.visible_objects) or
         ((config.get("SELECTED_ONLY") is True) and not ob.select_get())
