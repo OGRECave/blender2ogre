@@ -1,5 +1,12 @@
 from xml.sax.saxutils import XMLGenerator, quoteattr
 
+class AttributePlaceholder:
+    """A fixed-width attribute value that is filled in after it was written."""
+
+    def __init__(self, position, width):
+        self.position = position
+        self.width = width
+
 class SimpleSaxWriter():
     def __init__(self, output, root_tag, root_attrs):
         self.output = output
@@ -28,6 +35,33 @@ class SimpleSaxWriter():
 
     def start_tag(self, name, attrs):
         self._out_tag(name, attrs, False)
+
+    def start_tag_with_placeholder(self, name, attr, width=10):
+        """
+        Start an element whose numeric attribute `attr` is not known yet.
+
+        `width` characters are reserved for the value; pass the returned
+        placeholder to fill_placeholder() once the value is available. This
+        avoids writing a placeholder and then rewriting the whole document.
+        """
+        self.output.write(" " * self.indent)
+        self.output.write("<%s %s=\"" % (name, attr))
+        position = self.output.tell()
+        self.output.write(" " * width)
+        self.output.write("\">\n")
+        self.indent += 4
+        return AttributePlaceholder(position, width)
+
+    def fill_placeholder(self, placeholder, value):
+        text = str(value)
+        if len(text) > placeholder.width:
+            raise ValueError("value %s does not fit into placeholder of width %s"
+                             % (text, placeholder.width))
+        # remember where we were so writing can continue afterwards
+        current = self.output.tell()
+        self.output.seek(placeholder.position)
+        self.output.write(text.ljust(placeholder.width))
+        self.output.seek(current)
 
     def end_tag(self, name):
         self.indent -= 4

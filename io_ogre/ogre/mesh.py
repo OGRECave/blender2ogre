@@ -444,8 +444,9 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
     with open(target_file, 'w') as f:
         doc = SimpleSaxWriter(f, 'mesh', {})
 
-        # Very ugly, have to replace number of vertices later
-        doc.start_tag('sharedgeometry', {'vertexcount' : '__TO_BE_REPLACED_VERTEX_COUNT__'})
+        # The vertex count is only known after deduplicating the vertices, so
+        # reserve the attribute value and patch it in before closing the file.
+        vertex_count = doc.start_tag_with_placeholder('sharedgeometry', 'vertexcount')
 
         logger.info('* Writing shared geometry')
 
@@ -1089,20 +1090,8 @@ def write_shared (target_file, path, dotextures, mesh, normals, tangents, materi
 
         del _remap_verts_
         del _face_indices_
+        doc.fill_placeholder(vertex_count, numverts)
         doc.close() # reported by Reyn
-        f.close()
-        
-        # todo: Very ugly, find better way
-        def replaceInplace(f,searchExp,replaceExp):
-            import fileinput
-            
-            with fileinput.FileInput(f, inplace=True, encoding="utf-8") as file:
-                for line in file:
-                    if searchExp in line:
-                        line = line.replace(searchExp,replaceExp)
-                    sys.stdout.write(line)
-
-        replaceInplace(target_file, '__TO_BE_REPLACED_VERTEX_COUNT__' + '"', str(numverts) + '"' )#+ ' ' * (ls - lr))
 
     mats = []
     for mat_name, extern, mat in materials:
