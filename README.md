@@ -90,6 +90,14 @@ For materials using metalness it expects a single image with the blue channel co
 
 There are numerous features in the Ogre Next JSON format that are not directly supported, see the [Materials JSON](MaterialsJSON.md) notes for details.
 
+#### Meshes Without Materials
+If an object has no material slots, the exported submesh references Ogre's built-in `BaseWhite` material and no material file is written for it.
+Ogre requires every submesh to have a material name, but you can override `BaseWhite` with your own material at runtime.
+
+To reference a material that is already defined in your Ogre project instead, use the `extern.` prefix described in [External OGRE Materials](#external-ogre-materials).
+
+An empty material slot (a slot with no material assigned) is still reported as a missing material via `_missing_material_`.
+
 ### Blender Modifiers Support
 Blender has some very useful modifiers, and most of them are supported by `blender2ogre` but not all of them.
 Check out the [Blender Modifiers Support Page](Modifiers.md) to check out the list and also some recommendations about them.
